@@ -1,6 +1,7 @@
 """
 JobCopilot - Typed Data Models & Schemas
-Covers Candidate Profile, Knowledge Vault, Job Records, and HITL Events.
+Covers Candidate Profile, Knowledge Vault, Job Records, HITL Events, 
+Multi-Resume Variants, Email Tracking, and Outreach Records.
 """
 
 from typing import List, Dict, Optional, Any
@@ -30,6 +31,21 @@ class ApplicationStatus(str, Enum):
     OFFER = "OFFER"
 
 
+class EmailIntent(str, Enum):
+    CONFIRMATION = "CONFIRMATION"
+    INTERVIEW_INVITE = "INTERVIEW_INVITE"
+    ASSESSMENT = "ASSESSMENT"
+    REJECTION = "REJECTION"
+    FOLLOW_UP = "FOLLOW_UP"
+    OTHER = "OTHER"
+
+
+class OutreachChannel(str, Enum):
+    ATS_FORM = "ATS_FORM"
+    LINKEDIN_INMAIL = "LINKEDIN_INMAIL"
+    COLD_EMAIL = "COLD_EMAIL"
+
+
 class Education(BaseModel):
     degree: str
     institution: str
@@ -56,9 +72,25 @@ class Project(BaseModel):
     metrics: Optional[str] = None
 
 
+class CategorizedSkills(BaseModel):
+    languages: List[str] = Field(default_factory=list)
+    frameworks: List[str] = Field(default_factory=list)
+    cloud_devops: List[str] = Field(default_factory=list)
+    databases: List[str] = Field(default_factory=list)
+    tools_libraries: List[str] = Field(default_factory=list)
+
+
+class DemographicPreferences(BaseModel):
+    gender: Optional[str] = "Decline to Self-Identify"
+    race_ethnicity: Optional[str] = "Decline to Self-Identify"
+    veteran_status: Optional[str] = "Decline to Self-Identify"
+    disability_status: Optional[str] = "Decline to Self-Identify"
+
+
 class RecruiterPreferences(BaseModel):
     current_ctc: str = "0 LPA"
     expected_ctc: str = "15 LPA"
+    target_currency: str = "INR"
     notice_period_days: int = 0
     work_authorization: str = "Citizen"
     requires_sponsorship: bool = False
@@ -66,6 +98,21 @@ class RecruiterPreferences(BaseModel):
     remote_preference: str = "Remote / Hybrid / On-site"
     earliest_start_date: str = "Immediate"
     years_of_experience: float = 1.0
+    why_looking_for_role: str = ""
+    demographics: DemographicPreferences = Field(default_factory=DemographicPreferences)
+    company_blacklist: List[str] = Field(default_factory=list)
+    company_whitelist: List[str] = Field(default_factory=list)
+    current_employer: Optional[str] = None  # Used for stealth mode employer blacklisting
+
+
+class ResumeVariant(BaseModel):
+    variant_id: str
+    name: str  # e.g., "AI/ML Focus", "Backend Specialist", "Generalist"
+    target_roles: List[str] = Field(default_factory=list)
+    pdf_content_hash: Optional[str] = None
+    tailored_text: str = ""
+    is_default: bool = False
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
 class CandidateProfile(BaseModel):
@@ -82,10 +129,17 @@ class CandidateProfile(BaseModel):
     experience: List[WorkExperience] = Field(default_factory=list)
     projects: List[Project] = Field(default_factory=list)
     skills: List[str] = Field(default_factory=list)
+    categorized_skills: CategorizedSkills = Field(default_factory=CategorizedSkills)
     certifications: List[str] = Field(default_factory=list)
     preferences: RecruiterPreferences = Field(default_factory=RecruiterPreferences)
+    variants: List[ResumeVariant] = Field(default_factory=list)
+    raw_resume_text: str = ""
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        """Pydantic compatibility helper"""
+        return self.model_dump(*args, **kwargs)
 
 
 class VaultEntry(BaseModel):
@@ -100,22 +154,34 @@ class VaultEntry(BaseModel):
     last_used_at: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
 
 class JobListing(BaseModel):
     job_id: str
-    fingerprint: str  # Hash of company + title + location for deduplication
-    platform: str     # YC, Wellfound, Naukri, Greenhouse, Lever, Ashby, Indeed
+    fingerprint: str  # 64-bit SimHash of company + title + location + JD
+    platform: str     # Greenhouse, Lever, Ashby, Workday, YC, Wellfound, Indeed, etc.
     company: str
     title: str
     location: str = "Remote / India"
     url: str
     description: str = ""
+    salary_range: Optional[str] = None
+    seniority_level: Optional[str] = None
     posted_date: Optional[str] = None
     match_score: float = 0.0
     priority_score: float = 0.0
+    match_reasons: List[str] = Field(default_factory=list)
+    missing_skills: List[str] = Field(default_factory=list)
     status: ApplicationStatus = ApplicationStatus.DISCOVERED
     applied_at: Optional[str] = None
+    application_id: Optional[str] = None  # Internal ATS Reference ID scraped from confirmation
+    confirmation_screenshot_path: Optional[str] = None
     notes: Optional[str] = None
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
 
 
 class HITLEvent(BaseModel):
@@ -128,5 +194,55 @@ class HITLEvent(BaseModel):
     options: List[str] = Field(default_factory=list)
     ai_suggested_draft: str = ""
     user_answer: Optional[str] = None
-    status: str = "PENDING"  # PENDING, RESOLVED, SKIPPED
+    status: str = "PENDING"  # PENDING, RESOLVED, SKIPPED, EXPIRED
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    resolved_at: Optional[str] = None
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class OutreachRecord(BaseModel):
+    outreach_id: str
+    job_id: str
+    channel: OutreachChannel
+    recipient_name: Optional[str] = None
+    recipient_title: Optional[str] = None
+    recipient_contact: Optional[str] = None  # Email address or LinkedIn profile URL
+    message_content: str
+    status: str = "DRAFT"  # DRAFT, QUEUED, SENT, REPLIED, FAILED
+    sent_at: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class EmailMessage(BaseModel):
+    message_id: str
+    sender: str
+    recipient: str
+    subject: str
+    body_text: str
+    received_at: str
+    associated_job_id: Optional[str] = None
+    intent: EmailIntent = EmailIntent.OTHER
+    scheduling_links: List[str] = Field(default_factory=list)
+    has_tracking_pixels: bool = False
+    processed: bool = False
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class JobCheckpoint(BaseModel):
+    job_id: str
+    current_step: int = 1
+    total_steps: int = 1
+    filled_inputs: Dict[str, Any] = Field(default_factory=dict)
+    last_url: str = ""
+    screenshot_path: Optional[str] = None
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
