@@ -1,7 +1,7 @@
 """
 JobCopilot - Self-Learning Hybrid Knowledge Vault
-Indexes Q&A pairs with semantic embeddings and lexical token matching
-for zero-repeat, human-like autonomous question filling.
+Indexes Q&A pairs with semantic embeddings, lexical token matching,
+and deterministic slot key resolution for zero-repeat autonomous form filling.
 """
 
 import uuid
@@ -28,7 +28,6 @@ class KnowledgeVault:
             ("What is your expected salary / CTC?", SlotType.EXACT_PARAM, "expected_ctc", "{expected_ctc}"),
             ("What is your current CTC / salary?", SlotType.EXACT_PARAM, "current_ctc", "{current_ctc}"),
             ("What is your notice period or earliest start date?", SlotType.EXACT_PARAM, "notice_period_days", "{notice_period_days} days ({earliest_start_date})"),
-            ("How soon are you available to join?", SlotType.EXACT_PARAM, "notice_period_days", "{notice_period_days} days ({earliest_start_date})"),
             ("Are you legally authorized to work in this location?", SlotType.EXACT_PARAM, "work_authorization", "{work_authorization}"),
             ("Do you require visa sponsorship now or in the future?", SlotType.EXACT_PARAM, "requires_sponsorship", "{sponsorship_answer}"),
             ("Are you willing to relocate for this role?", SlotType.EXACT_PARAM, "willing_to_relocate", "{relocation_answer}"),
@@ -55,12 +54,12 @@ class KnowledgeVault:
     def seed_from_profile(self, profile: CandidateProfile):
         """Seeds the Knowledge Vault with rich, specialized slots directly from a candidate profile."""
         prefs = profile.preferences
-        notice_str = f"{prefs.notice_period_days} days" if prefs.notice_period_days > 0 else "Immediate (0 days)"
+        notice_str = f"{prefs.notice_period_days} days" if prefs.notice_period_days > 0 else "0 days (Immediate)"
 
-        # 1. Update Core Recruiter Preferences Slots with Phrasing Aliases
+        # 1. Update Core Recruiter Preferences Slots
         self.learn_answer("What is your expected CTC / compensation?", prefs.expected_ctc, slot_type=SlotType.EXACT_PARAM, slot_key="expected_ctc")
+        self.learn_answer("What is your current CTC / salary?", prefs.current_ctc, slot_type=SlotType.EXACT_PARAM, slot_key="current_ctc")
         self.learn_answer("What is your notice period / earliest start date?", notice_str, slot_type=SlotType.EXACT_PARAM, slot_key="notice_period_days")
-        self.learn_answer("How soon are you available to join?", notice_str, slot_type=SlotType.EXACT_PARAM, slot_key="notice_period_days")
         self.learn_answer("Are you open to relocation?", "Yes, willing to relocate" if prefs.willing_to_relocate else "No, remote only", slot_type=SlotType.EXACT_PARAM, slot_key="willing_to_relocate")
         self.learn_answer("Do you require visa sponsorship?", "Yes, require visa sponsorship" if prefs.requires_sponsorship else "No, legally authorized without sponsorship", slot_type=SlotType.EXACT_PARAM, slot_key="requires_sponsorship")
 
@@ -90,10 +89,10 @@ class KnowledgeVault:
 
         embedding = self.matcher.get_embedding(question)
 
-        # Check if an entry with this exact pattern or key exists to update template
+        # Check if an entry with this slot_key already exists
         existing_entries = db.get_all_vault_entries()
         for e in existing_entries:
-            if e.question_pattern.lower() == question.lower() or (e.slot_key == slot_key and e.slot_type == slot_type):
+            if (e.slot_key == slot_key and e.slot_type == slot_type) or e.question_pattern.lower() == question.lower():
                 e.answer_template = answer_template
                 e.question_pattern = question
                 e.embedding = embedding
@@ -115,6 +114,36 @@ class KnowledgeVault:
         db.save_vault_entry(entry)
         return entry
 
+    def _resolve_template(
+        self,
+        template: str,
+        profile: Optional[CandidateProfile],
+        company: str,
+        role: str,
+        domain: str
+    ) -> str:
+        """Substitutes dynamic template variables into final human answer."""
+        resolved = template.replace("{company}", company).replace("{role}", role).replace("{domain}", domain)
+        if profile:
+            prefs = profile.preferences
+            resolved = resolved.replace("{expected_ctc}", prefs.expected_ctc)
+            resolved = resolved.replace("{current_ctc}", prefs.current_ctc)
+            resolved = resolved.replace("{notice_period_days}", str(prefs.notice_period_days))
+            resolved = resolved.replace("{earliest_start_date}", prefs.earliest_start_date)
+            resolved = resolved.replace("{work_authorization}", prefs.work_authorization)
+            resolved = resolved.replace("{sponsorship_answer}", "Yes" if prefs.requires_sponsorship else "No")
+            resolved = resolved.replace("{relocation_answer}", "Yes, open to relocate" if prefs.willing_to_relocate else "No, remote only")
+            resolved = resolved.replace("{remote_preference}", prefs.remote_preference)
+            resolved = resolved.replace("{years_of_experience}", f"{prefs.years_of_experience:.1f}")
+            resolved = resolved.replace("{top_skills}", ", ".join(profile.skills[:5]))
+            resolved = resolved.replace("{full_name}", profile.full_name)
+            resolved = resolved.replace("{email}", profile.email)
+            resolved = resolved.replace("{phone}", profile.phone)
+            resolved = resolved.replace("{location}", profile.location)
+            resolved = resolved.replace("{github_url}", profile.github_url or "https://github.com")
+            resolved = resolved.replace("{linkedin_url}", profile.linkedin_url or "https://linkedin.com")
+        return resolved
+
     def query_answer(
         self,
         question: str,
@@ -124,17 +153,26 @@ class KnowledgeVault:
         domain: str = "Technology",
         similarity_threshold: float = 0.55
     ) -> Tuple[Optional[str], float, Optional[VaultEntry]]:
-        """Queries the Knowledge Vault using hybrid semantic + lexical search."""
-        query_embedding = self.matcher.get_embedding(question)
+        """Queries the Knowledge Vault using deterministic slot resolution and hybrid search."""
         entries = db.get_all_vault_entries()
         if not entries:
             return None, 0.0, None
 
+        # 1. Deterministic Slot Matching
+        detected_type, detected_key = self.matcher.detect_slot_type(question)
+        if detected_key != "general_question":
+            for entry in entries:
+                if entry.slot_key == detected_key and entry.slot_type == detected_type:
+                    db.increment_vault_usage(entry.qa_id)
+                    resolved = self._resolve_template(entry.answer_template, profile, company, role, domain)
+                    return resolved, 1.0, entry
+
+        # 2. Hybrid Semantic + Lexical Search Fallback
+        query_embedding = self.matcher.get_embedding(question)
         best_entry = None
         best_score = 0.0
 
         for entry in entries:
-            # Ensure embedding dimension matches
             doc_emb = entry.embedding
             if len(doc_emb) != len(query_embedding):
                 doc_emb = self.matcher.get_embedding(entry.question_pattern)
@@ -145,32 +183,8 @@ class KnowledgeVault:
                 best_entry = entry
 
         if best_entry and best_score >= similarity_threshold:
-            # Increment usage count
             db.increment_vault_usage(best_entry.qa_id)
-
-            # Dynamic parameter resolution
-            resolved = best_entry.answer_template
-            resolved = resolved.replace("{company}", company).replace("{role}", role).replace("{domain}", domain)
-
-            if profile:
-                prefs = profile.preferences
-                resolved = resolved.replace("{expected_ctc}", prefs.expected_ctc)
-                resolved = resolved.replace("{current_ctc}", prefs.current_ctc)
-                resolved = resolved.replace("{notice_period_days}", str(prefs.notice_period_days))
-                resolved = resolved.replace("{earliest_start_date}", prefs.earliest_start_date)
-                resolved = resolved.replace("{work_authorization}", prefs.work_authorization)
-                resolved = resolved.replace("{sponsorship_answer}", "Yes" if prefs.requires_sponsorship else "No")
-                resolved = resolved.replace("{relocation_answer}", "Yes, open to relocate" if prefs.willing_to_relocate else "No, remote only")
-                resolved = resolved.replace("{remote_preference}", prefs.remote_preference)
-                resolved = resolved.replace("{years_of_experience}", f"{prefs.years_of_experience:.1f}")
-                resolved = resolved.replace("{top_skills}", ", ".join(profile.skills[:5]))
-                resolved = resolved.replace("{full_name}", profile.full_name)
-                resolved = resolved.replace("{email}", profile.email)
-                resolved = resolved.replace("{phone}", profile.phone)
-                resolved = resolved.replace("{location}", profile.location)
-                resolved = resolved.replace("{github_url}", profile.github_url or "https://github.com")
-                resolved = resolved.replace("{linkedin_url}", profile.linkedin_url or "https://linkedin.com")
-
+            resolved = self._resolve_template(best_entry.answer_template, profile, company, role, domain)
             return resolved, best_score, best_entry
 
         return None, best_score, None
