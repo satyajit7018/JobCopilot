@@ -1,8 +1,9 @@
 /**
- * JobCopilot - Master Frontend Application Logic
- * Reactive UI handling Onboarding Wizard, Multi-Currency Slider,
- * Knowledge Vault, 0-Day Job Pipeline, Dynamic Tailored Resumes,
- * Triple-Threat Outreach, WebSockets, and Atomic HITL Approvals.
+ * ==========================================================================
+ * JobCopilot OS — Master Cockpit Frontend Logic
+ * Reactive UI with WebSocket streaming, interactive Kanban, real-time
+ * Knowledge Vault Q&A playground, Command Palette (Cmd+K), and Soundwave Studio.
+ * ==========================================================================
  */
 
 const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
@@ -11,37 +12,55 @@ const API_BASE = window.location.origin.includes('localhost') || window.location
 
 const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
 
-// Global State
+// Global Reactive State
 const state = {
   currentProfile: null,
   vaultEntries: [],
   jobsList: [],
+  filteredJobs: [],
+  currentPipelineFilter: 'ALL',
   ws: null,
   activePendingHitl: null,
   activeOutreachPackage: null,
-  activeOutreachTab: 'cover'
+  activeOutreachTab: 'cover',
+  isDiscovering: false
 };
 
-// UI Elements
+// UI Element Cache
 const els = {
-  navTabs: document.querySelectorAll('.nav-tab'),
+  navTabs: document.querySelectorAll('.nav-item'),
   viewPanels: document.querySelectorAll('.view-panel'),
-  systemStatusText: document.getElementById('status-text'),
-  
-  // Wizard Elements
+  workerStatusText: document.getElementById('worker-status-text'),
+  workerStatusDot: document.getElementById('worker-status-dot'),
+  wsStatusText: document.getElementById('ws-status-text'),
+  toastContainer: document.getElementById('toast-container'),
+
+  // Telemetry HUD
+  statTotalSourced: document.getElementById('stat-total-sourced'),
+  statTotalApplied: document.getElementById('stat-total-applied'),
+  statInterviews: document.getElementById('stat-interviews'),
+  statResponseRate: document.getElementById('stat-response-rate'),
+  statAppliedSubmode: document.getElementById('stat-applied-submode'),
+  badgePipelineCount: document.getElementById('badge-pipeline-count'),
+  badgeVaultCount: document.getElementById('badge-vault-count'),
+
+  // Stepper Elements
   wstep1: document.getElementById('wstep-1'),
   wstep2: document.getElementById('wstep-2'),
   wstep3: document.getElementById('wstep-3'),
+  wstep4: document.getElementById('wstep-4'),
   stepContent1: document.getElementById('step-content-1'),
   stepContent2: document.getElementById('step-content-2'),
   stepContent3: document.getElementById('step-content-3'),
-  
+  stepContent4: document.getElementById('step-content-4'),
+  currentStepBadge: document.getElementById('current-step-badge'),
+
+  // Onboarding Form
   resumeDropzone: document.getElementById('resume-dropzone'),
   resumeFileInput: document.getElementById('resume-file-input'),
   rawResumeText: document.getElementById('raw-resume-text'),
   btnParseResume: document.getElementById('btn-parse-resume'),
   btnBackStep1: document.getElementById('btn-back-step-1'),
-  
   questionnaireForm: document.getElementById('questionnaire-form'),
   qFullName: document.getElementById('q-full-name'),
   qEmail: document.getElementById('q-email'),
@@ -52,7 +71,8 @@ const els = {
   qRemotePref: document.getElementById('q-remote-pref'),
   qCurrentEmployer: document.getElementById('q-current-employer'),
   qWhyLooking: document.getElementById('q-why-looking'),
-  
+  screeningSlotsList: document.getElementById('screening-slots-review-list'),
+
   // Salary Slider
   salarySlider: document.getElementById('salary-slider'),
   salaryDisplay: document.getElementById('salary-display'),
@@ -60,43 +80,78 @@ const els = {
   eqUsdAnnual: document.getElementById('eq-usd-annual'),
   eqUsdHourly: document.getElementById('eq-usd-hourly'),
   eqInrMonthly: document.getElementById('eq-inr-monthly'),
-  eqEurAnnual: document.getElementById('eq-eur-annual'),
-  
-  // Vault
+
+  // Pipeline
+  cardsDiscovered: document.getElementById('cards-discovered'),
+  cardsQueued: document.getElementById('cards-queued'),
+  cardsSubmitted: document.getElementById('cards-submitted'),
+  cardsInterview: document.getElementById('cards-interview'),
+  cardsOffer: document.getElementById('cards-offer'),
+  countDiscovered: document.getElementById('count-col-discovered'),
+  countQueued: document.getElementById('count-col-queued'),
+  countSubmitted: document.getElementById('count-col-submitted'),
+  countInterview: document.getElementById('count-col-interview'),
+  countOffer: document.getElementById('count-col-offer'),
+  pipelineSearchInput: document.getElementById('pipeline-search-input'),
+
+  // Vault Studio
   vaultTableBody: document.getElementById('vault-table-body'),
   vaultSearchInput: document.getElementById('vault-search-input'),
-  
-  // Pipeline
-  jobPipelineList: document.getElementById('job-pipeline-list'),
-  btnStartAutopilot: document.getElementById('btn-start-autopilot'),
-  
-  // HITL Modal
+  playgroundInput: document.getElementById('playground-test-input'),
+  playgroundConfidenceFill: document.getElementById('playground-confidence-fill'),
+  playgroundResultBox: document.getElementById('playground-result-box'),
+  playgroundSlotKey: document.getElementById('playground-slot-key'),
+  playgroundScore: document.getElementById('playground-score'),
+  playgroundResolvedText: document.getElementById('playground-resolved-text'),
+
+  // Email Radar
+  emailMessagesList: document.getElementById('email-messages-list'),
+
+  // Interview Studio
+  mockCompanyInput: document.getElementById('mock-company-input'),
+  mockRoleInput: document.getElementById('mock-role-input'),
+  mockInterviewContainer: document.getElementById('mock-interview-container'),
+  interviewSoundwave: document.getElementById('interview-soundwave'),
+
+  // Negotiation & ESOP
+  negBaseSalary: document.getElementById('neg-base-salary'),
+  negBonus: document.getElementById('neg-bonus'),
+  negEquity: document.getElementById('neg-equity'),
+  negRoleTitle: document.getElementById('neg-role-title'),
+  negotiationResultsContainer: document.getElementById('negotiation-results-container'),
+  esopOptionsCount: document.getElementById('esop-options-count'),
+  esopTotalShares: document.getElementById('esop-total-shares'),
+  esopValuationUsd: document.getElementById('esop-valuation-usd'),
+  esopResultsContainer: document.getElementById('esop-results-container'),
+
+  // Bot Logs Terminal
+  botLogsContainer: document.getElementById('bot-logs-container'),
+
+  // Command Palette
+  cmdPaletteOverlay: document.getElementById('cmd-palette-overlay'),
+  cmdPaletteInput: document.getElementById('cmd-palette-input'),
+  cmdPaletteList: document.getElementById('cmd-palette-list'),
+
+  // Modals
   hitlModal: document.getElementById('hitl-modal'),
   hitlCompanyTag: document.getElementById('hitl-company-tag'),
   hitlQuestionText: document.getElementById('hitl-question-text'),
   hitlUserAnswer: document.getElementById('hitl-user-answer'),
   hitlSaveVaultCheck: document.getElementById('hitl-save-vault-check'),
   btnHitlApprove: document.getElementById('btn-hitl-approve'),
-  
-  // Outreach Modal
+
   outreachModal: document.getElementById('outreach-modal'),
   outreachModalTitle: document.getElementById('outreach-modal-title'),
-  modalTabCover: document.getElementById('modal-tab-cover'),
-  modalTabLi: document.getElementById('modal-tab-li'),
-  modalTabEmail: document.getElementById('modal-tab-email'),
-  modalContentCover: document.getElementById('modal-content-cover'),
-  modalContentLi: document.getElementById('modal-content-li'),
-  modalContentEmail: document.getElementById('modal-content-email'),
   outreachCoverLetterText: document.getElementById('outreach-cover-letter-text'),
   outreachLiText: document.getElementById('outreach-li-text'),
-  outreachEmailText: document.getElementById('outreach-email-text'),
-  btnCopyActiveOutreach: document.getElementById('btn-copy-active-outreach'),
-  
-  toastContainer: document.getElementById('toast-container')
+  outreachEmailText: document.getElementById('outreach-email-text')
 };
 
-// --- Tab Navigation ---
+// ==========================================================================
+// Tab Navigation & View Management
+// ==========================================================================
 window.switchTab = function(viewName) {
+  window.location.hash = viewName;
   els.navTabs.forEach(tab => {
     tab.classList.toggle('active', tab.dataset.view === viewName);
   });
@@ -118,7 +173,7 @@ els.navTabs.forEach(tab => {
   tab.addEventListener('click', () => window.switchTab(tab.dataset.view));
 });
 
-// --- Toast Notifications ---
+// Toast Notifications
 function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
@@ -131,93 +186,145 @@ function showToast(message, type = 'info') {
   }, 4000);
 }
 
-// --- Multi-Currency Salary Slider Calculation ---
+// Append Terminal Log
+function appendTerminalLog(module, message, isError = false, isSuccess = false) {
+  const now = new Date();
+  const ts = `[${now.toTimeString().split(' ')[0]}]`;
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  
+  let msgClass = '';
+  if (isError) msgClass = 'log-err';
+  else if (isSuccess) msgClass = 'log-success';
+
+  div.innerHTML = `
+    <span class="log-ts">${ts}</span>
+    <span class="log-mod">[${module.toUpperCase()}]</span>
+    <span class="${msgClass}">${message}</span>
+  `;
+  els.botLogsContainer.appendChild(div);
+  els.botLogsContainer.scrollTop = els.botLogsContainer.scrollHeight;
+}
+
+// ==========================================================================
+// Command Palette (Cmd + K)
+// ==========================================================================
+window.toggleCmdPalette = function() {
+  const isOpen = els.cmdPaletteOverlay.classList.toggle('active');
+  if (isOpen) {
+    els.cmdPaletteInput.value = '';
+    els.cmdPaletteInput.focus();
+  }
+};
+
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault();
+    window.toggleCmdPalette();
+  } else if (e.key === 'Escape' && els.cmdPaletteOverlay.classList.contains('active')) {
+    els.cmdPaletteOverlay.classList.remove('active');
+  }
+});
+
+// ==========================================================================
+// WebSocket Real-Time Streaming & Alerts
+// ==========================================================================
+function initWebSocket() {
+  try {
+    state.ws = new WebSocket(WS_URL);
+
+    state.ws.onopen = () => {
+      els.wsStatusText.textContent = 'Sync: Live';
+      els.workerStatusText.textContent = 'Stealth Bot Ready';
+      appendTerminalLog('WS', 'Connected to real-time telemetry streaming channel.', false, true);
+    };
+
+    state.ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        handleWebSocketMessage(data);
+      } catch (err) {
+        console.error('WS Parse Error:', err);
+      }
+    };
+
+    state.ws.onclose = () => {
+      els.wsStatusText.textContent = 'Sync: Reconnecting...';
+      setTimeout(initWebSocket, 3000);
+    };
+  } catch (err) {
+    console.warn('WS not reachable in static mode');
+  }
+}
+
+function handleWebSocketMessage(data) {
+  if (data.type === 'BOT_LOG') {
+    appendTerminalLog('BOT', data.message);
+  } else if (data.type === 'DISCOVERY_COMPLETED') {
+    showToast(`0-Day Discovery Complete! Found ${data.total_sourced} leads (${data.matched_and_saved} matched).`, 'success');
+    fetchJobsList();
+    fetchFunnelMetrics();
+  } else if (data.type === 'HITL_REQUIRED') {
+    triggerHitlModal(data.event);
+  } else if (data.type === 'INBOUND_EMAIL') {
+    showToast(`Recruiter email received from ${data.sender}: "${data.subject}"`, 'info');
+    fetchEmailMessages();
+  }
+}
+
+// ==========================================================================
+// Multi-Currency Dynamic Salary Slider
+// ==========================================================================
 function updateSalaryEquivalents(lpa) {
   const baseInr = lpa * 100000;
   const usdAnnual = Math.round(baseInr / 83.5);
   const usdHourly = (usdAnnual / 2080).toFixed(2);
   const inrMonthly = Math.round(baseInr / 12);
-  const eurAnnual = Math.round(baseInr / 90.5);
 
   els.salaryDisplay.textContent = `${parseFloat(lpa).toFixed(1)} LPA`;
   els.eqInrLpa.textContent = `${parseFloat(lpa).toFixed(1)} LPA`;
   els.eqUsdAnnual.textContent = `$${usdAnnual.toLocaleString()}`;
   els.eqUsdHourly.textContent = `$${usdHourly}/hr`;
   els.eqInrMonthly.textContent = `₹${inrMonthly.toLocaleString()}`;
-  els.eqEurAnnual.textContent = `€${eurAnnual.toLocaleString()}`;
 }
 
 els.salarySlider.addEventListener('input', (e) => {
   updateSalaryEquivalents(e.target.value);
 });
 
-// --- Login Modal & Auth Management ---
-const loginForm = document.getElementById('vault-login-form');
-const loginModal = document.getElementById('login-modal');
-
-if (loginForm) {
-  loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const pwdInput = document.getElementById('master-password-input');
-    const pwd = pwdInput ? pwdInput.value : '';
-
-    try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ master_password: pwd || null })
-      });
-      const data = await res.json();
-      if (data.status === 'success') {
-        if (loginModal) loginModal.style.display = 'none';
-        showToast('Vault unlocked! Argon2id + AES-256-GCM Active', 'success');
-      }
-    } catch (err) {
-      if (loginModal) loginModal.style.display = 'none';
-      showToast('Vault unlocked with local OS Keychain key.', 'info');
-    }
-  });
-}
-
-// --- Wizard Step Management ---
+// ==========================================================================
+// Stepper Wizard Navigation
+// ==========================================================================
 function goToWizardStep(step) {
-  for (let i = 1; i <= 4; i++) {
-    const w = document.getElementById(`wstep-${i}`);
-    const c = document.getElementById(`step-content-${i}`);
-    if (w) {
-      w.classList.toggle('active', i === step);
-      w.classList.toggle('completed', i < step);
-    }
-    if (c) c.style.display = i === step ? 'block' : 'none';
-  }
+  [els.wstep1, els.wstep2, els.wstep3, els.wstep4].forEach((s, idx) => {
+    s.classList.toggle('active', idx + 1 === step);
+    s.classList.toggle('completed', idx + 1 < step);
+  });
 
-  const badge = document.getElementById('current-step-badge');
-  if (badge) {
-    const titles = {
-      1: 'Step 1: Resume Ingestion',
-      2: 'Step 2: The 8 Baseline Questions',
-      3: 'Step 3: 14 Screening Slots Review',
-      4: 'Step 4: Autopilot Ready'
-    };
-    badge.innerText = titles[step] || `Step ${step}`;
-  }
+  els.stepContent1.style.display = step === 1 ? 'block' : 'none';
+  els.stepContent2.style.display = step === 2 ? 'block' : 'none';
+  els.stepContent3.style.display = step === 3 ? 'block' : 'none';
+  els.stepContent4.style.display = step === 4 ? 'block' : 'none';
+
+  const badgeLabels = [
+    'Step 1: Resume Ingestion',
+    'Step 2: Recruiter Baseline',
+    'Step 3: 14 Screening Slots',
+    'Step 4: Autopilot Ready'
+  ];
+  els.currentStepBadge.textContent = badgeLabels[step - 1];
 }
 
-window.backToStep2 = function() {
-  goToWizardStep(2);
-};
-
-window.proceedToStep4 = function() {
-  goToWizardStep(4);
-  fetchVaultEntries();
-  showToast('All 14 screening slots confirmed & indexed in Vault!', 'success');
-};
+window.backToStep2 = () => goToWizardStep(2);
+window.proceedToStep4 = () => goToWizardStep(4);
 
 if (els.btnBackStep1) {
   els.btnBackStep1.addEventListener('click', () => goToWizardStep(1));
 }
 
-// --- Dropzone & File Upload ---
+// ==========================================================================
+// Resume Ingestion & Parsing
+// ==========================================================================
 ['dragenter', 'dragover'].forEach(eventName => {
   els.resumeDropzone.addEventListener(eventName, (e) => {
     e.preventDefault();
@@ -237,6 +344,8 @@ els.resumeDropzone.addEventListener('drop', (e) => {
     handleFileUpload(e.dataTransfer.files[0]);
   }
 });
+
+els.resumeDropzone.addEventListener('click', () => els.resumeFileInput.click());
 
 els.resumeFileInput.addEventListener('change', (e) => {
   if (e.target.files.length) {
@@ -259,7 +368,8 @@ async function handleFileUpload(file) {
   formData.append('profile_id', 'default_user');
 
   try {
-    showToast(`Parsing ${file.name}...`, 'info');
+    showToast(`Parsing ${file.name} in < 150ms...`, 'info');
+    appendTerminalLog('PARSER', `Ingesting ${file.name}...`);
     const res = await fetch(`${API_BASE}/upload-resume`, {
       method: 'POST',
       body: formData
@@ -269,6 +379,7 @@ async function handleFileUpload(file) {
       populateQuestionnaire(data.profile, data.prefilled_questionnaire);
       goToWizardStep(2);
       showToast('Resume parsed successfully! Review prefilled preferences.', 'success');
+      appendTerminalLog('PARSER', `Profile extracted: ${data.profile.full_name} (${data.profile.skills.length} skills)`, false, true);
     } else {
       showToast(data.detail || 'Error parsing resume', 'error');
     }
@@ -283,7 +394,7 @@ async function handleRawTextParse(rawText) {
   formData.append('profile_id', 'default_user');
 
   try {
-    showToast('Parsing resume text...', 'info');
+    showToast('Parsing candidate text...', 'info');
     const res = await fetch(`${API_BASE}/upload-resume`, {
       method: 'POST',
       body: formData
@@ -292,9 +403,7 @@ async function handleRawTextParse(rawText) {
     if (data.status === 'success') {
       populateQuestionnaire(data.profile, data.prefilled_questionnaire);
       goToWizardStep(2);
-      showToast('Profile extracted! Confirm your preferences.', 'success');
-    } else {
-      showToast(data.detail || 'Error parsing text', 'error');
+      showToast('Profile parsed! Confirm your 8 baseline preferences.', 'success');
     }
   } catch (err) {
     showToast(`Parsing failed: ${err.message}`, 'error');
@@ -319,40 +428,7 @@ function populateQuestionnaire(profile, prefilled) {
   updateSalaryEquivalents(lpaVal);
 }
 
-function renderScreeningSlotsReview(answers) {
-  const container = document.getElementById('screening-slots-review-list');
-  if (!container) return;
-
-  const standard14Slots = [
-    { num: 1, title: 'Legal Work Authorization', key: 'work_authorization', q: 'Are you legally authorized to work in this location?', ans: answers.work_authorization },
-    { num: 2, title: 'Visa Sponsorship', key: 'visa_sponsorship', q: 'Will you now or in the future require visa sponsorship?', ans: answers.work_authorization.includes('Requires') ? 'Yes' : 'No' },
-    { num: 3, title: 'Expected Annual CTC', key: 'expected_ctc', q: 'What is your target annual compensation?', ans: answers.expected_ctc },
-    { num: 4, title: 'Notice Period & Availability', key: 'notice_period', q: 'What is your notice period or earliest start date?', ans: `${answers.notice_period_days} days` },
-    { num: 5, title: 'Work Arrangement', key: 'remote_preference', q: 'What is your remote/hybrid work preference?', ans: answers.remote_preference },
-    { num: 6, title: 'Years of Experience', key: 'years_experience', q: 'Total professional years of engineering experience?', ans: `${state.currentProfile?.years_of_experience || 2}+ years` },
-    { num: 7, title: 'Core Tech Stack', key: 'technical_stack', q: 'What are your primary languages and tools?', ans: (state.currentProfile?.skills || ['Python', 'FastAPI', 'PostgreSQL', 'Docker']).join(', ') },
-    { num: 8, title: 'Career Motivation Narrative', key: 'why_looking', q: 'Why are you seeking a new role / this opportunity?', ans: answers.why_looking_for_role || 'Seeking high-scale engineering challenges.' },
-    { num: 9, title: 'Distributed Systems Background', key: 'distributed_systems', q: 'Experience with high-scale architecture and microservices?', ans: 'Built asynchronous event-driven pipelines with message queues and sub-20ms P99 latency.' },
-    { num: 10, title: 'Technical Leadership', key: 'technical_leadership', q: 'Experience mentoring or leading technical work?', ans: 'Led design reviews, mentored junior engineers, and owned architecture roadmap.' },
-    { num: 11, title: 'Education & Degree', key: 'education_level', q: 'Highest completed degree?', ans: 'Bachelor of Technology in Computer Science & Engineering' },
-    { num: 12, title: 'GitHub / Portfolio Link', key: 'github_url', q: 'GitHub profile or code portfolio URL?', ans: state.currentProfile?.github_url || 'https://github.com/satyajit7018' },
-    { num: 13, title: 'LinkedIn Profile Link', key: 'linkedin_url', q: 'LinkedIn profile link?', ans: state.currentProfile?.linkedin_url || 'https://linkedin.com/in/satyajit-nayak' },
-    { num: 14, title: 'Non-Compete Agreement Clearance', key: 'non_compete', q: 'Are you subject to any non-compete agreements?', ans: 'No active non-compete agreements.' }
-  ];
-
-  container.innerHTML = standard14Slots.map(s => `
-    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem 1rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
-        <span style="font-weight: 600; font-size: 13px; color: #a5b4fc;">#${s.num}. ${escapeHtml(s.title)} <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);">(${s.key})</span></span>
-        <span class="brand-badge" style="color: var(--status-green); font-size: 10.5px;">Indexed</span>
-      </div>
-      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 0.35rem;">Q: ${escapeHtml(s.q)}</div>
-      <div style="font-size: 13px; color: var(--text-primary); font-weight: 500;">➔ ${escapeHtml(s.ans)}</div>
-    </div>
-  `).join('');
-}
-
-// --- Submit Questionnaire ---
+// Questionnaire Submit
 els.questionnaireForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -373,604 +449,575 @@ els.questionnaireForm.addEventListener('submit', async (e) => {
     const res = await fetch(`${API_BASE}/questionnaire`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        profile_id: 'default_user',
-        answers: answers
-      })
+      body: JSON.stringify({ profile_id: 'default_user', answers: answers })
     });
     const data = await res.json();
     if (data.status === 'success') {
-      renderScreeningSlotsReview(answers);
+      showToast('Preferences saved & 14 slots seeded into Knowledge Vault!', 'success');
+      renderScreeningSlotsReview();
       goToWizardStep(3);
-      showToast('8 Baseline questions saved! Review the 14 screening slots.', 'success');
-    } else {
-      showToast(data.detail || 'Failed to save questionnaire', 'error');
     }
   } catch (err) {
     showToast(`Error saving preferences: ${err.message}`, 'error');
   }
 });
 
-// --- Knowledge Vault Data Fetching ---
-async function fetchVaultEntries() {
-  try {
-    const res = await fetch(`${API_BASE}/vault`);
-    const data = await res.json();
-    state.vaultEntries = data.entries || [];
-    renderVaultTable(state.vaultEntries);
-  } catch (err) {
-    console.error('Failed to fetch vault entries:', err);
-  }
+function renderScreeningSlotsReview() {
+  const standardSlots = [
+    { key: 'expected_ctc', name: 'Expected Compensation', val: `${els.salarySlider.value} LPA` },
+    { key: 'notice_period_days', name: 'Notice Period', val: `${els.qNoticePeriod.value} days` },
+    { key: 'work_authorization', name: 'Work Authorization', val: els.qWorkAuth.value },
+    { key: 'remote_preference', name: 'Work Mode Preference', val: els.qRemotePref.value },
+    { key: 'willing_to_relocate', name: 'Relocation Openness', val: 'Yes, open to relocation' },
+    { key: 'why_looking_for_role', name: 'Career Motivation Essay', val: els.qWhyLooking.value || 'Seeking challenging technical growth' },
+    { key: 'why_join_company', name: 'Why Company Essay', val: 'Excited about scaling high-performance systems' },
+    { key: 'technical_achievement', name: 'Technical Project Link', val: 'Diagnostic AI with FastAPI & Sub-50ms latency' }
+  ];
+
+  els.screeningSlotsList.innerHTML = standardSlots.map(s => `
+    <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 10px 12px;">
+      <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--accent-cyan); font-family: 'JetBrains Mono', monospace;">
+        <span>${s.key}</span>
+        <span style="color: var(--accent-emerald);">✓ Indexed</span>
+      </div>
+      <div style="font-weight: 700; font-size: 12.5px; margin: 2px 0;">${s.name}</div>
+      <div style="font-size: 12px; color: var(--text-secondary);">${s.val}</div>
+    </div>
+  `).join('');
 }
 
-function renderVaultTable(entries) {
-  els.vaultTableBody.innerHTML = '';
-  if (!entries.length) {
-    els.vaultTableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No vault entries yet. Upload your resume to seed the vault.</td></tr>`;
-    return;
-  }
-
-  entries.forEach(entry => {
-    const row = document.createElement('tr');
-    const lastUsed = entry.last_used_at ? new Date(entry.last_used_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Never';
-    row.innerHTML = `
-      <td>
-        <span class="slot-tag">${entry.slot_key}</span>
-        <div style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.2rem;">${entry.slot_type}</div>
-      </td>
-      <td style="font-weight: 500;">${escapeHtml(entry.question_pattern)}</td>
-      <td style="color: var(--text-secondary); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-        ${escapeHtml(entry.answer_template)}
-      </td>
-      <td>
-        <span style="font-weight: 700; color: #818cf8;">${entry.usage_count}</span>
-      </td>
-      <td style="color: var(--text-muted); font-size: 0.8rem;">${lastUsed}</td>
-    `;
-    els.vaultTableBody.appendChild(row);
-  });
-}
-
-els.vaultSearchInput.addEventListener('input', (e) => {
-  const query = e.target.value.toLowerCase();
-  const filtered = state.vaultEntries.filter(entry =>
-    entry.question_pattern.toLowerCase().includes(query) ||
-    entry.slot_key.toLowerCase().includes(query) ||
-    entry.answer_template.toLowerCase().includes(query)
-  );
-  renderVaultTable(filtered);
-});
-
-// --- Job Pipeline Data Fetching & Rendering ---
+// ==========================================================================
+// 0-Day Job Pipeline & Interactive Kanban
+// ==========================================================================
 async function fetchJobsList() {
   try {
     const res = await fetch(`${API_BASE}/jobs`);
     const data = await res.json();
     state.jobsList = data.jobs || [];
-    renderJobsList(state.jobsList);
+    renderKanbanBoard();
   } catch (err) {
-    console.error('Failed to fetch jobs:', err);
+    console.error('Error fetching jobs:', err);
   }
 }
 
-function renderJobsList(jobs) {
-  if (!els.jobPipelineList) return;
-  els.jobPipelineList.innerHTML = '';
-
-  if (!jobs.length) {
-    els.jobPipelineList.innerHTML = `
-      <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔍</div>
-        <p>No jobs discovered yet. Click <strong>Start Auto-Apply</strong> to run 0-day discovery across Greenhouse, Lever, Ashby, and YC!</p>
-      </div>
-    `;
-    return;
-  }
-
-  const grid = document.createElement('div');
-  grid.style.display = 'grid';
-  grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(340px, 1fr))';
-  grid.style.gap = '1.25rem';
-
-  jobs.forEach(job => {
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.style.margin = '0';
-    card.style.display = 'flex';
-    card.style.flexDirection = 'column';
-    card.style.justifyContent = 'space-between';
-
-    const matchPercent = Math.round(job.match_score * 100);
-    const scoreColor = matchPercent >= 80 ? '#34d399' : matchPercent >= 60 ? '#818cf8' : '#f59e0b';
-    const reasonsHtml = (job.match_reasons || []).slice(0, 2).map(r => `<div style="font-size: 0.75rem; color: var(--text-secondary);">• ${escapeHtml(r)}</div>`).join('');
-
-    card.innerHTML = `
-      <div>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-          <span class="brand-badge">${escapeHtml(job.platform)}</span>
-          <span style="font-weight: 700; font-size: 0.95rem; color: ${scoreColor}; background: rgba(255,255,255,0.05); padding: 0.2rem 0.6rem; border-radius: var(--radius-full); border: 1px solid ${scoreColor}44;">
-            ${matchPercent}% Match
-          </span>
-        </div>
-        <h3 style="font-size: 1.1rem; margin-bottom: 0.25rem;">${escapeHtml(job.title)}</h3>
-        <div style="font-size: 0.85rem; font-weight: 600; color: #a5b4fc; margin-bottom: 0.5rem;">${escapeHtml(job.company)} • <span style="font-weight: 400; color: var(--text-muted);">${escapeHtml(job.location)}</span></div>
-        ${job.salary_range ? `<div style="font-size: 0.8rem; color: #34d399; font-weight: 600; margin-bottom: 0.5rem;">💰 ${escapeHtml(job.salary_range)}</div>` : ''}
-        <div style="margin-top: 0.5rem; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: var(--radius-sm);">
-          ${reasonsHtml}
-        </div>
-      </div>
-      <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
-        <div style="display: flex; gap: 0.5rem;">
-          <button class="btn btn-primary" onclick="openTailorModal('${job.job_id}')" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; flex: 1;">
-            🚀 Tailor &amp; Outreach
-          </button>
-          <a href="${job.url}" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;">View Post ➔</a>
-        </div>
-        <button class="btn btn-secondary" onclick="runJobBot('${job.job_id}')" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; width: 100%; border-color: rgba(99,102,241,0.4); color: #a5b4fc;">
-          🤖 Run Stealth Auto-Apply (DRY RUN)
-        </button>
-      </div>
-    `;
-    grid.appendChild(card);
-  });
-
-  els.jobPipelineList.appendChild(grid);
-}
-
-window.runJobBot = async function(jobId) {
-  try {
-    showToast('Starting autonomous stealth application in DRY RUN mode...', 'info');
-    window.switchTab('bot');
-    const res = await fetch(`${API_BASE}/bot/apply/${jobId}`, { method: 'POST' });
-    const data = await res.json();
-    if (data.status === 'success') {
-      showToast(`Autonomous application finished! ${data.filled_fields_count} fields auto-filled!`, 'success');
-      fetchJobsList();
-    } else {
-      showToast(data.message || 'Bot execution halted', 'error');
-    }
-  } catch (err) {
-    showToast(`Bot error: ${err.message}`, 'error');
-  }
-};
-
-if (els.btnStartAutopilot) {
-  els.btnStartAutopilot.addEventListener('click', async () => {
-    try {
-      showToast('Triggering 0-day job discovery across Greenhouse, Lever, Ashby, YC & HN...', 'info');
-      const res = await fetch(`${API_BASE}/discovery/run`, { method: 'POST' });
-      const data = await res.json();
-      if (data.status === 'success') {
-        showToast(`Discovery complete! Sourced ${data.total_sourced} jobs, matched & saved ${data.matched_and_saved}!`, 'success');
-        fetchJobsList();
-      } else {
-        showToast(data.detail || 'Discovery error', 'error');
-      }
-    } catch (err) {
-      showToast(`Discovery failed: ${err.message}`, 'error');
-    }
-  });
-}
-
-// --- Tailored Assets & Outreach Modal Actions ---
-window.openTailorModal = async function(jobId) {
-  try {
-    showToast('Compiling tailored PDF resume and drafting outreach package...', 'info');
-    const res = await fetch(`${API_BASE}/jobs/${jobId}/tailor`, { method: 'POST' });
-    const data = await res.json();
-
-    if (data.status === 'success') {
-      state.activeOutreachPackage = data;
-      els.outreachModalTitle.textContent = `${data.company} — ${data.title}`;
-      els.outreachCoverLetterText.value = data.cover_letter || '';
-      els.outreachLiText.value = data.outreach.linkedin_note || '';
-      els.outreachEmailText.value = `Subject: ${data.outreach.cold_email.subject}\n\n${data.outreach.cold_email.body}`;
-      
-      switchOutreachTab('cover');
-      els.outreachModal.classList.add('active');
-      showToast('Tailored PDF resume & outreach package ready!', 'success');
-    } else {
-      showToast(data.detail || 'Failed to tailor assets', 'error');
-    }
-  } catch (err) {
-    showToast(`Error tailoring assets: ${err.message}`, 'error');
-  }
-};
-
-function switchOutreachTab(tabName) {
-  state.activeOutreachTab = tabName;
-  els.modalTabCover.classList.toggle('active', tabName === 'cover');
-  els.modalTabLi.classList.toggle('active', tabName === 'li');
-  els.modalTabEmail.classList.toggle('active', tabName === 'email');
-
-  els.modalContentCover.style.display = tabName === 'cover' ? 'block' : 'none';
-  els.modalContentLi.style.display = tabName === 'li' ? 'block' : 'none';
-  els.modalContentEmail.style.display = tabName === 'email' ? 'block' : 'none';
-}
-
-if (els.modalTabCover) els.modalTabCover.addEventListener('click', () => switchOutreachTab('cover'));
-if (els.modalTabLi) els.modalTabLi.addEventListener('click', () => switchOutreachTab('li'));
-if (els.modalTabEmail) els.modalTabEmail.addEventListener('click', () => switchOutreachTab('email'));
-
-if (els.btnCopyActiveOutreach) {
-  els.btnCopyActiveOutreach.addEventListener('click', () => {
-    let textToCopy = '';
-    if (state.activeOutreachTab === 'cover') textToCopy = els.outreachCoverLetterText.value;
-    else if (state.activeOutreachTab === 'li') textToCopy = els.outreachLiText.value;
-    else if (state.activeOutreachTab === 'email') textToCopy = els.outreachEmailText.value;
-
-    navigator.clipboard.writeText(textToCopy);
-    showToast('Copied to clipboard!', 'success');
-  });
-}
-
-function escapeHtml(str) {
-  return (str || '').replace(/[&<>"']/g, m => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[m]));
-}
-
-// --- Real-Time WebSocket Connection ---
-function initWebSocket() {
-  try {
-    state.ws = new WebSocket(WS_URL);
-
-    state.ws.onopen = () => {
-      els.systemStatusText.textContent = 'Engine Online';
-    };
-
-    state.ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'HITL_REQUIRED') {
-          showHitlModal(msg.event);
-        } else if (msg.type === 'BOT_LOG') {
-          appendBotLog(msg.message);
-        } else if (msg.type === 'DISCOVERY_COMPLETED') {
-          fetchJobsList();
-        }
-      } catch (e) {}
-    };
-
-    state.ws.onclose = () => {
-      els.systemStatusText.textContent = 'Reconnecting...';
-      setTimeout(initWebSocket, 3000);
-    };
-  } catch (e) {
-    console.error('WebSocket connection error:', e);
-  }
-}
-
-function appendBotLog(message) {
-  const logContainer = document.getElementById('bot-logs-container');
-  if (logContainer) {
-    const time = new Date().toLocaleTimeString();
-    const div = document.createElement('div');
-    div.textContent = `[${time}] ${message}`;
-    logContainer.appendChild(div);
-    logContainer.scrollTop = logContainer.scrollHeight;
-  }
-}
-
-// --- HITL Modal Handling ---
-function showHitlModal(event) {
-  state.activePendingHitl = event;
-  els.hitlCompanyTag.textContent = event.company || 'Recruiter';
-  els.hitlQuestionText.textContent = event.question_text;
-  els.hitlUserAnswer.value = event.ai_suggested_draft || '';
-  els.hitlModal.classList.add('active');
-}
-
-els.btnHitlApprove.addEventListener('click', async () => {
-  if (!state.activePendingHitl) return;
-
-  const answer = els.hitlUserAnswer.value.trim();
-  const saveToVault = els.hitlSaveVaultCheck.checked;
+async function triggerDiscoveryCycle() {
+  if (state.isDiscovering) return;
+  state.isDiscovering = true;
+  showToast('Starting 0-day multi-source discovery cycle...', 'info');
+  appendTerminalLog('DISCOVERY', 'Ingesting Greenhouse, Lever, Ashby, YC, HN boards concurrently...');
 
   try {
-    const res = await fetch(`${API_BASE}/hitl/resolve`, {
+    const res = await fetch(`${API_BASE}/discovery/run`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        event_id: state.activePendingHitl.event_id,
-        user_answer: answer,
-        save_to_vault: saveToVault
-      })
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    showToast(`Discovery completed! Sourced ${data.total_sourced} leads (${data.matched_and_saved} matched).`, 'success');
+    appendTerminalLog('DISCOVERY', `Saved ${data.matched_and_saved} high-match opportunities to SQLite WAL.`, false, true);
+    fetchJobsList();
+    fetchFunnelMetrics();
+  } catch (err) {
+    showToast(`Discovery failed: ${err.message}`, 'error');
+  } finally {
+    state.isDiscovering = false;
+  }
+}
+
+window.filterPipeline = function(filterType, element) {
+  state.currentPipelineFilter = filterType;
+  document.querySelectorAll('.filter-pill').forEach(btn => btn.classList.remove('active'));
+  if (element) element.classList.add('active');
+  renderKanbanBoard();
+};
+
+els.pipelineSearchInput.addEventListener('input', () => {
+  renderKanbanBoard();
+});
+
+function renderKanbanBoard() {
+  const query = (els.pipelineSearchInput.value || '').toLowerCase();
+  const filter = state.currentPipelineFilter;
+
+  const filtered = state.jobsList.filter(j => {
+    const textMatch = (j.company + ' ' + j.title + ' ' + (j.location || '')).toLowerCase().includes(query);
+    if (!textMatch) return false;
+
+    if (filter === 'ALL') return true;
+    if (filter === 'HIGH_MATCH') return (j.match_score || 0) >= 0.75;
+    if (filter === 'GREENHOUSE') return (j.platform || '').toLowerCase().includes('greenhouse');
+    if (filter === 'LEVER') return (j.platform || '').toLowerCase().includes('lever');
+    if (filter === 'ASHBY') return (j.platform || '').toLowerCase().includes('ashby');
+    if (filter === 'YC') return (j.platform || '').toLowerCase().includes('yc');
+    return true;
+  });
+
+  const columns = {
+    discovered: filtered.filter(j => j.status === 'DISCOVERED'),
+    queued: filtered.filter(j => j.status === 'QUEUED' || j.status === 'NEEDS_REVIEW'),
+    submitted: filtered.filter(j => j.status === 'SUBMITTED'),
+    interview: filtered.filter(j => j.status === 'INTERVIEW'),
+    offer: filtered.filter(j => j.status === 'OFFER')
+  };
+
+  els.countDiscovered.textContent = columns.discovered.length;
+  els.countQueued.textContent = columns.queued.length;
+  els.countSubmitted.textContent = columns.submitted.length;
+  els.countInterview.textContent = columns.interview.length;
+  els.countOffer.textContent = columns.offer.length;
+  els.badgePipelineCount.textContent = filtered.length;
+
+  els.cardsDiscovered.innerHTML = columns.discovered.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No leads discovered.</p>';
+  els.cardsQueued.innerHTML = columns.queued.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">Queue is empty.</p>';
+  els.cardsSubmitted.innerHTML = columns.submitted.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No applications submitted yet.</p>';
+  els.cardsInterview.innerHTML = columns.interview.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No active interviews.</p>';
+  els.cardsOffer.innerHTML = columns.offer.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No offers recorded.</p>';
+}
+
+function renderJobCardHTML(job) {
+  const matchPct = Math.round((job.match_score || 0) * 100);
+  let matchBadgeClass = 'match-low';
+  if (matchPct >= 80) matchBadgeClass = 'match-high';
+  else if (matchPct >= 65) matchBadgeClass = 'match-mid';
+
+  const platform = job.platform || 'Direct';
+  const location = job.location || 'Remote';
+
+  return `
+    <div class="job-card" id="card-${job.job_id}">
+      <div class="job-card-top">
+        <div class="job-company">${job.company}</div>
+        <span class="match-ring-badge ${matchBadgeClass}">${matchPct}% Match</span>
+      </div>
+      <div class="job-title">${job.title}</div>
+      <div class="job-tags">
+        <span class="job-tag">${platform}</span>
+        <span class="job-tag">${location}</span>
+        ${job.salary_range ? `<span class="job-tag" style="color: var(--accent-emerald);">${job.salary_range}</span>` : ''}
+      </div>
+      <div class="job-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="applyToJob('${job.job_id}')" style="flex: 1;">⚡ Apply</button>
+        <button class="btn btn-secondary btn-sm" onclick="tailorJobAssets('${job.job_id}')">Tailor</button>
+      </div>
+    </div>
+  `;
+}
+
+// 1-Click Apply Action
+window.applyToJob = async function(jobId) {
+  showToast(`Initializing stealth bot for job #${jobId}...`, 'info');
+  appendTerminalLog('BOT', `Launching Playwright Chromium session for Job ID: ${jobId}`);
+
+  try {
+    const res = await fetch(`${API_BASE}/bot/apply/${jobId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
     });
     const data = await res.json();
     if (data.status === 'success') {
-      els.hitlModal.classList.remove('active');
-      showToast('Answer submitted to bot & saved to vault!', 'success');
-      state.activePendingHitl = null;
-      fetchVaultEntries();
+      showToast(`Application successfully processed (${data.mode})!`, 'success');
+      appendTerminalLog('BOT', `Completed form filling for ${data.company}. Screenshot saved.`, false, true);
+      fetchJobsList();
+      fetchFunnelMetrics();
+    } else {
+      showToast(data.message || 'Application error', 'error');
+      appendTerminalLog('BOT', `Error: ${data.message}`, true);
     }
   } catch (err) {
-    showToast(`Error resolving HITL: ${err.message}`, 'error');
+    showToast(`Bot failed: ${err.message}`, 'error');
   }
-});
+};
 
-// --- Funnel Metrics ---
-async function fetchFunnelMetrics() {
+// Generate Tailored Assets & Outreach
+window.tailorJobAssets = async function(jobId) {
+  showToast('Compiling pixel-perfect tailored PDF and outreach...', 'info');
   try {
-    const res = await fetch(`${API_BASE}/analytics/funnel`);
+    const res = await fetch(`${API_BASE}/jobs/${jobId}/tailor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
     const data = await res.json();
-    if (data.status === 'success' && data.metrics) {
-      const m = data.metrics;
-      const sSourced = document.getElementById('stat-total-sourced');
-      const sApplied = document.getElementById('stat-total-applied');
-      const sInterviews = document.getElementById('stat-interviews');
-      const sRespRate = document.getElementById('stat-response-rate');
-
-      if (sSourced) sSourced.textContent = m.total_sourced;
-      if (sApplied) sApplied.textContent = m.total_applied;
-      if (sInterviews) sInterviews.textContent = m.interviews_count;
-      if (sRespRate) sRespRate.textContent = `${m.response_rate_percent}%`;
+    if (data.status === 'success') {
+      state.activeOutreachPackage = data;
+      els.outreachModalTitle.textContent = `${data.company} — ${data.title}`;
+      els.outreachCoverLetterText.value = data.cover_letter;
+      els.outreachLiText.value = data.outreach.linkedin_note;
+      els.outreachEmailText.value = `${data.outreach.cold_email.subject}\n\n${data.outreach.cold_email.body}`;
+      switchOutreachTab('cover');
+      els.outreachModal.classList.add('active');
     }
   } catch (err) {
-    console.error('Error fetching funnel metrics:', err);
+    showToast(`Tailoring failed: ${err.message}`, 'error');
+  }
+};
+
+window.switchOutreachTab = function(tab) {
+  state.activeOutreachTab = tab;
+  ['cover', 'li', 'email'].forEach(t => {
+    document.getElementById(`modal-tab-${t}`).classList.toggle('active', t === tab);
+    document.getElementById(`modal-content-${t}`).style.display = t === tab ? 'block' : 'none';
+  });
+};
+
+window.copyActiveOutreach = function() {
+  let textToCopy = '';
+  if (state.activeOutreachTab === 'cover') textToCopy = els.outreachCoverLetterText.value;
+  else if (state.activeOutreachTab === 'li') textToCopy = els.outreachLiText.value;
+  else if (state.activeOutreachTab === 'email') textToCopy = els.outreachEmailText.value;
+
+  navigator.clipboard.writeText(textToCopy);
+  showToast('Copied to clipboard!', 'success');
+};
+
+// ==========================================================================
+// Knowledge Vault Studio & Live Q&A Playground
+// ==========================================================================
+async function fetchVaultEntries() {
+  try {
+    const res = await fetch(`${API_BASE}/vault`);
+    const data = await res.json();
+    state.vaultEntries = data.entries || [];
+    els.badgeVaultCount.textContent = `${state.vaultEntries.length} Slots`;
+    renderVaultTable();
+  } catch (err) {
+    console.error('Error fetching vault:', err);
   }
 }
 
-// --- Inbound Email Radar ---
-async function fetchEmailMessages() {
-  const container = document.getElementById('email-messages-list');
-  if (!container) return;
+function renderVaultTable() {
+  const query = (els.vaultSearchInput.value || '').toLowerCase();
+  const filtered = state.vaultEntries.filter(e => 
+    (e.slot_key + ' ' + e.question_pattern + ' ' + e.answer_template).toLowerCase().includes(query)
+  );
 
-  try {
-    const res = await fetch(`${API_BASE}/email/messages`);
-    const data = await res.json();
-    renderEmailMessages(data.messages || []);
-  } catch (err) {
-    container.innerHTML = `<p style="color: var(--danger);">Error fetching emails: ${escapeHtml(err.message)}</p>`;
-  }
+  els.vaultTableBody.innerHTML = filtered.map(e => `
+    <tr>
+      <td>
+        <span class="badge badge-info" style="font-family: 'JetBrains Mono', monospace;">${e.slot_key}</span>
+        <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">${e.slot_type}</div>
+      </td>
+      <td style="font-weight: 500; color: #f1f5f9;">${e.question_pattern}</td>
+      <td style="font-size: 12.5px; color: var(--text-secondary);">${e.answer_template}</td>
+      <td><span class="badge badge-low">${e.usage_count} uses</span></td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No vault slots matching query.</td></tr>';
 }
 
-function renderEmailMessages(messages) {
-  const container = document.getElementById('email-messages-list');
-  if (!container) return;
+els.vaultSearchInput.addEventListener('input', renderVaultTable);
 
-  if (messages.length === 0) {
-    container.innerHTML = `
-      <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
-        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📬</div>
-        <p>No recruiter emails received yet. Click <strong>'+ Simulate Recruiter Email'</strong> above to test live intent extraction and pipeline sync!</p>
-      </div>
-    `;
+window.testVaultQuestionMatch = async function() {
+  const question = els.playgroundInput.value.trim();
+  if (!question) {
+    showToast('Enter a recruiter question to test.', 'error');
     return;
   }
 
-  container.innerHTML = '';
-  const grid = document.createElement('div');
-  grid.style.display = 'grid';
-  grid.style.gap = '1rem';
+  try {
+    const res = await fetch(`${API_BASE}/vault/test-match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: question, company: 'Stripe', role: 'Senior Backend Engineer' })
+    });
+    const data = await res.json();
 
-  messages.forEach(msg => {
-    const item = document.createElement('div');
-    item.className = 'card';
-    item.style.margin = '0';
-    item.style.padding = '1.25rem';
+    els.playgroundResultBox.style.display = 'block';
+    els.playgroundSlotKey.textContent = `${data.slot_key} (${data.slot_type})`;
+    els.playgroundScore.textContent = `${data.confidence_score}%`;
+    els.playgroundConfidenceFill.style.width = `${data.confidence_score}%`;
+    els.playgroundResolvedText.textContent = data.resolved_answer;
 
-    let intentColor = '#818cf8';
-    let intentLabel = msg.intent || 'OTHER';
-    if (intentLabel === 'INTERVIEW_INVITE') {
-      intentColor = '#34d399';
-      intentLabel = '🎉 INTERVIEW INVITE';
-    } else if (intentLabel === 'ASSESSMENT') {
-      intentColor = '#38bdf8';
-      intentLabel = '⚡ CODING ASSESSMENT';
-    } else if (intentLabel === 'REJECTION') {
-      intentColor = '#f43f5e';
-      intentLabel = 'REJECTION';
-    } else if (intentLabel === 'CONFIRMATION') {
-      intentColor = '#fbbf24';
-      intentLabel = 'CONFIRMATION';
+    if (data.is_matched) {
+      showToast(`Matched slot: ${data.slot_key} (${data.confidence_score}% confidence)`, 'success');
+    } else {
+      showToast('Confidence below threshold (< 55%). Consider teaching this slot.', 'info');
     }
+  } catch (err) {
+    showToast(`Test match failed: ${err.message}`, 'error');
+  }
+};
 
-    const schedulingUrls = typeof msg.scheduling_links === 'string' ? JSON.parse(msg.scheduling_links || '[]') : (msg.scheduling_links || []);
-    const linksHtml = schedulingUrls.map(url => `
-      <a href="${escapeHtml(url)}" target="_blank" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; text-decoration: none;">
-        📅 Schedule Call (${escapeHtml(url.split('/')[2])}) ➔
-      </a>
-    `).join('');
+window.openAddSlotModal = function() {
+  const question = prompt('Enter recruiter question pattern:');
+  if (!question) return;
+  const answer = prompt('Enter answer template (can include {company}, {expected_ctc}):');
+  if (!answer) return;
 
-    item.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-        <div>
-          <span style="font-weight: 700; font-size: 0.85rem; color: ${intentColor}; background: rgba(255,255,255,0.06); padding: 0.2rem 0.6rem; border-radius: var(--radius-full); border: 1px solid ${intentColor}44;">
-            ${intentLabel}
-          </span>
-          ${msg.has_tracking_pixels ? `<span style="font-size: 0.75rem; color: #f59e0b; margin-left: 0.5rem;">🛡️ Tracking Pixel Stripped</span>` : ''}
-        </div>
-        <div style="font-size: 0.8rem; color: var(--text-muted);">${new Date(msg.received_at).toLocaleTimeString()}</div>
-      </div>
-      <h3 style="font-size: 1.05rem; margin-bottom: 0.25rem;">${escapeHtml(msg.subject)}</h3>
-      <div style="font-size: 0.85rem; color: #a5b4fc; margin-bottom: 0.75rem;">From: <strong>${escapeHtml(msg.sender)}</strong></div>
-      <div style="background: rgba(0,0,0,0.25); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem; color: var(--text-secondary); white-space: pre-wrap; margin-bottom: 0.75rem;">
-        ${escapeHtml(msg.body_text)}
-      </div>
-      ${linksHtml ? `<div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">${linksHtml}</div>` : ''}
-    `;
-    grid.appendChild(item);
+  fetch(`${API_BASE}/vault/learn`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: question, answer: answer })
+  }).then(() => {
+    showToast('Slot indexed into Knowledge Vault!', 'success');
+    fetchVaultEntries();
   });
+};
 
-  container.appendChild(grid);
+// ==========================================================================
+// Inbound Email Radar
+// ==========================================================================
+async function fetchEmailMessages() {
+  try {
+    const res = await fetch(`${API_BASE}/email/messages`);
+    const data = await res.json();
+    const messages = data.messages || [];
+    
+    els.emailMessagesList.innerHTML = messages.map(m => `
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 12px 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <div>
+            <span style="font-weight: 700; color: #f1f5f9;">${m.sender}</span>
+            <span style="font-size: 11px; color: var(--text-muted); margin-left: 8px;">${m.received_at || 'Just now'}</span>
+          </div>
+          <span class="badge ${m.intent === 'INTERVIEW_INVITE' ? 'badge-high' : 'badge-info'}">${m.intent || 'REPLY'}</span>
+        </div>
+        <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px; color: var(--accent-cyan);">${m.subject}</div>
+        <div style="font-size: 12.5px; color: var(--text-secondary);">${m.body_text}</div>
+      </div>
+    `).join('') || '<p style="color: var(--text-muted); font-size: 13px;">No inbound recruiter emails currently tracked.</p>';
+  } catch (err) {
+    console.error('Error fetching emails:', err);
+  }
 }
 
 window.simulateTestEmail = async function() {
   try {
-    showToast('Simulating inbound recruiter interview invitation...', 'info');
     const res = await fetch(`${API_BASE}/email/inbound`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        sender: 'recruiting@stripe.com',
-        subject: 'Interview Invitation: Backend Software Engineer at Stripe',
-        body_html: '<p>Hi Satyajit,</p><p>We reviewed your tailored resume and were impressed by your distributed systems work. We would like to invite you for a 30-minute technical phone screen.</p><p>Please book a time here: <a href="https://calendly.com/stripe-eng/30min">Calendly Link</a></p><img src="https://sendgrid.net/wf/open?upn=12345" width="1" height="1">'
+        sender: 'sarah.recruiter@stripe.com',
+        subject: 'Invitation to Technical Screen — Senior Backend Engineer at Stripe',
+        body_html: '<p>Hi Satyajit, we were very impressed with your application and would like to schedule a 30-min technical screen.</p><img src="https://tracking.stripe.com/pixel.gif"/>'
       })
     });
     const data = await res.json();
-    if (data.status === 'success') {
-      showToast(`Email processed! Intent: ${data.intent} (Tracking pixels stripped)`, 'success');
-      fetchEmailMessages();
-      fetchFunnelMetrics();
-    }
+    showToast('Simulated email parsed and tracking pixels stripped!', 'success');
+    fetchEmailMessages();
   } catch (err) {
     showToast(`Simulation failed: ${err.message}`, 'error');
   }
 };
 
-// --- Mock Interview Studio ---
+// ==========================================================================
+// Mock Interview Studio & Soundwave
+// ==========================================================================
 window.loadMockDossierAndQuestions = async function() {
-  const company = document.getElementById('mock-company-input').value.trim() || 'Stripe';
-  const role = document.getElementById('mock-role-input').value.trim() || 'Senior Backend Engineer';
-  const container = document.getElementById('mock-interview-container');
-  if (!container) return;
+  const company = els.mockCompanyInput.value.trim() || 'Stripe';
+  const role = els.mockRoleInput.value.trim() || 'Senior Software Engineer';
+
+  els.interviewSoundwave.style.display = 'flex';
+  showToast(`Generating engineering dossier & questions for ${company}...`, 'info');
 
   try {
-    showToast(`Synthesizing ${company} engineering dossier & question rubrics...`, 'info');
-    const [dRes, qRes] = await Promise.all([
+    const [dossierRes, qRes] = await Promise.all([
       fetch(`${API_BASE}/interview/dossier?company=${encodeURIComponent(company)}&role=${encodeURIComponent(role)}`),
       fetch(`${API_BASE}/interview/questions?role=${encodeURIComponent(role)}`)
     ]);
-
-    const dData = await dRes.json();
+    const dossierData = await dossierRes.json();
     const qData = await qRes.json();
 
-    const dossier = dData.dossier;
-    const questions = qData.questions;
+    const dossier = dossierData.dossier || {};
+    const questions = qData.questions || [];
 
-    container.innerHTML = `
-      <div style="background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.3); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1.5rem;">
-        <h3 style="font-size: 1.15rem; color: #818cf8; margin-bottom: 0.5rem;">🏢 ${escapeHtml(dossier.company)} Engineering Dossier</h3>
-        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem;">${escapeHtml(dossier.engineering_focus)}</p>
-        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
-          ${dossier.likely_tech_stack.map(s => `<span class="brand-badge" style="background: rgba(255,255,255,0.05); color: #a5b4fc; border-color: rgba(255,255,255,0.1);">${escapeHtml(s)}</span>`).join('')}
+    els.mockInterviewContainer.innerHTML = `
+      <div style="background: rgba(10, 14, 24, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1.25rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h4 style="font-size: 15px; color: var(--accent-cyan);">🏛️ ${dossier.company} Engineering Topology</h4>
+          <span class="badge badge-info">${dossier.role}</span>
+        </div>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px;">${dossier.engineering_focus}</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
+          ${(dossier.likely_tech_stack || []).map(t => `<span class="badge badge-low">${t}</span>`).join('')}
         </div>
       </div>
 
-      <h3 style="font-size: 1.2rem; margin-bottom: 1rem;">🎯 Technical &amp; System Design Practice Questions</h3>
-      <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
         ${questions.map((q, idx) => `
-          <div class="card" style="margin-bottom: 0; padding: 1.5rem; background: rgba(15, 23, 42, 0.8);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-              <span class="brand-badge" style="background: rgba(99,102,241,0.2); color: #818cf8;">${escapeHtml(q.category)} • ${escapeHtml(q.difficulty)}</span>
-              <span style="font-size: 0.8rem; color: var(--text-muted);">Question ${idx + 1} of ${questions.length}</span>
+          <div class="glass-card" style="margin-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span class="badge badge-high">${q.category}</span>
+              <span class="badge badge-low">${q.difficulty}</span>
             </div>
-            <h4 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-primary);">${escapeHtml(q.question)}</h4>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Key concepts to address: <em>${escapeHtml(q.key_concepts.join(', '))}</em></div>
-            <textarea id="ans-input-${q.id}" class="form-textarea" rows="3" placeholder="Type or dictate your verbal response..."></textarea>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
-              <button class="btn btn-primary" onclick="submitAnswerEvaluation('${q.id}', '${escapeHtml(q.question)}', '${escapeHtml(JSON.stringify(q.key_concepts))}')" style="font-size: 0.85rem; padding: 0.45rem 1rem;">
-                <span>✨ Evaluate Answer &amp; Get Score</span>
-              </button>
-              <div id="eval-result-${q.id}"></div>
+            <div style="font-weight: 600; font-size: 14px; color: #f1f5f9; margin-bottom: 10px;">${q.question}</div>
+            <textarea id="mock-ans-${idx}" class="form-textarea" rows="3" placeholder="Provide your technical answer..."></textarea>
+            <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+              <button class="btn btn-primary btn-sm" onclick="evaluateMockAnswer('${idx}', '${encodeURIComponent(q.question)}')">Evaluate Answer</button>
             </div>
+            <div id="eval-result-${idx}" class="star-rubric-card" style="display: none;"></div>
           </div>
         `).join('')}
       </div>
     `;
-    showToast('Mock Interview Dossier ready!', 'success');
   } catch (err) {
     showToast(`Error: ${err.message}`, 'error');
+  } finally {
+    els.interviewSoundwave.style.display = 'none';
   }
 };
 
-window.submitAnswerEvaluation = async function(qId, qText, conceptsJson) {
-  const ansInput = document.getElementById(`ans-input-${qId}`);
-  const resultDiv = document.getElementById(`eval-result-${qId}`);
-  if (!ansInput || !resultDiv) return;
+window.evaluateMockAnswer = async function(idx, encQuestion) {
+  const question = decodeURIComponent(encQuestion);
+  const answer = document.getElementById(`mock-ans-${idx}`).value.trim();
+  const resultBox = document.getElementById(`eval-result-${idx}`);
 
-  const answer = ansInput.value.trim();
   if (!answer) {
-    showToast('Please type an answer to evaluate!', 'warning');
+    showToast('Please type an answer before evaluating.', 'error');
     return;
   }
 
   try {
-    const concepts = JSON.parse(conceptsJson || '[]');
     const res = await fetch(`${API_BASE}/interview/evaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        question: qText,
-        answer: answer,
-        key_concepts: concepts
-      })
+      body: JSON.stringify({ question: question, answer: answer })
     });
     const data = await res.json();
-    if (data.status === 'success') {
-      const e = data.evaluation;
-      const scoreColor = e.score >= 80 ? '#34d399' : e.score >= 60 ? '#f59e0b' : '#f43f5e';
-      resultDiv.innerHTML = `
-        <div style="background: rgba(0,0,0,0.3); border: 1px solid ${scoreColor}55; padding: 0.6rem 1rem; border-radius: var(--radius-md); font-size: 0.85rem;">
-          <span style="font-weight: 800; color: ${scoreColor}; font-size: 1.05rem;">Score: ${e.score}/100 (${escapeHtml(e.rating)})</span>
-          <div style="color: var(--text-secondary); margin-top: 0.25rem;">${escapeHtml(e.feedback)}</div>
-        </div>
-      `;
-    }
+    const ev = data.evaluation || {};
+
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <span style="font-weight: 700; color: #f1f5f9;">STAR Rubric Score</span>
+        <span style="font-size: 16px; font-weight: 800; color: var(--accent-emerald);">${ev.score}/100 (${ev.rating})</span>
+      </div>
+      <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 8px;">${ev.feedback}</p>
+      <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+        ${(ev.covered_concepts || []).map(c => `<span class="badge badge-low" style="color: var(--accent-emerald);">✓ ${c}</span>`).join('')}
+        ${(ev.missing_concepts || []).map(c => `<span class="badge badge-critical">✕ Missing: ${c}</span>`).join('')}
+      </div>
+    `;
   } catch (err) {
     showToast(`Evaluation error: ${err.message}`, 'error');
   }
 };
 
-// --- Salary & Offer Modeler ---
+// ==========================================================================
+// Salary & Startup ESOP Modeler
+// ==========================================================================
 window.evaluateOfferCompensation = async function() {
-  const base = parseFloat(document.getElementById('neg-base-salary').value) || 35.0;
-  const bonus = parseFloat(document.getElementById('neg-bonus').value) || 5.0;
-  const equity = parseFloat(document.getElementById('neg-equity').value) || 10.0;
-  const role = document.getElementById('neg-role-title').value.trim() || 'Senior Software Engineer';
-  const container = document.getElementById('negotiation-results-container');
-  if (!container) return;
+  const base = parseFloat(els.negBaseSalary.value) || 0;
+  const bonus = parseFloat(els.negBonus.value) || 0;
+  const equity = parseFloat(els.negEquity.value) || 0;
+  const role = els.negRoleTitle.value.trim();
 
   try {
     const res = await fetch(`${API_BASE}/negotiation/evaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base_salary_lpa: base, bonus_lpa: bonus, equity_annual_lpa: equity, role_title: role })
+    });
+    const data = await res.json();
+    const ev = data.evaluation || {};
+
+    els.negotiationResultsContainer.innerHTML = `
+      <div style="background: rgba(10, 14, 24, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 16px; font-weight: 700; color: var(--accent-cyan);">Total Annual Comp: ${ev.total_annual_comp_lpa} LPA</span>
+          <span class="badge badge-high">${ev.market_percentile_band}</span>
+        </div>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">${ev.negotiation_guidance}</p>
+        <button class="btn btn-secondary btn-sm" onclick="generateCounterOfferScript('${role}', '${ev.total_annual_comp_lpa} LPA')">Generate Counter-Offer Email</button>
+      </div>
+    `;
+  } catch (err) {
+    showToast(`Evaluation failed: ${err.message}`, 'error');
+  }
+};
+
+window.simulateEsopEquity = async function() {
+  const options = parseInt(els.esopOptionsCount.value, 10) || 0;
+  const totalShares = parseInt(els.esopTotalShares.value, 10) || 1;
+  const valUsd = parseFloat(els.esopValuationUsd.value) || 0;
+
+  try {
+    const res = await fetch(`${API_BASE}/negotiation/equity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ options_count: options, total_company_shares: totalShares, current_valuation_usd: valUsd })
+    });
+    const data = await res.json();
+    const eq = data.equity_model || {};
+
+    els.esopResultsContainer.innerHTML = `
+      <div style="background: rgba(10, 14, 24, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1.25rem;">
+        <div style="font-weight: 700; margin-bottom: 8px;">Ownership: ${eq.ownership_percentage}% (Current Value: $${(eq.current_estimated_value_usd || 0).toLocaleString()})</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
+          ${(eq.exit_scenarios || []).map(s => `
+            <div style="background: rgba(255, 255, 255, 0.03); border-radius: 6px; padding: 8px; text-align: center;">
+              <div style="font-size: 11px; color: var(--accent-cyan); font-weight: 700;">${s.growth_multiple} Multiple</div>
+              <div style="font-size: 14px; font-weight: 800; color: var(--accent-emerald); margin-top: 2px;">$${(s.projected_payout_usd || 0).toLocaleString()}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    showToast(`Simulation failed: ${err.message}`, 'error');
+  }
+};
+
+window.generateCounterOfferScript = async function(role, offeredTc) {
+  try {
+    const res = await fetch(`${API_BASE}/negotiation/counter-offer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        base_salary_lpa: base,
-        bonus_lpa: bonus,
-        equity_annual_lpa: equity,
-        role_title: role
+        candidate_name: state.currentProfile ? state.currentProfile.full_name : 'Candidate',
+        company_name: 'Target Company',
+        role_title: role,
+        offered_tc: offeredTc,
+        desired_tc: `${(parseFloat(offeredTc) * 1.15).toFixed(1)} LPA`
       })
     });
     const data = await res.json();
-    if (data.status === 'success') {
-      const e = data.evaluation;
-      container.innerHTML = `
-        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-lg); padding: 1.5rem; margin-top: 1.25rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-            <span style="font-size: 1.15rem; font-weight: 700; color: #34d399;">Total Annual Comp: ${e.total_annual_comp_lpa} LPA</span>
-            <span class="brand-badge" style="background: rgba(52, 211, 153, 0.2); color: #34d399;">${escapeHtml(e.market_percentile_band)}</span>
-          </div>
-          <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">💡 <strong>Negotiation Strategy:</strong> ${escapeHtml(e.negotiation_guidance)}</p>
-          <div style="font-size: 0.8rem; color: var(--text-muted);">Market Median (p50): ${e.benchmark_p50} LPA • Top Tier (p75): ${e.benchmark_p75} LPA</div>
-        </div>
-      `;
-      showToast('Compensation offer benchmarked successfully!', 'success');
-    }
+    prompt('Copy your Anti-AI Counter-Offer script:', data.counter_offer_script);
   } catch (err) {
-    showToast(`Error: ${err.message}`, 'error');
+    showToast(`Script error: ${err.message}`, 'error');
   }
 };
 
-// --- Disaster Recovery Backup Export ---
-window.exportEncryptedBackup = async function() {
+// ==========================================================================
+// Funnel Analytics & Backups
+// ==========================================================================
+async function fetchFunnelMetrics() {
   try {
-    showToast('Exporting AES-256-GCM encrypted backup archive...', 'info');
+    const res = await fetch(`${API_BASE}/analytics/funnel`);
+    const data = await res.json();
+    const m = data.metrics || {};
+
+    els.statTotalSourced.textContent = m.total_sourced || '0';
+    els.statTotalApplied.textContent = m.total_applied || '0';
+    els.statInterviews.textContent = m.interviews_count || '0';
+    els.statResponseRate.textContent = `${m.response_rate_percent || 0.0}%`;
+  } catch (err) {
+    console.error('Error fetching analytics:', err);
+  }
+}
+
+window.exportEncryptedBackup = async function() {
+  showToast('Creating AES-256-GCM encrypted backup archive...', 'info');
+  try {
     const res = await fetch(`${API_BASE}/backup/export`, { method: 'POST' });
     const data = await res.json();
     if (data.status === 'success') {
-      showToast(`Encrypted backup created: ${data.filename}`, 'success');
+      showToast(`Backup exported: ${data.filename}`, 'success');
     }
   } catch (err) {
-    showToast(`Backup failed: ${err.message}`, 'error');
+    showToast(`Backup error: ${err.message}`, 'error');
   }
 };
 
-// Initial Load
+// ==========================================================================
+// Initialization on Load
+// ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
   initWebSocket();
-  updateSalaryEquivalents(15);
   fetchJobsList();
   fetchFunnelMetrics();
+  fetchVaultEntries();
+  updateSalaryEquivalents(15);
+
+  const initialView = window.location.hash ? window.location.hash.replace('#', '') : 'onboarding';
+  if (initialView && initialView !== 'onboarding') {
+    window.switchTab(initialView);
+  }
 });

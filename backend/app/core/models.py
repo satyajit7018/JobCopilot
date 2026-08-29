@@ -175,6 +175,7 @@ class JobListing(BaseModel):
     match_reasons: List[str] = Field(default_factory=list)
     missing_skills: List[str] = Field(default_factory=list)
     status: ApplicationStatus = ApplicationStatus.DISCOVERED
+    submission_mode: Optional[str] = None  # DRY_RUN or LIVE
     applied_at: Optional[str] = None
     application_id: Optional[str] = None  # Internal ATS Reference ID scraped from confirmation
     confirmation_screenshot_path: Optional[str] = None

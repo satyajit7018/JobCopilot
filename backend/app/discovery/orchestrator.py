@@ -51,13 +51,19 @@ class DiscoveryOrchestrator:
 
         self.is_running = True
         self.last_run_at = datetime.now().isoformat()
+        target_companies = companies or self.CURATED_TECH_COMPANIES
+
+        raw_leads: List[Dict[str, Any]] = []
+
         try:
-            target_companies = companies or self.CURATED_TECH_COMPANIES
-
-            raw_leads: List[Dict[str, Any]] = []
-
             # 1. Fetch from Direct ATS APIs & VC Boards Concurrently
-            async with httpx.AsyncClient(http2=True, timeout=10.0) as client:
+            try:
+                import h2
+                has_h2 = True
+            except ImportError:
+                has_h2 = False
+
+            async with httpx.AsyncClient(http2=has_h2, timeout=10.0) as client:
                 tasks = []
 
                 # Direct ATS Feeds
@@ -99,7 +105,6 @@ class DiscoveryOrchestrator:
 
                 # Compute Deduplication Fingerprint
                 fingerprint = JobDeduplicator.generate_fingerprint(company, title, location, desc)
-
                 # Compute Multi-Factor Match Score
                 match_score, match_reasons, missing_skills = MatchScorer.compute_match_score(
                     profile=profile,

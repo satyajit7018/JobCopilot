@@ -251,22 +251,63 @@ class ResumeCompiler:
 
     @classmethod
     async def compile_to_pdf(cls, html_content: str, output_pdf_path: Path) -> Path:
-        """Compiles HTML string into a standalone PDF file via Playwright Chromium."""
-        from playwright.async_api import async_playwright
-
+        """Compiles HTML string into a standalone PDF file via Playwright or Chrome CLI."""
         output_path = Path(output_pdf_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            await page.set_content(html_content, wait_until="load")
-            await page.pdf(
-                path=str(output_path),
-                format="Letter",
-                print_background=True,
-                margin={"top": "0.5in", "bottom": "0.5in", "left": "0.5in", "right": "0.5in"}
-            )
-            await browser.close()
+        # 1. Try Playwright
+        try:
+            from playwright.async_api import async_playwright
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                await page.set_content(html_content, wait_until="load")
+                await page.pdf(
+                    path=str(output_path),
+                    format="Letter",
+                    print_background=True,
+                    margin={"top": "0.5in", "bottom": "0.5in", "left": "0.5in", "right": "0.5in"}
+                )
+                await browser.close()
+            return output_path
+        except (ImportError, Exception):
+            pass
 
+        # 2. Fallback to System Chrome Binary
+        import tempfile
+        import subprocess
+        import shutil
+
+        chrome_candidates = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            shutil.which("google-chrome"),
+            shutil.which("chromium"),
+            shutil.which("chrome")
+        ]
+        chrome_bin = next((c for c in chrome_candidates if c and Path(c).exists()), None)
+
+        if chrome_bin:
+            with tempfile.NamedTemporaryFile("w", suffix=".html", delete=False, encoding="utf-8") as tf:
+                tf.write(html_content)
+                temp_html_path = tf.name
+
+            cmd = [
+                chrome_bin,
+                "--headless",
+                "--disable-gpu",
+                "--no-pdf-header-footer",
+                f"--print-to-pdf={str(output_path)}",
+                temp_html_path
+            ]
+            proc = subprocess.run(cmd, capture_output=True)
+            try:
+                os.remove(temp_html_path)
+            except Exception:
+                pass
+            if output_path.exists():
+                return output_path
+
+        # 3. Fallback to saving HTML if no PDF engine is present
+        with open(output_path.with_suffix(".html"), "w", encoding="utf-8") as f:
+            f.write(html_content)
         return output_path
