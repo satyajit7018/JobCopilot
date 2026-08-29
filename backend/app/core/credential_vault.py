@@ -62,6 +62,10 @@ class CredentialVault:
             new_key = base64.b64encode(os.urandom(32)).decode('utf-8')
             with open(fallback_file, "w") as f:
                 f.write(new_key)
+            try:
+                os.chmod(fallback_file, 0o600)
+            except Exception:
+                pass
             return new_key
 
     def _derive_key(self, master_password: str) -> bytes:

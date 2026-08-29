@@ -136,6 +136,11 @@ class DatabaseManager:
                     "confirmation_screenshot_path": "TEXT"
                 })
 
+                # Indices for fast queries
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_priority ON jobs(priority_score DESC);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_vault_slot_key ON vault(slot_key);")
+
                 # HITL Events Table
                 cursor.execute("""
                 CREATE TABLE IF NOT EXISTS hitl_events (

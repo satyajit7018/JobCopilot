@@ -562,6 +562,11 @@ class RestoreBackupRequest(BaseModel):
 async def restore_backup(payload: RestoreBackupRequest):
     """Restores database state from an encrypted backup archive."""
     from app.core.backup import BackupManager
-    res = BackupManager.restore_encrypted_backup(Path(payload.backup_file_path))
+    target_path = Path(payload.backup_file_path).resolve()
+    if not target_path.exists():
+        raise HTTPException(status_code=404, detail="Backup file not found.")
+    if not target_path.name.endswith(".jobcopilot.enc"):
+        raise HTTPException(status_code=400, detail="Invalid backup file format. Expected .jobcopilot.enc archive.")
+    res = BackupManager.restore_encrypted_backup(target_path)
     return res
 

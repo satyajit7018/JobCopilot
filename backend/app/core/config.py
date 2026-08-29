@@ -6,8 +6,8 @@ Local-first, privacy-respecting storage paths and system settings.
 import os
 from pathlib import Path
 
-# Local-first user directory: ~/.jobcopilot/
-APP_DIR = Path(os.path.expanduser("~/.jobcopilot"))
+# Local-first user directory: ~/.jobcopilot/ or custom JOBCOPILOT_DATA_DIR
+APP_DIR = Path(os.environ.get("JOBCOPILOT_DATA_DIR", os.path.expanduser("~/.jobcopilot")))
 APP_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = APP_DIR / "jobcopilot.db"

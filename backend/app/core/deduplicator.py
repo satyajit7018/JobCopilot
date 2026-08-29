@@ -144,7 +144,7 @@ class JobDeduplicator:
         if desc_a and desc_b:
             hash_a = cls.compute_simhash_64(desc_a)
             hash_b = cls.compute_simhash_64(desc_b)
-            if cls.hamming_distance(hash_a, hash_b) <= max_hamming_distance:
-                return True
+            return cls.hamming_distance(hash_a, hash_b) <= max_hamming_distance
 
+        # If no descriptions, return True only if company & title matched identically
         return True
