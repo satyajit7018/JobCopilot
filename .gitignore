@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/build/
+.vite/
+
+# Local data & secrets (NEVER commit)
+.jobcopilot/
+vault.enc
+*.enc
+browser_data/
+user_data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs & temp
+*.log
+logs/
+scratch/
+tmp/
+
+# Environment
+.env
+.env.local
+.env.production
