@@ -12,7 +12,7 @@ from typing import List, Dict, Optional, Any
 from app.core.config import DB_PATH
 from app.core.models import (
     CandidateProfile, VaultEntry, JobListing, HITLEvent,
-    ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint
+    ApplicationStatus, OutreachRecord, OutreachChannel, EmailMessage, JobCheckpoint
 )
 
 
@@ -443,6 +443,29 @@ class DatabaseManager:
                     record.message_content, record.status, record.sent_at, record.created_at
                 ))
                 conn.commit()
+
+    def get_outreach_records(self, job_id: Optional[str] = None) -> List[OutreachRecord]:
+        records = []
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if job_id:
+                cursor.execute("SELECT * FROM outreach_records WHERE job_id = ? ORDER BY created_at DESC", (job_id,))
+            else:
+                cursor.execute("SELECT * FROM outreach_records ORDER BY created_at DESC")
+            for row in cursor.fetchall():
+                records.append(OutreachRecord(
+                    outreach_id=row["outreach_id"],
+                    job_id=row["job_id"],
+                    channel=OutreachChannel(row["channel"]),
+                    recipient_name=row["recipient_name"],
+                    recipient_title=row["recipient_title"],
+                    recipient_contact=row["recipient_contact"],
+                    message_content=row["message_content"],
+                    status=row["status"],
+                    sent_at=row["sent_at"],
+                    created_at=row["created_at"]
+                ))
+        return records
 
     # --- Email Message Operations ---
     def save_email(self, email: EmailMessage):
