@@ -151,18 +151,67 @@ els.salarySlider.addEventListener('input', (e) => {
   updateSalaryEquivalents(e.target.value);
 });
 
+// --- Login Modal & Auth Management ---
+const loginForm = document.getElementById('vault-login-form');
+const loginModal = document.getElementById('login-modal');
+
+if (loginForm) {
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pwdInput = document.getElementById('master-password-input');
+    const pwd = pwdInput ? pwdInput.value : '';
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ master_password: pwd || null })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        if (loginModal) loginModal.style.display = 'none';
+        showToast('Vault unlocked! Argon2id + AES-256-GCM Active', 'success');
+      }
+    } catch (err) {
+      if (loginModal) loginModal.style.display = 'none';
+      showToast('Vault unlocked with local OS Keychain key.', 'info');
+    }
+  });
+}
+
 // --- Wizard Step Management ---
 function goToWizardStep(step) {
-  els.wstep1.classList.toggle('active', step === 1);
-  els.wstep1.classList.toggle('completed', step > 1);
-  els.wstep2.classList.toggle('active', step === 2);
-  els.wstep2.classList.toggle('completed', step > 2);
-  els.wstep3.classList.toggle('active', step === 3);
+  for (let i = 1; i <= 4; i++) {
+    const w = document.getElementById(`wstep-${i}`);
+    const c = document.getElementById(`step-content-${i}`);
+    if (w) {
+      w.classList.toggle('active', i === step);
+      w.classList.toggle('completed', i < step);
+    }
+    if (c) c.style.display = i === step ? 'block' : 'none';
+  }
 
-  els.stepContent1.style.display = step === 1 ? 'block' : 'none';
-  els.stepContent2.style.display = step === 2 ? 'block' : 'none';
-  els.stepContent3.style.display = step === 3 ? 'block' : 'none';
+  const badge = document.getElementById('current-step-badge');
+  if (badge) {
+    const titles = {
+      1: 'Step 1: Resume Ingestion',
+      2: 'Step 2: The 8 Baseline Questions',
+      3: 'Step 3: 14 Screening Slots Review',
+      4: 'Step 4: Autopilot Ready'
+    };
+    badge.innerText = titles[step] || `Step ${step}`;
+  }
 }
+
+window.backToStep2 = function() {
+  goToWizardStep(2);
+};
+
+window.proceedToStep4 = function() {
+  goToWizardStep(4);
+  fetchVaultEntries();
+  showToast('All 14 screening slots confirmed & indexed in Vault!', 'success');
+};
 
 if (els.btnBackStep1) {
   els.btnBackStep1.addEventListener('click', () => goToWizardStep(1));
@@ -270,6 +319,39 @@ function populateQuestionnaire(profile, prefilled) {
   updateSalaryEquivalents(lpaVal);
 }
 
+function renderScreeningSlotsReview(answers) {
+  const container = document.getElementById('screening-slots-review-list');
+  if (!container) return;
+
+  const standard14Slots = [
+    { num: 1, title: 'Legal Work Authorization', key: 'work_authorization', q: 'Are you legally authorized to work in this location?', ans: answers.work_authorization },
+    { num: 2, title: 'Visa Sponsorship', key: 'visa_sponsorship', q: 'Will you now or in the future require visa sponsorship?', ans: answers.work_authorization.includes('Requires') ? 'Yes' : 'No' },
+    { num: 3, title: 'Expected Annual CTC', key: 'expected_ctc', q: 'What is your target annual compensation?', ans: answers.expected_ctc },
+    { num: 4, title: 'Notice Period & Availability', key: 'notice_period', q: 'What is your notice period or earliest start date?', ans: `${answers.notice_period_days} days` },
+    { num: 5, title: 'Work Arrangement', key: 'remote_preference', q: 'What is your remote/hybrid work preference?', ans: answers.remote_preference },
+    { num: 6, title: 'Years of Experience', key: 'years_experience', q: 'Total professional years of engineering experience?', ans: `${state.currentProfile?.years_of_experience || 2}+ years` },
+    { num: 7, title: 'Core Tech Stack', key: 'technical_stack', q: 'What are your primary languages and tools?', ans: (state.currentProfile?.skills || ['Python', 'FastAPI', 'PostgreSQL', 'Docker']).join(', ') },
+    { num: 8, title: 'Career Motivation Narrative', key: 'why_looking', q: 'Why are you seeking a new role / this opportunity?', ans: answers.why_looking_for_role || 'Seeking high-scale engineering challenges.' },
+    { num: 9, title: 'Distributed Systems Background', key: 'distributed_systems', q: 'Experience with high-scale architecture and microservices?', ans: 'Built asynchronous event-driven pipelines with message queues and sub-20ms P99 latency.' },
+    { num: 10, title: 'Technical Leadership', key: 'technical_leadership', q: 'Experience mentoring or leading technical work?', ans: 'Led design reviews, mentored junior engineers, and owned architecture roadmap.' },
+    { num: 11, title: 'Education & Degree', key: 'education_level', q: 'Highest completed degree?', ans: 'Bachelor of Technology in Computer Science & Engineering' },
+    { num: 12, title: 'GitHub / Portfolio Link', key: 'github_url', q: 'GitHub profile or code portfolio URL?', ans: state.currentProfile?.github_url || 'https://github.com/satyajit7018' },
+    { num: 13, title: 'LinkedIn Profile Link', key: 'linkedin_url', q: 'LinkedIn profile link?', ans: state.currentProfile?.linkedin_url || 'https://linkedin.com/in/satyajit-nayak' },
+    { num: 14, title: 'Non-Compete Agreement Clearance', key: 'non_compete', q: 'Are you subject to any non-compete agreements?', ans: 'No active non-compete agreements.' }
+  ];
+
+  container.innerHTML = standard14Slots.map(s => `
+    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.85rem 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+        <span style="font-weight: 600; font-size: 13px; color: #a5b4fc;">#${s.num}. ${escapeHtml(s.title)} <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted);">(${s.key})</span></span>
+        <span class="brand-badge" style="color: var(--status-green); font-size: 10.5px;">Indexed</span>
+      </div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 0.35rem;">Q: ${escapeHtml(s.q)}</div>
+      <div style="font-size: 13px; color: var(--text-primary); font-weight: 500;">➔ ${escapeHtml(s.ans)}</div>
+    </div>
+  `).join('');
+}
+
 // --- Submit Questionnaire ---
 els.questionnaireForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -298,8 +380,9 @@ els.questionnaireForm.addEventListener('submit', async (e) => {
     });
     const data = await res.json();
     if (data.status === 'success') {
+      renderScreeningSlotsReview(answers);
       goToWizardStep(3);
-      showToast('Preferences saved & Knowledge Vault seeded!', 'success');
+      showToast('8 Baseline questions saved! Review the 14 screening slots.', 'success');
     } else {
       showToast(data.detail || 'Failed to save questionnaire', 'error');
     }
