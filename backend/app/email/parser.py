@@ -47,15 +47,27 @@ class EmailParser:
 
     @classmethod
     def html_to_clean_text(cls, html_content: str) -> str:
-        """Converts HTML email body into clean, normalized plain text."""
+        """Converts HTML email body into clean plain text while preserving hyperlinks."""
         if not html_content:
             return ""
 
+        # Preserve hrefs: <a href="url">text</a> -> text (url)
+        def replace_link(match):
+            href = match.group(1)
+            inner_text = re.sub(r'<[^>]+>', '', match.group(2)).strip()
+            if not inner_text:
+                return href
+            if href.lower() in inner_text.lower():
+                return inner_text
+            return f"{inner_text} ({href})"
+
+        preserved = re.sub(r'<a\s+[^>]*href=[\'"]([^\'"]+)[\'"][^>]*>(.*?)</a>', replace_link, html_content, flags=re.DOTALL | re.IGNORECASE)
+
         # Strip scripts and styles
-        cleaned = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
-        # Strip HTML tags
+        cleaned = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', preserved, flags=re.DOTALL | re.IGNORECASE)
+        # Strip remaining HTML tags
         cleaned = re.sub(r'<[^>]+>', ' ', cleaned)
-        # Unescape HTML entities (&nbsp;, &amp;, etc.)
+        # Unescape HTML entities
         cleaned = html.unescape(cleaned)
         # Normalize whitespace
         cleaned = re.sub(r'[ \t]+', ' ', cleaned)
