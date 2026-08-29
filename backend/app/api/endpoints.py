@@ -369,3 +369,16 @@ async def generate_job_followup(job_id: str, stage_days: int = 7, profile_id: st
     if not res:
         raise HTTPException(status_code=404, detail="Job not found.")
     return {"status": "success", "followup": res}
+
+
+# --- Funnel Analytics Endpoint ---
+
+@router.get("/analytics/funnel")
+async def get_funnel_analytics():
+    """Returns aggregated pipeline funnel metrics and telemetry."""
+    from app.core.analytics import AnalyticsEngine
+    return {
+        "status": "success",
+        "metrics": AnalyticsEngine.get_funnel_metrics()
+    }
+
