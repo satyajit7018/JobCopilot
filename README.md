@@ -79,22 +79,20 @@ flowchart TD
 
 | Component | Technology |
 |:---|:---|
-| **Frontend** | React 18, Vite, Vanilla CSS design tokens (WCAG 2.1 AA) |
+| **Frontend** | Vanilla JS (ES6+), HTML5, Glassmorphic CSS tokens (WCAG 2.1 AA) |
 | **Backend** | FastAPI (Python 3.11), Uvicorn, Typed JSON-RPC WebSockets |
 | **Browser Engine** | Playwright (Chromium BrowserContext pool), Chrome DevTools Protocol |
-| **LLM & Embeddings** | Gemini 1.5 Flash (Structured JSON schemas), SentenceTransformers |
-| **Vector Search** | Hybrid Reciprocal Rank Fusion (Dense 768d embeddings + BM25 lexical) |
+| **Vector Search** | Hybrid Reciprocal Rank Fusion (Dense embeddings + BM25 lexical) |
 | **Database & Storage** | SQLite (WAL Mode), Content-Addressable Blob Storage (SHA-256) |
 | **Security** | Argon2id key derivation, macOS/Linux Keyring, AES-256-GCM |
-| **Email Monitor** | Asynchronous IMAP IDLE push listener (`aioimaplib`), Gmail OAuth2 |
+| **Email Radar** | Privacy-First Inbound Parser with Tracking Pixel Stripping |
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
-- Python 3.11+
-- Node.js 18+
+- Python 3.10+ (macOS / Linux / Windows)
 - Chromium browser binaries (installed automatically via Playwright)
 
 ### Installation & Run
@@ -110,16 +108,16 @@ flowchart TD
    ./start.sh
    ```
 
-   Or run via Docker Compose:
-   ```bash
-   docker-compose up --build
-   ```
-
 3. **Onboarding**:
-   - Open `http://localhost:5173` in your browser.
-   - Upload your resume (PDF or DOCX).
+   - Open `http://localhost:8000` in your browser.
+   - Upload your resume (PDF, DOCX, or text).
    - Confirm the pre-filled recruiter preferences (salary expectations, work authorization, notice period).
-   - Start an automated application session or use **Dry-Run Mode** to preview form fills before submission.
+   - Start 0-Day discovery or run **Stealth Auto-Apply (DRY RUN)** to preview filled forms.
+
+4. **Run Full Test Suite**:
+   ```bash
+   backend/venv/bin/pytest backend/tests/ -v
+   ```
 
 ---
 
@@ -128,23 +126,21 @@ flowchart TD
 ```
 JobCopilot/
 ├── PLAN.md                           # Master Architecture & Implementation Specification
-├── docker-compose.yml                # Docker configuration
 ├── start.sh                          # One-click startup script
 ├── backend/
 │   ├── app/
 │   │   ├── api/                      # REST & WebSocket endpoints
-│   │   ├── bot/                      # Playwright worker pool & ATS adapters
-│   │   ├── core/                     # Storage, parsers, AI services & models
-│   │   └── discovery/                # ATS APIs and job scrapers
-│   ├── tests/                        # Pytest test suites & mock ATS server
+│   │   ├── bot/                      # Playwright worker pool, stealth & ATS adapters
+│   │   ├── core/                     # Storage, parsers, resume compiler & models
+│   │   ├── discovery/                # ATS APIs, YC, HN & platform scrapers
+│   │   └── email/                    # Inbound parser, 5-way classifier & follow-up engine
+│   ├── tests/                        # 36+ Pytest end-to-end test suites
 │   └── requirements.txt
 ├── frontend/
-│   ├── src/
-│   │   ├── components/               # React UI components (Kanban, Mini-Browser, Modals)
-│   │   ├── pages/                    # Dashboard, JobPipeline, KnowledgeVault, BotConsole
-│   │   └── services/                 # API & WebSocket client
-│   └── package.json
-└── docs/                             # Engineering audits, workforce plans & benchmarks
+│   ├── index.html                    # Glassmorphic Mission Control Dashboard
+│   ├── css/style.css                 # Clean CSS tokens & responsive layout
+│   └── js/app.js                     # Reactive WebSocket client & state manager
+└── docs/                             # Engineering audits & benchmark reports
 ```
 
 ---
