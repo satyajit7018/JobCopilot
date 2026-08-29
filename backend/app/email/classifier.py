@@ -13,7 +13,7 @@ class EmailClassifier:
     """Classifies recruiter email intent and extracts actionable scheduling links."""
 
     SCHEDULING_URL_REGEX = re.compile(
-        r'https?://(?:calendly\.com|goodtime\.io|chilipiper\.com|savvycal\.com|meetings\.hubspot\.com|app\.reclaim\.ai|meet\.google\.com|zoom\.us)[^\s<>"\']+',
+        r'https?://(?:calendly\.com|goodtime\.io|chilipiper\.com|savvycal\.com|meetings\.hubspot\.com|app\.reclaim\.ai|meet\.google\.com|zoom\.us|teams\.microsoft\.com|webex\.com)[^\s<>"\']+',
         re.IGNORECASE
     )
 

@@ -516,6 +516,8 @@ class DatabaseManager(DatabaseAdapter):
             row = cursor.fetchone()
             return self._row_to_job(row) if row else None
 
+    get_job = get_job_by_id
+
     def get_job_by_fingerprint(self, fingerprint: str, user_id: str = "default") -> Optional[JobListing]:
         """Checks for existing job by fingerprint."""
         with self.get_connection() as conn:
@@ -607,6 +609,32 @@ class DatabaseManager(DatabaseAdapter):
                 for r in rows
             ]
 
+    get_pending_hitl_events = get_pending_hitl
+
+    def get_hitl_event(self, event_id: str) -> Optional[HITLEvent]:
+        """Retrieves a single HITL event by ID."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM hitl_events WHERE event_id = ?", (event_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return HITLEvent(
+                event_id=row["event_id"],
+                user_id=row["user_id"] if "user_id" in row.keys() else "default",
+                job_id=row["job_id"],
+                company=row["company"],
+                role_title=row["role_title"],
+                question_text=row["question_text"],
+                input_type=row["input_type"],
+                options=json.loads(row["options"]) if row["options"] else [],
+                ai_suggested_draft=row["ai_suggested_draft"] or "",
+                user_answer=row["user_answer"],
+                status=row["status"],
+                created_at=row["created_at"],
+                resolved_at=row["resolved_at"] if "resolved_at" in row.keys() else None
+            )
+
     def resolve_hitl_event(self, event_id: str, user_answer: str, user_id: str = "default") -> bool:
         """Atomically resolves a pending HITL question."""
         with self._lock:
@@ -619,8 +647,9 @@ class DatabaseManager(DatabaseAdapter):
                 """, (user_answer, now_str, event_id))
                 conn.commit()
                 return cursor.rowcount > 0
-
-    get_pending_hitl_events = get_pending_hitl
+                ))
+        return events
+>>>>>>> 861b627 (feature-added)
 
     # =========================================================================
     # Outreach & Email Operations (Multi-Tenant)

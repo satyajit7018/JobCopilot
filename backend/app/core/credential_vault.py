@@ -173,6 +173,17 @@ class CredentialVault:
         except Exception:
             return {}
 
+    def store_credential(self, service: str, cred_data: Any, master_password: Optional[str] = None):
+        """Stores a named credential or token into the vault."""
+        secrets = self.load_secrets(master_password)
+        secrets[service] = cred_data
+        self.save_secrets(secrets, master_password)
+
+    def get_credential(self, service: str, master_password: Optional[str] = None) -> Optional[Any]:
+        """Retrieves a named credential from the vault."""
+        secrets = self.load_secrets(master_password)
+        return secrets.get(service)
+
     def save_platform_session(self, platform: str, session_data: Dict[str, Any], master_password: Optional[str] = None):
         """Saves platform cookies and storage state."""
         secrets = self.load_secrets(master_password)

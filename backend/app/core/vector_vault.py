@@ -82,6 +82,10 @@ class KnowledgeVault:
                 slot_key="why_looking_for_role"
             )
 
+    def learn_question(self, question: str, answer: str, **kwargs) -> VaultEntry:
+        """Alias for learn_answer."""
+        return self.learn_answer(question=question, answer_template=answer)
+
     def learn_answer(self, question: str, answer_template: str, slot_type: Optional[SlotType] = None, slot_key: Optional[str] = None) -> VaultEntry:
         """Stores or updates a Q&A slot in the Knowledge Vault."""
         if not slot_type or not slot_key:

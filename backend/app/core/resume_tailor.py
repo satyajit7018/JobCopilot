@@ -20,6 +20,16 @@ class ResumeTailor:
     """Dynamically aligns candidate profile emphasis with target Job Descriptions."""
 
     @classmethod
+    def tailor_for_job(cls, profile: CandidateProfile, job_title: str, job_description: str) -> Dict[str, Any]:
+        """Convenience method returning tailored skills and project names."""
+        tailored, matched = cls.tailor_profile_for_job(profile, job_title, job_description)
+        return {
+            "tailored_skills": tailored.skills,
+            "reordered_projects": [p.name for p in tailored.projects],
+            "matched_skills": matched
+        }
+
+    @classmethod
     def tailor_profile_for_job(
         cls,
         profile: CandidateProfile,

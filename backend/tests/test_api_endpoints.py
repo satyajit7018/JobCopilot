@@ -107,3 +107,76 @@ def test_hitl_resolution_endpoint():
     res = client.post("/api/hitl/resolve", json={"event_id": "evt_api_test", "user_answer": "4 years"})
     assert res.status_code == 200
     assert res.json()["status"] == "success"
+
+
+def test_google_sso_endpoint():
+    payload = {
+        "email": "alex.dev@gmail.com",
+        "full_name": "Alex Mercer",
+        "avatar_url": "https://lh3.googleusercontent.com/a/default-user",
+        "auto_login_permissions": True
+    }
+    res = client.post("/api/auth/google-sso", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert "session_token" in data
+    assert data["user"]["email"] == "alex.dev@gmail.com"
+
+
+def test_multi_role_tailor_endpoint():
+    payload = {
+        "roles": ["Backend Engineer", "Full Stack Engineer", "AI/ML Engineer"],
+        "profile_id": "default_user"
+    }
+    res = client.post("/api/resumes/tailor-multi", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert "Backend Engineer" in data["resumes"]
+    assert "AI/ML Engineer" in data["resumes"]
+    assert len(data["resumes"]["Backend Engineer"]["recommended_bullets"]) >= 2
+
+
+def test_manual_call_logger_endpoint():
+    payload = {
+        "company": "Anthropic",
+        "role_title": "Systems Engineer",
+        "recruiter_name": "Sarah Jenkins",
+        "status": "INTERVIEW",
+        "call_notes": "Discussed distributed inference and memory bandwidth. Scheduled next round.",
+        "meeting_link": "https://meet.google.com/abc-defg-hij"
+    }
+    res = client.post("/api/jobs/log-call", json=payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["company"] == "Anthropic"
+    assert data["current_status"] == "INTERVIEW"
+
+
+def test_held_application_resolution_lifecycle():
+    # 1. Create a held event
+    event = HITLEvent(
+        event_id="evt_held_001",
+        job_id="job_held_101",
+        company="Scale AI",
+        role_title="Data Platform Engineer",
+        question_text="What is your experience with Apache Iceberg?"
+    )
+    db.save_hitl_event(event)
+
+    # 2. Query held jobs
+    res_held = client.get("/api/jobs/held")
+    assert res_held.status_code == 200
+    data_held = res_held.json()
+    assert data_held["count"] >= 1
+
+    # 3. Resolve held job
+    res_res = client.post("/api/hitl/resolve-held", json={
+        "event_id": "evt_held_001",
+        "user_answer": "Built data lakes on Iceberg with Trino querying 50TB daily.",
+        "save_to_vault": True
+    })
+    assert res_res.status_code == 200
+    assert res_res.json()["status"] == "success"
