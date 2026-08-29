@@ -43,6 +43,7 @@ def run_tests():
     assert "Python" in profile.skills and "PyTorch" in profile.skills, "Failed: skills missing"
     assert len(profile.certifications) > 0, "Failed: certifications missing"
     db.save_profile(profile)
+    vault.seed_from_profile(profile)
     print("  ✅ Resume Parser passed! Structured profile generated and saved.")
 
     # 2. Test Knowledge Vault & Semantic Slot Retrieval
