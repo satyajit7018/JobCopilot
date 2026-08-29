@@ -1,7 +1,7 @@
 """
 JobCopilot - API Endpoints
 REST and WebSocket handlers for Onboarding, Questionnaire, Knowledge Vault,
-Job Pipeline, Real-Time HITL Alerts, and Configuration.
+Job Pipeline, Real-Time HITL Alerts, Dynamic Tailored Resumes, and Triple-Threat Outreach.
 """
 
 import os
@@ -19,6 +19,9 @@ from app.core.questionnaire import QuestionnaireEngine
 from app.core.compensation import CompensationConverter
 from app.core.vector_vault import vault
 from app.core.credential_vault import cred_vault
+from app.core.resume_tailor import ResumeTailor
+from app.core.cover_letter import CoverLetterGenerator
+from app.core.outreach_generator import OutreachGenerator
 from app.discovery.orchestrator import discovery_orchestrator
 
 router = APIRouter(prefix="/api")
@@ -214,6 +217,58 @@ async def get_jobs(status: Optional[str] = None):
     return {
         "count": len(jobs),
         "jobs": [j.dict() for j in jobs]
+    }
+
+
+# --- Tailored Resume & Triple-Threat Outreach Generation Endpoint ---
+
+@router.post("/jobs/{job_id}/tailor")
+async def generate_tailored_assets(job_id: str, profile_id: str = "default_user"):
+    """Compiles a bespoke tailored PDF resume, cover letter, and triple-threat outreach for a job."""
+    profile = db.get_profile(profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found.")
+
+    # Find job in database
+    jobs = db.get_jobs()
+    job = next((j for j in jobs if j.job_id == job_id), None)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    # 1. Compile Tailored PDF Resume
+    pdf_path, content_hash, tailored_profile = await ResumeTailor.compile_tailored_resume_for_job(
+        profile=profile,
+        job_id=job.job_id,
+        job_title=job.title,
+        job_description=job.description,
+        company_name=job.company
+    )
+
+    # 2. Generate Anti-AI Cover Letter
+    cover_letter = CoverLetterGenerator.generate_cover_letter(
+        profile=tailored_profile,
+        company_name=job.company,
+        job_title=job.title,
+        job_description=job.description
+    )
+
+    # 3. Generate Triple-Threat Outreach Package
+    outreach_pkg = OutreachGenerator.create_triple_threat_package(
+        profile=profile,
+        job_id=job.job_id,
+        company_name=job.company,
+        job_title=job.title
+    )
+
+    return {
+        "status": "success",
+        "job_id": job.job_id,
+        "company": job.company,
+        "title": job.title,
+        "tailored_pdf_path": str(pdf_path),
+        "pdf_hash": content_hash,
+        "cover_letter": cover_letter,
+        "outreach": outreach_pkg
     }
 
 
