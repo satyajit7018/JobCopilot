@@ -154,28 +154,28 @@ class BackupManager:
             for em in payload.get("emails", []):
                 cursor.execute("""
                 INSERT OR REPLACE INTO emails (
-                    message_id, job_id, sender, recipient, subject, body_text,
-                    body_html, intent, classification_confidence, booking_links,
-                    raw_headers, received_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    message_id, sender, recipient, subject, body_text,
+                    received_at, associated_job_id, intent, scheduling_links,
+                    has_tracking_pixels, processed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
-                    em["message_id"], em.get("job_id"), em["sender"], em["recipient"], em["subject"],
-                    em["body_text"], em.get("body_html"), em["intent"], em.get("classification_confidence", 1.0),
-                    em.get("booking_links"), em.get("raw_headers"), em["received_at"]
+                    em["message_id"], em["sender"], em["recipient"], em["subject"], em["body_text"],
+                    em["received_at"], em.get("associated_job_id"), em["intent"],
+                    json.dumps(em.get("scheduling_links", [])) if isinstance(em.get("scheduling_links"), list) else em.get("scheduling_links"),
+                    em.get("has_tracking_pixels", 0), em.get("processed", 0)
                 ))
 
             # Outreach
             for o in payload.get("outreach", []):
                 cursor.execute("""
                 INSERT OR REPLACE INTO outreach_records (
-                    outreach_id, job_id, company, candidate_name, hiring_manager_name,
-                    channel, content_preview, linkedin_note, cold_email_subject,
-                    cold_email_body, status, created_at, sent_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    outreach_id, job_id, channel, recipient_name, recipient_title,
+                    recipient_contact, message_content, status, sent_at, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
-                    o["outreach_id"], o["job_id"], o["company"], o["candidate_name"], o.get("hiring_manager_name"),
-                    o["channel"], o["content_preview"], o.get("linkedin_note"), o.get("cold_email_subject"),
-                    o.get("cold_email_body"), o["status"], o["created_at"], o.get("sent_at")
+                    o["outreach_id"], o["job_id"], o["channel"], o.get("recipient_name"),
+                    o.get("recipient_title"), o.get("recipient_contact"), o["message_content"],
+                    o["status"], o.get("sent_at"), o.get("created_at") or datetime.now().isoformat()
                 ))
 
             conn.commit()

@@ -228,7 +228,7 @@ class DatabaseManager:
                 conn.commit()
 
     # --- Profile Operations ---
-    def save_profile(self, profile: CandidateProfile):
+    def save_profile(self, profile: CandidateProfile) -> bool:
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -237,6 +237,7 @@ class DatabaseManager:
                 VALUES (?, ?, ?)
                 """, (profile.id, json.dumps(profile.dict()), profile.updated_at))
                 conn.commit()
+                return True
 
     def get_profile(self, profile_id: str = "default_user") -> Optional[CandidateProfile]:
         with self.get_connection() as conn:

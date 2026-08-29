@@ -139,6 +139,14 @@ class CredentialVault:
         except Exception:
             return "[ENCRYPTED]"
 
+    def encrypt(self, value: str, master_password: Optional[str] = None) -> str:
+        """Alias for encrypt_field"""
+        return self.encrypt_field(value, master_password)
+
+    def decrypt(self, enc_string: str, master_password: Optional[str] = None) -> str:
+        """Alias for decrypt_field"""
+        return self.decrypt_field(enc_string, master_password)
+
     # --- Full Secrets & Cookies Management ---
     def save_secrets(self, secrets: Dict[str, Any], master_password: Optional[str] = None):
         """Saves secrets dictionary to encrypted file."""

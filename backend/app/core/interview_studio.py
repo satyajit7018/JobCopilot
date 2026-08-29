@@ -73,6 +73,20 @@ class InterviewStudioEngine:
         ]
 
     @classmethod
+    def evaluate_interview_response(
+        cls,
+        question: str,
+        key_concepts: Optional[List[str]] = None,
+        candidate_answer: str = ""
+    ) -> Dict[str, Any]:
+        """Convenience alias for evaluate_candidate_response."""
+        return cls.evaluate_candidate_response(
+            question=question,
+            candidate_answer=candidate_answer,
+            key_concepts=key_concepts
+        )
+
+    @classmethod
     def evaluate_candidate_response(
         cls,
         question: str,

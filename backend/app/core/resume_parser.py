@@ -70,16 +70,20 @@ class ResumeParser:
     @classmethod
     def extract_raw_text(cls, source_path_or_text: str) -> str:
         """Extracts raw text from file path (PDF/DOCX) or returns raw string."""
-        path = Path(source_path_or_text)
-        if path.exists() and path.is_file():
-            ext = path.suffix.lower()
-            if ext == ".pdf":
-                return cls.extract_text_from_pdf(str(path))
-            elif ext in [".docx", ".doc"]:
-                return cls.extract_text_from_docx(str(path))
-            else:
-                with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                    return f.read()
+        if "\n" not in source_path_or_text and len(source_path_or_text) < 260:
+            try:
+                path = Path(source_path_or_text)
+                if path.exists() and path.is_file():
+                    ext = path.suffix.lower()
+                    if ext == ".pdf":
+                        return cls.extract_text_from_pdf(str(path))
+                    elif ext in [".docx", ".doc"]:
+                        return cls.extract_text_from_docx(str(path))
+                    else:
+                        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                            return f.read()
+            except Exception:
+                pass
         return source_path_or_text
 
     @classmethod

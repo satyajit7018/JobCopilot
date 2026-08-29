@@ -43,6 +43,12 @@ class CoverLetterGenerator:
         return cleaned
 
     @classmethod
+    def has_banned_cliches(cls, text: str) -> bool:
+        """Checks if any forbidden AI cliché exists in text."""
+        text_lower = text.lower()
+        return any(re.search(r'\b' + re.escape(c) + r'\b', text_lower) for c in cls.FORBIDDEN_AI_CLICHES)
+
+    @classmethod
     def generate_cover_letter(
         cls,
         profile: CandidateProfile,

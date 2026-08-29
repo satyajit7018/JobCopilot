@@ -13,6 +13,11 @@ class AnalyticsEngine:
     """Computes holistic pipeline conversion metrics and telemetry."""
 
     @classmethod
+    def get_funnel_stats(cls) -> Dict[str, Any]:
+        """Convenience alias for get_funnel_metrics."""
+        return cls.get_funnel_metrics()
+
+    @classmethod
     def get_funnel_metrics(cls) -> Dict[str, Any]:
         """Calculates stage counts, conversion rates, and platform breakdowns."""
         jobs = db.get_jobs()
