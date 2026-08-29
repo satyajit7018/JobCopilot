@@ -1,69 +1,71 @@
 /* ==========================================================================
-   JobCopilot - Linear & Raycast Inspired Design System
-   Ultra-Clean, Uncluttered, Dark Minimalist Aesthetic
+   JobCopilot - Executive Cobalt & Obsidian Design System
+   Professional Enterprise Aesthetic • High-Contrast WCAG AAA Typography
    ========================================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
-  /* Linear-grade Neutral Palette */
-  --bg-app: #08090c;
-  --bg-sidebar: #0d0f14;
-  --bg-card: #12151c;
-  --bg-card-hover: #171b24;
-  --bg-card-subtle: rgba(255, 255, 255, 0.02);
-  --bg-input: #0e1117;
-  --bg-input-focus: #141822;
+  /* Executive Obsidian Background Palette */
+  --bg-app: #08090d;
+  --bg-sidebar: #0d0f15;
+  --bg-card: #12151e;
+  --bg-card-hover: #171b26;
+  --bg-card-secondary: #161922;
+  --bg-input: #0a0c12;
+  --bg-input-focus: #0f121a;
 
-  /* Subtle Borders */
+  /* Executive Cobalt Primary Accents */
+  --accent-primary: #2563eb;
+  --accent-primary-hover: #1d4ed8;
+  --accent-light: #3b82f6;
+  --accent-subtle: rgba(37, 99, 235, 0.12);
+  --accent-border: rgba(37, 99, 235, 0.35);
+
+  /* Precise Borders */
   --border-color: rgba(255, 255, 255, 0.07);
-  --border-hover: rgba(255, 255, 255, 0.14);
-  --border-focus: #5e6ad2;
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-hover: rgba(255, 255, 255, 0.2);
+  --border-focus: #3b82f6;
 
-  /* Typography */
-  --text-primary: #f0f2f5;
-  --text-secondary: #8a8f98;
-  --text-muted: #575c66;
-  --text-dim: #3b3f47;
+  /* High-Contrast Typography */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-dim: #475569;
 
-  /* Linear Accent Colors */
-  --accent-primary: #5e6ad2;
-  --accent-primary-hover: #6875e5;
-  --accent-glow: rgba(94, 106, 210, 0.15);
-  
-  /* Status Colors */
-  --status-green: #22c55e;
-  --status-green-bg: rgba(34, 197, 94, 0.1);
-  --status-green-border: rgba(34, 197, 94, 0.25);
+  /* Status Accents */
+  --status-green: #10b981;
+  --status-green-bg: rgba(16, 185, 129, 0.1);
+  --status-green-border: rgba(16, 185, 129, 0.25);
 
-  --status-blue: #38bdf8;
-  --status-blue-bg: rgba(56, 189, 248, 0.1);
-  --status-blue-border: rgba(56, 189, 248, 0.25);
+  --status-blue: #0ea5e9;
+  --status-blue-bg: rgba(14, 165, 233, 0.1);
+  --status-blue-border: rgba(14, 165, 233, 0.25);
 
   --status-amber: #f59e0b;
   --status-amber-bg: rgba(245, 158, 11, 0.1);
   --status-amber-border: rgba(245, 158, 11, 0.25);
 
-  --status-purple: #a855f7;
-  --status-purple-bg: rgba(168, 85, 247, 0.1);
-  --status-purple-border: rgba(168, 85, 247, 0.25);
-
   --status-rose: #f43f5e;
+  --status-rose-bg: rgba(244, 63, 94, 0.1);
 
-  /* Radii */
+  /* Precise Radii */
+  --radius-xs: 4px;
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.35);
-  --shadow-popover: 0 12px 38px rgba(0, 0, 0, 0.65);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-popover: 0 12px 32px rgba(0, 0, 0, 0.7);
+  --shadow-blue-glow: 0 0 20px rgba(37, 99, 235, 0.2);
 }
 
-/* Base Reset & Typography */
+/* Base Reset */
 * {
   margin: 0;
   padding: 0;
@@ -73,19 +75,19 @@
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--bg-app);
   color: var(--text-primary);
   line-height: 1.5;
-  font-size: 14px;
+  font-size: 13.5px;
   min-height: 100vh;
   overflow-x: hidden;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: -0.025em;
   color: #ffffff;
 }
 
@@ -95,7 +97,7 @@ code, pre {
 }
 
 /* ==========================================================================
-   Linear Layout Architecture
+   Executive App Layout
    ========================================================================== */
 
 .app-layout {
@@ -103,9 +105,9 @@ code, pre {
   min-height: 100vh;
 }
 
-/* Sidebar (Linear Style: 240px, Minimal, Clean) */
+/* Sidebar (Executive Clean: 245px) */
 .sidebar {
-  width: 240px;
+  width: 245px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -124,6 +126,8 @@ code, pre {
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 1rem;
 }
 
 .brand-icon {
@@ -134,14 +138,15 @@ code, pre {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
-  color: #fff;
+  font-size: 0.95rem;
+  color: #ffffff;
   font-weight: 700;
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
 }
 
 .brand-name {
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #ffffff;
   letter-spacing: -0.02em;
@@ -153,11 +158,11 @@ code, pre {
 
 .sidebar-nav-title {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--text-muted);
-  padding: 0 0.75rem 0.4rem;
+  padding: 0 0.75rem 0.45rem;
 }
 
 .sidebar-nav {
@@ -170,12 +175,12 @@ code, pre {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.55rem 0.75rem;
   border-radius: var(--radius-sm);
-  border: none;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--text-secondary);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   text-align: left;
@@ -184,8 +189,8 @@ code, pre {
 }
 
 .nav-tab .nav-icon {
-  font-size: 1.05rem;
-  opacity: 0.7;
+  font-size: 1rem;
+  opacity: 0.8;
 }
 
 .nav-tab:hover {
@@ -194,17 +199,19 @@ code, pre {
 }
 
 .nav-tab.active {
-  background: rgba(94, 106, 210, 0.12);
-  color: #a5b4fc;
+  background: var(--accent-subtle);
+  color: #ffffff;
   font-weight: 600;
+  border-color: var(--accent-border);
 }
 
 .nav-tab.active .nav-icon {
   opacity: 1;
+  color: var(--accent-light);
 }
 
 .sidebar-footer {
-  padding: 0.75rem;
+  padding: 0.85rem 0.75rem 0.25rem;
   border-top: 1px solid var(--border-color);
   display: flex;
   align-items: center;
@@ -216,31 +223,32 @@ code, pre {
   align-items: center;
   gap: 0.4rem;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--status-green);
 }
 
 .status-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   background: var(--status-green);
   border-radius: 50%;
+  box-shadow: 0 0 8px var(--status-green);
 }
 
 /* ==========================================================================
-   Main Content Area (Uncluttered, Generous Breathing Room)
+   Main Content Area
    ========================================================================== */
 
 .main-content {
   flex: 1;
-  margin-left: 240px;
-  padding: 2.5rem 3.5rem;
-  max-width: 1160px;
+  margin-left: 245px;
+  padding: 2.25rem 3rem;
+  max-width: 1180px;
 }
 
 .view-panel {
   display: none;
-  animation: fadeInPanel 0.2s ease-out;
+  animation: fadeInPanel 0.18s ease-out;
 }
 
 .view-panel.active {
@@ -252,44 +260,44 @@ code, pre {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Top Header Bar */
+/* Page Header */
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
   padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--border-color);
 }
 
 .page-title {
-  font-size: 1.5rem;
+  font-size: 1.45rem;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.025em;
   margin-bottom: 0.25rem;
 }
 
 .page-subtitle {
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--text-secondary);
 }
 
 /* ==========================================================================
-   Clean Card Components (Linear-Grade)
+   Executive Cards
    ========================================================================== */
 
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 1.75rem;
-  margin-bottom: 1.5rem;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.25rem;
   box-shadow: var(--shadow-card);
   transition: border-color 0.15s ease;
 }
 
 .card:hover {
-  border-color: var(--border-hover);
+  border-color: var(--border-medium);
 }
 
 .card-header {
@@ -300,18 +308,19 @@ code, pre {
 }
 
 .card-title {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 600;
+  color: #ffffff;
 }
 
 .card-subtitle {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-secondary);
   margin-top: 0.15rem;
 }
 
 /* ==========================================================================
-   Buttons (Minimalist, Crisp)
+   Executive Buttons
    ========================================================================== */
 
 .btn {
@@ -322,21 +331,24 @@ code, pre {
   padding: 0.5rem 1rem;
   border-radius: var(--radius-sm);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
   transition: all 0.12s ease;
   border: 1px solid transparent;
   outline: none;
+  text-decoration: none;
 }
 
 .btn-primary {
   background: var(--accent-primary);
   color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 .btn-primary:hover {
   background: var(--accent-primary-hover);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
   transform: translateY(-1px);
 }
 
@@ -348,11 +360,11 @@ code, pre {
 
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: var(--border-hover);
+  border-color: var(--border-medium);
 }
 
 /* ==========================================================================
-   Clean Forms & Input Fields
+   Forms & Inputs
    ========================================================================== */
 
 .form-grid {
@@ -369,7 +381,7 @@ code, pre {
 
 .form-label {
   font-size: 12.5px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-secondary);
 }
 
@@ -380,58 +392,59 @@ code, pre {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 13.5px;
+  font-size: 13px;
   font-family: inherit;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   outline: none;
   border-color: var(--border-focus);
   background: var(--bg-input-focus);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
 }
 
 /* ==========================================================================
-   Clean Dropzone (Uncluttered)
+   Dropzone
    ========================================================================== */
 
 .dropzone {
-  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border: 1px dashed rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.015);
   border-radius: var(--radius-md);
-  padding: 2.5rem 1.5rem;
+  padding: 2.25rem 1.5rem;
   text-align: center;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .dropzone:hover {
-  border-color: var(--accent-primary);
-  background: rgba(94, 106, 210, 0.04);
+  border-color: var(--accent-light);
+  background: rgba(37, 99, 235, 0.04);
 }
 
 .dropzone-icon {
-  font-size: 2rem;
+  font-size: 1.85rem;
   margin-bottom: 0.5rem;
 }
 
 .dropzone-title {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   margin-bottom: 0.2rem;
 }
 
 .dropzone-subtitle {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
 /* ==========================================================================
-   Salary Slider (Clean, Minimalist)
+   Salary Slider
    ========================================================================== */
 
 .slider-container {
-  background: var(--bg-input);
+  background: var(--bg-card-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 1.25rem;
@@ -469,7 +482,7 @@ code, pre {
 }
 
 .currency-badge {
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   padding: 0.4rem 0.6rem;
@@ -477,10 +490,10 @@ code, pre {
 }
 
 .currency-badge-label {
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--text-muted);
   text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .currency-badge-val {
@@ -491,27 +504,26 @@ code, pre {
 }
 
 /* ==========================================================================
-   Pill Badges (Linear-Grade)
+   Pill Badges & Step Wizards
    ========================================================================== */
 
 .brand-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 11.5px;
-  font-weight: 500;
-  padding: 0.2rem 0.6rem;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text-secondary);
   border: 1px solid var(--border-color);
 }
 
-/* Step Wizard (Minimalist Line) */
 .wizard-steps {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem;
   margin-bottom: 1.75rem;
 }
 
@@ -520,8 +532,8 @@ code, pre {
   align-items: center;
   gap: 0.5rem;
   opacity: 0.4;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .wizard-step.active {
@@ -530,15 +542,15 @@ code, pre {
 }
 
 .wizard-step-num {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .wizard-step.active .wizard-step-num {
@@ -547,7 +559,7 @@ code, pre {
 }
 
 /* ==========================================================================
-   Table Components
+   Tables
    ========================================================================== */
 
 .vault-table {
@@ -560,10 +572,10 @@ code, pre {
   text-align: left;
   padding: 0.65rem 0.85rem;
   color: var(--text-muted);
-  font-weight: 500;
-  font-size: 11.5px;
+  font-weight: 600;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -587,7 +599,7 @@ code, pre {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   display: none;
@@ -601,8 +613,8 @@ code, pre {
 }
 
 .modal-box {
-  background: var(--bg-card);
-  border: 1px solid var(--border-hover);
+  background: #11141c;
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-xl);
   padding: 1.75rem;
   max-width: 580px;
@@ -621,8 +633,8 @@ code, pre {
 }
 
 .toast {
-  background: #181c24;
-  border: 1px solid var(--border-hover);
+  background: #161a24;
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-sm);
   padding: 0.65rem 1rem;
   color: #ffffff;
