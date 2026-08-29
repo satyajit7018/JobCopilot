@@ -1,7 +1,7 @@
 /**
  * JobCopilot - Master Frontend Application Logic
  * Reactive UI handling Onboarding Wizard, Multi-Currency Slider,
- * Knowledge Vault, WebSockets, and Atomic HITL Approvals.
+ * Knowledge Vault, 0-Day Job Pipeline, WebSockets, and Atomic HITL Approvals.
  */
 
 const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
@@ -14,6 +14,7 @@ const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${win
 const state = {
   currentProfile: null,
   vaultEntries: [],
+  jobsList: [],
   ws: null,
   activePendingHitl: null
 };
@@ -62,6 +63,10 @@ const els = {
   vaultTableBody: document.getElementById('vault-table-body'),
   vaultSearchInput: document.getElementById('vault-search-input'),
   
+  // Pipeline
+  jobPipelineList: document.getElementById('job-pipeline-list'),
+  btnStartAutopilot: document.getElementById('btn-start-autopilot'),
+  
   // HITL Modal
   hitlModal: document.getElementById('hitl-modal'),
   hitlCompanyTag: document.getElementById('hitl-company-tag'),
@@ -84,6 +89,8 @@ window.switchTab = function(viewName) {
 
   if (viewName === 'vault') {
     fetchVaultEntries();
+  } else if (viewName === 'pipeline') {
+    fetchJobsList();
   }
 };
 
@@ -237,7 +244,6 @@ function populateQuestionnaire(profile, prefilled) {
   els.qCurrentEmployer.value = prefilled.current_employer || '';
   els.qWhyLooking.value = prefilled.why_looking_for_role || '';
 
-  // Extract CTC numeric value
   const ctcMatch = (prefilled.expected_ctc || '').match(/[\d\.]+/);
   const lpaVal = ctcMatch ? parseFloat(ctcMatch[0]) : 15.0;
   els.salarySlider.value = lpaVal;
@@ -332,6 +338,93 @@ els.vaultSearchInput.addEventListener('input', (e) => {
   renderVaultTable(filtered);
 });
 
+// --- Job Pipeline Data Fetching & Rendering ---
+async function fetchJobsList() {
+  try {
+    const res = await fetch(`${API_BASE}/jobs`);
+    const data = await res.json();
+    state.jobsList = data.jobs || [];
+    renderJobsList(state.jobsList);
+  } catch (err) {
+    console.error('Failed to fetch jobs:', err);
+  }
+}
+
+function renderJobsList(jobs) {
+  if (!els.jobPipelineList) return;
+  els.jobPipelineList.innerHTML = '';
+
+  if (!jobs.length) {
+    els.jobPipelineList.innerHTML = `
+      <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔍</div>
+        <p>No jobs discovered yet. Click <strong>Start Auto-Apply</strong> to run 0-day discovery across Greenhouse, Lever, Ashby, and YC!</p>
+      </div>
+    `;
+    return;
+  }
+
+  const grid = document.createElement('div');
+  grid.style.display = 'grid';
+  grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(340px, 1fr))';
+  grid.style.gap = '1.25rem';
+
+  jobs.forEach(job => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.margin = '0';
+    card.style.display = 'flex';
+    card.style.flexDirection = 'column';
+    card.style.justifyContent = 'space-between';
+
+    const matchPercent = Math.round(job.match_score * 100);
+    const scoreColor = matchPercent >= 80 ? '#34d399' : matchPercent >= 60 ? '#818cf8' : '#f59e0b';
+    const reasonsHtml = (job.match_reasons || []).slice(0, 2).map(r => `<div style="font-size: 0.75rem; color: var(--text-secondary);">• ${escapeHtml(r)}</div>`).join('');
+
+    card.innerHTML = `
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+          <span class="brand-badge">${escapeHtml(job.platform)}</span>
+          <span style="font-weight: 700; font-size: 0.95rem; color: ${scoreColor}; background: rgba(255,255,255,0.05); padding: 0.2rem 0.6rem; border-radius: var(--radius-full); border: 1px solid ${scoreColor}44;">
+            ${matchPercent}% Match
+          </span>
+        </div>
+        <h3 style="font-size: 1.1rem; margin-bottom: 0.25rem;">${escapeHtml(job.title)}</h3>
+        <div style="font-size: 0.85rem; font-weight: 600; color: #a5b4fc; margin-bottom: 0.5rem;">${escapeHtml(job.company)} • <span style="font-weight: 400; color: var(--text-muted);">${escapeHtml(job.location)}</span></div>
+        ${job.salary_range ? `<div style="font-size: 0.8rem; color: #34d399; font-weight: 600; margin-bottom: 0.5rem;">💰 ${escapeHtml(job.salary_range)}</div>` : ''}
+        <div style="margin-top: 0.5rem; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: var(--radius-sm);">
+          ${reasonsHtml}
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
+        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Priority: ${job.priority_score}/100</span>
+        <a href="${job.url}" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem;">View ATS Post ➔</a>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  els.jobPipelineList.appendChild(grid);
+}
+
+if (els.btnStartAutopilot) {
+  els.btnStartAutopilot.addEventListener('click', async () => {
+    try {
+      showToast('Triggering 0-day job discovery across Greenhouse, Lever, Ashby, YC & HN...', 'info');
+      const res = await fetch(`${API_BASE}/discovery/run`, { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'success') {
+        showToast(`Discovery complete! Sourced ${data.total_sourced} jobs, matched & saved ${data.matched_and_saved}!`, 'success');
+        fetchJobsList();
+      } else {
+        showToast(data.detail || 'Discovery error', 'error');
+      }
+    } catch (err) {
+      showToast(`Discovery failed: ${err.message}`, 'error');
+    }
+  });
+}
+
 function escapeHtml(str) {
   return (str || '').replace(/[&<>"']/g, m => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -354,6 +447,8 @@ function initWebSocket() {
           showHitlModal(msg.event);
         } else if (msg.type === 'BOT_LOG') {
           appendBotLog(msg.message);
+        } else if (msg.type === 'DISCOVERY_COMPLETED') {
+          fetchJobsList();
         }
       } catch (e) {}
     };
@@ -419,4 +514,5 @@ els.btnHitlApprove.addEventListener('click', async () => {
 document.addEventListener('DOMContentLoaded', () => {
   initWebSocket();
   updateSalaryEquivalents(15);
+  fetchJobsList();
 });
