@@ -146,5 +146,6 @@ class JobDeduplicator:
             hash_b = cls.compute_simhash_64(desc_b)
             if cls.hamming_distance(hash_a, hash_b) <= max_hamming_distance:
                 return True
+            return False
 
-        return True
+        return False

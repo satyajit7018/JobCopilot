@@ -70,6 +70,13 @@ class HITLResolveRequest(BaseModel):
     save_to_vault: bool = True
 
 
+class VaultTestMatchRequest(BaseModel):
+    question: str
+    company: str = "Stripe"
+    role: str = "Senior Software Engineer"
+    profile_id: str = "default_user"
+
+
 # --- Endpoints ---
 
 @router.get("/health")
@@ -202,6 +209,30 @@ async def learn_vault_entry(payload: VaultLearnRequest):
         slot_key=payload.slot_key
     )
     return {"status": "success", "entry": entry.dict()}
+
+
+@router.post("/vault/test-match")
+async def test_vault_match(payload: VaultTestMatchRequest):
+    """Tests real-time question resolution against the Knowledge Vault for UI playground."""
+    profile = db.get_profile(payload.profile_id)
+    answer, confidence, entry = vault.get_answer_for_question(
+        question=payload.question,
+        profile=profile,
+        context={"company": payload.company, "role": payload.role}
+    )
+    
+    detected_type, detected_key = vault.matcher.detect_slot_type(payload.question)
+    
+    return {
+        "status": "success",
+        "question": payload.question,
+        "resolved_answer": answer or "No confident match in Knowledge Vault yet. (Confidence < 55%)",
+        "confidence_score": round(confidence * 100, 1),
+        "slot_key": entry.slot_key if entry else detected_key,
+        "slot_type": (entry.slot_type.value if entry else detected_type.value) if hasattr(detected_type, "value") else str(detected_type),
+        "matched_pattern": entry.question_pattern if entry else "N/A",
+        "is_matched": answer is not None
+    }
 
 
 # --- 0-Day Discovery Endpoints ---

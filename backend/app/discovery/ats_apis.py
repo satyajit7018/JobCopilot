@@ -12,6 +12,12 @@ import httpx
 
 from app.core.models import JobListing, ApplicationStatus
 
+try:
+    import h2
+    HAS_H2 = True
+except ImportError:
+    HAS_H2 = False
+
 
 class ATSApiFeeders:
     """Fetches real-time job listings directly from ATS public REST APIs."""
@@ -70,7 +76,7 @@ class ATSApiFeeders:
         if client:
             await _fetch(client)
         else:
-            async with httpx.AsyncClient(http2=True) as c:
+            async with httpx.AsyncClient(http2=HAS_H2) as c:
                 await _fetch(c)
 
         return jobs
@@ -115,7 +121,7 @@ class ATSApiFeeders:
         if client:
             await _fetch(client)
         else:
-            async with httpx.AsyncClient(http2=True) as c:
+            async with httpx.AsyncClient(http2=HAS_H2) as c:
                 await _fetch(c)
 
         return jobs
@@ -159,7 +165,7 @@ class ATSApiFeeders:
         if client:
             await _fetch(client)
         else:
-            async with httpx.AsyncClient(http2=True) as c:
+            async with httpx.AsyncClient(http2=HAS_H2) as c:
                 await _fetch(c)
 
         return jobs
@@ -167,7 +173,7 @@ class ATSApiFeeders:
     @classmethod
     async def fetch_all_company_jobs(cls, company_slug: str) -> List[Dict[str, Any]]:
         """Tries Greenhouse, Lever, and Ashby in parallel for a given company slug."""
-        async with httpx.AsyncClient(http2=True) as client:
+        async with httpx.AsyncClient(http2=HAS_H2) as client:
             results = await asyncio.gather(
                 cls.fetch_greenhouse_jobs(company_slug, client),
                 cls.fetch_lever_jobs(company_slug, client),

@@ -7,13 +7,18 @@ and sensitive candidate PII with OS Keychain integration.
 import os
 import json
 import base64
-import keyring
 from typing import Dict, Optional, Any
 from pathlib import Path
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from app.core.config import VAULT_ENC_PATH, APP_DIR
+
+try:
+    import keyring
+    HAS_KEYRING = True
+except ImportError:
+    HAS_KEYRING = False
 
 try:
     from argon2.low_level import hash_secret_raw, Type
@@ -46,23 +51,30 @@ class CredentialVault:
 
     def get_or_create_master_key(self) -> str:
         """Retrieves master key from OS Keychain or creates a secure random 32-byte key."""
+        if HAS_KEYRING:
+            try:
+                stored_key = keyring.get_password(self.KEYRING_SERVICE, self.KEYRING_USERNAME)
+                if stored_key:
+                    return stored_key
+                new_key = base64.b64encode(os.urandom(32)).decode('utf-8')
+                keyring.set_password(self.KEYRING_SERVICE, self.KEYRING_USERNAME, new_key)
+                return new_key
+            except Exception:
+                pass
+        
+        # Fallback to local machine identifier if keyring is unavailable in headless CI
+        fallback_file = APP_DIR / ".master.key"
+        if fallback_file.exists():
+            with open(fallback_file, "r") as f:
+                return f.read().strip()
+        new_key = base64.b64encode(os.urandom(32)).decode('utf-8')
+        with open(fallback_file, "w") as f:
+            f.write(new_key)
         try:
-            stored_key = keyring.get_password(self.KEYRING_SERVICE, self.KEYRING_USERNAME)
-            if stored_key:
-                return stored_key
-            new_key = base64.b64encode(os.urandom(32)).decode('utf-8')
-            keyring.set_password(self.KEYRING_SERVICE, self.KEYRING_USERNAME, new_key)
-            return new_key
+            os.chmod(fallback_file, 0o600)
         except Exception:
-            # Fallback to local machine identifier if keyring is unavailable in headless CI
-            fallback_file = APP_DIR / ".master.key"
-            if fallback_file.exists():
-                with open(fallback_file, "r") as f:
-                    return f.read().strip()
-            new_key = base64.b64encode(os.urandom(32)).decode('utf-8')
-            with open(fallback_file, "w") as f:
-                f.write(new_key)
-            return new_key
+            pass
+        return new_key
 
     def _derive_key(self, master_password: str) -> bytes:
         """Derives a 256-bit key using Argon2id (or PBKDF2 as fallback)."""

@@ -127,7 +127,7 @@ class AutonomousJobRunner:
                 # 5. Handle Submission Mode
                 if self.mode == "DRY_RUN":
                     await log(f"🛡️ DRY_RUN Mode: Form filled and verified! Screenshot saved to {screenshot_file.name}")
-                    job.status = ApplicationStatus.APPLIED
+                    job.status = ApplicationStatus.SUBMITTED
                     job.submission_mode = "DRY_RUN"
                     db.save_job(job)
                 else:
@@ -136,7 +136,7 @@ class AutonomousJobRunner:
                     if submit_btn:
                         await submit_btn.click()
                         await asyncio.sleep(2.0)
-                    job.status = ApplicationStatus.APPLIED
+                    job.status = ApplicationStatus.SUBMITTED
                     job.submission_mode = "LIVE"
                     db.save_job(job)
                     CheckpointManager.clear(job.job_id)

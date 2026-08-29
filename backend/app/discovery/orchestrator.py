@@ -55,101 +55,109 @@ class DiscoveryOrchestrator:
 
         raw_leads: List[Dict[str, Any]] = []
 
-        # 1. Fetch from Direct ATS APIs & VC Boards Concurrently
-        async with httpx.AsyncClient(http2=True, timeout=10.0) as client:
-            tasks = []
+        try:
+            # 1. Fetch from Direct ATS APIs & VC Boards Concurrently
+            try:
+                import h2
+                has_h2 = True
+            except ImportError:
+                has_h2 = False
 
-            # Direct ATS Feeds
-            for comp in target_companies:
-                tasks.append(ATSApiFeeders.fetch_greenhouse_jobs(comp, client))
-                tasks.append(ATSApiFeeders.fetch_lever_jobs(comp, client))
-                tasks.append(ATSApiFeeders.fetch_ashby_jobs(comp, client))
+            async with httpx.AsyncClient(http2=has_h2, timeout=10.0) as client:
+                tasks = []
 
-            # YC & Fast-Track Boards
-            tasks.append(VCBoardFeeders.fetch_yc_fast_track_jobs())
-            tasks.append(VCBoardFeeders.fetch_hn_who_is_hiring(max_posts=15, client=client))
+                # Direct ATS Feeds
+                for comp in target_companies:
+                    tasks.append(ATSApiFeeders.fetch_greenhouse_jobs(comp, client))
+                    tasks.append(ATSApiFeeders.fetch_lever_jobs(comp, client))
+                    tasks.append(ATSApiFeeders.fetch_ashby_jobs(comp, client))
 
-            # Wellfound Feeds
-            tasks.append(PlatformScrapers.fetch_wellfound_mock_or_feed("Engineer"))
+                # YC & Fast-Track Boards
+                tasks.append(VCBoardFeeders.fetch_yc_fast_track_jobs())
+                tasks.append(VCBoardFeeders.fetch_hn_who_is_hiring(max_posts=15, client=client))
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+                # Wellfound Feeds
+                tasks.append(PlatformScrapers.fetch_wellfound_mock_or_feed("Engineer"))
 
-            for res in results:
-                if isinstance(res, list):
-                    raw_leads.extend(res)
+                results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        self.total_discovered += len(raw_leads)
+                for res in results:
+                    if isinstance(res, list):
+                        raw_leads.extend(res)
 
-        # 2. Deduplicate, Blacklist Check, Score & Save
-        saved_jobs: List[JobListing] = []
-        blacklist = [c.lower() for c in profile.preferences.company_blacklist]
+            self.total_discovered += len(raw_leads)
 
-        for lead in raw_leads:
-            company = lead.get("company", "Company")
-            title = lead.get("title", "")
-            location = lead.get("location", "Remote")
-            url = lead.get("url", "")
-            desc = lead.get("description", "")
-            salary = lead.get("salary_range")
+            # 2. Deduplicate, Blacklist Check, Score & Save
+            saved_jobs: List[JobListing] = []
+            blacklist = [c.lower() for c in profile.preferences.company_blacklist]
 
-            # Check employer blacklist for stealth mode
-            if any(b in company.lower() for b in blacklist if b):
-                continue
+            for lead in raw_leads:
+                company = lead.get("company", "Company")
+                title = lead.get("title", "")
+                location = lead.get("location", "Remote")
+                url = lead.get("url", "")
+                desc = lead.get("description", "")
+                salary = lead.get("salary_range")
 
-            # Compute Deduplication Fingerprint
-            fingerprint = JobDeduplicator.generate_fingerprint(company, title, location, desc)
+                # Check employer blacklist for stealth mode
+                if any(b in company.lower() for b in blacklist if b):
+                    continue
 
-            # Compute Multi-Factor Match Score
-            match_score, match_reasons, missing_skills = MatchScorer.compute_match_score(
-                profile=profile,
-                job_title=title,
-                job_description=desc,
-                job_location=location
-            )
+                # Compute Deduplication Fingerprint
+                fingerprint = JobDeduplicator.generate_fingerprint(company, title, location, desc)
 
-            # Filter by candidate match threshold
-            if match_score >= self.min_match_threshold:
-                # Compute Priority Score (0-100)
-                priority_score = PriorityRanker.calculate_priority_score(
-                    match_score=match_score,
-                    platform=lead.get("platform", "Direct"),
-                    company=company,
-                    freshness_days=1,
-                    salary_range=salary,
-                    candidate_expected_ctc=profile.preferences.expected_ctc
+                # Compute Multi-Factor Match Score
+                match_score, match_reasons, missing_skills = MatchScorer.compute_match_score(
+                    profile=profile,
+                    job_title=title,
+                    job_description=desc,
+                    job_location=location
                 )
 
-                job = JobListing(
-                    job_id=f"job_{uuid.uuid4().hex[:12]}",
-                    fingerprint=fingerprint,
-                    platform=lead.get("platform", "Direct"),
-                    company=company,
-                    title=title,
-                    location=location,
-                    url=url,
-                    description=desc[:1500],
-                    salary_range=salary,
-                    seniority_level=MatchScorer.infer_job_seniority(title, desc),
-                    match_score=match_score,
-                    priority_score=priority_score,
-                    match_reasons=match_reasons,
-                    missing_skills=missing_skills,
-                    status=ApplicationStatus.DISCOVERED
-                )
+                # Filter by candidate match threshold
+                if match_score >= self.min_match_threshold:
+                    # Compute Priority Score (0-100)
+                    priority_score = PriorityRanker.calculate_priority_score(
+                        match_score=match_score,
+                        platform=lead.get("platform", "Direct"),
+                        company=company,
+                        freshness_days=1,
+                        salary_range=salary,
+                        candidate_expected_ctc=profile.preferences.expected_ctc
+                    )
 
-                # Persist to SQLite WAL
-                if db.save_job(job):
-                    saved_jobs.append(job)
+                    job = JobListing(
+                        job_id=f"job_{uuid.uuid4().hex[:12]}",
+                        fingerprint=fingerprint,
+                        platform=lead.get("platform", "Direct"),
+                        company=company,
+                        title=title,
+                        location=location,
+                        url=url,
+                        description=desc[:1500],
+                        salary_range=salary,
+                        seniority_level=MatchScorer.infer_job_seniority(title, desc),
+                        match_score=match_score,
+                        priority_score=priority_score,
+                        match_reasons=match_reasons,
+                        missing_skills=missing_skills,
+                        status=ApplicationStatus.DISCOVERED
+                    )
 
-        self.total_matched += len(saved_jobs)
-        self.is_running = False
+                    # Persist to SQLite WAL
+                    if db.save_job(job):
+                        saved_jobs.append(job)
 
-        return {
-            "status": "success",
-            "total_sourced": len(raw_leads),
-            "matched_and_saved": len(saved_jobs),
-            "top_matches": [j.dict() for j in saved_jobs[:5]]
-        }
+            self.total_matched += len(saved_jobs)
+
+            return {
+                "status": "success",
+                "total_sourced": len(raw_leads),
+                "matched_and_saved": len(saved_jobs),
+                "top_matches": [j.dict() for j in saved_jobs[:5]]
+            }
+        finally:
+            self.is_running = False
 
 
 discovery_orchestrator = DiscoveryOrchestrator()
