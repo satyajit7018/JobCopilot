@@ -19,6 +19,7 @@ from app.core.questionnaire import QuestionnaireEngine
 from app.core.compensation import CompensationConverter
 from app.core.vector_vault import vault
 from app.core.credential_vault import cred_vault
+from app.discovery.orchestrator import discovery_orchestrator
 
 router = APIRouter(prefix="/api")
 
@@ -173,6 +174,39 @@ async def learn_vault_entry(payload: VaultLearnRequest):
     return {"status": "success", "entry": entry.dict()}
 
 
+# --- 0-Day Discovery Endpoints ---
+
+@router.post("/discovery/run")
+async def run_discovery(profile_id: str = "default_user"):
+    """Triggers an async 0-day job discovery cycle across ATS APIs and VC boards."""
+    profile = db.get_profile(profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Candidate profile not found.")
+
+    await ws_manager.broadcast({"type": "BOT_LOG", "message": "Starting 0-day multi-source job discovery cycle..."})
+    
+    result = await discovery_orchestrator.run_discovery_cycle(profile)
+    
+    await ws_manager.broadcast({
+        "type": "DISCOVERY_COMPLETED",
+        "total_sourced": result.get("total_sourced", 0),
+        "matched_and_saved": result.get("matched_and_saved", 0)
+    })
+
+    return result
+
+
+@router.get("/discovery/status")
+async def get_discovery_status():
+    """Returns current discovery metrics."""
+    return {
+        "is_running": discovery_orchestrator.is_running,
+        "last_run_at": discovery_orchestrator.last_run_at,
+        "total_discovered": discovery_orchestrator.total_discovered,
+        "total_matched": discovery_orchestrator.total_matched
+    }
+
+
 @router.get("/jobs")
 async def get_jobs(status: Optional[str] = None):
     """Returns all tracked job applications, optionally filtered by status."""
@@ -200,9 +234,7 @@ async def resolve_hitl(payload: HITLResolveRequest):
     if not success:
         raise HTTPException(status_code=400, detail="Event already resolved or not found.")
 
-    # Permanently learn into vault if requested
     if payload.save_to_vault:
-        # Retrieve event details to learn question
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT question_text FROM hitl_events WHERE event_id = ?", (payload.event_id,))
@@ -210,7 +242,6 @@ async def resolve_hitl(payload: HITLResolveRequest):
             if row:
                 vault.learn_answer(row["question_text"], payload.user_answer)
 
-    # Broadcast resolution to connected UI clients
     await ws_manager.broadcast({
         "type": "HITL_RESOLVED",
         "event_id": payload.event_id,
