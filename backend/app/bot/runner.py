@@ -7,6 +7,7 @@ checkpoint recovery, and HITL resolution for target job postings.
 import os
 import asyncio
 from pathlib import Path
+from typing import Dict, Any, Optional, List
 try:
     from playwright.async_api import async_playwright
     HAS_PLAYWRIGHT = True

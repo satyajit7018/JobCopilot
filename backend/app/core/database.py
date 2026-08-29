@@ -497,7 +497,7 @@ class DatabaseManager(DatabaseAdapter):
         """Returns jobs for the user ordered by priority score."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            query = "SELECT * FROM jobs WHERE (user_id = ? OR user_id = 'default')"
+            query = "SELECT * FROM jobs WHERE user_id = ?"
             params = [user_id]
             if status:
                 query += " AND status = ?"
@@ -512,7 +512,10 @@ class DatabaseManager(DatabaseAdapter):
         """Retrieves a single job by ID."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM jobs WHERE job_id = ? AND (user_id = ? OR user_id = 'default')", (job_id, user_id))
+            if user_id == "default":
+                cursor.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,))
+            else:
+                cursor.execute("SELECT * FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, user_id))
             row = cursor.fetchone()
             return self._row_to_job(row) if row else None
 
@@ -522,7 +525,10 @@ class DatabaseManager(DatabaseAdapter):
         """Checks for existing job by fingerprint."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM jobs WHERE fingerprint = ? AND (user_id = ? OR user_id = 'default')", (fingerprint, user_id))
+            if user_id == "default":
+                cursor.execute("SELECT * FROM jobs WHERE fingerprint = ?", (fingerprint,))
+            else:
+                cursor.execute("SELECT * FROM jobs WHERE fingerprint = ? AND user_id = ?", (fingerprint, user_id))
             row = cursor.fetchone()
             return self._row_to_job(row) if row else None
 
