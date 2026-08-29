@@ -5,12 +5,16 @@ Tests /api/upload-resume, /api/questionnaire, /api/vault, /api/hitl, and /api/jo
 
 import sys
 from pathlib import Path
+
+# Add backend directory and venv site-packages to path
+backend_dir = Path(__file__).parent.parent.resolve()
+sys.path.insert(0, str(backend_dir))
+venv_site_packages = backend_dir / "venv" / "lib" / "python3.9" / "site-packages"
+if venv_site_packages.exists():
+    sys.path.insert(0, str(venv_site_packages))
+
 import pytest
 from fastapi.testclient import TestClient
-
-# Add backend directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
-
 from app.main import app
 from app.core.database import db
 from app.core.models import HITLEvent, JobListing
