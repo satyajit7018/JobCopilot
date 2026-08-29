@@ -145,9 +145,13 @@ class SlotMatcher:
             return SlotType.EXACT_PARAM, "years_of_experience"
 
         # 3. Skill-Specific Experience Years
-        tech_matches = ["python", "react", "fastapi", "docker", "aws", "gcp", "sql", "pytorch", "kubernetes", "typescript", "node"]
+        tech_matches = [
+            "python", "react", "fastapi", "docker", "aws", "gcp", "sql", "pytorch",
+            "kubernetes", "typescript", "node", "kafka", "redis", "postgres", "postgresql",
+            "mongodb", "graphql", "rust", "golang", "java", "c++", "linux", "ci/cd"
+        ]
         for tech in tech_matches:
-            if tech in text and any(k in text for k in ["experience", "years", "how long", "proficiency", "worked with"]):
+            if tech in text and any(k in text for k in ["experience", "years", "how long", "proficiency", "worked with", "managed", "using", "built"]):
                 return SlotType.TECH_YEARS, f"TECH_YEARS:{tech.capitalize()}"
 
         # 4. Technical Achievements

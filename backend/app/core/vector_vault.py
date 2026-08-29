@@ -6,7 +6,7 @@ and deterministic slot key resolution for zero-repeat autonomous form filling.
 
 import uuid
 from datetime import datetime
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Tuple, Any
 from app.core.models import VaultEntry, SlotType, CandidateProfile
 from app.core.slot_matcher import SlotMatcher
 from app.core.database import db
@@ -93,6 +93,8 @@ class KnowledgeVault:
         existing_entries = db.get_all_vault_entries()
         for e in existing_entries:
             if (e.slot_key == slot_key and e.slot_type == slot_type) or e.question_pattern.lower() == question.lower():
+                e.slot_key = slot_key
+                e.slot_type = slot_type
                 e.answer_template = answer_template
                 e.question_pattern = question
                 e.embedding = embedding
@@ -188,6 +190,27 @@ class KnowledgeVault:
             return resolved, best_score, best_entry
 
         return None, best_score, None
+
+    def get_answer_for_question(
+        self,
+        question: str,
+        profile: Optional[CandidateProfile] = None,
+        context: Optional[Dict[str, Any]] = None,
+        similarity_threshold: float = 0.55
+    ) -> Tuple[Optional[str], float, Optional[VaultEntry]]:
+        """Convenience wrapper for querying the vault with optional context dictionary."""
+        ctx = context or {}
+        company = ctx.get("company", "the company")
+        role = ctx.get("role", "Software Engineer")
+        domain = ctx.get("domain", "Technology")
+        return self.query_answer(
+            question=question,
+            profile=profile,
+            company=company,
+            role=role,
+            domain=domain,
+            similarity_threshold=similarity_threshold
+        )
 
 
 vault = KnowledgeVault()
