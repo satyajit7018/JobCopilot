@@ -4,6 +4,7 @@ Ranks jobs on a 0-100 scale: Match Score (40 pts), Company & Board Tier (25 pts)
 Freshness Decay (20 pts), and Compensation Alignment (15 pts).
 """
 
+import re
 from typing import Dict, Any, Optional
 from app.core.compensation import CompensationConverter
 
@@ -36,8 +37,11 @@ class PriorityRanker:
         # 2. Company Signal / Board Tier (25 pts)
         plat = platform.lower()
         comp = company.lower()
-        if "y combinator" in plat or "yc" in comp or "ashby" in plat or "greenhouse" in plat or "lever" in plat:
-            score += 25.0  # Tier 1 direct high-signal ATS & YC
+        is_yc = "y combinator" in plat or "y combinator" in comp or "(yc" in comp or bool(re.search(r'\byc\b', comp))
+        is_tier1 = "greenhouse" in plat or "lever" in plat or "ashby" in plat or is_yc
+
+        if is_tier1:
+            score += 25.0  # Tier 1 direct ATS & YC startups
         elif "wellfound" in plat:
             score += 20.0  # Tier 2 venture startups
         elif "naukri" in plat or "indeed" in plat:
@@ -68,7 +72,6 @@ class PriorityRanker:
             else:
                 score += 5.0
         else:
-            # Neutral compensation baseline
-            score += 12.0
+            score += 8.0
 
         return min(max(round(score, 1), 5.0), 100.0)

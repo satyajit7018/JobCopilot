@@ -73,20 +73,26 @@ class JobDeduplicator:
 
     @classmethod
     def compute_simhash_64(cls, text: str) -> int:
-        """Computes 64-bit SimHash of text for fuzzy duplicate detection."""
+        """Computes 64-bit 2-word shingle SimHash of text for fuzzy duplicate detection."""
         if not text:
             return 0
-        words = re.findall(r'\b\w{3,}\b', text.lower())
+        words = re.findall(r'\b\w+\b', text.lower())
         if not words:
             return 0
-        counts = Counter(words)
+
+        # Build 2-word shingles to preserve phrase locality
+        if len(words) >= 2:
+            shingles = [f"{words[i]} {words[i+1]}" for i in range(len(words)-1)]
+        else:
+            shingles = words
+
+        counts = Counter(shingles)
         v = [0] * 64
 
-        for word, weight in counts.items():
-            h = int(hashlib.md5(word.encode('utf-8')).hexdigest()[:16], 16)
+        for shingle, weight in counts.items():
+            h = int(hashlib.md5(shingle.encode('utf-8')).hexdigest()[:16], 16)
             for i in range(64):
-                bit = (h >> i) & 1
-                if bit == 1:
+                if (h >> i) & 1:
                     v[i] += weight
                 else:
                     v[i] -= weight
@@ -134,7 +140,7 @@ class JobDeduplicator:
         if cls.normalize_title(title_a) != cls.normalize_title(title_b):
             return False
 
-        # If descriptions exist, check SimHash similarity (Hamming distance <= max_hamming_distance)
+        # If descriptions exist, check SimHash similarity
         if desc_a and desc_b:
             hash_a = cls.compute_simhash_64(desc_a)
             hash_b = cls.compute_simhash_64(desc_b)
