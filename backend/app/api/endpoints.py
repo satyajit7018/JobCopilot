@@ -8,11 +8,11 @@ import os
 import shutil
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel
 
 from app.core.config import RESUMES_DIR, DEFAULT_SUBMISSION_MODE
-from app.core.models import CandidateProfile, VaultEntry, JobListing, HITLEvent, ApplicationStatus
+from app.core.models import CandidateProfile, VaultEntry, JobListing, HITLEvent, ApplicationStatus, User
 from app.core.database import db
 from app.core.resume_parser import ResumeParser
 from app.core.questionnaire import QuestionnaireEngine
@@ -23,8 +23,10 @@ from app.core.resume_tailor import ResumeTailor
 from app.core.cover_letter import CoverLetterGenerator
 from app.core.outreach_generator import OutreachGenerator
 from app.discovery.orchestrator import discovery_orchestrator
+from app.api.auth import router as auth_router, get_current_user_optional, get_current_user
 
 router = APIRouter(prefix="/api")
+router.include_router(auth_router)
 
 
 # --- WebSocket Connection Manager for Real-Time Bot Logs & HITL Events ---
@@ -115,16 +117,18 @@ async def auth_login(payload: LoginRequest):
 async def upload_resume(
     file: Optional[UploadFile] = File(None),
     raw_text: Optional[str] = Form(None),
-    profile_id: str = Form("default_user")
+    profile_id: str = Form("default_user"),
+    current_user: User = Depends(get_current_user_optional)
 ):
     """Uploads and parses a resume (PDF, DOCX, or text) and auto-prefills questionnaire."""
+    user_id = current_user.user_id
     if file:
         MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
         contents = await file.read()
         if len(contents) > MAX_FILE_SIZE:
             raise HTTPException(status_code=413, detail="Resume file exceeds maximum allowed size (10MB).")
         safe_filename = Path(file.filename or "resume.pdf").name
-        file_path = RESUMES_DIR / f"{profile_id}_{safe_filename}"
+        file_path = RESUMES_DIR / f"{user_id}_{safe_filename}"
         with open(file_path, "wb") as buffer:
             buffer.write(contents)
         profile = ResumeParser.parse_to_profile(str(file_path), profile_id=profile_id)
@@ -133,8 +137,9 @@ async def upload_resume(
     else:
         raise HTTPException(status_code=400, detail="No resume file or raw text provided.")
 
+    profile.user_id = user_id
     # Save to SQLite and seed the Knowledge Vault
-    db.save_profile(profile)
+    db.save_profile(profile, user_id=user_id)
     vault.seed_from_profile(profile)
 
     # Generate 70% prefilled questionnaire
@@ -150,18 +155,18 @@ async def upload_resume(
 
 
 @router.get("/profile")
-async def get_profile(profile_id: str = "default_user"):
+async def get_profile(profile_id: str = "default_user", current_user: User = Depends(get_current_user_optional)):
     """Retrieves current candidate profile."""
-    profile = db.get_profile(profile_id)
+    profile = db.get_profile(profile_id, user_id=current_user.user_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Candidate profile not found. Please upload a resume.")
     return {"status": "success", "profile": profile.dict()}
 
 
 @router.get("/questionnaire")
-async def get_questionnaire(profile_id: str = "default_user"):
+async def get_questionnaire(profile_id: str = "default_user", current_user: User = Depends(get_current_user_optional)):
     """Retrieves the 8 baseline recruiter questions schema and prefilled answers."""
-    profile = db.get_profile(profile_id)
+    profile = db.get_profile(profile_id, user_id=current_user.user_id)
     schema = QuestionnaireEngine.get_questions_schema()
     prefilled = QuestionnaireEngine.prefill_from_profile(profile) if profile else {}
     return {
@@ -171,12 +176,14 @@ async def get_questionnaire(profile_id: str = "default_user"):
 
 
 @router.post("/questionnaire")
-async def submit_questionnaire(payload: QuestionnaireSubmitRequest):
+async def submit_questionnaire(payload: QuestionnaireSubmitRequest, current_user: User = Depends(get_current_user_optional)):
     """Applies user-confirmed answers to profile and Knowledge Vault."""
-    profile = db.get_profile(payload.profile_id)
+    user_id = current_user.user_id
+    profile = db.get_profile(payload.profile_id, user_id=user_id)
     if not profile:
         profile = CandidateProfile(
             id=payload.profile_id,
+            user_id=user_id,
             full_name=payload.answers.get("full_name", "Candidate Name"),
             email=payload.answers.get("email", "candidate@example.com"),
             phone=payload.answers.get("phone", "+91 0000000000"),
@@ -184,7 +191,8 @@ async def submit_questionnaire(payload: QuestionnaireSubmitRequest):
         )
 
     updated_profile = QuestionnaireEngine.apply_answers_to_profile(profile, payload.answers)
-    db.save_profile(updated_profile)
+    updated_profile.user_id = user_id
+    db.save_profile(updated_profile, user_id=user_id)
     vault.seed_from_profile(updated_profile)
 
     return {
@@ -195,9 +203,9 @@ async def submit_questionnaire(payload: QuestionnaireSubmitRequest):
 
 
 @router.get("/vault")
-async def get_vault_entries():
+async def get_vault_entries(current_user: User = Depends(get_current_user_optional)):
     """Returns all indexed Q&A slots with usage counts and last used timestamps."""
-    entries = db.get_all_vault_entries()
+    entries = db.get_vault_entries(user_id=current_user.user_id)
     return {
         "count": len(entries),
         "entries": [e.dict() for e in entries]
@@ -205,7 +213,7 @@ async def get_vault_entries():
 
 
 @router.post("/vault/learn")
-async def learn_vault_entry(payload: VaultLearnRequest):
+async def learn_vault_entry(payload: VaultLearnRequest, current_user: User = Depends(get_current_user_optional)):
     """Manually teaches or updates a Q&A slot."""
     entry = vault.learn_answer(
         question=payload.question,
@@ -213,13 +221,15 @@ async def learn_vault_entry(payload: VaultLearnRequest):
         slot_type=payload.slot_type,
         slot_key=payload.slot_key
     )
+    entry.user_id = current_user.user_id
+    db.save_vault_entry(entry, user_id=current_user.user_id)
     return {"status": "success", "entry": entry.dict()}
 
 
 @router.post("/vault/test-match")
-async def test_vault_match(payload: VaultTestMatchRequest):
+async def test_vault_match(payload: VaultTestMatchRequest, current_user: User = Depends(get_current_user_optional)):
     """Tests real-time question resolution against the Knowledge Vault for UI playground."""
-    profile = db.get_profile(payload.profile_id)
+    profile = db.get_profile(payload.profile_id, user_id=current_user.user_id)
     answer, confidence, entry = vault.get_answer_for_question(
         question=payload.question,
         profile=profile,
@@ -243,9 +253,9 @@ async def test_vault_match(payload: VaultTestMatchRequest):
 # --- 0-Day Discovery Endpoints ---
 
 @router.post("/discovery/run")
-async def run_discovery(profile_id: str = "default_user"):
+async def run_discovery(profile_id: str = "default_user", current_user: User = Depends(get_current_user_optional)):
     """Triggers an async 0-day job discovery cycle across ATS APIs and VC boards."""
-    profile = db.get_profile(profile_id)
+    profile = db.get_profile(profile_id, user_id=current_user.user_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Candidate profile not found.")
 
@@ -258,7 +268,7 @@ async def run_discovery(profile_id: str = "default_user"):
         "total_sourced": result.get("total_sourced", 0),
         "matched_and_saved": result.get("matched_and_saved", 0)
     })
-
+    
     return result
 
 
@@ -274,9 +284,9 @@ async def get_discovery_status():
 
 
 @router.get("/jobs")
-async def get_jobs(status: Optional[str] = None):
+async def get_jobs(status: Optional[str] = None, current_user: User = Depends(get_current_user_optional)):
     """Returns all tracked job applications, optionally filtered by status."""
-    jobs = db.get_jobs(status=status)
+    jobs = db.get_jobs(status=status, user_id=current_user.user_id)
     return {
         "count": len(jobs),
         "jobs": [j.dict() for j in jobs]
@@ -336,9 +346,9 @@ async def generate_tailored_assets(job_id: str, profile_id: str = "default_user"
 
 
 @router.get("/hitl/pending")
-async def get_pending_hitl():
+async def get_pending_hitl(current_user: User = Depends(get_current_user_optional)):
     """Returns all pending HITL questions requiring human input."""
-    events = db.get_pending_hitl_events()
+    events = db.get_pending_hitl(user_id=current_user.user_id)
     return {
         "count": len(events),
         "events": [e.dict() for e in events]
@@ -346,19 +356,22 @@ async def get_pending_hitl():
 
 
 @router.post("/hitl/resolve")
-async def resolve_hitl(payload: HITLResolveRequest):
+async def resolve_hitl(payload: HITLResolveRequest, current_user: User = Depends(get_current_user_optional)):
     """Atomically resolves a pending HITL question and permanently saves it to the vault."""
-    success = db.resolve_hitl_event(payload.event_id, payload.user_answer)
-    if not success:
-        raise HTTPException(status_code=400, detail="Event already resolved or not found.")
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT question_text FROM hitl_events WHERE event_id = ? AND (user_id = ? OR user_id = 'default')", (payload.event_id, current_user.user_id))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=400, detail="Event already resolved or not found.")
+        
+        cursor.execute("UPDATE hitl_events SET status = 'RESOLVED', user_answer = ?, resolved_at = ? WHERE event_id = ?", (payload.user_answer, datetime.now().isoformat(), payload.event_id))
+        conn.commit()
 
-    if payload.save_to_vault:
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT question_text FROM hitl_events WHERE event_id = ?", (payload.event_id,))
-            row = cursor.fetchone()
-            if row:
-                vault.learn_answer(row["question_text"], payload.user_answer)
+        if payload.save_to_vault:
+            entry = vault.learn_answer(row["question_text"], payload.user_answer)
+            entry.user_id = current_user.user_id
+            db.save_vault_entry(entry, user_id=current_user.user_id)
 
     await ws_manager.broadcast({
         "type": "HITL_RESOLVED",
@@ -372,7 +385,7 @@ async def resolve_hitl(payload: HITLResolveRequest):
 # --- Autonomous Bot Execution Endpoint ---
 
 @router.post("/bot/apply/{job_id}")
-async def apply_to_job(job_id: str, profile_id: str = "default_user", mode: Optional[str] = None):
+async def apply_to_job(job_id: str, profile_id: str = "default_user", mode: Optional[str] = None, current_user: User = Depends(get_current_user_optional)):
     """Executes full autonomous stealth application workflow for a specific job."""
     from app.bot.runner import AutonomousJobRunner
     runner = AutonomousJobRunner(mode=mode or DEFAULT_SUBMISSION_MODE)
@@ -395,7 +408,7 @@ class InboundEmailPayload(BaseModel):
 
 
 @router.post("/email/inbound")
-async def receive_inbound_email(payload: InboundEmailPayload):
+async def receive_inbound_email(payload: InboundEmailPayload, current_user: User = Depends(get_current_user_optional)):
     """Processes incoming recruiter email, strips tracking pixels, classifies intent, and syncs pipeline."""
     from app.email.sync import EmailSyncEngine
     result = await EmailSyncEngine.process_inbound_email(
@@ -410,21 +423,17 @@ async def receive_inbound_email(payload: InboundEmailPayload):
 
 
 @router.get("/email/messages")
-async def list_email_messages():
+async def list_email_messages(current_user: User = Depends(get_current_user_optional)):
     """Returns all parsed recruiter communications."""
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM emails ORDER BY received_at DESC")
-        rows = cursor.fetchall()
-        emails = [dict(r) for r in rows]
-    return {"count": len(emails), "messages": emails}
+    emails = db.get_emails(user_id=current_user.user_id)
+    return {"count": len(emails), "messages": [e.dict() for e in emails]}
 
 
 @router.post("/email/followup/{job_id}")
-async def generate_job_followup(job_id: str, stage_days: int = 7, profile_id: str = "default_user"):
+async def generate_job_followup(job_id: str, stage_days: int = 7, profile_id: str = "default_user", current_user: User = Depends(get_current_user_optional)):
     """Generates and saves a 7-day or 14-day follow-up draft for a submitted application."""
     from app.email.followup import FollowUpEngine
-    profile = db.get_profile(profile_id)
+    profile = db.get_profile(profile_id, user_id=current_user.user_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found.")
 
@@ -437,12 +446,11 @@ async def generate_job_followup(job_id: str, stage_days: int = 7, profile_id: st
 # --- Funnel Analytics Endpoint ---
 
 @router.get("/analytics/funnel")
-async def get_funnel_analytics():
+async def get_funnel_analytics(current_user: User = Depends(get_current_user_optional)):
     """Returns aggregated pipeline funnel metrics and telemetry."""
-    from app.core.analytics import AnalyticsEngine
     return {
         "status": "success",
-        "metrics": AnalyticsEngine.get_funnel_metrics()
+        "metrics": db.get_funnel_metrics(user_id=current_user.user_id)
     }
 
 

@@ -115,8 +115,58 @@ class ResumeVariant(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
+class UserRole(str, Enum):
+    FREE = "FREE"
+    PRO = "PRO"
+    ELITE = "ELITE"
+    ADMIN = "ADMIN"
+
+
+class User(BaseModel):
+    user_id: str
+    email: str
+    password_hash: str
+    full_name: str = ""
+    role: UserRole = UserRole.FREE
+    is_active: bool = True
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class UserRegisterRequest(BaseModel):
+    email: str
+    password: str
+    full_name: Optional[str] = None
+
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user_id: str
+    email: str
+    role: str
+
+
+class UserResponse(BaseModel):
+    user_id: str
+    email: str
+    full_name: str
+    role: str
+    created_at: str
+
+
 class CandidateProfile(BaseModel):
     id: str = "default_user"
+    user_id: str = "default"
     full_name: str
     email: str
     phone: str
@@ -144,6 +194,7 @@ class CandidateProfile(BaseModel):
 
 class VaultEntry(BaseModel):
     qa_id: str
+    user_id: str = "default"
     slot_type: SlotType
     slot_key: str  # e.g., 'expected_ctc', 'TECH_YEARS:Python', 'why_join_company'
     question_pattern: str
@@ -160,6 +211,7 @@ class VaultEntry(BaseModel):
 
 class JobListing(BaseModel):
     job_id: str
+    user_id: str = "default"
     fingerprint: str  # 64-bit SimHash of company + title + location + JD
     platform: str     # Greenhouse, Lever, Ashby, Workday, YC, Wellfound, Indeed, etc.
     company: str
@@ -187,6 +239,7 @@ class JobListing(BaseModel):
 
 class HITLEvent(BaseModel):
     event_id: str
+    user_id: str = "default"
     job_id: str
     company: str
     role_title: str
@@ -205,6 +258,7 @@ class HITLEvent(BaseModel):
 
 class OutreachRecord(BaseModel):
     outreach_id: str
+    user_id: str = "default"
     job_id: str
     channel: OutreachChannel
     recipient_name: Optional[str] = None
@@ -221,6 +275,7 @@ class OutreachRecord(BaseModel):
 
 class EmailMessage(BaseModel):
     message_id: str
+    user_id: str = "default"
     sender: str
     recipient: str
     subject: str
@@ -238,6 +293,7 @@ class EmailMessage(BaseModel):
 
 class JobCheckpoint(BaseModel):
     job_id: str
+    user_id: str = "default"
     current_step: int = 1
     total_steps: int = 1
     filled_inputs: Dict[str, Any] = Field(default_factory=dict)
