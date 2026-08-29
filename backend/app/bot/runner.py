@@ -74,7 +74,7 @@ class AutonomousJobRunner:
             job_title=job.title,
             job_description=job.description
         )
-        OutreachGenerator.create_triple_threat_package(
+        outreach_pkg = OutreachGenerator.create_triple_threat_package(
             profile=profile,
             job_id=job.job_id,
             company_name=job.company,
@@ -125,10 +125,12 @@ class AutonomousJobRunner:
                 )
 
                 # 5. Handle Submission Mode
+                now_str = datetime.now().isoformat()
                 if self.mode == "DRY_RUN":
                     await log(f"🛡️ DRY_RUN Mode: Form filled and verified! Screenshot saved to {screenshot_file.name}")
-                    job.status = ApplicationStatus.APPLIED
+                    job.status = ApplicationStatus.SUBMITTED
                     job.submission_mode = "DRY_RUN"
+                    job.applied_at = now_str
                     db.save_job(job)
                 else:
                     await log("Submitting application...")
@@ -136,8 +138,9 @@ class AutonomousJobRunner:
                     if submit_btn:
                         await submit_btn.click()
                         await asyncio.sleep(2.0)
-                    job.status = ApplicationStatus.APPLIED
+                    job.status = ApplicationStatus.SUBMITTED
                     job.submission_mode = "LIVE"
+                    job.applied_at = now_str
                     db.save_job(job)
                     CheckpointManager.clear(job.job_id)
 
@@ -150,7 +153,8 @@ class AutonomousJobRunner:
                     "mode": self.mode,
                     "filled_fields_count": len(filled_data),
                     "screenshot": str(screenshot_file),
-                    "tailored_pdf": str(pdf_path)
+                    "tailored_pdf": str(pdf_path),
+                    "outreach_package": outreach_pkg
                 }
 
             except Exception as e:

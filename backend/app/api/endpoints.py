@@ -112,9 +112,14 @@ async def upload_resume(
 ):
     """Uploads and parses a resume (PDF, DOCX, or text) and auto-prefills questionnaire."""
     if file:
-        file_path = RESUMES_DIR / f"{profile_id}_{file.filename}"
+        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
+        contents = await file.read()
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail="Resume file exceeds maximum allowed size (10MB).")
+        safe_filename = Path(file.filename or "resume.pdf").name
+        file_path = RESUMES_DIR / f"{profile_id}_{safe_filename}"
         with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(contents)
         profile = ResumeParser.parse_to_profile(str(file_path), profile_id=profile_id)
     elif raw_text:
         profile = ResumeParser.parse_to_profile(raw_text, profile_id=profile_id)
