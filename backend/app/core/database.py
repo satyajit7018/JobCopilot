@@ -647,9 +647,6 @@ class DatabaseManager(DatabaseAdapter):
                 """, (user_answer, now_str, event_id))
                 conn.commit()
                 return cursor.rowcount > 0
-                ))
-        return events
->>>>>>> 861b627 (feature-added)
 
     # =========================================================================
     # Outreach & Email Operations (Multi-Tenant)
