@@ -413,11 +413,16 @@ function renderJobsList(jobs) {
           ${reasonsHtml}
         </div>
       </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle); gap: 0.5rem;">
-        <button class="btn btn-primary" onclick="openTailorModal('${job.job_id}')" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; flex: 1;">
-          🚀 Tailor &amp; Outreach
+      <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-primary" onclick="openTailorModal('${job.job_id}')" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; flex: 1;">
+            🚀 Tailor &amp; Outreach
+          </button>
+          <a href="${job.url}" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;">View Post ➔</a>
+        </div>
+        <button class="btn btn-secondary" onclick="runJobBot('${job.job_id}')" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; width: 100%; border-color: rgba(99,102,241,0.4); color: #a5b4fc;">
+          🤖 Run Stealth Auto-Apply (DRY RUN)
         </button>
-        <a href="${job.url}" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;">View Post ➔</a>
       </div>
     `;
     grid.appendChild(card);
@@ -425,6 +430,23 @@ function renderJobsList(jobs) {
 
   els.jobPipelineList.appendChild(grid);
 }
+
+window.runJobBot = async function(jobId) {
+  try {
+    showToast('Starting autonomous stealth application in DRY RUN mode...', 'info');
+    window.switchTab('bot');
+    const res = await fetch(`${API_BASE}/bot/apply/${jobId}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'success') {
+      showToast(`Autonomous application finished! ${data.filled_fields_count} fields auto-filled!`, 'success');
+      fetchJobsList();
+    } else {
+      showToast(data.message || 'Bot execution halted', 'error');
+    }
+  } catch (err) {
+    showToast(`Bot error: ${err.message}`, 'error');
+  }
+};
 
 if (els.btnStartAutopilot) {
   els.btnStartAutopilot.addEventListener('click', async () => {

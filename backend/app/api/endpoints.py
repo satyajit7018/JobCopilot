@@ -304,3 +304,18 @@ async def resolve_hitl(payload: HITLResolveRequest):
     })
 
     return {"status": "success", "message": "HITL event resolved and indexed permanently."}
+
+
+# --- Autonomous Bot Execution Endpoint ---
+
+@router.post("/bot/apply/{job_id}")
+async def apply_to_job(job_id: str, profile_id: str = "default_user", mode: Optional[str] = None):
+    """Executes full autonomous stealth application workflow for a specific job."""
+    from app.bot.runner import AutonomousJobRunner
+    runner = AutonomousJobRunner(mode=mode or DEFAULT_SUBMISSION_MODE)
+    result = await runner.execute_application(
+        job_id=job_id,
+        profile_id=profile_id,
+        ws_broadcast_callback=ws_manager.broadcast
+    )
+    return result
