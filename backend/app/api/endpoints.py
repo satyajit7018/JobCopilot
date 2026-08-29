@@ -319,3 +319,53 @@ async def apply_to_job(job_id: str, profile_id: str = "default_user", mode: Opti
         ws_broadcast_callback=ws_manager.broadcast
     )
     return result
+
+
+# --- Email Radar & Inbound Parser Endpoints ---
+
+class InboundEmailPayload(BaseModel):
+    sender: str
+    recipient: str = "default_user@jobcopilot.local"
+    subject: str
+    body_html: str
+    body_text: Optional[str] = None
+
+
+@router.post("/email/inbound")
+async def receive_inbound_email(payload: InboundEmailPayload):
+    """Processes incoming recruiter email, strips tracking pixels, classifies intent, and syncs pipeline."""
+    from app.email.sync import EmailSyncEngine
+    result = await EmailSyncEngine.process_inbound_email(
+        sender=payload.sender,
+        recipient=payload.recipient,
+        subject=payload.subject,
+        body_html=payload.body_html,
+        body_text=payload.body_text,
+        ws_broadcast_callback=ws_manager.broadcast
+    )
+    return result
+
+
+@router.get("/email/messages")
+async def list_email_messages():
+    """Returns all parsed recruiter communications."""
+    with db.get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM emails ORDER BY received_at DESC")
+        rows = cursor.fetchall()
+        emails = [dict(r) for r in rows]
+    return {"count": len(emails), "messages": emails}
+
+
+@router.post("/email/followup/{job_id}")
+async def generate_job_followup(job_id: str, stage_days: int = 7, profile_id: str = "default_user"):
+    """Generates and saves a 7-day or 14-day follow-up draft for a submitted application."""
+    from app.email.followup import FollowUpEngine
+    profile = db.get_profile(profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found.")
+
+    res = FollowUpEngine.generate_and_save_followup(profile, job_id, stage_days=stage_days)
+    if not res:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return {"status": "success", "followup": res}
