@@ -6,6 +6,8 @@ Job Pipeline, Real-Time HITL Alerts, Dynamic Tailored Resumes, and Triple-Threat
 
 import os
 import shutil
+import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends
@@ -448,9 +450,10 @@ async def generate_job_followup(job_id: str, stage_days: int = 7, profile_id: st
 @router.get("/analytics/funnel")
 async def get_funnel_analytics(current_user: User = Depends(get_current_user_optional)):
     """Returns aggregated pipeline funnel metrics and telemetry."""
+    from app.core.analytics import AnalyticsEngine
     return {
         "status": "success",
-        "metrics": db.get_funnel_metrics(user_id=current_user.user_id)
+        "metrics": AnalyticsEngine.get_funnel_metrics()
     }
 
 
