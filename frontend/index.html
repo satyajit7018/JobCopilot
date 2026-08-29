@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JobCopilot - Autonomous Job Application Platform</title>
+  <title>JobCopilot - Autonomous Career Operating System</title>
   <link rel="stylesheet" href="/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -15,46 +15,56 @@
     
     <!-- Left Navigation Sidebar -->
     <aside class="sidebar">
-      <div class="sidebar-header">
-        <a href="/" class="brand-logo">
-          <span class="brand-icon">⚡</span>
-          <span>JobCopilot</span>
-        </a>
-      </div>
+      <div>
+        <div class="sidebar-header">
+          <a href="/" class="brand-logo">
+            <span class="brand-icon">⚡</span>
+            <span>JobCopilot</span>
+          </a>
+        </div>
 
-      <nav class="sidebar-nav">
-        <button class="nav-tab active" data-view="onboarding">
-          <span class="nav-icon">✨</span>
-          <span>Smart Onboarding</span>
-        </button>
-        <button class="nav-tab" data-view="vault">
-          <span class="nav-icon">🧠</span>
-          <span>Knowledge Vault</span>
-        </button>
-        <button class="nav-tab" data-view="pipeline">
-          <span class="nav-icon">📊</span>
-          <span>Job Pipeline</span>
-        </button>
-        <button class="nav-tab" data-view="email">
-          <span class="nav-icon">📬</span>
-          <span>Email Radar</span>
-        </button>
-        <button class="nav-tab" data-view="bot">
-          <span class="nav-icon">🤖</span>
-          <span>Bot Automation</span>
-        </button>
-        <button class="nav-tab" data-view="settings">
-          <span class="nav-icon">🔒</span>
-          <span>Security & Keys</span>
-        </button>
-      </nav>
+        <nav class="sidebar-nav">
+          <button class="nav-tab active" data-view="onboarding">
+            <span class="nav-icon">✨</span>
+            <span>Smart Onboarding</span>
+          </button>
+          <button class="nav-tab" data-view="vault">
+            <span class="nav-icon">🧠</span>
+            <span>Knowledge Vault</span>
+          </button>
+          <button class="nav-tab" data-view="pipeline">
+            <span class="nav-icon">📊</span>
+            <span>Job Pipeline</span>
+          </button>
+          <button class="nav-tab" data-view="email">
+            <span class="nav-icon">📬</span>
+            <span>Email Radar</span>
+          </button>
+          <button class="nav-tab" data-view="interview">
+            <span class="nav-icon">🎙️</span>
+            <span>Mock Interview</span>
+          </button>
+          <button class="nav-tab" data-view="negotiation">
+            <span class="nav-icon">💰</span>
+            <span>Offer &amp; Salary</span>
+          </button>
+          <button class="nav-tab" data-view="bot">
+            <span class="nav-icon">🤖</span>
+            <span>Bot Worker</span>
+          </button>
+          <button class="nav-tab" data-view="settings">
+            <span class="nav-icon">🔒</span>
+            <span>Security &amp; Backup</span>
+          </button>
+        </nav>
+      </div>
 
       <div class="sidebar-footer">
         <div class="status-indicator">
           <span class="status-dot"></span>
-          <span id="status-text">System Ready</span>
+          <span id="status-text">System Active</span>
         </div>
-        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem; font-family: 'JetBrains Mono', monospace;">
           SQLite WAL • AES-256-GCM
         </div>
       </div>
@@ -88,7 +98,7 @@
             <div class="card-header">
               <div>
                 <h2 class="card-title">📄 Step 1: Upload Candidate Resume</h2>
-                <p class="card-subtitle">Supported formats: PDF, DOCX, or direct plain text. Our universal parser extracts skills, experience, and contact info in &lt; 200ms.</p>
+                <p class="card-subtitle">Supported formats: PDF, DOCX, or direct plain text. Universal parser extracts skills, experience, and contact info in &lt; 200ms.</p>
               </div>
             </div>
 
@@ -106,7 +116,7 @@
 
             <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem;">
               <button class="btn btn-primary" id="btn-parse-resume">
-                <span>Parse Resume & Auto-Prefill</span> ➔
+                <span>Parse Resume &amp; Auto-Prefill</span> ➔
               </button>
             </div>
           </div>
@@ -119,7 +129,7 @@
               <h2 class="card-title">⚡ Step 2: Review Recruiter Baseline Preferences</h2>
               <p class="card-subtitle">These 8 questions are auto-prefilled from your resume. Confirm or tweak your salary expectations and notice period in 30 seconds.</p>
             </div>
-            <span class="brand-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.4);">
+            <span class="brand-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); padding: 0.3rem 0.75rem; border-radius: var(--radius-full); font-size: 0.8rem; font-weight: 700;">
               ✓ 70% Auto-Extracted
             </span>
           </div>
@@ -237,23 +247,23 @@
                 ➔ Back to Resume
               </button>
               <button type="submit" class="btn btn-primary" id="btn-save-questionnaire">
-                <span>Save Preferences & Seed Vault</span> ➔
+                <span>Save Preferences &amp; Seed Vault</span> ➔
               </button>
             </div>
           </form>
         </div>
 
         <!-- Wizard Step 3: Launch Autopilot -->
-        <div id="step-content-3" class="card" style="display: none; text-align: center; padding: 3rem 2rem;">
+        <div id="step-content-3" class="card" style="display: none; text-align: center; padding: 3.5rem 2rem;">
           <div style="font-size: 3.5rem; margin-bottom: 1rem;">🎉</div>
-          <h2 style="font-size: 1.75rem; margin-bottom: 0.5rem;">You're Ready to Autopilot!</h2>
-          <p style="color: var(--text-secondary); max-width: 600px; margin: 0 auto 2rem;">
+          <h2 style="font-size: 1.85rem; margin-bottom: 0.5rem;">You're Ready to Autopilot!</h2>
+          <p style="color: var(--text-secondary); max-width: 600px; margin: 0 auto 2rem; font-size: 1rem;">
             Your candidate profile is saved locally and your Knowledge Vault is seeded with 14+ baseline recruiter response slots.
           </p>
 
           <div style="display: flex; gap: 1rem; justify-content: center;">
             <button class="btn btn-primary" onclick="window.switchTab('pipeline')">
-              <span>View Job Pipeline & Discovery</span>
+              <span>View Job Pipeline &amp; Discovery</span>
             </button>
             <button class="btn btn-secondary" onclick="window.switchTab('vault')">
               <span>Inspect Knowledge Vault Slots</span>
@@ -276,11 +286,11 @@
             </button>
           </div>
 
-          <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+          <div style="display: flex; gap: 1rem; margin-bottom: 1.25rem;">
             <input type="text" id="vault-search-input" class="form-input" placeholder="Search questions, slot keys, or answers..." style="flex: 1;">
           </div>
 
-          <div style="overflow-x: auto;">
+          <div style="overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
             <table class="vault-table">
               <thead>
                 <tr>
@@ -303,22 +313,22 @@
       <section id="view-pipeline" class="view-panel">
         
         <!-- Live Funnel Metrics Header -->
-        <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
-          <div class="card" style="margin-bottom: 0; padding: 1.25rem;">
-            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">0-Day Sourced</div>
-            <div style="font-size: 1.6rem; font-weight: 700; color: #818cf8;" id="stat-total-sourced">0</div>
+        <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+          <div class="card" style="margin-bottom: 0; padding: 1.25rem 1.5rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">0-Day Sourced</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: #818cf8; margin-top: 0.25rem;" id="stat-total-sourced">0</div>
           </div>
-          <div class="card" style="margin-bottom: 0; padding: 1.25rem;">
-            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total Applied</div>
-            <div style="font-size: 1.6rem; font-weight: 700; color: #38bdf8;" id="stat-total-applied">0</div>
+          <div class="card" style="margin-bottom: 0; padding: 1.25rem 1.5rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Total Applied</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: #38bdf8; margin-top: 0.25rem;" id="stat-total-applied">0</div>
           </div>
-          <div class="card" style="margin-bottom: 0; padding: 1.25rem;">
-            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Interviews</div>
-            <div style="font-size: 1.6rem; font-weight: 700; color: #34d399;" id="stat-interviews">0</div>
+          <div class="card" style="margin-bottom: 0; padding: 1.25rem 1.5rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Interviews</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: #34d399; margin-top: 0.25rem;" id="stat-interviews">0</div>
           </div>
-          <div class="card" style="margin-bottom: 0; padding: 1.25rem;">
-            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Response Rate</div>
-            <div style="font-size: 1.6rem; font-weight: 700; color: #f59e0b;" id="stat-response-rate">0.0%</div>
+          <div class="card" style="margin-bottom: 0; padding: 1.25rem 1.5rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Response Rate</div>
+            <div style="font-size: 1.8rem; font-weight: 800; color: #f59e0b; margin-top: 0.25rem;" id="stat-response-rate">0.0%</div>
           </div>
         </div>
 
@@ -359,7 +369,77 @@
         </div>
       </section>
 
-      <!-- VIEW 5: Bot Automation & HITL Console -->
+      <!-- VIEW 5: Mock Interview Studio -->
+      <section id="view-interview" class="view-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">🎙️ AI Technical Mock Interview Studio</h2>
+              <p class="card-subtitle">Generates company engineering dossiers, role-specific system design questions, and evaluates response depth.</p>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label class="form-label">Target Company</label>
+              <input type="text" id="mock-company-input" class="form-input" value="Stripe" placeholder="e.g. Stripe, Airbnb, Uber">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Target Role</label>
+              <input type="text" id="mock-role-input" class="form-input" value="Senior Backend Engineer">
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem;">
+            <button class="btn btn-primary" onclick="loadMockDossierAndQuestions()">
+              <span>⚡ Generate Company Dossier &amp; Questions</span>
+            </button>
+          </div>
+
+          <div id="mock-interview-container">
+            <!-- Dynamic Questions & Dossier -->
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 6: Salary & Offer Modeler -->
+      <section id="view-negotiation" class="view-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">💰 Salary Benchmarking &amp; Offer Modeler</h2>
+              <p class="card-subtitle">Evaluate compensation against market percentiles, model startup ESOP multiples, and draft counter-offers.</p>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-bottom: 1.5rem;">
+            <div class="form-group">
+              <label class="form-label">Base Salary (LPA)</label>
+              <input type="number" id="neg-base-salary" class="form-input" value="35">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Annual Bonus (LPA)</label>
+              <input type="number" id="neg-bonus" class="form-input" value="5">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Annual Stock / ESOP (LPA)</label>
+              <input type="number" id="neg-equity" class="form-input" value="10">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role Title</label>
+              <input type="text" id="neg-role-title" class="form-input" value="Senior Software Engineer">
+            </div>
+          </div>
+
+          <button class="btn btn-primary" onclick="evaluateOfferCompensation()" style="margin-bottom: 1.5rem;">
+            <span>📊 Benchmark Offer Against Market</span>
+          </button>
+
+          <div id="negotiation-results-container"></div>
+        </div>
+      </section>
+
+      <!-- VIEW 7: Bot Automation & HITL Console -->
       <section id="view-bot" class="view-panel">
         <div class="card">
           <div class="card-header">
@@ -374,14 +454,17 @@
         </div>
       </section>
 
-      <!-- VIEW 6: Security & Settings -->
+      <!-- VIEW 8: Security & Settings -->
       <section id="view-settings" class="view-panel">
         <div class="card">
           <div class="card-header">
             <div>
-              <h2 class="card-title">🔒 Cryptography & Privacy Vault</h2>
-              <p class="card-subtitle">Local-first AES-256-GCM encryption and Argon2id key derivation status.</p>
+              <h2 class="card-title">🔒 Cryptography &amp; Disaster Recovery</h2>
+              <p class="card-subtitle">Local-first AES-256-GCM encryption, Argon2id key derivation, and full encrypted backups.</p>
             </div>
+            <button class="btn btn-primary" onclick="exportEncryptedBackup()">
+              <span>📦 Export Encrypted Backup (.jobcopilot.enc)</span>
+            </button>
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
             <div class="card" style="margin-bottom: 0;">
@@ -421,7 +504,7 @@
         </div>
 
         <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem;">
-          <input type="checkbox" id="hitl-save-vault-check" checked style="accent-color: var(--primary);">
+          <input type="checkbox" id="hitl-save-vault-check" checked style="accent-color: var(--accent-primary);">
           <label for="hitl-save-vault-check" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">
             Save to Knowledge Vault so this question is auto-filled for all future applications
           </label>
@@ -440,7 +523,7 @@
       <div class="modal-box" style="max-width: 680px;">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
           <h3 style="font-size: 1.25rem; color: #818cf8; display: flex; align-items: center; gap: 0.5rem;">
-            <span>🚀</span> <span id="outreach-modal-title">Tailored Resume & Outreach Package</span>
+            <span>🚀</span> <span id="outreach-modal-title">Tailored Resume &amp; Outreach Package</span>
           </h3>
           <button class="btn btn-secondary" onclick="document.getElementById('outreach-modal').classList.remove('active')" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">✕ Close</button>
         </div>

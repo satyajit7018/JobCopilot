@@ -736,6 +736,154 @@ window.simulateTestEmail = async function() {
   }
 };
 
+// --- Mock Interview Studio ---
+window.loadMockDossierAndQuestions = async function() {
+  const company = document.getElementById('mock-company-input').value.trim() || 'Stripe';
+  const role = document.getElementById('mock-role-input').value.trim() || 'Senior Backend Engineer';
+  const container = document.getElementById('mock-interview-container');
+  if (!container) return;
+
+  try {
+    showToast(`Synthesizing ${company} engineering dossier & question rubrics...`, 'info');
+    const [dRes, qRes] = await Promise.all([
+      fetch(`${API_BASE}/interview/dossier?company=${encodeURIComponent(company)}&role=${encodeURIComponent(role)}`),
+      fetch(`${API_BASE}/interview/questions?role=${encodeURIComponent(role)}`)
+    ]);
+
+    const dData = await dRes.json();
+    const qData = await qRes.json();
+
+    const dossier = dData.dossier;
+    const questions = qData.questions;
+
+    container.innerHTML = `
+      <div style="background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.3); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 1.5rem;">
+        <h3 style="font-size: 1.15rem; color: #818cf8; margin-bottom: 0.5rem;">🏢 ${escapeHtml(dossier.company)} Engineering Dossier</h3>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem;">${escapeHtml(dossier.engineering_focus)}</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+          ${dossier.likely_tech_stack.map(s => `<span class="brand-badge" style="background: rgba(255,255,255,0.05); color: #a5b4fc; border-color: rgba(255,255,255,0.1);">${escapeHtml(s)}</span>`).join('')}
+        </div>
+      </div>
+
+      <h3 style="font-size: 1.2rem; margin-bottom: 1rem;">🎯 Technical &amp; System Design Practice Questions</h3>
+      <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+        ${questions.map((q, idx) => `
+          <div class="card" style="margin-bottom: 0; padding: 1.5rem; background: rgba(15, 23, 42, 0.8);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <span class="brand-badge" style="background: rgba(99,102,241,0.2); color: #818cf8;">${escapeHtml(q.category)} • ${escapeHtml(q.difficulty)}</span>
+              <span style="font-size: 0.8rem; color: var(--text-muted);">Question ${idx + 1} of ${questions.length}</span>
+            </div>
+            <h4 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-primary);">${escapeHtml(q.question)}</h4>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Key concepts to address: <em>${escapeHtml(q.key_concepts.join(', '))}</em></div>
+            <textarea id="ans-input-${q.id}" class="form-textarea" rows="3" placeholder="Type or dictate your verbal response..."></textarea>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
+              <button class="btn btn-primary" onclick="submitAnswerEvaluation('${q.id}', '${escapeHtml(q.question)}', '${escapeHtml(JSON.stringify(q.key_concepts))}')" style="font-size: 0.85rem; padding: 0.45rem 1rem;">
+                <span>✨ Evaluate Answer &amp; Get Score</span>
+              </button>
+              <div id="eval-result-${q.id}"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    showToast('Mock Interview Dossier ready!', 'success');
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+};
+
+window.submitAnswerEvaluation = async function(qId, qText, conceptsJson) {
+  const ansInput = document.getElementById(`ans-input-${qId}`);
+  const resultDiv = document.getElementById(`eval-result-${qId}`);
+  if (!ansInput || !resultDiv) return;
+
+  const answer = ansInput.value.trim();
+  if (!answer) {
+    showToast('Please type an answer to evaluate!', 'warning');
+    return;
+  }
+
+  try {
+    const concepts = JSON.parse(conceptsJson || '[]');
+    const res = await fetch(`${API_BASE}/interview/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: qText,
+        answer: answer,
+        key_concepts: concepts
+      })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      const e = data.evaluation;
+      const scoreColor = e.score >= 80 ? '#34d399' : e.score >= 60 ? '#f59e0b' : '#f43f5e';
+      resultDiv.innerHTML = `
+        <div style="background: rgba(0,0,0,0.3); border: 1px solid ${scoreColor}55; padding: 0.6rem 1rem; border-radius: var(--radius-md); font-size: 0.85rem;">
+          <span style="font-weight: 800; color: ${scoreColor}; font-size: 1.05rem;">Score: ${e.score}/100 (${escapeHtml(e.rating)})</span>
+          <div style="color: var(--text-secondary); margin-top: 0.25rem;">${escapeHtml(e.feedback)}</div>
+        </div>
+      `;
+    }
+  } catch (err) {
+    showToast(`Evaluation error: ${err.message}`, 'error');
+  }
+};
+
+// --- Salary & Offer Modeler ---
+window.evaluateOfferCompensation = async function() {
+  const base = parseFloat(document.getElementById('neg-base-salary').value) || 35.0;
+  const bonus = parseFloat(document.getElementById('neg-bonus').value) || 5.0;
+  const equity = parseFloat(document.getElementById('neg-equity').value) || 10.0;
+  const role = document.getElementById('neg-role-title').value.trim() || 'Senior Software Engineer';
+  const container = document.getElementById('negotiation-results-container');
+  if (!container) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/negotiation/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        base_salary_lpa: base,
+        bonus_lpa: bonus,
+        equity_annual_lpa: equity,
+        role_title: role
+      })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      const e = data.evaluation;
+      container.innerHTML = `
+        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-lg); padding: 1.5rem; margin-top: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <span style="font-size: 1.15rem; font-weight: 700; color: #34d399;">Total Annual Comp: ${e.total_annual_comp_lpa} LPA</span>
+            <span class="brand-badge" style="background: rgba(52, 211, 153, 0.2); color: #34d399;">${escapeHtml(e.market_percentile_band)}</span>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem;">💡 <strong>Negotiation Strategy:</strong> ${escapeHtml(e.negotiation_guidance)}</p>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">Market Median (p50): ${e.benchmark_p50} LPA • Top Tier (p75): ${e.benchmark_p75} LPA</div>
+        </div>
+      `;
+      showToast('Compensation offer benchmarked successfully!', 'success');
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+};
+
+// --- Disaster Recovery Backup Export ---
+window.exportEncryptedBackup = async function() {
+  try {
+    showToast('Exporting AES-256-GCM encrypted backup archive...', 'info');
+    const res = await fetch(`${API_BASE}/backup/export`, { method: 'POST' });
+    const data = await res.json();
+    if (data.status === 'success') {
+      showToast(`Encrypted backup created: ${data.filename}`, 'success');
+    }
+  } catch (err) {
+    showToast(`Backup failed: ${err.message}`, 'error');
+  }
+};
+
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
   initWebSocket();
