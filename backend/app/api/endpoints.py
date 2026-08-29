@@ -382,3 +382,133 @@ async def get_funnel_analytics():
         "metrics": AnalyticsEngine.get_funnel_metrics()
     }
 
+
+# --- Milestone 7: Mock Interview Studio & Architecture Dossiers ---
+
+@router.get("/interview/dossier")
+async def get_company_dossier(company: str, role: str = "Senior Software Engineer"):
+    """Generates technical architecture dossier and interview rounds for target company."""
+    from app.core.interview_studio import InterviewStudioEngine
+    return {
+        "status": "success",
+        "dossier": InterviewStudioEngine.generate_company_dossier(company, role)
+    }
+
+
+@router.get("/interview/questions")
+async def get_mock_questions(role: str = "Senior Software Engineer", profile_id: str = "default_user"):
+    """Generates role-specific mock technical and system design questions."""
+    from app.core.interview_studio import InterviewStudioEngine
+    profile = db.get_profile(profile_id)
+    skills = profile.skills if profile else ["Python", "Distributed Systems"]
+    return {
+        "status": "success",
+        "questions": InterviewStudioEngine.generate_mock_questions(role, skills=skills)
+    }
+
+
+class InterviewEvalRequest(BaseModel):
+    question: str
+    answer: str
+    key_concepts: Optional[List[str]] = None
+
+
+@router.post("/interview/evaluate")
+async def evaluate_interview_answer(payload: InterviewEvalRequest):
+    """Evaluates candidate response with depth, key concept coverage, and actionable feedback."""
+    from app.core.interview_studio import InterviewStudioEngine
+    return {
+        "status": "success",
+        "evaluation": InterviewStudioEngine.evaluate_candidate_response(
+            question=payload.question,
+            candidate_answer=payload.answer,
+            key_concepts=payload.key_concepts
+        )
+    }
+
+
+# --- Milestone 7: Salary Negotiation & Equity Modeler ---
+
+class OfferEvalRequest(BaseModel):
+    base_salary_lpa: float
+    bonus_lpa: float = 0.0
+    equity_annual_lpa: float = 0.0
+    role_title: str = "Senior Software Engineer"
+
+
+@router.post("/negotiation/evaluate")
+async def evaluate_offer_compensation(payload: OfferEvalRequest):
+    """Benchmarks job offer against market percentiles."""
+    from app.core.negotiation import SalaryNegotiationEngine
+    return {
+        "status": "success",
+        "evaluation": SalaryNegotiationEngine.evaluate_offer(
+            base_salary_lpa=payload.base_salary_lpa,
+            bonus_lpa=payload.bonus_lpa,
+            equity_annual_lpa=payload.equity_annual_lpa,
+            role_title=payload.role_title
+        )
+    }
+
+
+class EquityModelRequest(BaseModel):
+    options_count: int
+    total_company_shares: int
+    current_valuation_usd: float
+    strike_price: float = 0.0
+
+
+@router.post("/negotiation/equity")
+async def model_equity(payload: EquityModelRequest):
+    """Models startup ESOP ownership and future exit returns."""
+    from app.core.negotiation import SalaryNegotiationEngine
+    return {
+        "status": "success",
+        "equity_model": SalaryNegotiationEngine.model_startup_equity(
+            options_count=payload.options_count,
+            total_company_shares=payload.total_company_shares,
+            current_valuation_usd=payload.current_valuation_usd,
+            strike_price_per_share=payload.strike_price
+        )
+    }
+
+
+class CounterOfferRequest(BaseModel):
+    candidate_name: str = "Satyajit Nayak"
+    company_name: str
+    role_title: str
+    offered_tc: str
+    desired_tc: str
+    leverage_points: Optional[List[str]] = None
+
+
+@router.post("/negotiation/counter-offer")
+async def generate_counter_offer(payload: CounterOfferRequest):
+    """Generates an Anti-AI counter-offer negotiation email."""
+    from app.core.negotiation import SalaryNegotiationEngine
+    script = SalaryNegotiationEngine.generate_counter_offer_script(
+        candidate_name=payload.candidate_name,
+        company_name=payload.company_name,
+        role_title=payload.role_title,
+        offered_tc=payload.offered_tc,
+        desired_tc=payload.desired_tc,
+        leverage_points=payload.leverage_points
+    )
+    return {"status": "success", "counter_offer_script": script}
+
+
+# --- Milestone 7: Zero-Collision Calendar Availability ---
+
+@router.get("/calendar/availability")
+async def get_calendar_availability(timezone: str = "IST", days: int = 4):
+    """Calculates non-conflicting interview scheduling windows."""
+    from app.core.calendar_sync import CalendarAvailabilityEngine
+    slots = CalendarAvailabilityEngine.get_open_slots(timezone_str=timezone, days_ahead=days)
+    email_text = CalendarAvailabilityEngine.format_availability_email_text(slots)
+    return {
+        "status": "success",
+        "timezone": timezone,
+        "slots": slots,
+        "email_snippet": email_text
+    }
+
