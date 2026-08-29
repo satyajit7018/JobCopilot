@@ -1,10 +1,14 @@
 """
 JobCopilot - Backend Server Application
-FastAPI Server with WebSockets, SQLite WAL, and Cryptographic Vault.
+FastAPI Server with WebSockets, SQLite WAL, Static File Hosting, and Cryptographic Vault.
 """
 
+from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 from app.api.endpoints import router as api_router, ws_manager
 
 app = FastAPI(
@@ -13,7 +17,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for React frontend (Vite default: http://localhost:5173)
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,7 +37,6 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            # Handle incoming ping/heartbeat
             await websocket.send_json({"type": "PONG", "message": "connected"})
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
@@ -41,13 +44,15 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
 
 
-@app.get("/")
-async def root():
-    return {
-        "app": "JobCopilot",
-        "status": "online",
-        "docs_url": "/docs"
-    }
+# Mount Static Frontend
+frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"
+if frontend_dir.exists():
+    app.mount("/css", StaticFiles(directory=str(frontend_dir / "css")), name="css")
+    app.mount("/js", StaticFiles(directory=str(frontend_dir / "js")), name="js")
+
+    @app.get("/")
+    async def serve_frontend():
+        return FileResponse(str(frontend_dir / "index.html"))
 
 
 if __name__ == "__main__":

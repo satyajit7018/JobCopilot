@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobCopilot — Universal Autonomous Job Application OS</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22><text y=%2226%22 font-size=%2226%22>🚀</text></svg>">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Navigation Bar -->
+    <header class="navbar">
+      <a href="#" class="brand">
+        <div class="brand-icon">🚀</div>
+        <div class="brand-text">JobCopilot</div>
+        <span class="brand-badge">Local OS</span>
+      </a>
+
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-view="onboarding">
+          <span>⚡</span> Onboarding Wizard
+        </button>
+        <button class="nav-tab" data-view="vault">
+          <span>🧠</span> Knowledge Vault
+        </button>
+        <button class="nav-tab" data-view="pipeline">
+          <span>📊</span> Job Pipeline
+        </button>
+        <button class="nav-tab" data-view="bot">
+          <span>🤖</span> Bot Console
+        </button>
+        <button class="nav-tab" data-view="settings">
+          <span>🔒</span> Security & Settings
+        </button>
+      </nav>
+
+      <div class="nav-actions">
+        <div class="status-pill" id="system-status">
+          <span class="status-dot"></span>
+          <span id="status-text">Engine Online</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- VIEW 1: Smart 2-Minute Onboarding Wizard -->
+      <section id="view-onboarding" class="view-panel active">
+        
+        <!-- Wizard Steps Indicator -->
+        <div class="wizard-progress">
+          <div class="wizard-step active" id="wstep-1">
+            <div class="step-circle">1</div>
+            <span class="step-label">Upload Resume</span>
+          </div>
+          <div class="wizard-step" id="wstep-2">
+            <div class="step-circle">2</div>
+            <span class="step-label">Recruiter Baseline</span>
+          </div>
+          <div class="wizard-step" id="wstep-3">
+            <div class="step-circle">3</div>
+            <span class="step-label">Activate Autopilot</span>
+          </div>
+        </div>
+
+        <!-- Wizard Step 1: Resume Upload -->
+        <div id="step-content-1" class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">📄 Step 1: Upload Candidate Resume</h2>
+              <p class="card-subtitle">Upload your existing PDF or DOCX resume. JobCopilot extracts all contact info, skills, education, and work history locally.</p>
+            </div>
+          </div>
+
+          <div class="dropzone" id="resume-dropzone">
+            <input type="file" id="resume-file-input" accept=".pdf,.docx,.doc,.txt" style="display: none;">
+            <div class="dropzone-icon">📥</div>
+            <h3 class="dropzone-title">Drag & drop your resume file here</h3>
+            <p class="dropzone-desc">Supports PDF, DOCX, or plain text (Max 10MB) — 100% processed locally</p>
+            <button type="button" class="btn btn-secondary" style="margin-top: 1.25rem;" onclick="document.getElementById('resume-file-input').click()">
+              Choose File from Disk
+            </button>
+          </div>
+
+          <div style="text-align: center; margin: 1.5rem 0; color: var(--text-muted); font-size: 0.85rem;">— OR PASTE RAW RESUME TEXT —</div>
+
+          <div class="form-group">
+            <textarea id="raw-resume-text" class="form-textarea" placeholder="Paste your resume text here if you don't have a PDF file handy..."></textarea>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem;">
+            <button id="btn-parse-resume" class="btn btn-primary">
+              <span>Parse & Auto-Extract Profile</span> ➔
+            </button>
+          </div>
+        </div>
+
+        <!-- Wizard Step 2: Recruiter Baseline Form (70% Auto-Prefilled) -->
+        <div id="step-content-2" class="card" style="display: none;">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">⚡ Step 2: Review Recruiter Baseline Preferences</h2>
+              <p class="card-subtitle">These 8 questions are auto-prefilled from your resume. Confirm or tweak your salary expectations and notice period in 30 seconds.</p>
+            </div>
+            <span class="brand-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border-color: rgba(16, 185, 129, 0.4);">
+              ✓ 70% Auto-Extracted
+            </span>
+          </div>
+
+          <form id="questionnaire-form">
+            <div class="form-grid">
+              
+              <!-- Full Name -->
+              <div class="form-group">
+                <label class="form-label">Candidate Full Name</label>
+                <input type="text" id="q-full-name" class="form-input" required>
+              </div>
+
+              <!-- Email -->
+              <div class="form-group">
+                <label class="form-label">Email Address</label>
+                <input type="email" id="q-email" class="form-input" required>
+              </div>
+
+              <!-- Phone -->
+              <div class="form-group">
+                <label class="form-label">Phone Number</label>
+                <input type="text" id="q-phone" class="form-input" required>
+              </div>
+
+              <!-- Location -->
+              <div class="form-group">
+                <label class="form-label">Current Location / City</label>
+                <input type="text" id="q-location" class="form-input" required>
+              </div>
+
+              <!-- Multi-Currency Salary Slider -->
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <div class="slider-container">
+                  <div class="slider-header">
+                    <label class="form-label" style="margin-bottom: 0;">Expected Annual CTC / Salary</label>
+                    <span class="slider-value" id="salary-display">15.0 LPA</span>
+                  </div>
+                  <input type="range" id="salary-slider" class="slider-input" min="3" max="80" step="0.5" value="15">
+                  <div class="currency-equivalents">
+                    <div class="currency-badge">
+                      <div class="currency-badge-label">INR Annual</div>
+                      <div class="currency-badge-val" id="eq-inr-lpa">15.0 LPA</div>
+                    </div>
+                    <div class="currency-badge">
+                      <div class="currency-badge-label">USD Annual</div>
+                      <div class="currency-badge-val" id="eq-usd-annual">$17,964</div>
+                    </div>
+                    <div class="currency-badge">
+                      <div class="currency-badge-label">USD Hourly</div>
+                      <div class="currency-badge-val" id="eq-usd-hourly">$8.64/hr</div>
+                    </div>
+                    <div class="currency-badge">
+                      <div class="currency-badge-label">INR Monthly</div>
+                      <div class="currency-badge-val" id="eq-inr-monthly">₹1,25,000</div>
+                    </div>
+                    <div class="currency-badge">
+                      <div class="currency-badge-label">EUR Annual</div>
+                      <div class="currency-badge-val" id="eq-eur-annual">€16,574</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Notice Period -->
+              <div class="form-group">
+                <label class="form-label">Notice Period / Start Date</label>
+                <select id="q-notice-period" class="form-select">
+                  <option value="0">Immediate (0 days)</option>
+                  <option value="15">15 days</option>
+                  <option value="30">30 days</option>
+                  <option value="60">60 days</option>
+                  <option value="90">90 days</option>
+                </select>
+              </div>
+
+              <!-- Work Authorization -->
+              <div class="form-group">
+                <label class="form-label">Work Authorization Status</label>
+                <select id="q-work-auth" class="form-select">
+                  <option value="Citizen / Permanent Resident">Citizen / Permanent Resident</option>
+                  <option value="Require Visa Sponsorship">Require Visa Sponsorship</option>
+                  <option value="Existing Work Visa (OPT/CPT/H1B)">Existing Work Visa (OPT/CPT/H1B)</option>
+                  <option value="Open to Remote Contractor Work">Open to Remote Contractor Work</option>
+                </select>
+              </div>
+
+              <!-- Preferred Work Mode -->
+              <div class="form-group">
+                <label class="form-label">Preferred Work Arrangement</label>
+                <select id="q-remote-pref" class="form-select">
+                  <option value="Remote / Hybrid / On-site">Remote / Hybrid / On-site</option>
+                  <option value="Remote Only">Remote Only</option>
+                  <option value="Remote / Hybrid">Remote / Hybrid</option>
+                  <option value="On-site Only">On-site Only</option>
+                </select>
+              </div>
+
+              <!-- Current Employer (Stealth Blacklisting) -->
+              <div class="form-group">
+                <label class="form-label">Current Employer <span class="form-label-hint">(Auto-blacklisted for stealth)</span></label>
+                <input type="text" id="q-current-employer" class="form-input" placeholder="e.g. Current Company Name">
+              </div>
+
+              <!-- Career Narrative -->
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label class="form-label">Career Motivation Narrative <span class="form-label-hint">(Used for 'Why us?' essays)</span></label>
+                <textarea id="q-why-looking" class="form-textarea" rows="2"></textarea>
+              </div>
+
+            </div>
+
+            <div style="display: flex; justify-content: space-between; margin-top: 1.5rem;">
+              <button type="button" class="btn btn-secondary" id="btn-back-step-1">
+                ➔ Back to Resume
+              </button>
+              <button type="submit" class="btn btn-primary" id="btn-save-questionnaire">
+                <span>Save Preferences & Seed Vault</span> ➔
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Wizard Step 3: Launch Autopilot -->
+        <div id="step-content-3" class="card" style="display: none; text-align: center; padding: 3rem 2rem;">
+          <div style="font-size: 3.5rem; margin-bottom: 1rem;">🎉</div>
+          <h2 style="font-size: 1.75rem; margin-bottom: 0.5rem;">You're Ready to Autopilot!</h2>
+          <p style="color: var(--text-secondary); max-width: 600px; margin: 0 auto 2rem;">
+            Your candidate profile is saved locally and your Knowledge Vault is seeded with 14+ baseline recruiter response slots.
+          </p>
+
+          <div style="display: flex; gap: 1rem; justify-content: center;">
+            <button class="btn btn-primary" onclick="window.switchTab('pipeline')">
+              <span>View Job Pipeline & Discovery</span>
+            </button>
+            <button class="btn btn-secondary" onclick="window.switchTab('vault')">
+              <span>Inspect Knowledge Vault Slots</span>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- VIEW 2: Self-Learning Knowledge Vault -->
+      <section id="view-vault" class="view-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">🧠 Self-Learning Knowledge Vault</h2>
+              <p class="card-subtitle">Every form question answered is stored here. Unfamiliar questions prompt you once, then are never asked again.</p>
+            </div>
+            <button class="btn btn-secondary" id="btn-add-vault-slot">
+              <span>+ Add Custom Slot</span>
+            </button>
+          </div>
+
+          <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+            <input type="text" id="vault-search-input" class="form-input" placeholder="Search questions, slot keys, or answers..." style="flex: 1;">
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="vault-table">
+              <thead>
+                <tr>
+                  <th>Slot Key / Type</th>
+                  <th>Question Pattern</th>
+                  <th>Answer / Resolved Template</th>
+                  <th>Usage Count</th>
+                  <th>Last Used</th>
+                </tr>
+              </thead>
+              <tbody id="vault-table-body">
+                <!-- Dynamically Populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: Job Pipeline & Kanban -->
+      <section id="view-pipeline" class="view-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">📊 Autonomous Job Application Pipeline</h2>
+              <p class="card-subtitle">Track applications across Greenhouse, Lever, Ashby, Workday, YC, and Wellfound.</p>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-primary" id="btn-start-autopilot">
+                <span>▶ Start Auto-Apply</span>
+              </button>
+            </div>
+          </div>
+          <div id="job-pipeline-list" style="margin-top: 1rem;">
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Job discovery runs in the background. Sourced jobs will appear here ranked by Match Score.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: Bot Automation & HITL Console -->
+      <section id="view-bot" class="view-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">🤖 Autonomous Browser Worker Console</h2>
+              <p class="card-subtitle">Real-time telemetry from Playwright browser instances and HITL question alerts.</p>
+            </div>
+          </div>
+          <div id="bot-logs-container" style="background: #06090e; padding: 1.25rem; border-radius: var(--radius-md); font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; height: 350px; overflow-y: auto; color: #a5b4fc; border: 1px solid var(--border-subtle);">
+            <div>[System] JobCopilot Bot Console initialized. Waiting for task queue...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: Security & Settings -->
+      <section id="view-settings" class="view-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">🔒 Cryptography & Privacy Vault</h2>
+              <p class="card-subtitle">Local-first AES-256-GCM encryption and Argon2id key derivation status.</p>
+            </div>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+            <div class="card" style="margin-bottom: 0;">
+              <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Database Storage</div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: #34d399; margin-top: 0.25rem;">SQLite WAL Mode (Active)</div>
+            </div>
+            <div class="card" style="margin-bottom: 0;">
+              <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Credential Encryption</div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: #818cf8; margin-top: 0.25rem;">Argon2id + AES-256-GCM</div>
+            </div>
+            <div class="card" style="margin-bottom: 0;">
+              <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Local Master Key</div>
+              <div style="font-size: 1.15rem; font-weight: 700; color: #f59e0b; margin-top: 0.25rem;">OS Keychain Protected</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Real-Time HITL Modal Dialog -->
+    <div class="modal-overlay" id="hitl-modal">
+      <div class="modal-box">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+          <h3 style="font-size: 1.25rem; color: var(--warning); display: flex; align-items: center; gap: 0.5rem;">
+            <span>⚠️</span> Recruiter Question Encountered
+          </h3>
+          <span class="brand-badge" id="hitl-company-tag">Company</span>
+        </div>
+        <p id="hitl-question-text" style="font-weight: 600; font-size: 1rem; margin-bottom: 1rem; color: var(--text-primary);">
+          Question text...
+        </p>
+
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label">Your Answer <span class="form-label-hint">(AI suggestion pre-filled)</span></label>
+          <textarea id="hitl-user-answer" class="form-textarea" rows="3"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <label style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="hitl-save-vault-check" checked> Save answer permanently to Knowledge Vault
+          </label>
+          <button id="btn-hitl-approve" class="btn btn-primary">
+            <span>Approve & Continue Bot</span> ➔
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+  </div>
+
+  <!-- Main JavaScript App Logic -->
+  <script src="js/app.js"></script>
+</body>
+</html>
