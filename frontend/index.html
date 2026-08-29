@@ -47,7 +47,7 @@
               <span class="nav-icon">🧠</span>
               <span>Knowledge Vault</span>
             </div>
-            <span class="nav-badge" id="badge-vault-count">14+</span>
+            <span class="nav-badge" id="badge-vault-count">20+</span>
           </button>
 
           <button class="nav-item" data-view="email">
@@ -112,6 +112,17 @@
       </div>
 
       <div class="topbar-right">
+        <!-- Held Applications Alert Badge (Step 6 & 7) -->
+        <button class="hud-pill" id="held-apps-trigger" onclick="window.openHeldAppsModal()" style="display: none; background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.5); color: #fbbf24; cursor: pointer;">
+          <span class="hud-dot" style="background: #f59e0b;"></span>
+          <span id="held-apps-count">⏸️ 0 Held Applications</span>
+        </button>
+
+        <div class="hud-pill" id="user-profile-pill">
+          <span style="font-size: 13px;">👤</span>
+          <span id="user-display-name">Candidate</span>
+        </div>
+
         <div class="hud-pill">
           <span class="hud-dot live" id="worker-status-dot"></span>
           <span id="worker-status-text">Stealth Bot Ready</span>
@@ -131,22 +142,11 @@
     <!-- Main Dynamic Content Cockpit -->
     <main class="cockpit-content">
 
-      <!-- Global Telemetry HUD (Available across views) -->
+      <!-- Executive Deck Board HUD (Step 11: Applied, Responses, Accepted, Rejected, Converted %) -->
       <section class="telemetry-hud" id="global-telemetry-hud">
-        <div class="telemetry-card">
-          <div class="telemetry-header">
-            <span>Sourced Leads</span>
-            <span>⚡ 0-Day</span>
-          </div>
-          <div class="telemetry-val-group">
-            <span class="telemetry-val" id="stat-total-sourced">0</span>
-            <span class="telemetry-badge">Live Feed</span>
-          </div>
-        </div>
-
         <div class="telemetry-card cyan">
           <div class="telemetry-header">
-            <span>Submitted Applications</span>
+            <span>1. Submitted Applications</span>
             <span>🤖 Autopilot</span>
           </div>
           <div class="telemetry-val-group">
@@ -155,20 +155,42 @@
           </div>
         </div>
 
+        <div class="telemetry-card">
+          <div class="telemetry-header">
+            <span>2. Recruiter Responses</span>
+            <span>📬 Email / Call</span>
+          </div>
+          <div class="telemetry-val-group">
+            <span class="telemetry-val" id="stat-recruiter-responses" style="color: #a5b4fc;">0</span>
+            <span class="telemetry-badge">Inbound Radar</span>
+          </div>
+        </div>
+
         <div class="telemetry-card emerald">
           <div class="telemetry-header">
-            <span>Interviews Secured</span>
+            <span>3. Interviews &amp; Offers</span>
             <span>🎯 Match</span>
           </div>
           <div class="telemetry-val-group">
             <span class="telemetry-val" id="stat-interviews" style="color: var(--accent-emerald);">0</span>
-            <span class="telemetry-badge">Confirmed</span>
+            <span class="telemetry-badge">Scheduled</span>
+          </div>
+        </div>
+
+        <div class="telemetry-card" style="border-left: 3px solid rgba(239, 68, 68, 0.6);">
+          <div class="telemetry-header">
+            <span>4. Rejections</span>
+            <span>⚡ Neutralized</span>
+          </div>
+          <div class="telemetry-val-group">
+            <span class="telemetry-val" id="stat-rejections" style="color: #f87171;">0</span>
+            <span class="telemetry-badge">Auto-Classified</span>
           </div>
         </div>
 
         <div class="telemetry-card sunset">
           <div class="telemetry-header">
-            <span>Response Velocity</span>
+            <span>5. Conversion Rate</span>
             <span>📊 Funnel</span>
           </div>
           <div class="telemetry-val-group">
@@ -183,10 +205,10 @@
         <div class="view-header">
           <div class="view-title-group">
             <h1>Candidate Onboarding Cockpit</h1>
-            <p class="view-subtitle">Universal parser extracts contact details, skills, and pre-fills the 8 canonical recruiter parameters.</p>
+            <p class="view-subtitle">Google authentication, universal resume parser, 20+ recruiter screening parameters, and multi-role ATS resume maker.</p>
           </div>
           <span class="hud-pill" id="current-step-badge" style="background: var(--grad-subtle); border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe;">
-            Step 1: Resume Ingestion
+            Step 1: Auth &amp; Resume Ingestion
           </span>
         </div>
 
@@ -195,22 +217,22 @@
           <div class="stepper-step active" id="wstep-1">
             <div class="stepper-num">1</div>
             <div>
-              <div style="font-weight: 700; font-size: 13px;">Upload Resume</div>
-              <div style="font-size: 11px; opacity: 0.8;">PDF, DOCX, or Text</div>
+              <div style="font-weight: 700; font-size: 13px;">Auth &amp; Resume</div>
+              <div style="font-size: 11px; opacity: 0.8;">Google SSO + PDF/DOCX</div>
             </div>
           </div>
           <div class="stepper-step" id="wstep-2">
             <div class="stepper-num">2</div>
             <div>
-              <div style="font-weight: 700; font-size: 13px;">8 Recruiter Baseline</div>
-              <div style="font-size: 11px; opacity: 0.8;">70% Auto-Prefilled</div>
+              <div style="font-weight: 700; font-size: 13px;">Screening Form</div>
+              <div style="font-size: 11px; opacity: 0.8;">20+ Qs (Skip Allowed)</div>
             </div>
           </div>
           <div class="stepper-step" id="wstep-3">
             <div class="stepper-num">3</div>
             <div>
-              <div style="font-weight: 700; font-size: 13px;">14 Screening Slots</div>
-              <div style="font-size: 11px; opacity: 0.8;">Knowledge Vault Index</div>
+              <div style="font-weight: 700; font-size: 13px;">Target Roles &amp; ATS</div>
+              <div style="font-size: 11px; opacity: 0.8;">Multi-Resume Maker</div>
             </div>
           </div>
           <div class="stepper-step" id="wstep-4">
@@ -222,12 +244,43 @@
           </div>
         </div>
 
-        <!-- Step 1: Drag & Drop Resume -->
+        <!-- Step 1: Google SSO & Resume Dropzone (Steps 1, 2, 3) -->
         <div id="step-content-1">
+          
+          <!-- Google SSO & Hiring Portal Permission Card -->
+          <div class="glass-card" style="margin-bottom: 1.25rem;">
+            <div class="glass-card-header">
+              <div>
+                <h3 class="glass-card-title">🔐 Step 1A: Google Authentication &amp; Portal Auto-Login</h3>
+                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 2px;">Sign in with Google to enable seamless Single Sign-On and portal session automation.</p>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; background: rgba(10, 14, 24, 0.6); padding: 1.25rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+              <div style="display: flex; gap: 1rem; align-items: center;">
+                <button type="button" class="btn btn-secondary" id="btn-google-sso" onclick="window.triggerGoogleSSO()" style="background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); font-weight: 600;">
+                  <span style="font-size: 16px;">🌐</span>
+                  <span>Sign in with Google</span>
+                </button>
+                <div id="google-auth-status" style="font-size: 13px; color: var(--text-muted);">
+                  Status: Signed in as <strong style="color: #c7d2fe;" id="auth-email-display">default_candidate@jobcopilot.local</strong>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="chk-auto-login-perm" checked style="accent-color: var(--accent-indigo); width: 16px; height: 16px; cursor: pointer;">
+                <label for="chk-auto-login-perm" style="font-size: 12.5px; color: var(--text-secondary); cursor: pointer;">
+                  Grant permission to auto-login on ATS hiring portals (Greenhouse, Lever, Ashby)
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drag & Drop Resume Card -->
           <div class="glass-card">
             <div class="glass-card-header">
               <div>
-                <h3 class="glass-card-title">📄 Step 1: Ingest Candidate Profile</h3>
+                <h3 class="glass-card-title">📄 Step 1B: Ingest Candidate Profile</h3>
                 <p style="color: var(--text-secondary); font-size: 13px; margin-top: 2px;">Extracts skills, project achievements, and experience in &lt; 150ms.</p>
               </div>
             </div>
@@ -252,17 +305,22 @@
           </div>
         </div>
 
-        <!-- Step 2: The 8 Canonical Recruiter Baseline Questions -->
+        <!-- Step 2: Expanded 20+ Canonical Recruiter Screening Questions (Step 4, with Skip) -->
         <div id="step-content-2" style="display: none;">
           <div class="glass-card">
             <div class="glass-card-header">
               <div>
-                <h3 class="glass-card-title">⚙️ Step 2: The 8 Recruiter Baseline Preferences</h3>
-                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 2px;">Review prefilled fields and configure salary expectations.</p>
+                <h3 class="glass-card-title">⚙️ Step 2: Recruiter Screening Form</h3>
+                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 2px;">Pre-fills standard application form questions. You can complete these now or skip and fill later.</p>
               </div>
-              <span class="hud-pill" style="color: var(--accent-emerald); border-color: rgba(16, 185, 129, 0.3);">
-                ✓ 70% Auto-Prefilled
-              </span>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="window.skipQuestionnaire()" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
+                  <span>⏭️ Skip &amp; Fill Later</span>
+                </button>
+                <span class="hud-pill" style="color: var(--accent-emerald); border-color: rgba(16, 185, 129, 0.3);">
+                  ✓ Auto-Prefilled
+                </span>
+              </div>
             </div>
 
             <form id="questionnaire-form">
@@ -284,7 +342,7 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">4. Geographic Location</label>
+                  <label class="form-label">4. Geographic Location (City, Country)</label>
                   <input type="text" id="q-location" class="form-input" required>
                 </div>
 
@@ -334,13 +392,22 @@
                   <label class="form-label">7. Work Authorization</label>
                   <select id="q-work-auth" class="form-select">
                     <option value="Citizen / Permanent Resident">Citizen / Permanent Resident</option>
-                    <option value="Requires Visa Sponsorship">Requires Visa Sponsorship</option>
                     <option value="Authorized with OPT/CPT">Authorized with OPT/CPT</option>
+                    <option value="H1B Transfer Eligible">H1B Transfer Eligible</option>
+                    <option value="Requires Visa Sponsorship">Requires Visa Sponsorship</option>
                   </select>
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">8. Work Mode Preference</label>
+                  <label class="form-label">8. Visa Sponsorship Requirement</label>
+                  <select id="q-sponsorship" class="form-select">
+                    <option value="No">No, I do not require sponsorship</option>
+                    <option value="Yes">Yes, now or in the future</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">9. Work Mode Preference</label>
                   <select id="q-remote-pref" class="form-select">
                     <option value="Remote / Hybrid / On-site">Remote / Hybrid / On-site</option>
                     <option value="Remote Only">Remote Only</option>
@@ -350,12 +417,35 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">Current Employer (Stealth Blacklisted)</label>
-                  <input type="text" id="q-current-employer" class="form-input" placeholder="e.g. Current Company">
+                  <label class="form-label">10. Willingness to Relocate</label>
+                  <select id="q-relocation" class="form-select">
+                    <option value="Yes">Yes, open to relocate</option>
+                    <option value="No">No, local / remote only</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">11. LinkedIn Profile URL</label>
+                  <input type="url" id="q-linkedin-url" class="form-input" placeholder="https://linkedin.com/in/username">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">12. GitHub / Portfolio URL</label>
+                  <input type="url" id="q-github-url" class="form-input" placeholder="https://github.com/username">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">13. Overall Years of Experience</label>
+                  <input type="number" step="0.5" id="q-yoe" class="form-input" value="4.0">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">14. Current Employer (Stealth Blacklisted)</label>
+                  <input type="text" id="q-current-employer" class="form-input" placeholder="e.g. Current Tech Company">
                 </div>
 
                 <div class="form-group" style="grid-column: 1 / -1;">
-                  <label class="form-label">Career Narrative (Why are you seeking a new challenge?)</label>
+                  <label class="form-label">15. Career Narrative (Why are you seeking a new challenge?)</label>
                   <textarea id="q-why-looking" class="form-textarea" rows="2" placeholder="Brief motivation for recruiter essay prompts..."></textarea>
                 </div>
 
@@ -363,35 +453,56 @@
 
               <div style="display: flex; justify-content: space-between; margin-top: 1.5rem;">
                 <button type="button" class="btn btn-secondary" id="btn-back-step-1">➔ Back to Resume</button>
-                <button type="submit" class="btn btn-primary" id="btn-save-questionnaire">
-                  <span>Save &amp; Continue to 14 Slots</span> ➔
-                </button>
+                <div style="display: flex; gap: 0.75rem;">
+                  <button type="button" class="btn btn-secondary" onclick="window.skipQuestionnaire()" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
+                    <span>⏭️ Skip &amp; Fill Later</span>
+                  </button>
+                  <button type="submit" class="btn btn-primary" id="btn-save-questionnaire">
+                    <span>Save &amp; Continue to Target Roles</span> ➔
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
 
-        <!-- Step 3: Review 14 Screening Slots -->
+        <!-- Step 3: Target Roles & Multi-Resume ATS Workshop (Step 5) -->
         <div id="step-content-3" style="display: none;">
           <div class="glass-card">
             <div class="glass-card-header">
               <div>
-                <h3 class="glass-card-title">🧠 Step 3: Review 14 Knowledge Vault Screening Slots</h3>
-                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 2px;">These standard recruiter Q&amp;As are indexed in your Knowledge Vault for 100% automated form filling.</p>
+                <h3 class="glass-card-title">🎯 Step 3: Target Roles &amp; Multi-Resume ATS Workshop</h3>
+                <p style="color: var(--text-secondary); font-size: 13px; margin-top: 2px;">Select the job roles you are targeting. The AI compiles distinct ATS-tailored resume variants for each role.</p>
               </div>
-              <span class="hud-pill" style="color: var(--accent-emerald); border-color: rgba(16, 185, 129, 0.3);">
-                ✓ 14 Slots Indexed
+              <span class="hud-pill" style="color: var(--accent-cyan); border-color: rgba(6, 182, 212, 0.3);">
+                ATS Multi-Resume Maker
               </span>
             </div>
 
-            <div id="screening-slots-review-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; max-height: 420px; overflow-y: auto; padding-right: 4px; margin-bottom: 1.5rem;">
-              <!-- Populated dynamically via app.js -->
+            <!-- Role Selector Pills -->
+            <div style="margin-bottom: 1.5rem;">
+              <label class="form-label" style="margin-bottom: 0.75rem;">Select Target Roles (Choose one or multiple):</label>
+              <div class="role-selector-grid" id="role-selector-grid" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <button type="button" class="role-pill active" data-role="Backend Engineer" onclick="window.toggleTargetRole(this)">⚡ Backend Engineer</button>
+                <button type="button" class="role-pill active" data-role="Full Stack Engineer" onclick="window.toggleTargetRole(this)">🌐 Full Stack Engineer</button>
+                <button type="button" class="role-pill" data-role="AI/ML Engineer" onclick="window.toggleTargetRole(this)">🤖 AI/ML Engineer</button>
+                <button type="button" class="role-pill" data-role="DevOps / Cloud Engineer" onclick="window.toggleTargetRole(this)">☁️ DevOps / Cloud</button>
+                <button type="button" class="role-pill" data-role="Frontend Engineer" onclick="window.toggleTargetRole(this)">🎨 Frontend Engineer</button>
+                <button type="button" class="role-pill" data-role="Data Platform Engineer" onclick="window.toggleTargetRole(this)">📊 Data Platform</button>
+                <button type="button" class="role-pill" data-role="Mobile (iOS/Android)" onclick="window.toggleTargetRole(this)">📱 Mobile Engineer</button>
+                <button type="button" class="role-pill" data-role="Engineering Manager" onclick="window.toggleTargetRole(this)">👑 Engineering Manager</button>
+              </div>
+            </div>
+
+            <!-- Multi-Resume Workshop Display Container -->
+            <div id="multi-resume-workshop-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+              <!-- Dynamically populated via app.js -->
             </div>
 
             <div style="display: flex; justify-content: space-between;">
-              <button type="button" class="btn btn-secondary" onclick="window.backToStep2()">➔ Back to 8 Questions</button>
+              <button type="button" class="btn btn-secondary" onclick="window.backToStep2()">➔ Back to Form</button>
               <button type="button" class="btn btn-primary" onclick="window.proceedToStep4()">
-                <span>Confirm &amp; Launch Autopilot</span> ➔
+                <span>Confirm Tailored Resumes &amp; Launch</span> ➔
               </button>
             </div>
           </div>
@@ -401,9 +512,9 @@
         <div id="step-content-4" style="display: none;">
           <div class="glass-card" style="text-align: center; padding: 3.5rem 2rem;">
             <div style="font-size: 48px; margin-bottom: 1rem;">🚀</div>
-            <h2 style="font-size: 24px; margin-bottom: 0.5rem;">Onboarding Cockpit Configured!</h2>
+            <h2 style="font-size: 24px; margin-bottom: 0.5rem;">Onboarding Complete &amp; Cockpit Ready!</h2>
             <p style="color: var(--text-secondary); max-width: 520px; margin: 0 auto 1.75rem;">
-              Your profile is verified and all recruiter slots are active in the Knowledge Vault. Launch 0-day discovery to begin hunting.
+              Your profile is verified, tailored resume variants are compiled, and 0-day feeds are synchronized. Ready to launch autonomous hunting.
             </p>
             <div style="display: flex; gap: 1rem; justify-content: center;">
               <button class="btn btn-primary" onclick="window.switchTab('pipeline')">🎯 Open 0-Day Pipeline</button>
@@ -422,6 +533,9 @@
             <p class="view-subtitle">High-frequency parallel ingestion from Greenhouse, Lever, Ashby, Y Combinator, and HackerNews.</p>
           </div>
           <div style="display: flex; gap: 0.75rem;">
+            <button class="btn btn-secondary" onclick="window.openLogCallModal()">
+              <span>📞 + Log Direct Recruiter Call</span>
+            </button>
             <button class="btn btn-cyan" onclick="triggerDiscoveryCycle()">
               <span>⚡ Fetch 0-Day Openings</span>
             </button>
@@ -444,7 +558,7 @@
           </div>
         </div>
 
-        <!-- Multi-Column Interactive Kanban Board -->
+        <!-- Multi-Column Interactive Kanban Board (Step 8 & 9: GMeet buttons & call status) -->
         <div class="kanban-board" id="kanban-board-container">
           
           <!-- Column 1: Discovered -->
@@ -474,7 +588,7 @@
             <div class="kanban-cards-list" id="cards-submitted"></div>
           </div>
 
-          <!-- Column 4: Interview Scheduled -->
+          <!-- Column 4: Interview Scheduled (GMeet Button) -->
           <div class="kanban-col" id="col-interview">
             <div class="kanban-col-header">
               <span class="kanban-col-title">Interviewing</span>
@@ -499,165 +613,119 @@
       <section id="view-vault" class="view-panel">
         <div class="view-header">
           <div class="view-title-group">
-            <h1>Knowledge Vault Studio</h1>
-            <p class="view-subtitle">Hybrid semantic embeddings and deterministic slot resolution for zero-repeat form filling.</p>
+            <h1>Knowledge Vault &amp; Self-Learning Engine</h1>
+            <p class="view-subtitle">Hybrid Reciprocal Rank Fusion (Dense Vector + BM25 Lexical) indexing all screening questions.</p>
           </div>
-          <button class="btn btn-secondary" onclick="openAddSlotModal()">
-            <span>+ Teach New Slot</span>
+          <button class="btn btn-secondary" onclick="window.openNewSlotModal()">
+            <span>+ Add Custom Q&amp;A Slot</span>
           </button>
         </div>
 
-        <!-- Real-Time Q&A Playground -->
-        <div class="vault-playground">
-          <div class="playground-title-group">
-            <span style="font-size: 20px;">⚡</span>
-            <div>
-              <h3 style="font-size: 15px; font-weight: 700;">Live Recruiter Q&amp;A Tester Playground</h3>
-              <p style="color: var(--text-muted); font-size: 12px;">Type any arbitrary recruiter prompt to see real-time vector matching, confidence score, and candidate substitution.</p>
+        <div class="vault-grid">
+          <div class="glass-card" style="margin-bottom: 0;">
+            <div class="glass-card-header">
+              <h3 class="glass-card-title">Indexed Recruiter Screening Slots</h3>
+              <span class="hud-pill" id="vault-total-badge" style="color: var(--accent-emerald);">20+ Slots Active</span>
+            </div>
+            <div id="vault-entries-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 520px; overflow-y: auto;">
+              <!-- Dynamically populated via app.js -->
             </div>
           </div>
 
-          <div style="display: flex; gap: 10px;">
-            <input type="text" id="playground-test-input" class="form-input" placeholder="e.g. What is your expected CTC and earliest joining date?" style="font-size: 14px;">
-            <button class="btn btn-primary" onclick="testVaultQuestionMatch()">Test Match</button>
-          </div>
-
-          <div class="live-confidence-bar">
-            <div class="confidence-fill" id="playground-confidence-fill"></div>
-          </div>
-
-          <div id="playground-result-box" class="slot-resolution-box" style="display: none;">
-            <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: var(--text-muted);">
-              <span>Slot Key: <strong id="playground-slot-key" style="color: var(--accent-cyan);">-</strong></span>
-              <span>Confidence: <strong id="playground-score" style="color: var(--accent-emerald);">0%</strong></span>
+          <!-- Test Match Simulator -->
+          <div class="glass-card" style="margin-bottom: 0;">
+            <div class="glass-card-header">
+              <h3 class="glass-card-title">Live Vector Match Simulator</h3>
             </div>
-            <div id="playground-resolved-text" style="color: #f1f5f9; font-weight: 500;"></div>
-          </div>
-        </div>
-
-        <!-- Filterable Slots Library Table -->
-        <div class="glass-card">
-          <div class="glass-card-header">
-            <h3 class="glass-card-title">Indexed Q&amp;A Slots Library</h3>
-            <input type="text" id="vault-search-input" class="form-input" placeholder="Filter indexed slots..." style="max-width: 260px; padding: 6px 10px; font-size: 12.5px;">
-          </div>
-
-          <div style="overflow-x: auto;">
-            <table class="data-table" style="width: 100%;">
-              <thead>
-                <tr>
-                  <th style="width: 22%;">Slot Key &amp; Type</th>
-                  <th style="width: 32%;">Canonical Question Pattern</th>
-                  <th>Answer Template (Dynamic Variables)</th>
-                  <th style="width: 10%;">Uses</th>
-                </tr>
-              </thead>
-              <tbody id="vault-table-body"></tbody>
-            </table>
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 1rem;">
+              Test how the Knowledge Vault resolves novel recruiter screening prompts in real-time.
+            </p>
+            <div class="form-group">
+              <label class="form-label">Novel Recruiter Prompt</label>
+              <textarea id="vault-test-prompt" class="form-textarea" rows="3" placeholder="e.g. Do you have experience building event-driven microservices?"></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="simulateVaultMatch()">
+              <span>⚡ Execute Hybrid Vector Match</span>
+            </button>
+            <div id="vault-test-result" style="margin-top: 1rem;"></div>
           </div>
         </div>
       </section>
 
-      <!-- ==================== VIEW 4: INBOUND EMAIL RADAR ==================== -->
+      <!-- ==================== VIEW 4: EMAIL RADAR (IMAP PUSH & GMEET EXTRACTOR) ==================== -->
       <section id="view-email" class="view-panel">
         <div class="view-header">
           <div class="view-title-group">
-            <h1>Inbound Email Radar</h1>
-            <p class="view-subtitle">Recruiter communication classifier, surveillance tracking pixel remover, and 1-click scheduling sync.</p>
+            <h1>Inbound Email Radar &amp; Calendar</h1>
+            <p class="view-subtitle">Real-time IMAP IDLE push listener, 5-way intent classification, and automatic Google Meet extraction.</p>
           </div>
-          <button class="btn btn-secondary" onclick="simulateTestEmail()">
-            <span>+ Simulate Inbound Recruiter Email</span>
+          <button class="btn btn-cyan" onclick="syncEmailRadar()">
+            <span>🔄 Sync Inbound Messages</span>
           </button>
         </div>
 
-        <div class="glass-card">
-          <div class="glass-card-header">
-            <h3 class="glass-card-title">Recruiter Communications Stream</h3>
-            <span class="hud-pill" style="color: var(--accent-emerald); border-color: rgba(16, 185, 129, 0.3);">
-              🛡️ Pixel Neutralizer Active
-            </span>
-          </div>
-          <div id="email-messages-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
+        <div id="email-radar-feed" style="display: flex; flex-direction: column; gap: 12px;">
+          <!-- Dynamically populated via app.js -->
         </div>
       </section>
 
-      <!-- ==================== VIEW 5: MOCK INTERVIEW STUDIO & SOUNDWAVE ==================== -->
+      <!-- ==================== VIEW 5: INTERVIEW STUDIO & STAR COACH ==================== -->
       <section id="view-interview" class="view-panel">
         <div class="view-header">
           <div class="view-title-group">
-            <h1>Mock Technical &amp; System Design Studio</h1>
-            <p class="view-subtitle">Company engineering dossiers, interactive verbal/text evaluation, and STAR rubric scoring.</p>
-          </div>
-        </div>
-
-        <div class="glass-card">
-          <div class="form-grid" style="margin-bottom: 1.25rem;">
-            <div class="form-group">
-              <label class="form-label">Target Company</label>
-              <input type="text" id="mock-company-input" class="form-input" value="Stripe">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Target Role Title</label>
-              <input type="text" id="mock-role-input" class="form-input" value="Senior Backend Engineer">
-            </div>
-          </div>
-
-          <button class="btn btn-primary" onclick="loadMockDossierAndQuestions()">
-            <span>Generate Questions &amp; Architecture Dossier</span>
-          </button>
-
-          <!-- Animated Audio Soundwave Simulation -->
-          <div class="soundwave-visualizer" id="interview-soundwave" style="display: none;">
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-            <div class="wave-bar"></div>
-          </div>
-
-          <div id="mock-interview-container" style="margin-top: 1.5rem;"></div>
-        </div>
-      </section>
-
-      <!-- ==================== VIEW 6: SALARY & STARTUP ESOP MODELER ==================== -->
-      <section id="view-negotiation" class="view-panel">
-        <div class="view-header">
-          <div class="view-title-group">
-            <h1>Salary Benchmark &amp; ESOP Equity Modeler</h1>
-            <p class="view-subtitle">Market percentile compensation benchmarking, startup exit multiplier projections, and counter-offer scripts.</p>
+            <h1>AI Mock Interview Studio</h1>
+            <p class="view-subtitle">STAR-method evaluation, system design scoring rubrics, and target company architecture dossiers.</p>
           </div>
         </div>
 
         <div class="glass-card">
           <div class="glass-card-header">
-            <h3 class="glass-card-title">1. Total Compensation Market Benchmarking</h3>
+            <h3 class="glass-card-title">Company Architecture Dossier &amp; Questions</h3>
           </div>
-
           <div class="form-grid" style="margin-bottom: 1.25rem;">
             <div class="form-group">
-              <label class="form-label">Base Salary (LPA)</label>
-              <input type="number" id="neg-base-salary" class="form-input" value="35">
+              <label class="form-label">Company Name</label>
+              <input type="text" id="mock-company-name" class="form-input" value="Stripe">
             </div>
             <div class="form-group">
-              <label class="form-label">Bonus / Variable (LPA)</label>
-              <input type="number" id="neg-bonus" class="form-input" value="5">
+              <label class="form-label">Target Role</label>
+              <input type="text" id="mock-role-title" class="form-input" value="Senior Backend Engineer">
             </div>
+          </div>
+          <button class="btn btn-primary" onclick="loadInterviewQuestions()">
+            <span>Generate Interview Dossier</span>
+          </button>
+          <div id="interview-dossier-container" style="margin-top: 1.5rem;"></div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 6: SALARY NEGOTIATION & ESOP MODELER ==================== -->
+      <section id="view-negotiation" class="view-panel">
+        <div class="view-header">
+          <div class="view-title-group">
+            <h1>Salary Negotiation &amp; ESOP Modeler</h1>
+            <p class="view-subtitle">Levels.fyi comp benchmarking, equity waterfall exit simulator, and Anti-AI counter-offer email generator.</p>
+          </div>
+        </div>
+
+        <!-- Levels.fyi Compensation Benchmarks -->
+        <div class="glass-card">
+          <div class="glass-card-header">
+            <h3 class="glass-card-title">1. Levels.fyi Compensation Benchmarking</h3>
+          </div>
+          <div class="form-grid" style="margin-bottom: 1.25rem;">
             <div class="form-group">
-              <label class="form-label">Annual Equity / ESOP (LPA)</label>
-              <input type="number" id="neg-equity" class="form-input" value="10">
+              <label class="form-label">Target Company</label>
+              <input type="text" id="neg-company-name" class="form-input" value="Google">
             </div>
             <div class="form-group">
               <label class="form-label">Role Title Benchmark</label>
               <input type="text" id="neg-role-title" class="form-input" value="Senior Software Engineer">
             </div>
           </div>
-
           <button class="btn btn-primary" onclick="evaluateOfferCompensation()">
             <span>Benchmark Compensation Offer</span>
           </button>
-
           <div id="negotiation-results-container" style="margin-top: 1.5rem;"></div>
         </div>
 
@@ -666,7 +734,6 @@
           <div class="glass-card-header">
             <h3 class="glass-card-title">2. Startup Stock Options &amp; Exit Multipliers Simulator</h3>
           </div>
-
           <div class="form-grid" style="margin-bottom: 1.25rem;">
             <div class="form-group">
               <label class="form-label">Options Granted</label>
@@ -681,11 +748,9 @@
               <input type="number" id="esop-valuation-usd" class="form-input" value="50000000">
             </div>
           </div>
-
           <button class="btn btn-secondary" onclick="simulateEsopEquity()">
             <span>Calculate Exit Multipliers</span>
           </button>
-
           <div id="esop-results-container" style="margin-top: 1.25rem;"></div>
         </div>
       </section>
@@ -793,6 +858,66 @@
             <span class="cmd-k-badge">B</span>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ==================== HELD APPLICATIONS QUEUE MODAL (Step 6 & 7) ==================== -->
+    <div class="modal-overlay" id="modal-held-applications">
+      <div class="modal-box" style="max-width: 620px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h3 style="font-size: 16px; color: var(--accent-amber); font-weight: 700;">⏸️ Held Applications Queue</h3>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('modal-held-applications').classList.remove('active')">✕</button>
+        </div>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 1.25rem;">
+          These job applications were paused due to novel screening questions not yet indexed in your Knowledge Vault. Answering resumes submission immediately!
+        </p>
+        <div id="held-apps-list" style="display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto;">
+          <!-- Populated via app.js -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MANUAL DIRECT CALL LOGGER MODAL (Step 8) ==================== -->
+    <div class="modal-overlay" id="modal-log-call">
+      <div class="modal-box" style="max-width: 540px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h3 style="font-size: 16px; font-weight: 700;">📞 Log Direct Recruiter Call / Update</h3>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('modal-log-call').classList.remove('active')">✕</button>
+        </div>
+        <form id="form-log-call" onsubmit="window.submitDirectCall(event)">
+          <div class="form-group">
+            <label class="form-label">Company Name</label>
+            <input type="text" id="call-company" class="form-input" placeholder="e.g. Anthropic" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Role Title</label>
+            <input type="text" id="call-role" class="form-input" placeholder="e.g. Systems Engineer" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Recruiter / Contact Name</label>
+            <input type="text" id="call-recruiter" class="form-input" placeholder="e.g. Sarah Jenkins">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Call Outcome / New Status</label>
+            <select id="call-status" class="form-select">
+              <option value="INTERVIEW">🎯 Interview Scheduled</option>
+              <option value="OFFER">💎 Offer Received</option>
+              <option value="RESPONDED">📬 Recruiter Replied / Screening</option>
+              <option value="REJECTED">✕ Position Closed / Rejected</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Google Meet / Zoom Meeting Link (Optional)</label>
+            <input type="url" id="call-meeting-link" class="form-input" placeholder="https://meet.google.com/abc-defg-hij">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Call Notes &amp; Next Steps</label>
+            <textarea id="call-notes" class="form-textarea" rows="3" placeholder="Discussed role scope, team structure, and scheduled technical round..."></textarea>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+            <button type="submit" class="btn btn-primary">Save to Pipeline</button>
+          </div>
+        </form>
       </div>
     </div>
 
