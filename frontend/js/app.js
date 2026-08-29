@@ -1,7 +1,8 @@
 /**
  * JobCopilot - Master Frontend Application Logic
  * Reactive UI handling Onboarding Wizard, Multi-Currency Slider,
- * Knowledge Vault, 0-Day Job Pipeline, WebSockets, and Atomic HITL Approvals.
+ * Knowledge Vault, 0-Day Job Pipeline, Dynamic Tailored Resumes,
+ * Triple-Threat Outreach, WebSockets, and Atomic HITL Approvals.
  */
 
 const API_BASE = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')
@@ -16,7 +17,9 @@ const state = {
   vaultEntries: [],
   jobsList: [],
   ws: null,
-  activePendingHitl: null
+  activePendingHitl: null,
+  activeOutreachPackage: null,
+  activeOutreachTab: 'cover'
 };
 
 // UI Elements
@@ -74,6 +77,20 @@ const els = {
   hitlUserAnswer: document.getElementById('hitl-user-answer'),
   hitlSaveVaultCheck: document.getElementById('hitl-save-vault-check'),
   btnHitlApprove: document.getElementById('btn-hitl-approve'),
+  
+  // Outreach Modal
+  outreachModal: document.getElementById('outreach-modal'),
+  outreachModalTitle: document.getElementById('outreach-modal-title'),
+  modalTabCover: document.getElementById('modal-tab-cover'),
+  modalTabLi: document.getElementById('modal-tab-li'),
+  modalTabEmail: document.getElementById('modal-tab-email'),
+  modalContentCover: document.getElementById('modal-content-cover'),
+  modalContentLi: document.getElementById('modal-content-li'),
+  modalContentEmail: document.getElementById('modal-content-email'),
+  outreachCoverLetterText: document.getElementById('outreach-cover-letter-text'),
+  outreachLiText: document.getElementById('outreach-li-text'),
+  outreachEmailText: document.getElementById('outreach-email-text'),
+  btnCopyActiveOutreach: document.getElementById('btn-copy-active-outreach'),
   
   toastContainer: document.getElementById('toast-container')
 };
@@ -396,9 +413,11 @@ function renderJobsList(jobs) {
           ${reasonsHtml}
         </div>
       </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
-        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">Priority: ${job.priority_score}/100</span>
-        <a href="${job.url}" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem;">View ATS Post ➔</a>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle); gap: 0.5rem;">
+        <button class="btn btn-primary" onclick="openTailorModal('${job.job_id}')" style="padding: 0.4rem 0.75rem; font-size: 0.8rem; flex: 1;">
+          🚀 Tailor &amp; Outreach
+        </button>
+        <a href="${job.url}" target="_blank" class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;">View Post ➔</a>
       </div>
     `;
     grid.appendChild(card);
@@ -422,6 +441,58 @@ if (els.btnStartAutopilot) {
     } catch (err) {
       showToast(`Discovery failed: ${err.message}`, 'error');
     }
+  });
+}
+
+// --- Tailored Assets & Outreach Modal Actions ---
+window.openTailorModal = async function(jobId) {
+  try {
+    showToast('Compiling tailored PDF resume and drafting outreach package...', 'info');
+    const res = await fetch(`${API_BASE}/jobs/${jobId}/tailor`, { method: 'POST' });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      state.activeOutreachPackage = data;
+      els.outreachModalTitle.textContent = `${data.company} — ${data.title}`;
+      els.outreachCoverLetterText.value = data.cover_letter || '';
+      els.outreachLiText.value = data.outreach.linkedin_note || '';
+      els.outreachEmailText.value = `Subject: ${data.outreach.cold_email.subject}\n\n${data.outreach.cold_email.body}`;
+      
+      switchOutreachTab('cover');
+      els.outreachModal.classList.add('active');
+      showToast('Tailored PDF resume & outreach package ready!', 'success');
+    } else {
+      showToast(data.detail || 'Failed to tailor assets', 'error');
+    }
+  } catch (err) {
+    showToast(`Error tailoring assets: ${err.message}`, 'error');
+  }
+};
+
+function switchOutreachTab(tabName) {
+  state.activeOutreachTab = tabName;
+  els.modalTabCover.classList.toggle('active', tabName === 'cover');
+  els.modalTabLi.classList.toggle('active', tabName === 'li');
+  els.modalTabEmail.classList.toggle('active', tabName === 'email');
+
+  els.modalContentCover.style.display = tabName === 'cover' ? 'block' : 'none';
+  els.modalContentLi.style.display = tabName === 'li' ? 'block' : 'none';
+  els.modalContentEmail.style.display = tabName === 'email' ? 'block' : 'none';
+}
+
+if (els.modalTabCover) els.modalTabCover.addEventListener('click', () => switchOutreachTab('cover'));
+if (els.modalTabLi) els.modalTabLi.addEventListener('click', () => switchOutreachTab('li'));
+if (els.modalTabEmail) els.modalTabEmail.addEventListener('click', () => switchOutreachTab('email'));
+
+if (els.btnCopyActiveOutreach) {
+  els.btnCopyActiveOutreach.addEventListener('click', () => {
+    let textToCopy = '';
+    if (state.activeOutreachTab === 'cover') textToCopy = els.outreachCoverLetterText.value;
+    else if (state.activeOutreachTab === 'li') textToCopy = els.outreachLiText.value;
+    else if (state.activeOutreachTab === 'email') textToCopy = els.outreachEmailText.value;
+
+    navigator.clipboard.writeText(textToCopy);
+    showToast('Copied to clipboard!', 'success');
   });
 }
 

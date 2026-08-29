@@ -3,98 +3,108 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JobCopilot — Universal Autonomous Job Application OS</title>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22><text y=%2226%22 font-size=%2226%22>🚀</text></svg>">
+  <title>JobCopilot - Autonomous Job Application Platform</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="app-container">
-    
-    <!-- Top Navigation Bar -->
-    <header class="navbar">
-      <a href="#" class="brand">
-        <div class="brand-icon">🚀</div>
-        <div class="brand-text">JobCopilot</div>
-        <span class="brand-badge">Local OS</span>
-      </a>
 
-      <nav class="nav-tabs">
+  <div class="app-layout">
+    
+    <!-- Left Navigation Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <a href="/" class="brand-logo">
+          <span class="brand-icon">⚡</span>
+          <span>JobCopilot</span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
         <button class="nav-tab active" data-view="onboarding">
-          <span>⚡</span> Onboarding Wizard
+          <span class="nav-icon">✨</span>
+          <span>Smart Onboarding</span>
         </button>
         <button class="nav-tab" data-view="vault">
-          <span>🧠</span> Knowledge Vault
+          <span class="nav-icon">🧠</span>
+          <span>Knowledge Vault</span>
         </button>
         <button class="nav-tab" data-view="pipeline">
-          <span>📊</span> Job Pipeline
+          <span class="nav-icon">📊</span>
+          <span>Job Pipeline</span>
         </button>
         <button class="nav-tab" data-view="bot">
-          <span>🤖</span> Bot Console
+          <span class="nav-icon">🤖</span>
+          <span>Bot Automation</span>
         </button>
         <button class="nav-tab" data-view="settings">
-          <span>🔒</span> Security & Settings
+          <span class="nav-icon">🔒</span>
+          <span>Security & Keys</span>
         </button>
       </nav>
 
-      <div class="nav-actions">
-        <div class="status-pill" id="system-status">
+      <div class="sidebar-footer">
+        <div class="status-indicator">
           <span class="status-dot"></span>
-          <span id="status-text">Engine Online</span>
+          <span id="status-text">System Ready</span>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+          SQLite WAL • AES-256-GCM
         </div>
       </div>
-    </header>
+    </aside>
 
     <!-- Main Content Area -->
     <main class="main-content">
-
+      
       <!-- VIEW 1: Smart 2-Minute Onboarding Wizard -->
       <section id="view-onboarding" class="view-panel active">
         
-        <!-- Wizard Steps Indicator -->
-        <div class="wizard-progress">
+        <!-- Wizard Step Indicators -->
+        <div class="wizard-steps">
           <div class="wizard-step active" id="wstep-1">
-            <div class="step-circle">1</div>
-            <span class="step-label">Upload Resume</span>
+            <div class="wizard-step-num">1</div>
+            <div class="wizard-step-label">Upload Resume</div>
           </div>
           <div class="wizard-step" id="wstep-2">
-            <div class="step-circle">2</div>
-            <span class="step-label">Recruiter Baseline</span>
+            <div class="wizard-step-num">2</div>
+            <div class="wizard-step-label">Recruiter Baseline (70% Prefilled)</div>
           </div>
           <div class="wizard-step" id="wstep-3">
-            <div class="step-circle">3</div>
-            <span class="step-label">Activate Autopilot</span>
+            <div class="wizard-step-num">3</div>
+            <div class="wizard-step-label">Launch Autopilot</div>
           </div>
         </div>
 
-        <!-- Wizard Step 1: Resume Upload -->
-        <div id="step-content-1" class="card">
-          <div class="card-header">
-            <div>
-              <h2 class="card-title">📄 Step 1: Upload Candidate Resume</h2>
-              <p class="card-subtitle">Upload your existing PDF or DOCX resume. JobCopilot extracts all contact info, skills, education, and work history locally.</p>
+        <!-- Wizard Step 1: Upload & Auto-Extraction -->
+        <div id="step-content-1">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">📄 Step 1: Upload Candidate Resume</h2>
+                <p class="card-subtitle">Supported formats: PDF, DOCX, or direct plain text. Our universal parser extracts skills, experience, and contact info in &lt; 200ms.</p>
+              </div>
             </div>
-          </div>
 
-          <div class="dropzone" id="resume-dropzone">
-            <input type="file" id="resume-file-input" accept=".pdf,.docx,.doc,.txt" style="display: none;">
-            <div class="dropzone-icon">📥</div>
-            <h3 class="dropzone-title">Drag & drop your resume file here</h3>
-            <p class="dropzone-desc">Supports PDF, DOCX, or plain text (Max 10MB) — 100% processed locally</p>
-            <button type="button" class="btn btn-secondary" style="margin-top: 1.25rem;" onclick="document.getElementById('resume-file-input').click()">
-              Choose File from Disk
-            </button>
-          </div>
+            <div class="dropzone" id="resume-dropzone">
+              <div class="dropzone-icon">📥</div>
+              <div class="dropzone-title">Drag and drop your resume file here</div>
+              <div class="dropzone-subtitle">or click to browse from your computer (PDF / DOCX)</div>
+              <input type="file" id="resume-file-input" style="display: none;" accept=".pdf,.docx,.txt">
+            </div>
 
-          <div style="text-align: center; margin: 1.5rem 0; color: var(--text-muted); font-size: 0.85rem;">— OR PASTE RAW RESUME TEXT —</div>
+            <div style="margin-top: 1.5rem;">
+              <label class="form-label">Or paste resume plain text directly:</label>
+              <textarea id="raw-resume-text" class="form-textarea" placeholder="Paste full resume text here..." rows="4"></textarea>
+            </div>
 
-          <div class="form-group">
-            <textarea id="raw-resume-text" class="form-textarea" placeholder="Paste your resume text here if you don't have a PDF file handy..."></textarea>
-          </div>
-
-          <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem;">
-            <button id="btn-parse-resume" class="btn btn-primary">
-              <span>Parse & Auto-Extract Profile</span> ➔
-            </button>
+            <div style="display: flex; justify-content: flex-end; margin-top: 1.25rem;">
+              <button class="btn btn-primary" id="btn-parse-resume">
+                <span>Parse Resume & Auto-Prefill</span> ➔
+              </button>
+            </div>
           </div>
         </div>
 
@@ -184,18 +194,18 @@
 
               <!-- Work Authorization -->
               <div class="form-group">
-                <label class="form-label">Work Authorization Status</label>
+                <label class="form-label">Work Authorization</label>
                 <select id="q-work-auth" class="form-select">
                   <option value="Citizen / Permanent Resident">Citizen / Permanent Resident</option>
-                  <option value="Require Visa Sponsorship">Require Visa Sponsorship</option>
-                  <option value="Existing Work Visa (OPT/CPT/H1B)">Existing Work Visa (OPT/CPT/H1B)</option>
-                  <option value="Open to Remote Contractor Work">Open to Remote Contractor Work</option>
+                  <option value="Requires Visa Sponsorship">Requires Visa Sponsorship (H-1B / Tier 2)</option>
+                  <option value="Authorized with OPT/CPT">Authorized with OPT/CPT</option>
+                  <option value="Contract / Corp-to-Corp">Contract / Corp-to-Corp</option>
                 </select>
               </div>
 
-              <!-- Preferred Work Mode -->
+              <!-- Remote Preference -->
               <div class="form-group">
-                <label class="form-label">Preferred Work Arrangement</label>
+                <label class="form-label">Remote / On-site Preference</label>
                 <select id="q-remote-pref" class="form-select">
                   <option value="Remote / Hybrid / On-site">Remote / Hybrid / On-site</option>
                   <option value="Remote Only">Remote Only</option>
@@ -358,31 +368,78 @@
           <span class="brand-badge" id="hitl-company-tag">Company</span>
         </div>
         <p id="hitl-question-text" style="font-weight: 600; font-size: 1rem; margin-bottom: 1rem; color: var(--text-primary);">
-          Question text...
+          <!-- Dynamic Question Text -->
         </p>
 
-        <div class="form-group" style="margin-bottom: 1.25rem;">
-          <label class="form-label">Your Answer <span class="form-label-hint">(AI suggestion pre-filled)</span></label>
-          <textarea id="hitl-user-answer" class="form-textarea" rows="3"></textarea>
+        <div class="form-group">
+          <label class="form-label">Your Answer (Will be permanently saved to Knowledge Vault)</label>
+          <textarea id="hitl-user-answer" class="form-textarea" rows="3" placeholder="Enter your response..."></textarea>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <label style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-            <input type="checkbox" id="hitl-save-vault-check" checked> Save answer permanently to Knowledge Vault
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem;">
+          <input type="checkbox" id="hitl-save-vault-check" checked style="accent-color: var(--primary);">
+          <label for="hitl-save-vault-check" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">
+            Save to Knowledge Vault so this question is auto-filled for all future applications
           </label>
-          <button id="btn-hitl-approve" class="btn btn-primary">
-            <span>Approve & Continue Bot</span> ➔
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button class="btn btn-primary" id="btn-hitl-approve">
+            <span>Submit &amp; Resume Bot</span> ➔
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Toast Notifications Container -->
+    <!-- Tailored Assets & Outreach Package Modal -->
+    <div class="modal-overlay" id="outreach-modal">
+      <div class="modal-box" style="max-width: 680px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+          <h3 style="font-size: 1.25rem; color: #818cf8; display: flex; align-items: center; gap: 0.5rem;">
+            <span>🚀</span> <span id="outreach-modal-title">Tailored Resume & Outreach Package</span>
+          </h3>
+          <button class="btn btn-secondary" onclick="document.getElementById('outreach-modal').classList.remove('active')" style="padding: 0.2rem 0.6rem; font-size: 0.8rem;">✕ Close</button>
+        </div>
+
+        <!-- Tab Bar -->
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.5rem;">
+          <button class="btn btn-secondary active" id="modal-tab-cover" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Cover Letter</button>
+          <button class="btn btn-secondary" id="modal-tab-li" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">LinkedIn Note (280c)</button>
+          <button class="btn btn-secondary" id="modal-tab-email" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Cold Email</button>
+        </div>
+
+        <!-- Cover Letter Tab Content -->
+        <div id="modal-content-cover">
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Anti-AI Cliché Filtered • Direct Engineering Tone</div>
+          <textarea id="outreach-cover-letter-text" class="form-textarea" rows="8" readonly style="font-size: 0.85rem; font-family: inherit;"></textarea>
+        </div>
+
+        <!-- LinkedIn Tab Content -->
+        <div id="modal-content-li" style="display: none;">
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Under 280 characters for LinkedIn connection requests:</div>
+          <textarea id="outreach-li-text" class="form-textarea" rows="4" readonly style="font-size: 0.85rem;"></textarea>
+        </div>
+
+        <!-- Email Tab Content -->
+        <div id="modal-content-email" style="display: none;">
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Concise 3-sentence outreach to engineering lead:</div>
+          <textarea id="outreach-email-text" class="form-textarea" rows="7" readonly style="font-size: 0.85rem;"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem;">
+          <span id="pdf-status-badge" style="font-size: 0.8rem; color: #34d399; font-weight: 600;">✓ PDF Resume Compiled</span>
+          <button class="btn btn-primary" id="btn-copy-active-outreach">
+            <span>📋 Copy to Clipboard</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Toast Alerts -->
     <div class="toast-container" id="toast-container"></div>
 
   </div>
 
-  <!-- Main JavaScript App Logic -->
-  <script src="js/app.js"></script>
+  <script src="/js/app.js"></script>
 </body>
 </html>
