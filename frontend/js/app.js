@@ -108,6 +108,9 @@ window.switchTab = function(viewName) {
     fetchVaultEntries();
   } else if (viewName === 'pipeline') {
     fetchJobsList();
+    fetchFunnelMetrics();
+  } else if (viewName === 'email') {
+    fetchEmailMessages();
   }
 };
 
@@ -603,9 +606,140 @@ els.btnHitlApprove.addEventListener('click', async () => {
   }
 });
 
+// --- Funnel Metrics ---
+async function fetchFunnelMetrics() {
+  try {
+    const res = await fetch(`${API_BASE}/analytics/funnel`);
+    const data = await res.json();
+    if (data.status === 'success' && data.metrics) {
+      const m = data.metrics;
+      const sSourced = document.getElementById('stat-total-sourced');
+      const sApplied = document.getElementById('stat-total-applied');
+      const sInterviews = document.getElementById('stat-interviews');
+      const sRespRate = document.getElementById('stat-response-rate');
+
+      if (sSourced) sSourced.textContent = m.total_sourced;
+      if (sApplied) sApplied.textContent = m.total_applied;
+      if (sInterviews) sInterviews.textContent = m.interviews_count;
+      if (sRespRate) sRespRate.textContent = `${m.response_rate_percent}%`;
+    }
+  } catch (err) {
+    console.error('Error fetching funnel metrics:', err);
+  }
+}
+
+// --- Inbound Email Radar ---
+async function fetchEmailMessages() {
+  const container = document.getElementById('email-messages-list');
+  if (!container) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/email/messages`);
+    const data = await res.json();
+    renderEmailMessages(data.messages || []);
+  } catch (err) {
+    container.innerHTML = `<p style="color: var(--danger);">Error fetching emails: ${escapeHtml(err.message)}</p>`;
+  }
+}
+
+function renderEmailMessages(messages) {
+  const container = document.getElementById('email-messages-list');
+  if (!container) return;
+
+  if (messages.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📬</div>
+        <p>No recruiter emails received yet. Click <strong>'+ Simulate Recruiter Email'</strong> above to test live intent extraction and pipeline sync!</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.style.display = 'grid';
+  grid.style.gap = '1rem';
+
+  messages.forEach(msg => {
+    const item = document.createElement('div');
+    item.className = 'card';
+    item.style.margin = '0';
+    item.style.padding = '1.25rem';
+
+    let intentColor = '#818cf8';
+    let intentLabel = msg.intent || 'OTHER';
+    if (intentLabel === 'INTERVIEW_INVITE') {
+      intentColor = '#34d399';
+      intentLabel = '🎉 INTERVIEW INVITE';
+    } else if (intentLabel === 'ASSESSMENT') {
+      intentColor = '#38bdf8';
+      intentLabel = '⚡ CODING ASSESSMENT';
+    } else if (intentLabel === 'REJECTION') {
+      intentColor = '#f43f5e';
+      intentLabel = 'REJECTION';
+    } else if (intentLabel === 'CONFIRMATION') {
+      intentColor = '#fbbf24';
+      intentLabel = 'CONFIRMATION';
+    }
+
+    const schedulingUrls = typeof msg.scheduling_links === 'string' ? JSON.parse(msg.scheduling_links || '[]') : (msg.scheduling_links || []);
+    const linksHtml = schedulingUrls.map(url => `
+      <a href="${escapeHtml(url)}" target="_blank" class="btn btn-primary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; text-decoration: none;">
+        📅 Schedule Call (${escapeHtml(url.split('/')[2])}) ➔
+      </a>
+    `).join('');
+
+    item.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+        <div>
+          <span style="font-weight: 700; font-size: 0.85rem; color: ${intentColor}; background: rgba(255,255,255,0.06); padding: 0.2rem 0.6rem; border-radius: var(--radius-full); border: 1px solid ${intentColor}44;">
+            ${intentLabel}
+          </span>
+          ${msg.has_tracking_pixels ? `<span style="font-size: 0.75rem; color: #f59e0b; margin-left: 0.5rem;">🛡️ Tracking Pixel Stripped</span>` : ''}
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted);">${new Date(msg.received_at).toLocaleTimeString()}</div>
+      </div>
+      <h3 style="font-size: 1.05rem; margin-bottom: 0.25rem;">${escapeHtml(msg.subject)}</h3>
+      <div style="font-size: 0.85rem; color: #a5b4fc; margin-bottom: 0.75rem;">From: <strong>${escapeHtml(msg.sender)}</strong></div>
+      <div style="background: rgba(0,0,0,0.25); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.85rem; color: var(--text-secondary); white-space: pre-wrap; margin-bottom: 0.75rem;">
+        ${escapeHtml(msg.body_text)}
+      </div>
+      ${linksHtml ? `<div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">${linksHtml}</div>` : ''}
+    `;
+    grid.appendChild(item);
+  });
+
+  container.appendChild(grid);
+}
+
+window.simulateTestEmail = async function() {
+  try {
+    showToast('Simulating inbound recruiter interview invitation...', 'info');
+    const res = await fetch(`${API_BASE}/email/inbound`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sender: 'recruiting@stripe.com',
+        subject: 'Interview Invitation: Backend Software Engineer at Stripe',
+        body_html: '<p>Hi Satyajit,</p><p>We reviewed your tailored resume and were impressed by your distributed systems work. We would like to invite you for a 30-minute technical phone screen.</p><p>Please book a time here: <a href="https://calendly.com/stripe-eng/30min">Calendly Link</a></p><img src="https://sendgrid.net/wf/open?upn=12345" width="1" height="1">'
+      })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      showToast(`Email processed! Intent: ${data.intent} (Tracking pixels stripped)`, 'success');
+      fetchEmailMessages();
+      fetchFunnelMetrics();
+    }
+  } catch (err) {
+    showToast(`Simulation failed: ${err.message}`, 'error');
+  }
+};
+
 // Initial Load
 document.addEventListener('DOMContentLoaded', () => {
   initWebSocket();
   updateSalaryEquivalents(15);
   fetchJobsList();
+  fetchFunnelMetrics();
 });

@@ -35,6 +35,10 @@
           <span class="nav-icon">📊</span>
           <span>Job Pipeline</span>
         </button>
+        <button class="nav-tab" data-view="email">
+          <span class="nav-icon">📬</span>
+          <span>Email Radar</span>
+        </button>
         <button class="nav-tab" data-view="bot">
           <span class="nav-icon">🤖</span>
           <span>Bot Automation</span>
@@ -295,17 +299,38 @@
         </div>
       </section>
 
-      <!-- VIEW 3: Job Pipeline & Kanban -->
+      <!-- VIEW 3: Job Pipeline & Funnel Metrics -->
       <section id="view-pipeline" class="view-panel">
+        
+        <!-- Live Funnel Metrics Header -->
+        <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+          <div class="card" style="margin-bottom: 0; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">0-Day Sourced</div>
+            <div style="font-size: 1.6rem; font-weight: 700; color: #818cf8;" id="stat-total-sourced">0</div>
+          </div>
+          <div class="card" style="margin-bottom: 0; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total Applied</div>
+            <div style="font-size: 1.6rem; font-weight: 700; color: #38bdf8;" id="stat-total-applied">0</div>
+          </div>
+          <div class="card" style="margin-bottom: 0; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Interviews</div>
+            <div style="font-size: 1.6rem; font-weight: 700; color: #34d399;" id="stat-interviews">0</div>
+          </div>
+          <div class="card" style="margin-bottom: 0; padding: 1.25rem;">
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Response Rate</div>
+            <div style="font-size: 1.6rem; font-weight: 700; color: #f59e0b;" id="stat-response-rate">0.0%</div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header">
             <div>
               <h2 class="card-title">📊 Autonomous Job Application Pipeline</h2>
-              <p class="card-subtitle">Track applications across Greenhouse, Lever, Ashby, Workday, YC, and Wellfound.</p>
+              <p class="card-subtitle">Track opportunities across Greenhouse, Lever, Ashby, YC, and Wellfound.</p>
             </div>
             <div style="display: flex; gap: 0.5rem;">
               <button class="btn btn-primary" id="btn-start-autopilot">
-                <span>▶ Start Auto-Apply</span>
+                <span>▶ Start 0-Day Discovery</span>
               </button>
             </div>
           </div>
@@ -315,7 +340,26 @@
         </div>
       </section>
 
-      <!-- VIEW 4: Bot Automation & HITL Console -->
+      <!-- VIEW 4: Inbound Email Radar -->
+      <section id="view-email" class="view-panel">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">📬 Inbound Recruiter Email Radar</h2>
+              <p class="card-subtitle">Sanitizes tracking pixels, classifies recruiter intent, extracts interview scheduling links, and links to pipeline.</p>
+            </div>
+            <button class="btn btn-secondary" onclick="simulateTestEmail()">
+              <span>+ Simulate Recruiter Email</span>
+            </button>
+          </div>
+
+          <div id="email-messages-list" style="margin-top: 1rem;">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: Bot Automation & HITL Console -->
       <section id="view-bot" class="view-panel">
         <div class="card">
           <div class="card-header">
@@ -330,7 +374,7 @@
         </div>
       </section>
 
-      <!-- VIEW 5: Security & Settings -->
+      <!-- VIEW 6: Security & Settings -->
       <section id="view-settings" class="view-panel">
         <div class="card">
           <div class="card-header">
