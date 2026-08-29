@@ -18,8 +18,9 @@ PROFILES_DIR.mkdir(parents=True, exist_ok=True)
 RESUMES_DIR = APP_DIR / "resumes"
 RESUMES_DIR.mkdir(parents=True, exist_ok=True)
 
-LOGS_DIR = APP_DIR / "logs"
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
+DATA_DIR = APP_DIR
+BACKUPS_DIR = APP_DIR / "backups"
+BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Default Application Settings
 DEFAULT_MATCH_THRESHOLD = 0.60

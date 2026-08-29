@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  jobcopilot-engine:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: jobcopilot-engine
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/backend/data
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SUBMISSION_MODE=DRY_RUN
+      - HOST=0.0.0.0
+      - PORT=8000
+    restart: unless-stopped

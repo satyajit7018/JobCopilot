@@ -512,3 +512,29 @@ async def get_calendar_availability(timezone: str = "IST", days: int = 4):
         "email_snippet": email_text
     }
 
+
+# --- Milestone 8: Disaster Recovery & Encrypted Backup Endpoints ---
+
+@router.post("/backup/export")
+async def export_backup():
+    """Exports full encrypted archive (.jobcopilot.enc) of local state."""
+    from app.core.backup import BackupManager
+    path = BackupManager.export_encrypted_backup()
+    return {
+        "status": "success",
+        "backup_path": str(path),
+        "filename": path.name
+    }
+
+
+class RestoreBackupRequest(BaseModel):
+    backup_file_path: str
+
+
+@router.post("/backup/restore")
+async def restore_backup(payload: RestoreBackupRequest):
+    """Restores database state from an encrypted backup archive."""
+    from app.core.backup import BackupManager
+    res = BackupManager.restore_encrypted_backup(Path(payload.backup_file_path))
+    return res
+
