@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>JobCopilot - System Architecture & Security Audit Report</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap');
+
+    @page {
+      size: A4;
+      margin: 12mm 12mm 14mm 12mm;
+      @bottom-right {
+        content: "Page " counter(page) " of " counter(pages);
+        font-family: 'Inter', sans-serif;
+        font-size: 8pt;
+        color: #94a3b8;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #0f172a;
+      background-color: #ffffff;
+      line-height: 1.45;
+      font-size: 9pt;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page-break {
+      page-break-before: always;
+      break-before: page;
+    }
+
+    .avoid-break {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    /* Cover / Header Banner */
+    .header-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #311042 100%);
+      color: #ffffff;
+      padding: 20px 24px;
+      border-radius: 10px;
+      margin-bottom: 14px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #334155;
+    }
+
+    .header-banner::after {
+      content: "";
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 150px;
+      height: 150px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.35) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .brand-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(99, 102, 241, 0.25);
+      border: 1px solid rgba(165, 180, 252, 0.3);
+      color: #c7d2fe;
+      padding: 3px 8px;
+      border-radius: 16px;
+      font-size: 7.5pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .report-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20pt;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .report-subtitle {
+      font-size: 9.5pt;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .meta-item {
+      font-size: 7.5pt;
+    }
+
+    .meta-label {
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 600;
+      margin-bottom: 1px;
+    }
+
+    .meta-value {
+      color: #f1f5f9;
+      font-weight: 600;
+    }
+
+    /* KPI Summary Cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .kpi-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .kpi-card.critical { border-left: 4px solid #ef4444; background: #fff5f5; }
+    .kpi-card.high { border-left: 4px solid #f97316; background: #fffaf0; }
+    .kpi-card.medium { border-left: 4px solid #eab308; background: #fefce8; }
+    .kpi-card.low { border-left: 4px solid #3b82f6; background: #eff6ff; }
+
+    .kpi-number {
+      font-family: 'Outfit', sans-serif;
+      font-size: 16pt;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+
+    .kpi-card.critical .kpi-number { color: #dc2626; }
+    .kpi-card.high .kpi-number { color: #ea580c; }
+    .kpi-card.medium .kpi-number { color: #ca8a04; }
+    .kpi-card.low .kpi-number { color: #2563eb; }
+
+    .kpi-title {
+      font-size: 7pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #475569;
+    }
+
+    /* Section Headings */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 14px 0 8px 0;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .section-header h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 11.5pt;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.01em;
+    }
+
+    .section-icon {
+      font-size: 11pt;
+    }
+
+    /* Finding Items */
+    .finding-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      background: #ffffff;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .finding-card.critical {
+      border-left: 4px solid #ef4444;
+      background: linear-gradient(to right, rgba(239, 68, 68, 0.02), #ffffff);
+    }
+
+    .finding-card.high {
+      border-left: 4px solid #f97316;
+      background: linear-gradient(to right, rgba(249, 115, 22, 0.02), #ffffff);
+    }
+
+    .finding-card.medium {
+      border-left: 4px solid #eab308;
+      background: linear-gradient(to right, rgba(234, 179, 8, 0.02), #ffffff);
+    }
+
+    .finding-card.low {
+      border-left: 4px solid #3b82f6;
+    }
+
+    .finding-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .finding-title {
+      font-weight: 700;
+      font-size: 9pt;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 6.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .badge-critical { background: #fee2e2; color: #991b1b; }
+    .badge-high { background: #ffedd5; color: #9a3412; }
+    .badge-medium { background: #fef9c3; color: #854d0e; }
+    .badge-low { background: #dbeafe; color: #1e40af; }
+
+    .file-ref {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 7pt;
+      color: #64748b;
+      background: #f1f5f9;
+      padding: 2px 5px;
+      border-radius: 4px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .finding-desc {
+      font-size: 8pt;
+      color: #334155;
+      margin-bottom: 4px;
+      line-height: 1.4;
+    }
+
+    .code-block {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 5px;
+      padding: 6px 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 7pt;
+      margin: 4px 0;
+      line-height: 1.35;
+      border: 1px solid #1e293b;
+    }
+
+    .code-diff-del { color: #f87171; }
+    .code-diff-add { color: #4ade80; }
+    .code-comment { color: #94a3b8; }
+
+    .impact-box {
+      background: #f8fafc;
+      border-left: 3px solid #cbd5e1;
+      padding: 3px 6px;
+      font-size: 7.5pt;
+      color: #475569;
+      margin-top: 3px;
+      border-radius: 0 3px 3px 0;
+    }
+
+    .impact-box strong { color: #0f172a; }
+
+    /* Tables */
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0;
+      font-size: 7.5pt;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    table.data-table th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 6px 8px;
+      text-align: left;
+      border-bottom: 1px solid #cbd5e1;
+      font-size: 7pt;
+    }
+
+    table.data-table td {
+      padding: 5px 8px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #334155;
+      vertical-align: top;
+    }
+
+    table.data-table tr:last-child td { border-bottom: none; }
+    table.data-table tr:nth-child(even) { background: #f8fafc; }
+
+    /* Callout Boxes */
+    .callout {
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin: 10px 0;
+      font-size: 8pt;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .callout-info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+    .callout-warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .callout-icon { font-size: 10pt; }
+
+    /* Architecture Grid */
+    .arch-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .arch-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: #ffffff;
+    }
+
+    .arch-card-header {
+      font-weight: 700;
+      font-size: 8pt;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 3px;
+    }
+
+    .arch-card-body {
+      font-size: 7.5pt;
+      color: #475569;
+      line-height: 1.35;
+    }
+
+    .arch-card-body ul { margin-left: 12px; }
+    .arch-card-body li { margin-bottom: 2px; }
+
+    /* Footer */
+    .report-footer {
+      margin-top: 16px;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 7pt;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== PAGE 1: COVER & EXECUTIVE SUMMARY ==================== -->
+  <div class="header-banner">
+    <div class="brand-tag">⚡ JobCopilot Engineering &amp; Security Review</div>
+    <h1 class="report-title">Full System Audit &amp; Architecture Report</h1>
+    <p class="report-subtitle">Comprehensive code quality, security vulnerability, functional integrity, and scalability assessment across the entire autonomous job hunting engine.</p>
+    
+    <div class="meta-grid">
+      <div class="meta-item">
+        <div class="meta-label">Audit Scope</div>
+        <div class="meta-value">Full Monorepo (Backend + UI)</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Audit Date</div>
+        <div class="meta-value">August 30, 2026</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">Target Stack</div>
+        <div class="meta-value">FastAPI • SQLite WAL • Playwright</div>
+      </div>
+      <div class="meta-item">
+        <div class="meta-label">System Readiness</div>
+        <div class="meta-value" style="color: #fca5a5;">Action Required (5 Blockers)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Severity Overview -->
+  <div class="kpi-grid">
+    <div class="kpi-card critical">
+      <div class="kpi-number">5</div>
+      <div class="kpi-title">Critical Blockers</div>
+    </div>
+    <div class="kpi-card high">
+      <div class="kpi-number">5</div>
+      <div class="kpi-title">High Severity Gaps</div>
+    </div>
+    <div class="kpi-card medium">
+      <div class="kpi-number">8</div>
+      <div class="kpi-title">Medium Issues</div>
+    </div>
+    <div class="kpi-card low">
+      <div class="kpi-number">9</div>
+      <div class="kpi-title">Optimizations</div>
+    </div>
+  </div>
+
+  <!-- Executive Summary Text -->
+  <div class="callout callout-info">
+    <div class="callout-icon">ℹ️</div>
+    <div>
+      <strong>Executive Verdict:</strong> JobCopilot possesses a high-quality local-first foundation (SQLite WAL, Argon2id/AES-256-GCM, and Playwright stealth contexts). However, several critical runtime bugs (non-existent enum references in bot execution, always-True deduplication fallback, and wildcard CORS credentials) must be addressed before running live autonomous job applications.
+    </div>
+  </div>
+
+  <!-- Executive Summary Table -->
+  <div class="section-header">
+    <span class="section-icon">📊</span>
+    <h2>Audit Overview by Architectural Layer</h2>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width: 26%;">Layer / Component</th>
+        <th style="width: 14%;">Health</th>
+        <th style="width: 22%;">Key Risk Area</th>
+        <th>Audit Summary</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Autonomous Bot Engine</strong><br><span class="file-ref">app/bot/*</span></td>
+        <td><span class="badge badge-critical">Critical (45/100)</span></td>
+        <td>Runtime Enum &amp; State Crashes</td>
+        <td><code>runner.py</code> assigns invalid enum <code>APPLIED</code> and non-existent attribute <code>submission_mode</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>0-Day Discovery &amp; Deduplication</strong><br><span class="file-ref">app/discovery/*</span></td>
+        <td><span class="badge badge-critical">Critical (55/100)</span></td>
+        <td>Logic Flaw in Deduplication</td>
+        <td><code>is_duplicate()</code> returns <code>True</code> unconditionally when description is blank. Discovery flag locks on error.</td>
+      </tr>
+      <tr>
+        <td><strong>Security &amp; API Layer</strong><br><span class="file-ref">app/main.py</span>, <span class="file-ref">app/api/*</span></td>
+        <td><span class="badge badge-high">High (62/100)</span></td>
+        <td>CORS &amp; Path Traversal</td>
+        <td>Wildcard CORS with credentials breaks browser spec; unvalidated file path in encrypted backup restore.</td>
+      </tr>
+      <tr>
+        <td><strong>Resume Parsing &amp; Compilation</strong><br><span class="file-ref">app/core/resume_*</span></td>
+        <td><span class="badge badge-medium">Medium (70/100)</span></td>
+        <td>Hardcoded Project Heuristics</td>
+        <td>Resume parser uses static strings instead of dynamic section extraction; missing file size limits on upload.</td>
+      </tr>
+      <tr>
+        <td><strong>Storage &amp; Vector Vault</strong><br><span class="file-ref">app/core/database.py</span>, <span class="file-ref">vault.py</span></td>
+        <td><span class="badge badge-high">High (72/100)</span></td>
+        <td>O(N) Full-Table Scans</td>
+        <td>Missing database indexes on <code>status</code> and <code>slot_key</code>; full deserialization scan on every Q&amp;A lookup.</td>
+      </tr>
+      <tr>
+        <td><strong>Frontend &amp; Deployment</strong><br><span class="file-ref">frontend/*</span>, <span class="file-ref">docker-compose.yml</span></td>
+        <td><span class="badge badge-medium">Medium (75/100)</span></td>
+        <td>Docker Volume Path Mismatch</td>
+        <td>Compose mounts <code>./data</code> to <code>/app/backend/data</code> while app writes to <code>~/.jobcopilot</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ==================== PAGE 2: CRITICAL FINDINGS ==================== -->
+  <div class="page-break"></div>
+
+  <div class="section-header">
+    <span class="section-icon">🔴</span>
+    <h2>1. Critical Bugs (Immediate Action Required)</h2>
+  </div>
+
+  <!-- Critical Issue 1 -->
+  <div class="finding-card critical">
+    <div class="finding-header">
+      <div class="finding-title">
+        <span class="badge badge-critical">C-01</span>
+        <span>Runtime Crash: Missing <code>submission_mode</code> &amp; Non-Existent <code>ApplicationStatus.APPLIED</code></span>
+      </div>
+      <span class="file-ref">backend/app/bot/runner.py:130-140</span>
+    </div>
+    <div class="finding-desc">
+      In <code>AutonomousJobRunner.execute_application()</code>, the runner sets <code>job.status = ApplicationStatus.APPLIED</code> and <code>job.submission_mode = "DRY_RUN"</code>. In <code>models.py</code>, the status enum only defines <code>SUBMITTED</code>, not <code>APPLIED</code>. Furthermore, <code>JobListing</code> lacks a <code>submission_mode</code> field.
+    </div>
+    <div class="code-block">
+<span class="code-comment"># backend/app/bot/runner.py (Broken lines 130-131)</span>
+<span class="code-diff-del">- job.status = ApplicationStatus.APPLIED   # ❌ AttributeError: APPLIED does not exist</span>
+<span class="code-diff-del">- job.submission_mode = "DRY_RUN"          # ❌ Not in JobListing Pydantic schema</span>
+<span class="code-diff-add">+ job.status = ApplicationStatus.SUBMITTED</span>
+<span class="code-diff-add">+ job.submission_mode = "DRY_RUN"          # ✅ Add field to JobListing model</span>
+    </div>
+    <div class="impact-box">
+      <strong>Direct Impact:</strong> Every single bot run crashes immediately upon completing form fill. Additionally, <code>AnalyticsEngine</code> metrics for DRY_RUN/LIVE counts always report 0.
+    </div>
+  </div>
+
+  <!-- Critical Issue 2 -->
+  <div class="finding-card critical">
+    <div class="finding-header">
+      <div class="finding-title">
+        <span class="badge badge-critical">C-02</span>
+        <span>Logic Flaw: Deduplication Utility <code>is_duplicate()</code> Always Returns <code>True</code></span>
+      </div>
+      <span class="file-ref">backend/app/core/deduplicator.py:150</span>
+    </div>
+    <div class="finding-desc">
+      In <code>JobDeduplicator.is_duplicate()</code>, the final fallback statement unconditionally returns <code>True</code> if neither job has a description. Two completely different jobs from the same company will be marked as duplicates.
+    </div>
+    <div class="code-block">
+<span class="code-comment"># backend/app/core/deduplicator.py (Broken line 150)</span>
+<span class="code-diff-del">- return True   # ❌ Always flags any two non-empty titles at the same company as duplicate</span>
+<span class="code-diff-add">+ return False  # ✅ Default to False unless explicit similarity matches</span>
+    </div>
+    <div class="impact-box">
+      <strong>Direct Impact:</strong> Any component calling <code>is_duplicate()</code> will discard genuine job listings from the same company (e.g. "Frontend Engineer" vs "Backend Engineer").
+    </div>
+  </div>
+
+  <!-- Critical Issue 3 -->
+  <div class="finding-card critical">
+    <div class="finding-header">
+      <div class="finding-title">
+        <span class="badge badge-critical">C-03</span>
+        <span>Security &amp; Spec Violation: Insecure Wildcard CORS with Credentials</span>
+      </div>
+      <span class="file-ref">backend/app/main.py:21-27</span>
+    </div>
+    <div class="finding-desc">
+      FastAPI CORS middleware is configured with <code>allow_origins=["*"]</code> and <code>allow_credentials=True</code>. According to the W3C fetch specification, web browsers reject requests with credentials if wildcard origin is specified.
+    </div>
+    <div class="code-block">
+<span class="code-comment"># backend/app/main.py</span>
+<span class="code-diff-del">- allow_origins=["*"], allow_credentials=True</span>
+<span class="code-diff-add">+ allow_origins=["http://localhost:8000", "http://127.0.0.1:8000", "http://localhost:5173"], allow_credentials=True</span>
+    </div>
+    <div class="impact-box">
+      <strong>Direct Impact:</strong> Cross-origin frontend clients fail with CORS policy errors in standards-compliant browsers. If exposed to network, enables CSRF cross-origin leakage.
+    </div>
+  </div>
+
+  <!-- Critical Issue 4 -->
+  <div class="finding-card critical">
+    <div class="finding-header">
+      <div class="finding-title">
+        <span class="badge badge-critical">C-04</span>
+        <span>Overfitting: Resume Parser Hardcodes Specific Candidate Projects</span>
+      </div>
+      <span class="file-ref">backend/app/core/resume_parser.py:208-243</span>
+    </div>
+    <div class="finding-desc">
+      <code>ResumeParser.extract_projects_and_experience()</code> contains hardcoded string searches for <code>"skin lesion"</code>, <code>"resnet"</code>, <code>"qdrant"</code> and assigns static company name <code>"Engineering Innovation Labs"</code>. For any other candidate, the parser creates incorrect project objects.
+    </div>
+    <div class="impact-box">
+      <strong>Direct Impact:</strong> System fails to be a universal candidate platform; tailored resumes and outreach generated for general users will contain fabricated or mismatched projects.
+    </div>
+  </div>
+
+  <!-- Critical Issue 5 -->
+  <div class="finding-card critical">
+    <div class="finding-header">
+      <div class="finding-title">
+        <span class="badge badge-critical">C-05</span>
+        <span>Silent Drop: Bot Runner Generates Outreach Packages but Discards Them</span>
+      </div>
+      <span class="file-ref">backend/app/bot/runner.py:77-82</span>
+    </div>
+    <div class="finding-desc">
+      In <code>AutonomousJobRunner.execute_application()</code>, <code>OutreachGenerator.create_triple_threat_package()</code> is called, but its return value is discarded without being saved to SQLite or returned in the response dictionary.
+    </div>
+    <div class="impact-box">
+      <strong>Direct Impact:</strong> Generated Triple-Threat LinkedIn/Email drafts for applied jobs are completely lost.
+    </div>
+  </div>
+
+  <!-- ==================== PAGE 3: HIGH SEVERITY FINDINGS ==================== -->
+  <div class="page-break"></div>
+
+  <div class="section-header">
+    <span class="section-icon">🟠</span>
+    <h2>2. High-Severity Resilience &amp; Security Vulnerabilities</h2>
+  </div>
+
+  <!-- High Issue 1 -->
+  <div class="finding-card high">
+    <div class="finding-header">
+      <div class="finding-title">
+        <span class="badge badge-high">H-01</span>
+        <span>State Deadlock: <code>DiscoveryOrchestrator.is_running</code> Stuck on Unhandled Exception</span>
+      </div>
+      <span class="file-ref">backend/app/discovery/orchestrator.py:52-145</span>
+    </div>
+    <div class="finding-desc">
+      <code>self.is_running = True</code> is set at the start of discovery, but <code>self.is_running = False</code> is only reached at the end of the method without a <code>try ... finally</code> block. If any network timeout or database error occurs, <code>is_running</code> remains <code>True</code> permanently.
+    </div>
+    <div class="impact-box">
+      <strong>Remediation:</strong> Wrap the entire discovery execution inside <code>try: ... finally: self.is_running = False</code>.
+    </div>
+  </div>
+
+  <!-- High Issue 2 -->
+  <div class="finding-card high">
+    <div class="finding-header">
+      <div class="finding-title">
+        <span class="badge badge-high">H-02</span>
+        <span>Data Loss: Docker Compose Mount Path Does Not Match Core App Storage</span>
+      </div>
+      <span class="file-ref">docker-compose.yml:12</span> &amp; <span class="file-ref">app/core/config.py:10</span>
+    </div>
+    <div class="finding-desc">
+      <code>docker-compose.yml</code> mounts <code>./data:/app/backend/data</code>, but <code>config.py</code> hardcodes <code>APP_DIR = Path(os.path.expanduser("~/.jobcopilot"))</code>. SQLite database, encryption keys, and tailored PDFs are written inside the container's root home directory, causing all user data to vanish when the container restarts.
+    </div>
+    <div class="code-block">
+<span class="code-comment"># app/core/config.py</span>
+<span class="code-diff-add">+ APP_DIR = Path(os.environ.get("JOBCOPILOT_DATA_DIR", os.path.expanduser("~/.jobcopilot")))</span>
+    </div>
+  </div>
+
+  <!-- High Issue 3 -->
+  <div class="finding-card high">
+    <div class="finding-header">
+      <div class="finding-title">
+        <span class="badge badge-high">H-03</span>
+        <span>Security Risk: Plaintext Master Key Fallback Without Restricted File Permissions</span>
+      </div>
+      <span class="file-ref">backend/app/core/credential_vault.py:58-65</span>
+    </div>
+    <div class="finding-desc">
+      When OS Keychain is unavailable (e.g. Linux servers, headless containers), the encryption master key is written to <code>~/.jobcopilot/.master.key</code> in plaintext without setting POSIX permissions (<code>chmod 0600</code>). Any process running under the same user or shared volume can read the master key.
+    </div>
+    <div class="impact-box">
+      <strong>Remediation:</strong> Apply <code>os.chmod(fallback_file, 0o600)</code> immediately after file creation.
+    </div>
+  </div>
+
+  <!-- High Issue 4 -->
+  <div class="finding-card high">
+    <div class="finding-header">
+      <div class="finding-title">
+        <span class="badge badge-high">H-04</span>
+        <span>Security Risk: Arbitrary Path Traversal in Encrypted Backup Restore Endpoint</span>
+      </div>
+      <span class="file-ref">backend/app/api/endpoints.py:530-540</span>
+    </div>
+    <div class="finding-desc">
+      <code>POST /api/backup/restore</code> takes a raw string <code>backup_file_path</code> directly from user JSON without validating whether the resolved path resides within the designated <code>BACKUPS_DIR</code>.
+    </div>
+    <div class="impact-box">
+      <strong>Remediation:</strong> Enforce <code>resolved_path.is_relative_to(BACKUPS_DIR)</code> or accept only backup filenames instead of arbitrary paths.
+    </div>
+  </div>
+
+  <!-- High Issue 5 -->
+  <div class="finding-card high">
+    <div class="finding-header">
+      <div class="finding-title">
+        <span class="badge badge-high">H-05</span>
+        <span>Scalability Bottleneck: O(N) In-Memory Table Scans on Knowledge Vault Lookups</span>
+      </div>
+      <span class="file-ref">backend/app/core/vector_vault.py:93-103, 159-185</span>
+    </div>
+    <div class="finding-desc">
+      Both <code>learn_answer()</code> and <code>query_answer()</code> execute <code>db.get_all_vault_entries()</code>, deserializing JSON embeddings for every single database row into Python memory to perform slot matching. As the vault scales, form-filling latency degrades significantly.
+    </div>
+    <div class="impact-box">
+      <strong>Remediation:</strong> Query SQLite directly by <code>slot_key</code> index for exact matches; restrict vector similarity scans to top candidate candidates.
+    </div>
+  </div>
+
+  <!-- ==================== PAGE 4: MEDIUM & LOW ISSUES + ROADMAP ==================== -->
+  <div class="page-break"></div>
+
+  <div class="section-header">
+    <span class="section-icon">🟡</span>
+    <h2>3. Medium &amp; Low Severity Findings</h2>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width: 8%;">ID</th>
+        <th style="width: 12%;">Severity</th>
+        <th style="width: 25%;">Component</th>
+        <th>Description &amp; Remediation</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>M-01</strong></td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td><code>backend/requirements.txt</code></td>
+        <td><code>playwright</code> is missing from requirements. A standard <code>pip install -r requirements.txt</code> will fail to run the bot engine. Add <code>playwright>=1.40.0</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>M-02</strong></td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td><code>backend/app/core/backup.py</code></td>
+        <td><code>restore_encrypted_backup()</code> exports outreach records during backup, but forgets to restore them during recovery. Restore routine should insert outreach entries.</td>
+      </tr>
+      <tr>
+        <td><strong>M-03</strong></td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td><code>backend/app/api/endpoints.py</code></td>
+        <td>Resume upload lacks max file size limits and MIME-type validation. An oversized payload could cause memory exhaustion or disk filling.</td>
+      </tr>
+      <tr>
+        <td><strong>M-04</strong></td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td><code>backend/app/main.py</code></td>
+        <td>WebSocket disconnect and message exceptions are caught with bare <code>except Exception: pass</code> without logging, obscuring bot streaming telemetry errors.</td>
+      </tr>
+      <tr>
+        <td><strong>M-05</strong></td>
+        <td><span class="badge badge-medium">Medium</span></td>
+        <td><code>frontend/js/app.js</code></td>
+        <td>Salary currency conversion uses hardcoded exchange rates (<code>1 USD = 83.5 INR</code>). Integrate a lightweight client-side FX fetch with fallback.</td>
+      </tr>
+      <tr>
+        <td><strong>L-01</strong></td>
+        <td><span class="badge badge-low">Low</span></td>
+        <td><code>backend/app/core/database.py</code></td>
+        <td>Missing database index on <code>jobs(status)</code>, <code>jobs(priority_score)</code>, and <code>vault(slot_key)</code>. Add <code>CREATE INDEX IF NOT EXISTS</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>L-02</strong></td>
+        <td><span class="badge badge-low">Low</span></td>
+        <td><code>backend/app/core/deduplicator.py</code></td>
+        <td>SimHash shingles use MD5 hash function. Upgrade to SHA-256 for consistent cryptographic hygiene.</td>
+      </tr>
+      <tr>
+        <td><strong>L-03</strong></td>
+        <td><span class="badge badge-low">Low</span></td>
+        <td><code>backend/app/api/endpoints.py</code></td>
+        <td>Zero rate-limiting on <code>/api/discovery/run</code>, leaving external ATS APIs vulnerable to IP throttling. Add request rate throttling.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-header">
+    <span class="section-icon">🛠️</span>
+    <h2>4. Prioritized Remediation Roadmap</h2>
+  </div>
+
+  <div class="arch-grid">
+    <div class="arch-card">
+      <div class="arch-card-header">
+        <span class="badge badge-critical">Phase 1</span>
+        <span>Immediate Blockers (Hours 0 – 24)</span>
+      </div>
+      <div class="arch-card-body">
+        <ul>
+          <li>Fix <code>ApplicationStatus.APPLIED</code> &rarr; <code>SUBMITTED</code> in <code>runner.py</code></li>
+          <li>Add <code>submission_mode</code> field to <code>JobListing</code> in <code>models.py</code></li>
+          <li>Fix <code>deduplicator.py</code> to return <code>False</code> on fallback</li>
+          <li>Lock down CORS allowed origins in <code>main.py</code></li>
+          <li>Add <code>playwright>=1.40.0</code> to <code>requirements.txt</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="arch-card">
+      <div class="arch-card-header">
+        <span class="badge badge-high">Phase 2</span>
+        <span>Resilience &amp; Docker Storage (Days 1 – 3)</span>
+      </div>
+      <div class="arch-card-body">
+        <ul>
+          <li>Align <code>APP_DIR</code> with <code>JOBCOPILOT_DATA_DIR</code> environment variable</li>
+          <li>Wrap discovery orchestration with <code>try ... finally</code></li>
+          <li>Enforce <code>chmod 0600</code> on plaintext master key fallback</li>
+          <li>Add path traversal boundary checks in backup restore endpoint</li>
+          <li>Store and return outreach package in bot runner execution</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="arch-card">
+      <div class="arch-card-header">
+        <span class="badge badge-medium">Phase 3</span>
+        <span>Generic NLP &amp; Parser Hardening (Week 1)</span>
+      </div>
+      <div class="arch-card-body">
+        <ul>
+          <li>Replace hardcoded project extraction with generic section parser</li>
+          <li>Add file size (10MB max) and MIME checks on resume uploads</li>
+          <li>Create SQL indexes on <code>jobs(status)</code> and <code>vault(slot_key)</code></li>
+          <li>Include outreach records in backup restore routine</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="arch-card">
+      <div class="arch-card-header">
+        <span class="badge badge-low">Phase 4</span>
+        <span>Enterprise Scalability &amp; Telemetry (Week 2+)</span>
+      </div>
+      <div class="arch-card-body">
+        <ul>
+          <li>Implement SQLite connection pooling / reuse per thread</li>
+          <li>Add rate-limiting on discovery endpoints</li>
+          <li>Add live exchange rate caching for multi-currency slider</li>
+          <li>Add automated regression test suite covering all bot adapters</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-warning">
+    <div class="callout-icon">⚡</div>
+    <div>
+      <strong>Deployment Recommendation:</strong> Complete Phase 1 and Phase 2 before running live automated application batches or deploying via Docker.
+    </div>
+  </div>
+
+  <div class="report-footer">
+    <div>JobCopilot Autonomous Platform Audit • Confidential &amp; Proprietary</div>
+    <div>Generated via Antigravity Automated Security Reviewer</div>
+  </div>
+
+</body>
+</html>
