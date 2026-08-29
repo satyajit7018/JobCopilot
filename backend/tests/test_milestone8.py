@@ -5,13 +5,15 @@ and Database State Restoration.
 """
 
 import sys
+import os
 import uuid
 from pathlib import Path
-import pytest
-from httpx import AsyncClient, ASGITransport
 
 # Add backend directory to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
+
+import pytest
+from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from app.core.models import CandidateProfile, JobListing, ApplicationStatus
