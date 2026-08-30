@@ -3,11 +3,51 @@
 **The Autonomous Career Operating System & Distributed Multi-Tenant SaaS Platform.**
 
 [![CI/CD Pipeline](https://github.com/satyajit7018/JobCopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/satyajit7018/JobCopilot/actions/workflows/ci.yml)
-[![Tests Passing](https://img.shields.io/badge/tests-59%20passed-brightgreen.svg)](https://github.com/satyajit7018/JobCopilot)
-[![Stress Audit](https://img.shields.io/badge/stress--audit-100%25%20perfect-blueviolet.svg)](https://github.com/satyajit7018/JobCopilot)
+[![Tests Passing](https://img.shields.io/badge/tests-65%20passed-brightgreen.svg)](https://github.com/satyajit7018/JobCopilot)
+[![Stress Audit](https://img.shields.io/badge/stress--audit-30%2F30%20(100%25)-blueviolet.svg)](https://github.com/satyajit7018/JobCopilot)
+[![Docker Ready](https://img.shields.io/badge/docker-compose%20ready-0db7ed.svg)](https://github.com/satyajit7018/JobCopilot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-JobCopilot eliminates the manual friction of technical job hunting. It continuously discovers 0-day openings across direct ATS APIs, compiles targeted PDF resumes per role, fills multi-step application forms with humanized stealth browser automation, and automatically syncs recruiter feedback into a real-time executive cockpit.
+JobCopilot eliminates the manual friction of technical job hunting. It continuously discovers 0-day openings across direct ATS APIs, compiles targeted PDF resumes per role, fills multi-step application forms with humanized stealth browser automation, provides an AI-powered voice mock interview studio with real-time cadence scoring, and models multi-offer 4-year compensation trajectories.
+
+---
+
+## ⚡ 60-Second Quickstart
+
+Get JobCopilot up and running on your local machine with zero configuration:
+
+### 🐳 Option A: 1-Command Launch with Docker (Recommended)
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/satyajit7018/JobCopilot.git
+cd JobCopilot
+
+# 2. Launch the full-stack container stack
+docker compose -f docker-compose.production.yml up -d
+```
+
+👉 Open **[http://localhost](http://localhost)** (or `http://localhost:8000`) in your browser.
+
+---
+
+### 🐍 Option B: Run Locally with Python
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/satyajit7018/JobCopilot.git
+cd JobCopilot
+
+# 2. Setup virtual environment & install dependencies
+python3 -m venv backend/venv
+source backend/venv/bin/activate
+pip install -r backend/requirements.txt
+
+# 3. Start the FastAPI development server
+python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
+```
+
+👉 Open **[http://localhost:8000](http://localhost:8000)** in your browser.
 
 ---
 
@@ -15,7 +55,7 @@ JobCopilot eliminates the manual friction of technical job hunting. It continuou
 
 ```mermaid
 flowchart TD
-    subgraph CandidateJourney [Candidate 11-Step Interactive Workflow]
+    subgraph CandidateJourney [Candidate Interactive Workflow]
         A[Google SSO & Portal Session Grant] --> B[Universal <150ms Resume Ingestion]
         B --> C[20+ Canonical Questionnaire & CTC Slider]
         C --> D[Multi-Role ATS Resume Workshop]
@@ -23,8 +63,9 @@ flowchart TD
         E --> F[Held Queue & 1-Click HITL Resolution]
         F --> G[Inbound Email Radar & Call CRM Logger]
         G --> H[1-Click GMeet / Zoom Launcher]
-        H --> I[Mock Studio & Levels.fyi Modeler]
-        I --> J[5-Metric Executive Deck Board HUD]
+        H --> I[🎙️ Glass Booth Voice Studio & Rubrics]
+        I --> J[💰 Multi-Offer 4-Yr TC Matrix & Counters]
+        J --> K[5-Metric Executive Deck Board HUD]
     end
 
     subgraph DistributedSaaS [Distributed Cloud & Multi-Tenant Engine]
@@ -49,19 +90,46 @@ flowchart TD
 
 ---
 
-## 🎯 The 11-Step Interactive Candidate Workflow
+## 🎯 Candidate Workflow & Features
 
 | Step | Feature | Description |
 |:---|:---|:---|
 | **1 & 3** | **Google SSO & Portal Permissions** | Google Single Sign-On + auto-login session authorization for Greenhouse, Lever, and Ashby hiring portals. |
 | **2** | **Universal Resume Ingestion** | Instant drag-and-drop parser for PDF, DOCX, and TXT with sub-150ms extraction latency. |
 | **4** | **20+ Canonical Questionnaire** | Multi-currency CTC live slider, Notice Period, Work Authorization, Visa Sponsorship, Stealth Employer Blacklisting, and `⏭️ Skip & Fill Later`. |
-| **5** | **Multi-Role ATS Resume Maker** | Live side-by-side tailored resume variant builder with promoted projects, keyword match badges, and custom bullet reordering. |
+| **5** | **Multi-Role ATS Resume Workshop** | Live side-by-side tailored resume variant builder with promoted projects, keyword match badges, and custom bullet reordering. |
 | **6 & 7** | **Non-Blocking Apply & Held Queue** | Unindexed questions pause only that specific job and trigger topbar `⏸️ N Held Applications`. 1-click approval submits and indexes Q&As. |
 | **8** | **Email Radar & Direct Call Logger** | IMAP IDLE intent classification (Interviews, Assessments, Offers, Rejections) + manual phone screen CRM logger. |
 | **9** | **1-Click Video Meeting Launcher** | Extracted meeting links render a direct **`📹 Join Google Meet`** / **`📹 Join Zoom`** button on *Interviewing* cards. |
-| **10** | **Career Value Multipliers** | AI Mock Interview Studio, Levels.fyi ESOP valuation modeler, Triple-Threat outreach, and AES-256-GCM encrypted backups. |
-| **11** | **Executive Deck Board HUD** | 5-Metric top HUD tracking: *Submitted Applications*, *Recruiter Responses*, *Interviews & Offers*, *Rejections*, and *Conversion Rate %*. |
+| **10** | **🎙️ Voice Interview Studio & Glass Booth** | Real-time Web Speech API transcription, WPM Cadence Radar, Filler Word Scanner, and STAR scoring rubric in a distraction-free modal. |
+| **11** | **💰 Multi-Offer 4-Year TC Modeler** | Side-by-side compensation comparison, equity vesting schedules, and executive anti-AI counter-offer email generator. |
+| **12** | **Executive Deck Board HUD** | 5-Metric top HUD tracking: *Submitted Applications*, *Recruiter Responses*, *Interviews & Offers*, *Rejections*, and *Conversion Rate %*. |
+
+---
+
+## 🎙️ Career Acceleration Pillars
+
+### 1. 🎙️ Live Voice-to-Text & Speech Cadence Intelligence
+- **Real-Time Web Speech API**: Streams your spoken answers word-by-word directly into the answer box.
+- **Cadence & WPM Radar**: Measures speaking speed in real-time (`🟢 145 WPM (Optimal)`, `🟡 100 WPM (Deliberate)`, `🔴 180 WPM (Rushed)`).
+- **Filler Word Radar**: Scans for crutches (`"um"`, `"uh"`, `"like"`, `"you know"`, `"actually"`) and calculates a **Delivery Polish Score**.
+- **Reverse-Interview Questions Engine**: Generates 3 strategic questions tailored for the hiring manager (Velocity & Tech Debt, Production On-Call & Reliability, 90-Day Success Metrics).
+
+### 2. 💰 Multi-Offer Comparison Matrix & Counter-Offer Generator
+- **Side-by-Side 4-Year TC Growth**: Models Base Salary + Performance Bonus + Equity (RSU vs Options) + Sign-on across 4 years.
+- **Executive Counter-Offer Email & Script Generator**: Produces Anti-AI sanitized executive counter emails and structured phone negotiation talking points with 1-click clipboard copy.
+
+### 3. 🕵️ Interviewer Persona Sleuth & Engineering Tech Blog Intel
+- **Persona Profiler**: Classifies interviewer styles (Bar Raiser / Amazonian Assessor, Staff+ Systems Architect, Engineering Manager / Team Multiplier, Peer Programmer) and generates tailored response tactics.
+- **Engineering Tech Intel**: Pre-seeded deep architecture initiatives across Stripe (Envoy, Sorbet), Uber (H3, Schemaless), Netflix (Titus, Chaos Monkey), Meta (TAO, PyTorch), and OpenAI (Triton, GPU clusters).
+
+### 4. ⚡ High-Velocity Referral & Recruiter Nudge Engine
+- **Alumni Referral Pitch Generator**: Formulates high-converting 280-character LinkedIn connection notes and structured cold emails.
+- **5-Day Recruiter Follow-Up Nudge**: Crafts value-add follow-up templates referencing recent technical accomplishments.
+
+### 5. 🎮 Distraction-Free "Glass Booth" & Procedural Audio Chimes
+- **Glass Booth Modal (`#glass-booth-modal`)**: Full-screen cockpit with backdrop blur, waveform canvas, prompter cards, live rubric notes, and instant `ESC` exit.
+- **Procedural Synthesizer Chimes**: Web Audio API harmonic sound effects (`'success'`, `'celebrate'`, `'tap'`) with zero external MP3 dependencies.
 
 ---
 
@@ -87,49 +155,10 @@ flowchart TD
 
 ---
 
-## 🚀 Quickstart & Production Deployment
-
-### Local Development Setup
-
-```bash
-# 1. Clone repository
-git clone https://github.com/satyajit7018/JobCopilot.git
-cd JobCopilot
-
-# 2. Set up virtual environment
-python3 -m venv backend/venv
-source backend/venv/bin/activate
-pip install -r backend/requirements.txt
-
-# 3. Start local development server
-python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
-```
-Open **[http://localhost:8000](http://localhost:8000)** in your browser.
-
----
-
-### Production Deployment (Docker Compose)
-
-```bash
-# 1. Copy environment template
-cp .env.production.example .env.production
-
-# 2. Launch production stack
-docker-compose -f docker-compose.production.yml up -d --build
-```
-
-The production stack orchestrates:
-- **`jobcopilot_frontend`** (NGINX Alpine reverse proxy & static SPA on port 80)
-- **`jobcopilot_api`** (FastAPI Uvicorn workers on port 8000)
-- **`jobcopilot_worker`** (Celery distributed application task workers)
-- **`jobcopilot_redis`** (Redis 7 queue broker & cache on port 6379)
-
----
-
 ## 🧪 Testing & Verification
 
 ```bash
-# Run full 59-test integration test suite
+# Run full 65-test integration test suite
 backend/venv/bin/pytest backend/tests/ -v
 
 # Run 30-loop deep subsystem stress audit
