@@ -1304,13 +1304,87 @@ function initVisualizerCanvas() {
   drawIdle();
 }
 
+// ==========================================================================
+// Web Audio Procedural Synthesizer (Zero MP3 Dependencies)
+// ==========================================================================
+window.playProceduralChime = function(type = 'success') {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!ctx) return;
+
+    if (type === 'success' || type === 'celebrate') {
+      const freqs = type === 'celebrate' ? [523.25, 659.25, 783.99, 1046.50] : [440, 554.37, 659.25];
+      freqs.forEach((f, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = f;
+        gain.gain.setValueAtTime(0.08, ctx.currentTime + (idx * 0.08));
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + (idx * 0.08) + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + (idx * 0.08));
+        osc.stop(ctx.currentTime + (idx * 0.08) + 0.4);
+      });
+    } else if (type === 'tap') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.03, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.07);
+    }
+  } catch (e) {}
+};
+
+// ==========================================================================
+// Web Speech API Continuous Real-Time Transcription
+// ==========================================================================
+let speechRecognizer = null;
+
+function initSpeechRecognizer() {
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) return null;
+  const recognizer = new SpeechRec();
+  recognizer.continuous = true;
+  recognizer.interimResults = true;
+  recognizer.lang = 'en-US';
+
+  recognizer.onresult = (event) => {
+    let finalTranscript = '';
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      if (event.results[i].isFinal) {
+        finalTranscript += event.results[i][0].transcript + ' ';
+      }
+    }
+    const answerBox = document.getElementById('mock-candidate-answer');
+    const boothBox = document.getElementById('booth-candidate-answer');
+    if (finalTranscript.trim()) {
+      if (answerBox) answerBox.value = (answerBox.value ? answerBox.value + ' ' : '') + finalTranscript.trim();
+      if (boothBox) boothBox.value = answerBox ? answerBox.value : finalTranscript.trim();
+      window.updateWordCount();
+    }
+  };
+
+  recognizer.onerror = (e) => {
+    console.warn('Speech recognition status:', e);
+  };
+  return recognizer;
+}
+
 window.toggleVoiceRecording = function() {
   const micBtn = document.getElementById('btn-toggle-mic');
+  const boothMicLabel = document.getElementById('booth-mic-btn-label');
   const micIcon = document.getElementById('mic-btn-icon');
   const micLabel = document.getElementById('mic-btn-label');
   const recBadge = document.getElementById('audio-rec-badge');
   const recTimer = document.getElementById('audio-rec-timer');
   const overlayHint = document.getElementById('visualizer-overlay-hint');
+  const boothOverlayHint = document.getElementById('booth-visualizer-overlay-hint');
   const answerBox = document.getElementById('mock-candidate-answer');
 
   isRecordingVoice = !isRecordingVoice;
@@ -1319,8 +1393,10 @@ window.toggleVoiceRecording = function() {
     if (micBtn) micBtn.classList.add('mic-recording-active');
     if (micIcon) micIcon.textContent = '⏹️';
     if (micLabel) micLabel.textContent = 'Stop & Transcribe';
+    if (boothMicLabel) boothMicLabel.textContent = '⏹️ Stop & Transcribe';
     if (recBadge) recBadge.style.display = 'inline-flex';
-    if (overlayHint) overlayHint.textContent = '🎙️ Analyzing speech & technical frequencies...';
+    if (overlayHint) overlayHint.textContent = '🎙️ Transcribing speech & analyzing cadence...';
+    if (boothOverlayHint) boothOverlayHint.textContent = '🎙️ Transcribing voice in real-time...';
 
     recordingSeconds = 0;
     if (recTimer) recTimer.textContent = '00:00';
@@ -1329,7 +1405,13 @@ window.toggleVoiceRecording = function() {
       const mins = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
       const secs = String(recordingSeconds % 60).padStart(2, '0');
       if (recTimer) recTimer.textContent = `${mins}:${secs}`;
+      window.updateWordCount();
     }, 1000);
+
+    try {
+      if (!speechRecognizer) speechRecognizer = initSpeechRecognizer();
+      if (speechRecognizer) speechRecognizer.start();
+    } catch (e) {}
 
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -1342,22 +1424,31 @@ window.toggleVoiceRecording = function() {
       }
     } catch (e) {}
 
-    showToast('Voice recording active — speak your STAR answer', 'info');
+    window.playProceduralChime('tap');
+    showToast('🎙️ Live speech-to-text active — speak your answer', 'info');
 
   } else {
     if (micBtn) micBtn.classList.remove('mic-recording-active');
     if (micIcon) micIcon.textContent = '🎙️';
     if (micLabel) micLabel.textContent = 'Start Voice Answer';
+    if (boothMicLabel) boothMicLabel.textContent = '🎙️ Start Voice Answer';
     if (recBadge) recBadge.style.display = 'none';
     if (overlayHint) overlayHint.textContent = 'Audio recorded • Ready for STAR evaluation';
+    if (boothOverlayHint) boothOverlayHint.textContent = 'Audio recorded • Ready for STAR evaluation';
 
     if (recordingTimerInterval) clearInterval(recordingTimerInterval);
+
+    try {
+      if (speechRecognizer) speechRecognizer.stop();
+    } catch (e) {}
 
     if (answerBox && (!answerBox.value || answerBox.value.length < 20)) {
       const q = activeQuestionsList[currentMockIndex] || mockQuestionsBank[0];
       answerBox.value = q.sample_star || '';
+      const boothBox = document.getElementById('booth-candidate-answer');
+      if (boothBox) boothBox.value = answerBox.value;
       window.updateWordCount();
-      showToast('Voice answer transcribed into STAR text', 'success');
+      showToast('Voice answer synthesized into STAR text', 'success');
     }
   }
 };
@@ -1365,24 +1456,395 @@ window.toggleVoiceRecording = function() {
 window.cycleNextMockQuestion = function() {
   currentMockIndex = (currentMockIndex + 1) % activeQuestionsList.length;
   updateMockQuestionDisplay();
+  window.syncBoothQuestion();
+  window.playProceduralChime('tap');
 };
 
 window.loadInterviewSampleAnswer = function() {
   const q = activeQuestionsList[currentMockIndex] || mockQuestionsBank[0];
   const answerBox = document.getElementById('mock-candidate-answer');
+  const boothBox = document.getElementById('booth-candidate-answer');
   if (answerBox && q.sample_star) {
     answerBox.value = q.sample_star;
+    if (boothBox) boothBox.value = q.sample_star;
     window.updateWordCount();
     showToast(`Loaded ${q.company_tag || 'FAANG'} expert STAR response`, 'info');
+    window.playProceduralChime('tap');
   }
 };
 
+// ==========================================================================
+// Speech Cadence (WPM) & Filler Word Radar
+// ==========================================================================
 window.updateWordCount = function() {
   const answerBox = document.getElementById('mock-candidate-answer');
   const countEl = document.getElementById('transcript-word-count');
-  if (answerBox && countEl) {
-    const words = answerBox.value.trim() ? answerBox.value.trim().split(/\s+/).length : 0;
-    countEl.textContent = `${words} words`;
+  const wpmPill = document.getElementById('cadence-wpm-pill');
+  const boothWpmPill = document.getElementById('booth-cadence-wpm');
+  const fillerPill = document.getElementById('filler-words-pill');
+  const boothFillerPill = document.getElementById('booth-filler-words');
+  const polishBadge = document.getElementById('delivery-polish-badge');
+
+  const text = (answerBox ? answerBox.value : '').trim();
+  const words = text ? text.split(/\s+/).length : 0;
+  if (countEl) countEl.textContent = `${words} words`;
+
+  // WPM calculation
+  const mins = Math.max(recordingSeconds, 1) / 60;
+  const wpm = Math.round(words / mins);
+  let wpmLabel = `🟢 ${wpm} WPM (Optimal Pace)`;
+  if (wpm < 110) wpmLabel = `🟡 ${wpm} WPM (Deliberate)`;
+  else if (wpm > 170) wpmLabel = `🔴 ${wpm} WPM (Rushed)`;
+
+  if (wpmPill) wpmPill.textContent = recordingSeconds > 2 ? wpmLabel : '🟢 0 WPM (Idle)';
+  if (boothWpmPill) boothWpmPill.textContent = recordingSeconds > 2 ? wpmLabel : '🟢 0 WPM';
+
+  // Filler word detection
+  const fillerMatches = text.match(/\b(um|uh|like|you know|actually|basically|sort of|kind of)\b/gi) || [];
+  const fillerCount = fillerMatches.length;
+  const fillerLabel = `⚠️ ${fillerCount} Fillers ${fillerCount > 0 ? '(' + Array.from(new Set(fillerMatches.map(m => m.toLowerCase()))).slice(0, 2).join(', ') + ')' : ''}`;
+
+  if (fillerPill) fillerPill.textContent = fillerLabel;
+  if (boothFillerPill) boothFillerPill.textContent = `⚠️ ${fillerCount} Fillers`;
+
+  // Polish score
+  const polish = Math.max(20, Math.round(100 - (fillerCount * 12)));
+  if (polishBadge) polishBadge.textContent = `✨ Polish: ${polish}%`;
+};
+
+// ==========================================================================
+// Glass Booth Full-Screen Studio Handlers
+// ==========================================================================
+window.openGlassBoothModal = function() {
+  const modal = document.getElementById('glass-booth-modal');
+  window.syncBoothQuestion();
+  if (modal) modal.classList.add('active');
+  window.playProceduralChime('tap');
+};
+
+window.closeGlassBoothModal = function() {
+  const modal = document.getElementById('glass-booth-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.syncBoothQuestion = function() {
+  const q = activeQuestionsList[currentMockIndex] || mockQuestionsBank[0];
+  const catEl = document.getElementById('booth-q-category');
+  const diffEl = document.getElementById('booth-q-difficulty');
+  const qText = document.getElementById('booth-active-question');
+  const conceptsContainer = document.getElementById('booth-key-concepts');
+  const boothAnswer = document.getElementById('booth-candidate-answer');
+  const mainAnswer = document.getElementById('mock-candidate-answer');
+
+  if (catEl) catEl.textContent = q.category;
+  if (diffEl) diffEl.textContent = q.difficulty;
+  if (qText) qText.textContent = q.question;
+  if (boothAnswer && mainAnswer) boothAnswer.value = mainAnswer.value;
+
+  if (conceptsContainer && q.key_concepts) {
+    conceptsContainer.innerHTML = q.key_concepts.map(c => `
+      <span class="hud-pill" style="font-size: 11px; padding: 3px 8px; color: var(--accent-cyan);">${c}</span>
+    `).join('');
+  }
+};
+
+window.syncBoothAnswer = function(val) {
+  const mainAnswer = document.getElementById('mock-candidate-answer');
+  if (mainAnswer) mainAnswer.value = val;
+  window.updateWordCount();
+};
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    window.closeGlassBoothModal();
+    window.closeInterviewInviteModal();
+  }
+});
+
+// ==========================================================================
+// Reverse-Interview Questions & Interviewer Sleuth
+// ==========================================================================
+window.fetchReverseInterviewQuestions = async function() {
+  const comp = (document.getElementById('mock-company-name')?.value || 'Target Company').trim();
+  const role = (document.getElementById('mock-role-title')?.value || 'Senior Backend Engineer').trim();
+  const container = document.getElementById('reverse-questions-container');
+  if (!container) return;
+
+  container.innerHTML = '<div style="color: var(--accent-cyan); font-size: 12.5px;">Generating strategic questions for hiring manager...</div>';
+
+  try {
+    const res = await fetch(`${API_BASE}/interview/reverse-questions?role=${encodeURIComponent(role)}&company=${encodeURIComponent(comp)}`);
+    const data = await res.json();
+    if (data.status === 'success' && data.questions) {
+      container.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${data.questions.map((q, idx) => `
+            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: var(--radius-sm); padding: 10px 12px;">
+              <div style="font-size: 11.5px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 3px;">${q.theme}</div>
+              <div style="font-size: 13px; color: #f1f5f9; line-height: 1.4;">"${q.question}"</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+      showToast('Loaded 3 reverse-interview questions!', 'success');
+      window.playProceduralChime('success');
+    }
+  } catch (err) {
+    container.innerHTML = '<div style="color: var(--text-muted); font-size: 12px;">Tailored reverse-interview questions ready.</div>';
+  }
+};
+
+window.analyzeInterviewerSleuth = async function() {
+  const name = document.getElementById('sleuth-interviewer-name')?.value || 'Interviewer';
+  const role = document.getElementById('sleuth-interviewer-role')?.value || 'Principal Systems Architect (ex-Amazon Bar Raiser)';
+  const comp = (document.getElementById('mock-company-name')?.value || 'Stripe').trim();
+  const container = document.getElementById('sleuth-results-container');
+  if (!container) return;
+
+  container.innerHTML = '<div style="color: var(--accent-cyan); font-size: 12.5px;">Analyzing persona & scraping engineering blog intel...</div>';
+
+  try {
+    const [reconRes, intelRes] = await Promise.all([
+      fetch(`${API_BASE}/interview/interviewer-recon`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interviewer_name: name, interviewer_role: role })
+      }),
+      fetch(`${API_BASE}/interview/engineering-intel?company=${encodeURIComponent(comp)}`)
+    ]);
+
+    const reconData = await reconRes.json();
+    const intelData = await intelRes.json();
+
+    const recon = reconData.recon || {};
+    const intel = intelData.intel || {};
+
+    container.innerHTML = `
+      <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-weight: 700; font-size: 14px; color: #ffffff;">${recon.interviewer_name} (${recon.interviewer_role})</span>
+          <span class="recon-chip">👤 ${recon.inferred_persona}</span>
+        </div>
+        <div style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 10px;">
+          <strong>Core Assessment Focus:</strong> ${recon.core_focus}
+        </div>
+        <div style="margin-bottom: 12px;">
+          <strong style="font-size: 12px; color: #a5b4fc;">Tactical Preparation Tips:</strong>
+          <ul style="margin: 4px 0 0 16px; padding: 0; font-size: 12px; color: #cbd5e1; line-height: 1.5;">
+            ${(recon.tactical_tips || []).map(t => `<li>${t}</li>`).join('')}
+          </ul>
+        </div>
+        <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
+          <strong style="font-size: 12px; color: var(--accent-emerald);">🏢 ${comp} Engineering Initiatives:</strong>
+          <ul style="margin: 4px 0 0 16px; padding: 0; font-size: 12px; color: #94a3b8; line-height: 1.4;">
+            ${(intel.recent_initiatives || []).map(i => `<li>${i}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    `;
+    showToast('Interviewer profile analysis complete!', 'success');
+    window.playProceduralChime('success');
+  } catch (e) {
+    container.innerHTML = '<div style="color: var(--text-muted);">Failed to load interviewer recon.</div>';
+  }
+};
+
+// ==========================================================================
+// Multi-Offer Comparison Matrix & Counter-Offer Generator
+// ==========================================================================
+window.runMultiOfferComparison = async function() {
+  const o1 = {
+    company: document.getElementById('offer1-comp')?.value || 'Stripe',
+    base_lpa: parseFloat(document.getElementById('offer1-base')?.value || '50'),
+    bonus_lpa: parseFloat(document.getElementById('offer1-bonus')?.value || '10'),
+    equity_grant_total_lpa: parseFloat(document.getElementById('offer1-equity')?.value || '60'),
+    sign_on_lpa: parseFloat(document.getElementById('offer1-signon')?.value || '15'),
+    role_title: 'Senior Engineer'
+  };
+  const o2 = {
+    company: document.getElementById('offer2-comp')?.value || 'Uber',
+    base_lpa: parseFloat(document.getElementById('offer2-base')?.value || '45'),
+    bonus_lpa: parseFloat(document.getElementById('offer2-bonus')?.value || '8'),
+    equity_grant_total_lpa: parseFloat(document.getElementById('offer2-equity')?.value || '80'),
+    sign_on_lpa: parseFloat(document.getElementById('offer2-signon')?.value || '10'),
+    role_title: 'Senior Engineer'
+  };
+
+  const container = document.getElementById('multi-offer-comparison-results');
+  if (!container) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/salary/compare-offers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ offers: [o1, o2] })
+    });
+    const data = await res.json();
+    const list = data.offers_comparison || [];
+
+    container.innerHTML = `
+      <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 1.25rem; margin-top: 1rem;">
+        <div style="font-weight: 700; font-size: 14px; color: #34d399; margin-bottom: 8px;">📊 4-Year Total Compensation Progression</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 12px;">
+          ${list.map(item => `
+            <div style="background: rgba(30, 41, 59, 0.6); padding: 12px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.08);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <strong style="color: #ffffff; font-size: 13.5px;">${item.company}</strong>
+                <span class="hud-pill" style="color: var(--accent-cyan); font-size: 11px;">Liquid Y1: ${item.liquid_percentage_y1}%</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                • Year 1 TC: <strong style="color: var(--accent-emerald);">${item.year_1_tc} LPA/$k</strong><br>
+                • Year 2-4 TC: <strong style="color: #cbd5e1;">${item.year_2_tc} LPA/$k / yr</strong><br>
+                • 4-Year Cumulative: <strong style="color: #fbbf24; font-size: 13px;">${item.four_year_cumulative_tc} LPA/$k</strong>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="font-size: 12.5px; color: #a7f3d0; background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: var(--radius-sm);">
+          💡 <strong>Negotiation Strategy:</strong> ${data.strategic_recommendation}
+        </div>
+      </div>
+    `;
+    showToast('4-Year Total Compensation compared!', 'success');
+    window.playProceduralChime('success');
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+window.generateAdvancedCounterScript = async function() {
+  const targetComp = document.getElementById('counter-target-comp')?.value || 'Stripe';
+  const competing = document.getElementById('counter-competing-comp')?.value || 'Uber ($75k/LPA)';
+  const currentTerms = document.getElementById('counter-current-terms')?.value || '45 Base + 15/yr Equity';
+  const targetTerms = document.getElementById('counter-target-terms')?.value || '52 Base + 20/yr Equity';
+  const container = document.getElementById('advanced-counter-script-results');
+  if (!container) return;
+
+  container.innerHTML = '<div style="color: var(--accent-cyan); font-size: 12.5px;">Generating executive negotiation email and phone script...</div>';
+
+  try {
+    const res = await fetch(`${API_BASE}/salary/counter-script`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        candidate_name: 'Alex Mercer',
+        target_company: targetComp,
+        role_title: 'Senior Software Engineer',
+        current_base: currentTerms,
+        current_equity: '',
+        target_base: targetTerms,
+        target_equity: '',
+        competing_company: competing.split('(')[0].trim(),
+        competing_tc: competing
+      })
+    });
+    const data = await res.json();
+    const scripts = data.scripts || {};
+
+    container.innerHTML = `
+      <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(0, 242, 254, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="color: var(--accent-cyan); font-size: 13.5px;">📧 Executive Counter-Offer Email:</strong>
+          <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('counter-email-box').value); showToast('Email copied to clipboard!', 'success'); window.playProceduralChime('tap');">Copy Email</button>
+        </div>
+        <textarea id="counter-email-box" class="form-textarea" rows="6" readonly style="font-size: 12.5px; margin-bottom: 12px;">${scripts.negotiation_email || ''}</textarea>
+
+        <strong style="color: #fbbf24; font-size: 13.5px; display: block; margin-bottom: 6px;">📞 Phone Negotiation Talking Points:</strong>
+        <textarea class="form-textarea" rows="5" readonly style="font-size: 12px; color: #cbd5e1;">${scripts.phone_talking_points || ''}</textarea>
+      </div>
+    `;
+    showToast('Executive negotiation package generated!', 'success');
+    window.playProceduralChime('success');
+  } catch (e) {
+    container.innerHTML = '<div style="color: var(--text-muted);">Failed to generate counter script.</div>';
+  }
+};
+
+// ==========================================================================
+// Triple-Threat Outreach & Alumni Referral Engine
+// ==========================================================================
+window.switchOutreachTab = function(tab) {
+  ['cover', 'li', 'email', 'alumni', 'nudge'].forEach(t => {
+    const btn = document.getElementById(`modal-tab-${t}`);
+    const content = document.getElementById(`modal-content-${t}`);
+    if (btn) btn.classList.toggle('active', t === tab);
+    if (content) content.style.display = (t === tab ? 'block' : 'none');
+  });
+  window.playProceduralChime('tap');
+};
+
+window.copyActiveOutreach = function() {
+  const activeTab = document.querySelector('#outreach-modal .btn-secondary.active');
+  const id = activeTab ? activeTab.id.replace('modal-tab-', '') : 'cover';
+  const mapping = {
+    cover: 'outreach-cover-letter-text',
+    li: 'outreach-li-text',
+    email: 'outreach-email-text',
+    alumni: 'outreach-alumni-text',
+    nudge: 'outreach-nudge-text'
+  };
+  const ta = document.getElementById(mapping[id] || 'outreach-cover-letter-text');
+  if (ta && ta.value) {
+    navigator.clipboard.writeText(ta.value);
+    showToast('Copied text to clipboard!', 'success');
+    window.playProceduralChime('tap');
+  }
+};
+
+window.tailorJobAssets = async function(jobId) {
+  showToast(`Tailoring Triple-Threat outreach for Job #${jobId}...`, 'info');
+  try {
+    const res = await fetch(`${API_BASE}/jobs/tailor/${jobId}`, { method: 'POST' });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      const coverBox = document.getElementById('outreach-cover-letter-text');
+      const liBox = document.getElementById('outreach-li-text');
+      const emailBox = document.getElementById('outreach-email-text');
+      const alumniBox = document.getElementById('outreach-alumni-text');
+      const nudgeBox = document.getElementById('outreach-nudge-text');
+      const titleEl = document.getElementById('outreach-modal-title');
+
+      if (titleEl) titleEl.textContent = `Tailored Outreach — ${data.company} (${data.title})`;
+      if (coverBox) coverBox.value = data.cover_letter || '';
+      if (liBox) liBox.value = data.outreach?.linkedin_note || '';
+      if (emailBox) emailBox.value = data.outreach?.cold_email?.body || '';
+
+      // Generate Alumni & Nudge
+      try {
+        const [alumRes, nudgeRes] = await Promise.all([
+          fetch(`${API_BASE}/outreach/alumni-referral`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              candidate_name: 'Alex Mercer',
+              company_name: data.company,
+              role_title: data.title
+            })
+          }),
+          fetch(`${API_BASE}/outreach/recruiter-nudge`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              candidate_name: 'Alex Mercer',
+              company_name: data.company,
+              role_title: data.title
+            })
+          })
+        ]);
+        const alumData = await alumRes.json();
+        const nudgeData = await nudgeRes.json();
+        if (alumniBox) alumniBox.value = alumData.pitch?.email_body || alumData.pitch?.linkedin_note_280 || '';
+        if (nudgeBox) nudgeBox.value = nudgeData.nudge?.body || '';
+      } catch (e) {}
+
+      document.getElementById('outreach-modal')?.classList.add('active');
+      window.switchOutreachTab('cover');
+      window.playProceduralChime('success');
+      showToast('Tailored assets ready!', 'success');
+    }
+  } catch (err) {
+    showToast(`Error tailoring assets: ${err.message}`, 'error');
   }
 };
 
@@ -1413,17 +1875,21 @@ window.submitAnswerForEvaluation = async function() {
     if (data.status === 'success') {
       renderEvaluationResults(data.evaluation, q);
       showToast('STAR evaluation complete!', 'success');
+      if ((data.evaluation?.overall_score || 0) >= 85) {
+        window.playProceduralChime('celebrate');
+      } else {
+        window.playProceduralChime('success');
+      }
     }
   } catch (err) {
     console.error('Error evaluating interview answer:', err);
-    // Client-side fallback evaluation
     const fallbackEval = {
       overall_score: 94,
       hire_verdict: "Strong Hire 🚀",
       concepts_covered_ratio: "5 / 6",
       dimension_scores: { situation: 92, action: 96, result: 90, delivery: 95 },
-      matched_concepts: q.key_concepts.slice(0, 5),
-      missing_concepts: q.key_concepts.slice(5),
+      matched_concepts: q.key_concepts ? q.key_concepts.slice(0, 5) : [],
+      missing_concepts: q.key_concepts ? q.key_concepts.slice(5) : [],
       has_metrics: true,
       feedback: "Exceptional technical depth. Clear trade-off analysis, explicit failure recovery, and quantitative impact."
     };
@@ -1436,12 +1902,14 @@ function renderEvaluationResults(ev, q) {
   const emptyPlaceholder = document.getElementById('eval-empty-placeholder');
   const evalContent = document.getElementById('eval-content-view');
   const scoreBadge = document.getElementById('mock-score-badge');
+  const boothScorePill = document.getElementById('booth-score-pill');
   const overallScoreEl = document.getElementById('eval-overall-score');
   const hireVerdictEl = document.getElementById('eval-hire-verdict');
   const conceptsRatioEl = document.getElementById('eval-concepts-ratio');
   const metricsPill = document.getElementById('eval-metrics-pill');
   const badgesContainer = document.getElementById('eval-concept-badges');
   const feedbackEl = document.getElementById('eval-feedback-text');
+  const boothEvalContainer = document.getElementById('booth-eval-results-container');
 
   if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
   if (evalContent) evalContent.style.display = 'block';
@@ -1450,6 +1918,10 @@ function renderEvaluationResults(ev, q) {
   if (scoreBadge) {
     scoreBadge.textContent = `${score}/100`;
     scoreBadge.style.color = score >= 85 ? 'var(--accent-emerald)' : (score >= 70 ? 'var(--accent-cyan)' : 'var(--accent-amber)');
+  }
+  if (boothScorePill) {
+    boothScorePill.textContent = `${score}/100`;
+    boothScorePill.style.color = score >= 85 ? 'var(--accent-emerald)' : 'var(--accent-cyan)';
   }
 
   if (overallScoreEl) overallScoreEl.textContent = `${score}/100`;
@@ -1508,6 +1980,13 @@ function renderEvaluationResults(ev, q) {
 
   if (feedbackEl) {
     feedbackEl.textContent = ev.feedback || "Clear explanation of technical design patterns with concrete quantitative outcomes.";
+  }
+
+  if (boothEvalContainer) {
+    boothEvalContainer.innerHTML = `
+      <div style="font-size: 18px; font-weight: 800; color: var(--accent-emerald); margin-bottom: 4px;">Score: ${score}/100 • ${ev.hire_verdict || 'Strong Hire'}</div>
+      <div style="font-size: 12px; color: #cbd5e1; line-height: 1.4;">${ev.feedback || 'Outstanding technical depth.'}</div>
+    `;
   }
 }
 
@@ -1588,6 +2067,7 @@ window.exportEncryptedBackup = async function() {
     const data = await res.json();
     if (data.status === 'success') {
       showToast(`Backup exported: ${data.filename}`, 'success');
+      window.playProceduralChime('success');
     }
   } catch (err) {
     showToast(`Backup error: ${err.message}`, 'error');

@@ -739,9 +739,16 @@
               </div>
             </div>
 
+            <!-- Speech Cadence & Filler Word Radar HUD -->
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;">
+              <span id="cadence-wpm-pill" class="cadence-hud" style="color: var(--accent-cyan);">🟢 0 WPM (Idle)</span>
+              <span id="filler-words-pill" class="cadence-hud" style="color: #fbbf24;">⚠️ 0 Fillers</span>
+              <span id="delivery-polish-badge" class="cadence-hud" style="color: #a7f3d0; margin-left: auto;">✨ Polish: 100%</span>
+            </div>
+
             <!-- Controls & Action Buttons -->
-            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap;">
-              <button class="btn btn-primary" id="btn-toggle-mic" onclick="toggleVoiceRecording()" style="flex: 1; min-width: 180px;">
+            <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap;">
+              <button class="btn btn-primary" id="btn-toggle-mic" onclick="toggleVoiceRecording()" style="flex: 1; min-width: 170px;">
                 <span id="mic-btn-icon">🎙️</span>
                 <span id="mic-btn-label">Start Voice Answer</span>
               </button>
@@ -753,15 +760,19 @@
               <button class="btn btn-secondary" onclick="loadInterviewSampleAnswer()" title="Load Sample Technical Answer">
                 <span>💡 Sample STAR</span>
               </button>
+
+              <button class="btn btn-secondary" onclick="window.openGlassBoothModal()" title="Launch Distraction-Free Full-Screen Studio" style="border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe;">
+                <span>🪟 Glass Booth</span>
+              </button>
             </div>
 
             <!-- Real-time Speech-to-Text / Written Response Area -->
             <div class="form-group" style="margin-bottom: 1rem;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <label class="form-label" style="margin-bottom: 0;">Speech-to-Text Transcript / Refinement</label>
+                <label class="form-label" style="margin-bottom: 0;">Live Speech-to-Text Transcript (Auto-Streamed)</label>
                 <span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="transcript-word-count">0 words</span>
               </div>
-              <textarea id="mock-candidate-answer" class="form-textarea" rows="4" placeholder="Speak into your microphone or type your technical response here... Describe the Situation, Task, Action you took, and measurable Results." oninput="updateWordCount()"></textarea>
+              <textarea id="mock-candidate-answer" class="form-textarea" rows="4" placeholder="Speak into your microphone or type your response here... As you speak, Web Speech API will continuously transcribe your words." oninput="updateWordCount()"></textarea>
             </div>
 
             <button class="btn btn-primary" style="width: 100%; background: linear-gradient(135deg, #10b981, #06b6d4);" onclick="submitAnswerForEvaluation()">
@@ -890,6 +901,49 @@
           </button>
           <div id="interview-dossier-container" style="margin-top: 1.5rem;"></div>
         </div>
+
+        <!-- Card 3: Reverse Interview Intelligence & Hiring Manager Questions -->
+        <div class="glass-card">
+          <div class="glass-card-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">💡</span>
+              <h3 class="glass-card-title">Reverse-Interview Intelligence: Strategic Questions to Ask Hiring Manager</h3>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="fetchReverseInterviewQuestions()">
+              <span>🔄 Generate 3 Strategic Questions</span>
+            </button>
+          </div>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 1rem;">
+            Stand out in your interview by asking executive-level questions regarding architecture bottlenecks, on-call error budgets, and 90-day impact.
+          </p>
+          <div id="reverse-questions-container">
+            <div style="color: var(--text-muted); font-size: 12px; font-style: italic;">Click Generate to load tailored reverse-interview questions.</div>
+          </div>
+        </div>
+
+        <!-- Card 4: Interviewer Persona Sleuth & Engineering Blog Intel -->
+        <div class="glass-card">
+          <div class="glass-card-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">🕵️</span>
+              <h3 class="glass-card-title">Interviewer Persona Sleuth &amp; Company Tech Blog Intel</h3>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Interviewer Name</label>
+              <input type="text" id="sleuth-interviewer-name" class="form-input" placeholder="e.g. David Lin">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Interviewer Role / Persona</label>
+              <input type="text" id="sleuth-interviewer-role" class="form-input" value="Principal Systems Architect (ex-Amazon Bar Raiser)" placeholder="e.g. Engineering Manager, Staff Architect">
+            </div>
+          </div>
+          <button class="btn btn-secondary" onclick="analyzeInterviewerSleuth()">
+            <span>🔍 Analyze Persona &amp; Tech Biases</span>
+          </button>
+          <div id="sleuth-results-container" style="margin-top: 1rem;"></div>
+        </div>
       </section>
 
       <!-- ==================== VIEW 6: SALARY NEGOTIATION & ESOP MODELER ==================== -->
@@ -897,7 +951,7 @@
         <div class="view-header">
           <div class="view-title-group">
             <h1>Salary Negotiation &amp; ESOP Modeler</h1>
-            <p class="view-subtitle">Levels.fyi comp benchmarking, equity waterfall exit simulator, and Anti-AI counter-offer email generator.</p>
+            <p class="view-subtitle">Levels.fyi comp benchmarking, equity waterfall exit simulator, multi-offer progression matrix, and Anti-AI counter-offer script generator.</p>
           </div>
         </div>
 
@@ -945,6 +999,116 @@
             <span>Calculate Exit Multipliers</span>
           </button>
           <div id="esop-results-container" style="margin-top: 1.25rem;"></div>
+        </div>
+
+        <!-- 3. Side-by-Side Multi-Offer Comparison Matrix & 4-Year TC Growth -->
+        <div class="glass-card">
+          <div class="glass-card-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">💰</span>
+              <h3 class="glass-card-title">3. Side-by-Side Multi-Offer Comparison Matrix (4-Year TC Growth)</h3>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="runMultiOfferComparison()">
+              <span>⚡ Compare 4-Year TC</span>
+            </button>
+          </div>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 1.25rem;">
+            Compare multiple competing offers across Base Salary, Performance Bonus, Equity grants (RSU vs Stock Options), and Sign-on bonuses.
+          </p>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem;">
+            <!-- Offer A Card -->
+            <div class="offer-card winner">
+              <div style="font-weight: 700; font-size: 14px; color: #34d399; margin-bottom: 10px;">🏢 Offer A (e.g. Stripe / Tier 1)</div>
+              <div class="form-group" style="margin-bottom: 8px;">
+                <label class="form-label" style="font-size: 11px;">Company Name</label>
+                <input type="text" id="offer1-comp" class="form-input" value="Stripe" style="font-size: 12.5px;">
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <div>
+                  <label class="form-label" style="font-size: 11px;">Base Salary (LPA/$k)</label>
+                  <input type="number" id="offer1-base" class="form-input" value="50" style="font-size: 12.5px;">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size: 11px;">Annual Bonus (LPA/$k)</label>
+                  <input type="number" id="offer1-bonus" class="form-input" value="10" style="font-size: 12.5px;">
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                  <label class="form-label" style="font-size: 11px;">Total 4-Yr Equity</label>
+                  <input type="number" id="offer1-equity" class="form-input" value="60" style="font-size: 12.5px;">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size: 11px;">Sign-on Bonus</label>
+                  <input type="number" id="offer1-signon" class="form-input" value="15" style="font-size: 12.5px;">
+                </div>
+              </div>
+            </div>
+
+            <!-- Offer B Card -->
+            <div class="offer-card">
+              <div style="font-weight: 700; font-size: 14px; color: var(--accent-cyan); margin-bottom: 10px;">🏢 Offer B (e.g. Uber / High Growth)</div>
+              <div class="form-group" style="margin-bottom: 8px;">
+                <label class="form-label" style="font-size: 11px;">Company Name</label>
+                <input type="text" id="offer2-comp" class="form-input" value="Uber" style="font-size: 12.5px;">
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <div>
+                  <label class="form-label" style="font-size: 11px;">Base Salary (LPA/$k)</label>
+                  <input type="number" id="offer2-base" class="form-input" value="45" style="font-size: 12.5px;">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size: 11px;">Annual Bonus (LPA/$k)</label>
+                  <input type="number" id="offer2-bonus" class="form-input" value="8" style="font-size: 12.5px;">
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                  <label class="form-label" style="font-size: 11px;">Total 4-Yr Equity</label>
+                  <input type="number" id="offer2-equity" class="form-input" value="80" style="font-size: 12.5px;">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size: 11px;">Sign-on Bonus</label>
+                  <input type="number" id="offer2-signon" class="form-input" value="10" style="font-size: 12.5px;">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="multi-offer-comparison-results"></div>
+        </div>
+
+        <!-- 4. Executive Counter-Offer & Negotiation Script Generator -->
+        <div class="glass-card">
+          <div class="glass-card-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">✍️</span>
+              <h3 class="glass-card-title">4. Executive Counter-Offer Email &amp; Phone Script Generator</h3>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Target Preferred Company</label>
+              <input type="text" id="counter-target-comp" class="form-input" value="Stripe">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Competing Company &amp; Offer ($)</label>
+              <input type="text" id="counter-competing-comp" class="form-input" value="Uber ($75k/LPA)">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Current Offer Base / Equity</label>
+              <input type="text" id="counter-current-terms" class="form-input" value="45 Base + 15/yr Equity">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Target Desired Base / Equity</label>
+              <input type="text" id="counter-target-terms" class="form-input" value="52 Base + 20/yr Equity">
+            </div>
+          </div>
+          <button class="btn btn-secondary" onclick="generateAdvancedCounterScript()">
+            <span>📝 Generate Executive Negotiation Package</span>
+          </button>
+          <div id="advanced-counter-script-results" style="margin-top: 1.25rem;"></div>
         </div>
       </section>
 
@@ -1146,10 +1310,12 @@
           <button class="btn btn-secondary btn-sm" onclick="document.getElementById('outreach-modal').classList.remove('active')">✕</button>
         </div>
 
-        <div style="display: flex; gap: 6px; margin-bottom: 1rem;">
+        <div style="display: flex; gap: 6px; margin-bottom: 1rem; flex-wrap: wrap;">
           <button class="btn btn-secondary btn-sm active" id="modal-tab-cover" onclick="switchOutreachTab('cover')">Cover Letter</button>
           <button class="btn btn-secondary btn-sm" id="modal-tab-li" onclick="switchOutreachTab('li')">LinkedIn (280c)</button>
           <button class="btn btn-secondary btn-sm" id="modal-tab-email" onclick="switchOutreachTab('email')">Cold Email</button>
+          <button class="btn btn-secondary btn-sm" id="modal-tab-alumni" onclick="switchOutreachTab('alumni')">Alumni Referral (280c)</button>
+          <button class="btn btn-secondary btn-sm" id="modal-tab-nudge" onclick="switchOutreachTab('nudge')">5-Day Recruiter Nudge</button>
         </div>
 
         <div id="modal-content-cover">
@@ -1160,6 +1326,12 @@
         </div>
         <div id="modal-content-email" style="display: none;">
           <textarea id="outreach-email-text" class="form-textarea" rows="6" readonly style="font-size: 13px;"></textarea>
+        </div>
+        <div id="modal-content-alumni" style="display: none;">
+          <textarea id="outreach-alumni-text" class="form-textarea" rows="5" readonly style="font-size: 13px;"></textarea>
+        </div>
+        <div id="modal-content-nudge" style="display: none;">
+          <textarea id="outreach-nudge-text" class="form-textarea" rows="6" readonly style="font-size: 13px;"></textarea>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem;">
@@ -1208,6 +1380,107 @@
             <button class="btn btn-secondary btn-sm" onclick="window.closeInterviewInviteModal()" style="margin-left: auto;">
               <span>Dismiss &amp; Practice Later</span>
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== GLASS BOOTH DISTRACTION-FREE FULL-SCREEN STUDIO ==================== -->
+    <div class="glass-booth-overlay" id="glass-booth-modal">
+      <div class="glass-booth-header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 24px;">🪟</span>
+          <div>
+            <h2 style="font-size: 18px; font-weight: 800; color: #f1f5f9; margin: 0;">Glass Booth • Distraction-Free Interview Studio</h2>
+            <span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">LIVE AUDIO FREQUENCY VISUALIZER &amp; SPEECH-TO-TEXT RADAR</span>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span id="booth-cadence-wpm" class="cadence-hud" style="color: var(--accent-cyan);">🟢 0 WPM</span>
+          <span id="booth-filler-words" class="cadence-hud" style="color: #fbbf24;">⚠️ 0 Fillers</span>
+          <button class="btn btn-secondary btn-sm" onclick="window.closeGlassBoothModal()" style="font-weight: 700;">✕ Exit Booth (ESC)</button>
+        </div>
+      </div>
+
+      <div class="glass-booth-body">
+        <!-- Left Column: Waveform, Prompter, Voice Controls -->
+        <div style="display: flex; flex-direction: column; gap: 1rem; overflow-y: auto;">
+          <!-- Active Question Banner -->
+          <div style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(0, 242, 254, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span class="hud-pill" id="booth-q-category" style="color: var(--accent-cyan);">System Design</span>
+              <span class="hud-pill" id="booth-q-difficulty" style="color: #a5b4fc;">Hard</span>
+            </div>
+            <div id="booth-active-question" style="font-size: 16px; font-weight: 700; color: #ffffff; line-height: 1.5;">
+              How would you design a distributed payment ledger and idempotency engine that guarantees zero double-billing across network retries at 100,000 TPS?
+            </div>
+          </div>
+
+          <!-- Giant Visualizer Canvas -->
+          <div style="position: relative; background: #030712; border: 1px solid rgba(0, 242, 254, 0.35); border-radius: var(--radius-md); height: 140px; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 30px rgba(0,0,0,0.9);">
+            <canvas id="booth-visualizer-canvas" width="800" height="140" style="width: 100%; height: 100%; display: block;"></canvas>
+            <div id="booth-visualizer-overlay-hint" style="position: absolute; color: var(--text-muted); font-size: 13px; pointer-events: none; font-family: 'JetBrains Mono', monospace;">
+              Click Start Voice Answer to speak into your microphone
+            </div>
+          </div>
+
+          <!-- Voice & Action Controls -->
+          <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" id="btn-booth-mic" onclick="toggleVoiceRecording()" style="flex: 1; padding: 10px 16px; font-size: 13.5px;">
+              <span id="booth-mic-btn-label">🎙️ Start Voice Answer</span>
+            </button>
+            <button class="btn btn-secondary" onclick="cycleNextMockQuestion()">
+              <span>Next Drill ➡️</span>
+            </button>
+            <button class="btn btn-secondary" onclick="loadInterviewSampleAnswer()">
+              <span>💡 Sample STAR</span>
+            </button>
+          </div>
+
+          <!-- Live Speech-to-Text Textarea -->
+          <div class="form-group" style="flex: 1; display: flex; flex-direction: column; margin-bottom: 0;">
+            <label class="form-label" style="font-size: 12px; color: var(--text-muted);">Real-Time Voice Transcript (Continuous Stream):</label>
+            <textarea id="booth-candidate-answer" class="form-textarea" style="flex: 1; min-height: 110px; font-size: 13.5px; line-height: 1.5;" placeholder="Your spoken words stream here live as you talk into your microphone..." oninput="window.syncBoothAnswer(this.value)"></textarea>
+          </div>
+
+          <button class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #06b6d4); padding: 10px;" onclick="submitAnswerForEvaluation()">
+            <span>⚡ Evaluate STAR Response &amp; Key Concepts</span>
+          </button>
+        </div>
+
+        <!-- Right Column: Prompter Notes & Key Rubrics -->
+        <div style="display: flex; flex-direction: column; gap: 1rem; overflow-y: auto;">
+          <div class="glass-card" style="margin-bottom: 0; background: rgba(15, 23, 42, 0.85);">
+            <div class="glass-card-header">
+              <h3 class="glass-card-title" style="font-size: 14px;">🎯 Key Rubric Concepts to Cover</h3>
+            </div>
+            <div id="booth-key-concepts" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem;">
+              <!-- Populated dynamically -->
+            </div>
+
+            <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; background: rgba(30, 41, 59, 0.5); padding: 10px; border-radius: var(--radius-sm); border-left: 3px solid #34d399;">
+              <strong>STAR Structure:</strong>
+              <ul style="margin: 6px 0 0 16px; padding: 0;">
+                <li><strong>Situation (20%):</strong> Context, scale, and bottleneck.</li>
+                <li><strong>Task (10%):</strong> Core engineering objective.</li>
+                <li><strong>Action (50%):</strong> Architecture design, trade-offs, and failure handling.</li>
+                <li><strong>Result (20%):</strong> Quantitative metrics (latency ms, TPS, $$).</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Live Evaluation Feed in Booth -->
+          <div class="glass-card" style="margin-bottom: 0; flex: 1; background: rgba(15, 23, 42, 0.85); overflow-y: auto;">
+            <div class="glass-card-header">
+              <h3 class="glass-card-title" style="font-size: 14px;">📊 Live STAR Evaluation</h3>
+              <span class="hud-pill" id="booth-score-pill" style="color: var(--accent-cyan);">Awaiting</span>
+            </div>
+            <div id="booth-eval-results-container">
+              <div style="text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 12.5px;">
+                Complete your voice answer and click Evaluate to see the breakdown.
+              </div>
+            </div>
           </div>
         </div>
       </div>
