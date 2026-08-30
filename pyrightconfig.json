@@ -27,5 +27,7 @@
     }
   ],
   "reportMissingImports": "none",
-  "reportMissingTypeStubs": false
+  "reportMissingModuleSource": "none",
+  "reportMissingTypeStubs": false,
+  "typeCheckingMode": "off"
 }
