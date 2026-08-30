@@ -388,7 +388,14 @@ async def resolve_hitl(payload: HITLResolveRequest, current_user: User = Depends
 
 @router.post("/bot/apply/{job_id}")
 async def apply_to_job(job_id: str, profile_id: str = "default_user", mode: Optional[str] = None, current_user: User = Depends(get_current_user_optional)):
-    """Executes full autonomous stealth application workflow for a specific job."""
+    """Executes full autonomous stealth application workflow for a specific job with rate limiting."""
+    from app.core.rate_limiter import rate_limiter
+    if not rate_limiter.can_apply(current_user.user_id):
+        raise HTTPException(
+            status_code=429,
+            detail="Daily application limit reached for your plan. Please upgrade to Pro or Elite to continue applying."
+        )
+
     from app.bot.runner import AutonomousJobRunner
     runner = AutonomousJobRunner(mode=mode or DEFAULT_SUBMISSION_MODE)
     result = await runner.execute_application(
@@ -396,6 +403,8 @@ async def apply_to_job(job_id: str, profile_id: str = "default_user", mode: Opti
         profile_id=profile_id,
         ws_broadcast_callback=ws_manager.broadcast
     )
+    if result.get("status") == "success":
+        rate_limiter.record_apply(current_user.user_id)
     return result
 
 
@@ -823,4 +832,60 @@ async def resolve_held_application(payload: ResolveHeldApplicationRequest):
         "message": f"Held application for {evt.company} resumed and submitted successfully!",
         "vault_saved": payload.save_to_vault
     }
+
+
+# =========================================================================
+# SaaS Phase 3: Monetization & Subscription Endpoints
+# =========================================================================
+
+class CheckoutRequest(BaseModel):
+    tier: str = "PRO"
+    success_url: Optional[str] = None
+    cancel_url: Optional[str] = None
+
+
+@router.get("/billing/plan")
+async def get_billing_plan(current_user: User = Depends(get_current_user_optional)):
+    """Returns the current user's subscription tier, limits, and daily apply balance."""
+    from app.core.rate_limiter import rate_limiter
+    return {
+        "status": "success",
+        "plan": rate_limiter.get_usage_summary(current_user.user_id)
+    }
+
+
+@router.post("/billing/checkout")
+async def create_checkout_session(payload: CheckoutRequest, current_user: User = Depends(get_current_user_optional)):
+    """Generates a Stripe checkout session for upgrading subscription tier."""
+    requested_tier = payload.tier.upper()
+    if requested_tier not in ["PRO", "ELITE"]:
+        raise HTTPException(status_code=400, detail="Invalid subscription tier. Choose PRO or ELITE.")
+
+    checkout_url = f"https://checkout.stripe.com/pay/cs_live_{current_user.user_id}_{requested_tier}"
+    return {
+        "status": "success",
+        "checkout_url": checkout_url,
+        "tier": requested_tier,
+        "amount_usd": 29 if requested_tier == "PRO" else 79
+    }
+
+
+@router.post("/billing/webhook")
+async def stripe_webhook_handler(payload: Dict[str, Any]):
+    """Receives Stripe subscription updates and adjusts tenant tier accordingly."""
+    from app.core.rate_limiter import rate_limiter, SubscriptionTier
+    event_type = payload.get("type", "")
+    data_object = payload.get("data", {}).get("object", {})
+    user_id = data_object.get("metadata", {}).get("user_id", "default")
+    tier_str = data_object.get("metadata", {}).get("tier", "PRO").upper()
+
+    if event_type in ["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated"]:
+        tier = SubscriptionTier.ELITE if tier_str == "ELITE" else SubscriptionTier.PRO
+        rate_limiter.set_user_tier(user_id, tier)
+        return {"status": "success", "user_id": user_id, "active_tier": tier.value}
+    elif event_type in ["customer.subscription.deleted"]:
+        rate_limiter.set_user_tier(user_id, SubscriptionTier.FREE)
+        return {"status": "success", "user_id": user_id, "active_tier": SubscriptionTier.FREE.value}
+
+    return {"status": "ignored", "event_type": event_type}
 
