@@ -5,7 +5,11 @@ WebGL noise, Canvas jitter, AudioContext perturbation, and Webdriver evasion.
 """
 
 from typing import Dict, Any, Optional
-from playwright.async_api import Browser, BrowserContext
+try:
+    from playwright.async_api import Browser, BrowserContext
+except ImportError:
+    Browser = Any  # type: ignore
+    BrowserContext = Any  # type: ignore
 
 
 class StealthEngine:

@@ -9,6 +9,9 @@ import uuid
 import time
 from pathlib import Path
 import pytest
+
+# Skip this entire module when Playwright is not installed in the environment
+pytest.importorskip("playwright", reason="Playwright browser driver not installed — skipping Milestone 4 browser automation tests")
 from playwright.async_api import async_playwright
 
 # Add backend directory to sys.path

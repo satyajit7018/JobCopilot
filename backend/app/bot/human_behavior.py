@@ -7,8 +7,12 @@ Gaussian keystroke rhythm with digraph variance, and organic page exploration.
 import math
 import random
 import asyncio
-from typing import List, Tuple
-from playwright.async_api import Page, ElementHandle
+from typing import List, Tuple, Any
+try:
+    from playwright.async_api import Page, ElementHandle
+except ImportError:
+    Page = Any  # type: ignore
+    ElementHandle = Any  # type: ignore
 
 
 class HumanBehaviorEngine:
