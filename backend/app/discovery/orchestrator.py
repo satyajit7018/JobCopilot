@@ -125,8 +125,10 @@ class DiscoveryOrchestrator:
                         candidate_expected_ctc=profile.preferences.expected_ctc
                     )
 
+                    user_id = getattr(profile, "user_id", "default") or "default"
                     job = JobListing(
                         job_id=f"job_{uuid.uuid4().hex[:12]}",
+                        user_id=user_id,
                         fingerprint=fingerprint,
                         platform=lead.get("platform", "Direct"),
                         company=company,
@@ -143,8 +145,8 @@ class DiscoveryOrchestrator:
                         status=ApplicationStatus.DISCOVERED
                     )
 
-                    # Persist to SQLite WAL
-                    if db.save_job(job):
+                    # Persist to Multi-Tenant DB
+                    if db.save_job(job, user_id=user_id):
                         saved_jobs.append(job)
 
             self.total_matched += len(saved_jobs)

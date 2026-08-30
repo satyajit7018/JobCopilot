@@ -7,10 +7,26 @@ Simulates realistic candidate behavior under load:
 4. Knowledge Vault hybrid vector searches
 5. Mock interview question generation
 6. Telemetry & Kanban board polling
-"""
-
 import uuid
-from locust import HttpUser, task, between
+
+try:
+    from locust import HttpUser, task, between
+    HAS_LOCUST = True
+except ImportError:
+    HAS_LOCUST = False
+    # Dummy classes for environments without locust installed
+    def task(weight=1):
+        def decorator(f):
+            return f
+        return decorator
+
+    def between(a, b):
+        return (a, b)
+
+    class HttpUser:
+        abstract = True
+        wait_time = (0.5, 2.0)
+        client = None
 
 
 class CandidateUser(HttpUser):
