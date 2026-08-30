@@ -74,11 +74,15 @@ class LocalTaskRunner:
                 self.tasks[task_id]["error"] = str(ex)
 
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
                 asyncio.create_task(_run())
             else:
-                loop.run_until_complete(_run())
+                asyncio.run(_run())
         except Exception:
             # Fallback sync
             try:
