@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: jobcopilot_api
+    restart: always
+    environment:
+      - DB_MODE=sqlite
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_BACKEND=local
+      - USE_CELERY=true
+      - JWT_SECRET=production_super_secret_key_change_in_env
+    volumes:
+      - jobcopilot_data:/data
+    depends_on:
+      - redis
+    ports:
+      - "8000:8000"
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: jobcopilot_worker
+    restart: always
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "-Q", "priority.high,priority.normal,priority.low"]
+    environment:
+      - DB_MODE=sqlite
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_BACKEND=local
+      - USE_CELERY=true
+    volumes:
+      - jobcopilot_data:/data
+    depends_on:
+      - redis
+      - api
+
+  redis:
+    image: redis:7-alpine
+    container_name: jobcopilot_redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: jobcopilot_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
+volumes:
+  jobcopilot_data:
+  redis_data:
