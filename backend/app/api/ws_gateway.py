@@ -57,3 +57,4 @@ class MultiTenantWebSocketGateway:
 
 # Global WebSocket Gateway Singleton
 ws_gateway = MultiTenantWebSocketGateway()
+ws_manager = ws_gateway
