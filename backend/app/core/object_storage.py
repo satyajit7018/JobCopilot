@@ -35,7 +35,7 @@ class ObjectStorageAdapter:
         if self.backend in ["s3", "r2"] and self.s3_access_key:
             # S3 / R2 Upload simulation or boto3 call if present
             try:
-                import boto3
+                import boto3  # type: ignore
                 client = boto3.client(
                     "s3",
                     endpoint_url=self.s3_endpoint_url,
@@ -78,7 +78,7 @@ class ObjectStorageAdapter:
         key = f"users/{user_id}/resumes/{filename}"
         if self.backend in ["s3", "r2"] and self.s3_access_key:
             try:
-                import boto3
+                import boto3  # type: ignore
                 client = boto3.client(
                     "s3",
                     endpoint_url=self.s3_endpoint_url,

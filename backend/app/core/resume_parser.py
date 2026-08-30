@@ -7,10 +7,15 @@ with section segmentation, date parsing, and categorized skill taxonomy.
 import re
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
-from pypdf import PdfReader
+try:
+    from pypdf import PdfReader  # type: ignore
+    HAS_PYPDF = True
+except ImportError:
+    PdfReader = None  # type: ignore
+    HAS_PYPDF = False
 
 try:
-    import docx
+    import docx  # type: ignore
     HAS_DOCX = True
 except ImportError:
     HAS_DOCX = False
@@ -51,6 +56,12 @@ class ResumeParser:
     @classmethod
     def extract_text_from_pdf(cls, pdf_path: str) -> str:
         """Extracts plain text from all pages of a PDF."""
+        if not HAS_PYPDF or PdfReader is None:
+            try:
+                with open(pdf_path, "r", encoding="utf-8", errors="ignore") as f:
+                    return f.read()
+            except Exception:
+                return ""
         text = ""
         reader = PdfReader(pdf_path)
         for page in reader.pages:

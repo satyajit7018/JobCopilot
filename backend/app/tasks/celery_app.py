@@ -18,24 +18,28 @@ USE_CELERY = os.environ.get("USE_CELERY", "false").lower() in ["true", "1", "yes
 
 try:
     if USE_CELERY:
-        from celery import Celery
-        celery_app = Celery(
-            "jobcopilot",
-            broker=REDIS_URL,
-            backend=REDIS_URL
-        )
-        celery_app.conf.update(
-            task_routes={
-                "jobcopilot.high.*": {"queue": "priority.high"},
-                "jobcopilot.normal.*": {"queue": "priority.normal"},
-                "jobcopilot.low.*": {"queue": "priority.low"},
-            },
-            task_serializer="json",
-            result_serializer="json",
-            accept_content=["json"],
-            timezone="UTC",
-            enable_utc=True,
-        )
+        try:
+            from celery import Celery  # type: ignore
+            celery_app = Celery(
+                "jobcopilot",
+                broker=REDIS_URL,
+                backend=REDIS_URL
+            )
+            celery_app.conf.update(
+                task_routes={
+                    "jobcopilot.high.*": {"queue": "priority.high"},
+                    "jobcopilot.normal.*": {"queue": "priority.normal"},
+                    "jobcopilot.low.*": {"queue": "priority.low"},
+                },
+                task_serializer="json",
+                result_serializer="json",
+                accept_content=["json"],
+                timezone="UTC",
+                enable_utc=True,
+            )
+        except ImportError:
+            logger.warning("Celery package is not installed. Falling back to in-memory async task runner.")
+            celery_app = None
     else:
         celery_app = None
 except Exception as e:

@@ -9,7 +9,7 @@ import asyncio
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 try:
-    from playwright.async_api import async_playwright
+    from playwright.async_api import async_playwright  # type: ignore
     HAS_PLAYWRIGHT = True
 except ImportError:
     async_playwright = None
