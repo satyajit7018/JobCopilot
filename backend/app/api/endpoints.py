@@ -347,6 +347,56 @@ async def generate_tailored_assets(job_id: str, profile_id: str = "default_user"
     }
 
 
+class AlumniReferralRequest(BaseModel):
+    candidate_name: str = "Satyajit Nayak"
+    company_name: str
+    role_title: str
+    contact_name: str = "Fellow Alumni"
+    common_ground: str = "our shared university background"
+
+
+@router.post("/outreach/alumni-referral")
+async def generate_alumni_referral(payload: AlumniReferralRequest):
+    """Generates 280-char LinkedIn connection note and email for alumni referral outreach."""
+    from app.core.outreach_generator import OutreachGenerator
+    return {
+        "status": "success",
+        "pitch": OutreachGenerator.generate_alumni_referral_pitch(
+            candidate_name=payload.candidate_name,
+            company_name=payload.company_name,
+            role_title=payload.role_title,
+            contact_name=payload.contact_name,
+            common_ground=payload.common_ground
+        )
+    }
+
+
+class RecruiterNudgeRequest(BaseModel):
+    candidate_name: str = "Satyajit Nayak"
+    company_name: str
+    role_title: str
+    recruiter_name: str = "Recruiter"
+    days_elapsed: int = 5
+    recent_highlight: Optional[str] = None
+
+
+@router.post("/outreach/recruiter-nudge")
+async def generate_recruiter_nudge_endpoint(payload: RecruiterNudgeRequest):
+    """Generates polite, high-converting recruiter follow-up message."""
+    from app.core.outreach_generator import OutreachGenerator
+    return {
+        "status": "success",
+        "nudge": OutreachGenerator.generate_recruiter_followup_nudge(
+            candidate_name=payload.candidate_name,
+            company_name=payload.company_name,
+            role_title=payload.role_title,
+            recruiter_name=payload.recruiter_name,
+            days_elapsed=payload.days_elapsed,
+            recent_highlight=payload.recent_highlight
+        )
+    }
+
+
 @router.get("/hitl/pending")
 async def get_pending_hitl(current_user: User = Depends(get_current_user_optional)):
     """Returns all pending HITL questions requiring human input."""
@@ -554,6 +604,48 @@ async def trigger_interview_invitation_notification(payload: InterviewInvitation
     }
 
 
+@router.get("/interview/reverse-questions")
+async def get_reverse_interview_questions(role: str = "Senior Software Engineer", company: str = "Target Company"):
+    """Generates strategic questions to ask the hiring manager at the end of the interview."""
+    from app.core.interview_studio import InterviewStudioEngine
+    return {
+        "status": "success",
+        "company": company,
+        "role": role,
+        "questions": InterviewStudioEngine.generate_reverse_interview_questions(role_title=role, company_name=company)
+    }
+
+
+class InterviewerReconRequest(BaseModel):
+    interviewer_name: str
+    interviewer_role: str = "Engineering Manager"
+    background_text: str = ""
+
+
+@router.post("/interview/interviewer-recon")
+async def analyze_interviewer_recon(payload: InterviewerReconRequest):
+    """Infers interviewer persona, technical biases, and strategic preparation advice."""
+    from app.core.interview_studio import InterviewStudioEngine
+    return {
+        "status": "success",
+        "recon": InterviewStudioEngine.analyze_interviewer_profile(
+            interviewer_name=payload.interviewer_name,
+            interviewer_role=payload.interviewer_role,
+            background_text=payload.background_text
+        )
+    }
+
+
+@router.get("/interview/engineering-intel")
+async def get_company_engineering_intel_endpoint(company: str):
+    """Fetches company public engineering blog initiatives and architecture highlights."""
+    from app.core.interview_studio import InterviewStudioEngine
+    return {
+        "status": "success",
+        "intel": InterviewStudioEngine.get_company_engineering_intel(company_name=company)
+    }
+
+
 # --- Milestone 7: Salary Negotiation & Equity Modeler ---
 
 class OfferEvalRequest(BaseModel):
@@ -596,6 +688,51 @@ async def model_equity(payload: EquityModelRequest):
             total_company_shares=payload.total_company_shares,
             current_valuation_usd=payload.current_valuation_usd,
             strike_price_per_share=payload.strike_price
+        )
+    }
+
+
+class MultiOfferCompareRequest(BaseModel):
+    offers: List[Dict[str, Any]]
+
+
+@router.post("/salary/compare-offers")
+@router.post("/negotiation/compare-offers")
+async def compare_offers_endpoint(payload: MultiOfferCompareRequest):
+    """Compares multiple offers with 4-year TC progression and liquidation analysis."""
+    from app.core.negotiation import SalaryNegotiationEngine
+    return SalaryNegotiationEngine.compare_multiple_offers(payload.offers)
+
+
+class AdvancedCounterOfferRequest(BaseModel):
+    candidate_name: str = "Satyajit Nayak"
+    target_company: str
+    role_title: str
+    current_base: str
+    current_equity: str
+    target_base: str
+    target_equity: str
+    competing_company: Optional[str] = None
+    competing_tc: Optional[str] = None
+
+
+@router.post("/salary/counter-script")
+@router.post("/negotiation/advanced-counter")
+async def generate_advanced_counter_script_endpoint(payload: AdvancedCounterOfferRequest):
+    """Generates tailored executive negotiation email and phone talking points."""
+    from app.core.negotiation import SalaryNegotiationEngine
+    return {
+        "status": "success",
+        "scripts": SalaryNegotiationEngine.generate_advanced_counter_script(
+            candidate_name=payload.candidate_name,
+            target_company=payload.target_company,
+            role_title=payload.role_title,
+            current_base=payload.current_base,
+            current_equity=payload.current_equity,
+            target_base=payload.target_base,
+            target_equity=payload.target_equity,
+            competing_company=payload.competing_company,
+            competing_tc=payload.competing_tc
         )
     }
 

@@ -122,3 +122,65 @@ class OutreachGenerator:
             "cold_email": email_data,
             "records": [li_record.dict(), email_record.dict()]
         }
+
+    @classmethod
+    def generate_alumni_referral_pitch(
+        cls,
+        candidate_name: str,
+        company_name: str,
+        role_title: str,
+        contact_name: str = "Fellow Alumni",
+        common_ground: str = "our shared university background"
+    ) -> Dict[str, str]:
+        """Generates tailored 280-char LinkedIn connection note and email for alumni referral requests."""
+        first_name = contact_name.split()[0] if contact_name else "there"
+
+        li_note = (
+            f"Hi {first_name}! Noticed we both share {common_ground}. I'm applying for {company_name}'s {role_title} role and admire your team's work. "
+            f"Would you be open to connecting or sharing 5 mins of advice on engineering culture?"
+        )
+        if len(li_note) > 280:
+            li_note = f"Hi {first_name}! Shared {common_ground} connection here. I'm applying for {company_name}'s {role_title} role. Would love to connect and follow your work!"
+
+        email_subject = f"{common_ground} connection — Quick question regarding {company_name}"
+        email_body = (
+            f"Hi {first_name},\n\n"
+            f"I hope you're having a great week! I came across your profile and noticed {common_ground}.\n\n"
+            f"I recently applied for the {role_title} position at {company_name}. Given your experience on the team, I would greatly appreciate any quick insights on the engineering culture or if you'd be open to submitting an internal employee referral.\n\n"
+            f"Either way, thank you for your time and continued great work at {company_name}!\n\n"
+            f"Best regards,\n{candidate_name}"
+        )
+
+        return {
+            "linkedin_note_280": CoverLetterGenerator.sanitize_anti_ai(li_note),
+            "email_subject": email_subject,
+            "email_body": CoverLetterGenerator.sanitize_anti_ai(email_body)
+        }
+
+    @classmethod
+    def generate_recruiter_followup_nudge(
+        cls,
+        candidate_name: str,
+        company_name: str,
+        role_title: str,
+        recruiter_name: str = "Recruiter",
+        days_elapsed: int = 5,
+        recent_highlight: Optional[str] = None
+    ) -> Dict[str, str]:
+        """Generates polite, high-converting 3-sentence recruiter bump message after application cooling period."""
+        first_name = recruiter_name.split()[0] if recruiter_name else "there"
+        highlight = recent_highlight or "recently published a new open-source distributed systems walkthrough"
+
+        subject = f"Following up: {role_title} application — {candidate_name}"
+        body = (
+            f"Hi {first_name},\n\n"
+            f"I hope you're having a productive week! I wanted to briefly follow up on my application submitted {days_elapsed} business days ago for the {role_title} role at {company_name}.\n\n"
+            f"I remain extremely enthusiastic about contributing to {company_name}'s technical mission, and {highlight} that directly aligns with your team's stack.\n\n"
+            f"Please let me know if there are any additional project demos or references I can provide to assist in your review.\n\n"
+            f"Best regards,\n{candidate_name}"
+        )
+
+        return {
+            "subject": subject,
+            "body": CoverLetterGenerator.sanitize_anti_ai(body)
+        }
