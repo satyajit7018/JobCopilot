@@ -431,3 +431,199 @@ class InterviewStudioEngine:
             candidate_answer=candidate_answer,
             key_concepts=key_concepts
         )
+
+    @classmethod
+    def generate_reverse_interview_questions(
+        cls,
+        role_title: str = "Senior Software Engineer",
+        company_name: str = "Target Company"
+    ) -> List[Dict[str, str]]:
+        """Generates 3 high-impact, strategic questions for the candidate to ask the hiring manager."""
+        track = cls.infer_role_track(role_title)
+        comp = company_name.strip()
+
+        if track == "Frontend & Full-Stack":
+            return [
+                {
+                    "theme": "🏗️ Architecture & Evolution",
+                    "question": f"How is the frontend team at {comp} handling the transition to modern React 19 Server Components / Next.js, and what is your strategy for design system token governance across multiple repos?"
+                },
+                {
+                    "theme": "⚡ Performance & Web Vitals",
+                    "question": "What tooling and alerting thresholds do you maintain for Core Web Vitals (LCP, INP, CLS) in production, and how do you resolve performance regressions during rapid continuous deployment?"
+                },
+                {
+                    "theme": "🤝 Team Autonomy & KPIs",
+                    "question": f"How does engineering prioritize frontend technical debt refactoring versus high-velocity product feature deliverables at {comp}?"
+                }
+            ]
+        elif track == "AI / ML & Data":
+            return [
+                {
+                    "theme": "🤖 AI Infrastructure & Latency",
+                    "question": f"How is {comp}'s ML platform architected around real-time inference latency (P99 SLAs) and vector database chunking strategies for enterprise RAG?"
+                },
+                {
+                    "theme": "🧪 Experimentation & Drift",
+                    "question": "What is the team's automated workflow for continuous model evaluation, shadow deployments, and detecting semantic drift in production LLM pipelines?"
+                },
+                {
+                    "theme": "📈 Compute Allocation & Strategy",
+                    "question": f"How does the data/AI engineering org at {comp} manage GPU cluster budgeting, fine-tuning versus prompt caching trade-offs, and inference cost optimization?"
+                }
+            ]
+        elif track == "DevOps & SRE":
+            return [
+                {
+                    "theme": "🛡️ Resilience & Chaos",
+                    "question": f"How does {comp} approach automated chaos testing and disaster recovery drills across multi-region Kubernetes clusters?"
+                },
+                {
+                    "theme": "🔄 GitOps & Deployment Velocity",
+                    "question": "What does your progressive delivery pipeline look like with ArgoCD and Istio canaries, and how do you ensure zero-downtime database schema migrations?"
+                },
+                {
+                    "theme": "🚨 On-Call & Error Budgets",
+                    "question": "How is on-call rotation structured, what is the team's error budget policy when SLIs are breached, and how do you cultivate a blameless post-mortem culture?"
+                }
+            ]
+        else:
+            return [
+                {
+                    "theme": "🏛️ Distributed Systems Scaling",
+                    "question": f"What is currently the single largest architectural bottleneck or high-contention database service that {comp} is actively re-architecting for 10x scale?"
+                },
+                {
+                    "theme": "⚙️ Technical Debt & Ownership",
+                    "question": f"How does {comp}'s engineering leadership allocate time between roadmap features, automated test coverage, and infrastructure modernization?"
+                },
+                {
+                    "theme": "🚀 Team Culture & 90-Day Success",
+                    "question": f"If I join as a {role_title}, what concrete technical milestone or system impact would make you say this hire was a massive home run after 90 days?"
+                }
+            ]
+
+    @classmethod
+    def analyze_interviewer_profile(
+        cls,
+        interviewer_name: str,
+        interviewer_role: str = "Engineering Manager",
+        background_text: str = ""
+    ) -> Dict[str, Any]:
+        """Infers interviewer persona, technical biases, and strategic preparation advice."""
+        name = interviewer_name.strip() or "Hiring Lead"
+        role_low = interviewer_role.lower()
+        bg_low = background_text.lower()
+
+        is_bar_raiser = any(w in bg_low or w in role_low for w in ["bar raiser", "amazon", "aws", "principle", "principal"])
+        is_em = any(w in role_low for w in ["manager", "director", "head", "lead", "vp"])
+        is_staff_plus = any(w in role_low for w in ["staff", "principal", "architect", "distinguished"])
+
+        if is_bar_raiser:
+            persona = "Bar Raiser / Amazonian Leadership Assessor 🛡️"
+            focus = "Extreme alignment with Leadership Principles: Ownership, Dive Deep, Bias for Action, and Disagree & Commit."
+            tips = [
+                "Structure every answer rigidly around STAR (Situation, Task, Action, Result) with 100% first-person 'I' statements, not 'we'.",
+                "Have 2 backup stories ready for times when you failed, took calculated risks, or pushed back against leadership with empirical data.",
+                "Quantify all outcomes with exact percentages, dollars saved, or latency reductions."
+            ]
+        elif is_staff_plus:
+            persona = "Staff+ Systems Architect & Deep Technologist ⚡"
+            focus = "Architectural trade-offs, fault tolerance, distributed consensus, failure modes, and long-term maintainability."
+            tips = [
+                "Proactively mention failure scenarios: network partitions, cache stampedes, retry storms, and eventual consistency.",
+                "Explain the 'why' behind choosing tools (e.g. why Kafka over RabbitMQ, why Redis sorted sets over database indexes).",
+                "Highlight developer ergonomics, API contracts, and modular service boundaries."
+            ]
+        elif is_em:
+            persona = "Engineering Manager & Team Multiplier 👥"
+            focus = "Team velocity, cross-functional collaboration with PM/Design, mentorship, unblocking teammates, and project delivery."
+            tips = [
+                "Demonstrate how you elevate junior engineers and navigate sprint scope trade-offs without burning out.",
+                "Explain your approach to sprint planning, estimating ambiguous tasks, and communicating delays proactively.",
+                "Show empathy for product constraints and customer pain points."
+            ]
+        else:
+            persona = "Senior Peer Engineer 💻"
+            focus = "Code quality, pragmatic design, testing rigor, daily workflow, and culture fit."
+            tips = [
+                "Show passion for clean code, automated CI/CD pipelines, and solid test coverage.",
+                "Engage collaboratively: treat the interview as a joint whiteboarding session rather than an exam.",
+                "Be honest about what you know versus what you'd research."
+            ]
+
+        return {
+            "interviewer_name": name,
+            "interviewer_role": interviewer_role,
+            "inferred_persona": persona,
+            "core_focus": focus,
+            "tactical_tips": tips
+        }
+
+    @classmethod
+    def get_company_engineering_intel(cls, company_name: str) -> Dict[str, Any]:
+        """Provides synthesized public engineering blog posts and architecture initiatives."""
+        comp = company_name.strip().lower()
+
+        INTEL_DB = {
+            "stripe": {
+                "recent_initiatives": [
+                    "Migration to Envoy and Service Mesh for zero-downtime mTLS across multi-region clusters.",
+                    "Sorbet Ruby static type checker open-sourcing and compiler optimization.",
+                    "Active-Active payment database architectures utilizing Spanner and deterministic consensus."
+                ],
+                "engineering_culture": "Extremely written-first culture with doc-driven RFCs, meticulous API consistency, and automated idempotency verification."
+            },
+            "uber": {
+                "recent_initiatives": [
+                    "H3 Spatial Indexing adoption for sub-millisecond driver-rider dispatch matching.",
+                    "Schemaless MySQL sharding engine powering trillion-row trip data stores.",
+                    "Kafka streaming with millions of messages/sec feeding real-time surge pricing models."
+                ],
+                "engineering_culture": "Data-driven, high-throughput microservices, sub-second latency SLAs, and high ownership."
+            },
+            "netflix": {
+                "recent_initiatives": [
+                    "Titus container management platform running on AWS EC2 bare metal instances.",
+                    "Chaos Monkey and Simian Army automated failure injection in production.",
+                    "Open Connect CDN edge caching appliance hardware optimizations."
+                ],
+                "engineering_culture": "Freedom & Responsibility culture memo, context over control, and extreme autonomy."
+            },
+            "meta": {
+                "recent_initiatives": [
+                    "TAO distributed graph store handling trillions of queries per day with multi-tier caching.",
+                    "PyTorch and vLLM GPU inference optimizations for generative AI feeds.",
+                    "Buck build system and Hack language compiler improvements for rapid dev iteration."
+                ],
+                "engineering_culture": "Move fast with stable infra, bottom-up project ideation, and metrics-driven execution."
+            },
+            "openai": {
+                "recent_initiatives": [
+                    "Kubernetes clusters scaling to tens of thousands of GPUs with custom InfiniBand networking.",
+                    "Triton language for writing performant GPU kernels with high developer velocity.",
+                    "Speculative decoding and continuous batching in vLLM serving frameworks."
+                ],
+                "engineering_culture": "High-velocity research-to-production pipeline, safety guardrails, and extreme compute efficiency."
+            }
+        }
+
+        intel = INTEL_DB.get(comp)
+        if intel:
+            return {
+                "company": company_name,
+                "found_intel": True,
+                "recent_initiatives": intel["recent_initiatives"],
+                "engineering_culture": intel["engineering_culture"]
+            }
+
+        return {
+            "company": company_name,
+            "found_intel": False,
+            "recent_initiatives": [
+                f"Modernizing service architecture towards cloud-native containerized microservices and automated CI/CD.",
+                "Adopting async event-driven message streaming (Kafka / RabbitMQ) to decouple core processing pipelines.",
+                "Investing in developer tooling, observability (Prometheus/Grafana/OpenTelemetry), and P99 latency reductions."
+            ],
+            "engineering_culture": f"Collaborative engineering focused on scalable system design, operational resilience, and agile product delivery at {company_name}."
+        }
