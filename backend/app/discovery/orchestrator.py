@@ -58,7 +58,7 @@ class DiscoveryOrchestrator:
         try:
             # 1. Fetch from Direct ATS APIs & VC Boards Concurrently
             try:
-                import h2
+                import h2  # type: ignore
                 has_h2 = True
             except ImportError:
                 has_h2 = False

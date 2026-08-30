@@ -15,13 +15,13 @@ from cryptography.hazmat.primitives import hashes
 from app.core.config import VAULT_ENC_PATH, APP_DIR
 
 try:
-    import keyring
+    import keyring  # type: ignore
     HAS_KEYRING = True
 except ImportError:
     HAS_KEYRING = False
 
 try:
-    from argon2.low_level import hash_secret_raw, Type
+    from argon2.low_level import hash_secret_raw, Type  # type: ignore
     HAS_ARGON2 = True
 except ImportError:
     HAS_ARGON2 = False

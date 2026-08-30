@@ -258,7 +258,7 @@ class ResumeCompiler:
 
         # 1. Try Playwright
         try:
-            from playwright.async_api import async_playwright
+            from playwright.async_api import async_playwright  # type: ignore
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()

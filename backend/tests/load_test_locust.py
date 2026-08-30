@@ -12,7 +12,7 @@ Simulates realistic candidate behavior under load:
 import uuid
 
 try:
-    from locust import HttpUser, task, between
+    from locust import HttpUser, task, between  # type: ignore
     HAS_LOCUST = True
 except ImportError:
     HAS_LOCUST = False
