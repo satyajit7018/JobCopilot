@@ -673,13 +673,22 @@
       <section id="view-interview" class="view-panel">
         <div class="view-header">
           <div class="view-title-group">
-            <h1>🎙️ AI Mock Interview Studio &amp; Audio Visualizer</h1>
-            <p class="view-subtitle">Live waveform voice analysis, real-time STAR scoring rubrics, and target company architecture dossiers.</p>
+            <h1>🎙️ AI Mock Interview Studio &amp; Real-World FAANG Drill</h1>
+            <p class="view-subtitle">Live waveform voice analysis, real-time STAR scoring rubrics, and target company architecture dossiers (Stripe, Meta, Netflix, Uber).</p>
           </div>
           <div class="hud-pill" id="interview-session-status" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399;">
             <span class="hud-dot live" style="background: #10b981;"></span>
-            <span>Studio Ready</span>
+            <span>Studio Ready • 9 Master Drills Active</span>
           </div>
+        </div>
+
+        <!-- Category Selector Pills -->
+        <div class="filter-pills" style="margin-bottom: 1.25rem;">
+          <button class="filter-pill active" data-qcat="all" onclick="filterMockQuestions('all', this)">All Master Drills (9)</button>
+          <button class="filter-pill" data-qcat="System Design" onclick="filterMockQuestions('System Design', this)">🏗️ System Design &amp; Scale (4)</button>
+          <button class="filter-pill" data-qcat="Architecture &amp; Concurrency" onclick="filterMockQuestions('Architecture & Concurrency', this)">⚡ Concurrency &amp; Databases (2)</button>
+          <button class="filter-pill" data-qcat="Incident Response" onclick="filterMockQuestions('Incident Response', this)">🚨 Outages &amp; Chaos (1)</button>
+          <button class="filter-pill" data-qcat="STAR Leadership" onclick="filterMockQuestions('STAR Leadership', this)">💼 Executive STAR Leadership (2)</button>
         </div>
 
         <!-- Studio Grid Layout -->
@@ -698,14 +707,25 @@
               </span>
             </div>
 
+            <!-- Question Jump Selector -->
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label class="form-label" style="font-size: 11.5px; color: var(--text-muted);">Jump to Interview Drill:</label>
+              <select id="mock-question-dropdown" class="form-input" onchange="selectMockQuestionById(this.value)" style="font-size: 12.5px; padding: 6px 10px; background: #0f172a;">
+                <!-- Populated dynamically via app.js -->
+              </select>
+            </div>
+
             <!-- Question Prompter Box -->
             <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-cyan);" id="mock-q-category">System Design</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-cyan);" id="mock-q-category">System Design</span>
+                  <span class="hud-pill" id="mock-q-company-tag" style="font-size: 10px; padding: 1px 6px; color: #a5b4fc;">Stripe</span>
+                </div>
                 <span class="hud-pill" id="mock-q-difficulty" style="font-size: 10.5px; padding: 1px 6px;">Hard</span>
               </div>
-              <div id="mock-active-question" style="font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.5;">
-                How would you design a real-time event streaming and notification pipeline handling 50,000 requests per second with at-least-once delivery guarantees?
+              <div id="mock-active-question" style="font-size: 13.5px; font-weight: 600; color: var(--text-primary); line-height: 1.5;">
+                How would you design a distributed payment ledger and idempotency engine that guarantees zero double-billing across network retries at 100,000 TPS?
               </div>
             </div>
 
@@ -713,7 +733,7 @@
             <div style="position: relative; background: #030712; border: 1px solid rgba(0, 242, 254, 0.25); border-radius: var(--radius-md); height: 120px; overflow: hidden; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 20px rgba(0,0,0,0.8);">
               <canvas id="audio-visualizer-canvas" width="600" height="120" style="width: 100%; height: 100%; display: block;"></canvas>
               <div id="visualizer-overlay-hint" style="position: absolute; color: var(--text-muted); font-size: 12px; pointer-events: none; font-family: 'JetBrains Mono', monospace;">
-                Click "Start Recording" or type your response
+                Click "Start Voice Answer" or type your response
               </div>
             </div>
 
@@ -725,7 +745,7 @@
               </button>
 
               <button class="btn btn-secondary" onclick="cycleNextMockQuestion()" title="Next Question">
-                <span>Next Question ➡️</span>
+                <span>Next Drill ➡️</span>
               </button>
 
               <button class="btn btn-secondary" onclick="loadInterviewSampleAnswer()" title="Load Sample Technical Answer">
@@ -764,7 +784,7 @@
               <div id="eval-empty-placeholder" style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
                 <div style="font-size: 42px; margin-bottom: 12px; opacity: 0.6;">🎯</div>
                 <div style="font-size: 15px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">No Evaluation Yet</div>
-                <p style="font-size: 12.5px; max-width: 320px; margin: 0 auto; line-height: 1.5;">Record your voice answer or type your response, then click Evaluate to receive instant STAR metrics, key concept coverage, and AI feedback.</p>
+                <p style="font-size: 12.5px; max-width: 320px; margin: 0 auto; line-height: 1.5;">Record your voice answer or type your response, then click Evaluate to receive instant STAR metrics, quantitative validation, and AI feedback.</p>
               </div>
 
               <!-- Dynamic Score Results (Hidden by default) -->
@@ -780,6 +800,7 @@
                   <div style="text-align: right;">
                     <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 2px;">Key Concepts Covered</div>
                     <div style="font-size: 20px; font-weight: 700; color: var(--accent-cyan); font-family: 'JetBrains Mono', monospace;" id="eval-concepts-ratio">4 / 5</div>
+                    <span class="hud-pill" id="eval-metrics-pill" style="margin-top: 4px; font-size: 10.5px; display: inline-block;">📈 Metrics Detected</span>
                   </div>
                 </div>
 
@@ -855,7 +876,7 @@
           <div class="form-grid" style="margin-bottom: 1.25rem;">
             <div class="form-group">
               <label class="form-label">Company Name</label>
-              <input type="text" id="mock-company-name" class="form-input" value="Stripe" placeholder="e.g. Stripe, OpenAI, Google, Meta">
+              <input type="text" id="mock-company-name" class="form-input" value="Stripe" placeholder="e.g. Stripe, OpenAI, Google, Meta, Uber, Netflix">
             </div>
             <div class="form-group">
               <label class="form-label">Target Role Title</label>

@@ -479,32 +479,38 @@ async def get_company_dossier(company: str, role: str = "Senior Software Enginee
 
 
 @router.get("/interview/questions")
-async def get_mock_questions(role: str = "Senior Software Engineer", profile_id: str = "default_user"):
-    """Generates role-specific mock technical and system design questions."""
+async def get_mock_questions(
+    role: str = "Senior Software Engineer",
+    profile_id: str = "default_user",
+    category: Optional[str] = None
+):
+    """Generates role-specific mock technical, system design, and STAR leadership questions."""
     from app.core.interview_studio import InterviewStudioEngine
     profile = db.get_profile(profile_id)
     skills = profile.skills if profile else ["Python", "Distributed Systems"]
     return {
         "status": "success",
-        "questions": InterviewStudioEngine.generate_mock_questions(role, skills=skills)
+        "questions": InterviewStudioEngine.generate_mock_questions(role, skills=skills, category=category)
     }
 
 
 class InterviewEvalRequest(BaseModel):
     question: str
-    answer: str
+    answer: Optional[str] = None
+    candidate_answer: Optional[str] = None
     key_concepts: Optional[List[str]] = None
 
 
 @router.post("/interview/evaluate")
 async def evaluate_interview_answer(payload: InterviewEvalRequest):
-    """Evaluates candidate response with depth, key concept coverage, and actionable feedback."""
+    """Evaluates candidate response with multi-dimensional STAR scoring and metrics verification."""
     from app.core.interview_studio import InterviewStudioEngine
+    ans = payload.candidate_answer or payload.answer or ""
     return {
         "status": "success",
-        "evaluation": InterviewStudioEngine.evaluate_candidate_response(
+        "evaluation": InterviewStudioEngine.evaluate_interview_response(
             question=payload.question,
-            candidate_answer=payload.answer,
+            candidate_answer=ans,
             key_concepts=payload.key_concepts
         )
     }

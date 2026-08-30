@@ -962,31 +962,89 @@ function renderEmailRadar(emails) {
 // ==========================================================================
 const mockQuestionsBank = [
   {
-    id: "q_sys_1",
+    id: "q_sys_stripe_1",
     category: "System Design",
+    company_tag: "Stripe",
     difficulty: "Hard",
-    question: "How would you design a real-time event streaming and notification pipeline handling 50,000 requests per second with at-least-once delivery guarantees?",
-    key_concepts: ["Message Broker (Kafka/RabbitMQ)", "Idempotency Keys", "Consumer Group Partitioning", "Dead Letter Queues (DLQ)", "P99 Latency SLA"],
-    sample_star: "In my previous role, our ingestion service dropped webhooks during traffic spikes of 45k req/sec. I architected a distributed Kafka pipeline with 32 partitioned consumer groups and Redis-backed idempotency keys. When downstream workers timed out, unprocessable events were routed to a Dead Letter Queue (DLQ) with exponential backoff. This eliminated data loss completely, achieved 99.99% at-least-once reliability, and reduced P99 latency from 1.8s down to 38ms."
+    question: "How would you design a distributed payment ledger and idempotency engine that guarantees zero double-billing across network retries at 100,000 TPS?",
+    key_concepts: ["Idempotency-Key Header", "Double-Entry Ledger", "Distributed Lock (Redis Lua)", "Compensating Transactions", "Atomic State Machine", "P99 SLA"],
+    sample_star: "At my previous fintech role, payment retry storms caused duplicate authorizations during gateway outages. I architected an idempotency middleware storing client keys in Redis with an atomic Lua script distributed lock. Successful charges were written to an immutable double-entry PostgreSQL ledger where debits strictly matched credits. Unfinished requests returned cached payloads. This eliminated duplicate transactions across 80M monthly payments and lowered P99 latency to 42ms."
   },
   {
-    id: "q_tech_2",
+    id: "q_sys_uber_2",
+    category: "System Design",
+    company_tag: "Uber",
+    difficulty: "Hard",
+    question: "How would you design a high-throughput geospatial ingestion pipeline to track millions of concurrent driver locations and calculate nearest-driver dispatch in real-time?",
+    key_concepts: ["H3 Spatial Indexing", "Geohash / Quadtree", "WebSocket Gateway", "Redis Pub/Sub & Sorted Sets", "Dispatch Matcher", "Backpressure"],
+    sample_star: "Our fleet tracking platform experienced severe lag when processing GPS pings from 150k vehicles. I introduced an H3 hexagonal indexing pipeline with a WebSocket cluster terminating TLS at Envoy edge proxies. Location pings were partitioned into Redis Geospatial indices with a 15-second TTL. The dispatch matching engine queried adjacent H3 rings in O(1) time, cutting match latency from 3.2s to 120ms and handling 100k writes/sec seamlessly."
+  },
+  {
+    id: "q_sys_netflix_3",
+    category: "System Design",
+    company_tag: "Netflix",
+    difficulty: "Hard",
+    question: "Design a global content delivery infrastructure and video transcoding pipeline capable of serving adaptive bitrate streaming to 200 million users during live events.",
+    key_concepts: ["Edge CDN Caching", "Adaptive Bitrate (HLS/DASH)", "Transcoding Workers", "S3 Blob Storage", "Circuit Breaker", "Simian Chaos"],
+    sample_star: "We needed to broadcast live events to 2M concurrent viewers without buffering. I built an automated transcoding pipeline using asynchronous worker clusters that segmented MP4 video into multi-bitrate HLS chunks uploaded to S3. We configured global Cloudflare CDN edge caching with proactive pre-fetching of video manifests. When regional CDN nodes failed, automated circuit breakers rerouted traffic, maintaining a 99.98% stream availability."
+  },
+  {
+    id: "q_sys_meta_4",
+    category: "System Design",
+    company_tag: "Meta",
+    difficulty: "Hard",
+    question: "How would you design a real-time social feed with personalized ranking for users with millions of followers (handling the celebrity fan-out problem)?",
+    key_concepts: ["Fan-out on Write vs Read", "Hybrid Feed Pipeline", "Redis Tiered Cache", "Graph Database (TAO)", "Ranking Model Inference", "Kafka Stream"],
+    sample_star: "In our social app, posting from verified creators with >1M followers overwhelmed our database fan-out queue. I redesigned the feed with a hybrid model: regular users used fan-out on write, while high-follower accounts used fan-out on read with lazy client-side feed merging. We cached personalized timelines in Redis Cluster and ranked posts with an async inference service, reducing timeline load times by 78%."
+  },
+  {
+    id: "q_con_rate_5",
     category: "Architecture & Concurrency",
+    company_tag: "Universal",
     difficulty: "Medium",
-    question: "In Python and FastAPI, how do you manage race conditions, connection pooling, and horizontal scaling under heavy database write contention?",
-    key_concepts: ["Optimistic vs Pessimistic Locking", "Connection Pool Sizing", "AsyncIO / Event Loop", "Read Replicas & Sharding"],
-    sample_star: "We faced severe database connection starvation during flash sales with 12,000 concurrent users. I implemented asynchronous connection pooling with SQLAlchemy AsyncEngine, configured max overflow limits, and migrated high-contention row updates to Redis atomic Lua scripts with optimistic concurrency control. This prevented thread exhaustion in the event loop, kept database CPU below 55%, and supported a 4x increase in write throughput."
+    question: "How would you implement a distributed rate limiter supporting sliding window counters across multiple microservice regions without clock drift vulnerabilities?",
+    key_concepts: ["Sliding Window Logs", "Redis Sorted Sets (ZADD/ZREMRANGE)", "Atomic Lua Scripts", "Fail-Open vs Fail-Closed", "Memory Eviction"],
+    sample_star: "To prevent API abuse on our public endpoints, I built a distributed sliding window rate limiter using Redis sorted sets. Each request executed an atomic Lua script that removed expired timestamps, added the current timestamp, and checked card against quota in a single round-trip. We implemented a fail-open circuit breaker to guarantee availability if Redis degraded. The service handled 40,000 req/sec with < 2ms latency."
   },
   {
-    id: "q_beh_3",
-    category: "Engineering Leadership",
+    id: "q_con_db_6",
+    category: "Architecture & Concurrency",
+    company_tag: "Universal",
+    difficulty: "Hard",
+    question: "Under heavy concurrent database write contention, how do you diagnose and eliminate database connection pool exhaustion and deadlocks?",
+    key_concepts: ["Optimistic Concurrency Control", "Connection Pool Sizing", "AsyncIO Event Loop", "Read Replicas & Sharding", "WAL Checkpoints"],
+    sample_star: "During a flash sale, our primary PostgreSQL instance reached 100% connection pool exhaustion with rampant row-level deadlocks. I diagnosed lock contention using pg_stat_activity and reorganized transaction statements to acquire row locks in deterministic order. I replaced pessimistic locks with optimistic concurrency using version tokens, moved read traffic to read replicas with PgBouncer connection pooling, reducing CPU from 98% to 34%."
+  },
+  {
+    id: "q_inc_thundering_7",
+    category: "Incident Response",
+    company_tag: "Universal",
+    difficulty: "Hard",
+    question: "Describe an incident involving a cascading failure or cache stampede (thundering herd) that you investigated. How did you stabilize production and prevent recurrence?",
+    key_concepts: ["Cache Stampede / Thundering Herd", "Mutex / Singleflight Pattern", "Circuit Breakers", "Exponential Backoff with Jitter", "Blameless Post-Mortem"],
+    sample_star: "When our Redis cache node crashed, thousands of incoming requests hit our primary database simultaneously, causing a thundering herd that took down our auth service. I quickly enabled a bypass singleflight mutex pattern so only one worker computed the cache miss while others waited. I added randomized TTL jitter (±15%) to prevent simultaneous expirations, drafted an incident RCA, and deployed automated chaos tests."
+  },
+  {
+    id: "q_lead_conflict_8",
+    category: "STAR Leadership",
+    company_tag: "FAANG",
     difficulty: "Medium",
-    question: "Describe a situation where a critical production outage occurred or a technical decision caused a bottleneck. How did you diagnose, resolve, and prevent recurrence?",
-    key_concepts: ["Root Cause Analysis (RCA)", "Observability / Metrics", "Zero-Downtime Rollback", "Blameless Post-Mortem"],
-    sample_star: "A memory leak in our WebSocket gateway caused rolling worker crashes during peak hours. I used Prometheus metrics and heap profiling to identify unclosed client socket handles. I immediately initiated a zero-downtime rollback to the prior release, drafted a comprehensive Root Cause Analysis (RCA), and introduced automated connection lifecycle unit tests in our CI pipeline. We conducted a blameless post-mortem and prevented recurrence across all microservices."
+    question: "Tell me about a high-stakes technical disagreement you had with a Principal Engineer or Manager regarding architecture. How did you navigate it to a successful outcome?",
+    key_concepts: ["Disagree and Commit", "Data-Driven Benchmarks", "Trade-Off Matrix", "Cross-Functional Alignment", "Customer-First Focus"],
+    sample_star: "Our Principal Architect wanted to rebuild our entire monolithic billing pipeline into a microservice mesh in Go, which posed a high risk to our 3-month launch target. I developed an empirical benchmark comparison and a risk-weighted trade-off matrix demonstrating that modularizing the existing Python service with async background workers met our 10x throughput requirement with 80% less risk. We aligned, delivered 2 weeks early, and scaled to $20M ARR without outage."
+  },
+  {
+    id: "q_lead_ambiguity_9",
+    category: "STAR Leadership",
+    company_tag: "FAANG",
+    difficulty: "Medium",
+    question: "Describe a project where you had to deliver critical technical outcomes under tight deadlines with highly ambiguous or frequently shifting product requirements.",
+    key_concepts: ["Scope Negotiation", "MVP De-Risking", "Vertical Slices", "Rapid Feedback Loops", "Measurable Business Value"],
+    sample_star: "Our executive team requested a compliant SOC-2 audit logging system in 4 weeks with vague specifications from enterprise customers. I de-risked the initiative by defining an MVP vertical slice covering the core audit event schema and immutable append-only storage. I set up daily 15-minute syncs with our compliance lead, delivered the core audit trail in 3 weeks, and successfully passed the enterprise compliance audit with zero findings."
   }
 ];
 
+let activeQuestionsList = [...mockQuestionsBank];
 let currentMockIndex = 0;
 let isRecordingVoice = false;
 let audioContext = null;
@@ -995,8 +1053,75 @@ let visualizerAnimFrame = null;
 let recordingSeconds = 0;
 let recordingTimerInterval = null;
 
+// Populate dropdown selector
+function populateMockQuestionsDropdown() {
+  const dropdown = document.getElementById('mock-question-dropdown');
+  if (!dropdown) return;
+  dropdown.innerHTML = activeQuestionsList.map((q, idx) => `
+    <option value="${q.id}">[${q.company_tag || q.category}] ${q.question.substring(0, 75)}...</option>
+  `).join('');
+  if (activeQuestionsList[currentMockIndex]) {
+    dropdown.value = activeQuestionsList[currentMockIndex].id;
+  }
+}
+
+window.filterMockQuestions = function(category, btn) {
+  document.querySelectorAll('#view-interview .filter-pill').forEach(p => p.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  if (category === 'all') {
+    activeQuestionsList = [...mockQuestionsBank];
+  } else {
+    activeQuestionsList = mockQuestionsBank.filter(q => q.category.toLowerCase() === category.toLowerCase());
+  }
+
+  currentMockIndex = 0;
+  populateMockQuestionsDropdown();
+  updateMockQuestionDisplay();
+};
+
+window.selectMockQuestionById = function(qId) {
+  const idx = activeQuestionsList.findIndex(q => q.id === qId);
+  if (idx !== -1) {
+    currentMockIndex = idx;
+    updateMockQuestionDisplay();
+  }
+};
+
+function updateMockQuestionDisplay() {
+  const q = activeQuestionsList[currentMockIndex] || mockQuestionsBank[0];
+
+  const catEl = document.getElementById('mock-q-category');
+  const compEl = document.getElementById('mock-q-company-tag');
+  const diffEl = document.getElementById('mock-q-difficulty');
+  const textEl = document.getElementById('mock-active-question');
+  const answerBox = document.getElementById('mock-candidate-answer');
+  const dropdown = document.getElementById('mock-question-dropdown');
+
+  if (catEl) catEl.textContent = q.category;
+  if (compEl) compEl.textContent = q.company_tag || 'Universal';
+  if (diffEl) diffEl.textContent = q.difficulty;
+  if (textEl) textEl.textContent = q.question;
+  if (dropdown) dropdown.value = q.id;
+  if (answerBox) answerBox.value = '';
+  window.updateWordCount();
+
+  // Reset scoring HUD
+  const emptyPlaceholder = document.getElementById('eval-empty-placeholder');
+  const evalContent = document.getElementById('eval-content-view');
+  const scoreBadge = document.getElementById('mock-score-badge');
+
+  if (emptyPlaceholder) emptyPlaceholder.style.display = 'block';
+  if (evalContent) evalContent.style.display = 'none';
+  if (scoreBadge) {
+    scoreBadge.textContent = 'Awaiting Input';
+    scoreBadge.style.color = 'var(--accent-cyan)';
+  }
+}
+
 // Initialize Visualizer Canvas
 function initVisualizerCanvas() {
+  populateMockQuestionsDropdown();
   const canvas = document.getElementById('audio-visualizer-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -1043,12 +1168,11 @@ window.toggleVoiceRecording = function() {
   isRecordingVoice = !isRecordingVoice;
 
   if (isRecordingVoice) {
-    // Start Recording
     if (micBtn) micBtn.classList.add('mic-recording-active');
     if (micIcon) micIcon.textContent = '⏹️';
     if (micLabel) micLabel.textContent = 'Stop & Transcribe';
     if (recBadge) recBadge.style.display = 'inline-flex';
-    if (overlayHint) overlayHint.textContent = '🎙️ Listening & analyzing voice frequencies...';
+    if (overlayHint) overlayHint.textContent = '🎙️ Analyzing speech & technical frequencies...';
 
     recordingSeconds = 0;
     if (recTimer) recTimer.textContent = '00:00';
@@ -1059,7 +1183,6 @@ window.toggleVoiceRecording = function() {
       if (recTimer) recTimer.textContent = `${mins}:${secs}`;
     }, 1000);
 
-    // Try real microphone Web Audio API if available
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
@@ -1071,10 +1194,9 @@ window.toggleVoiceRecording = function() {
       }
     } catch (e) {}
 
-    showToast('Voice recording active — speak your answer', 'info');
+    showToast('Voice recording active — speak your STAR answer', 'info');
 
   } else {
-    // Stop Recording
     if (micBtn) micBtn.classList.remove('mic-recording-active');
     if (micIcon) micIcon.textContent = '🎙️';
     if (micLabel) micLabel.textContent = 'Start Voice Answer';
@@ -1083,9 +1205,8 @@ window.toggleVoiceRecording = function() {
 
     if (recordingTimerInterval) clearInterval(recordingTimerInterval);
 
-    // Auto-transcribe sample text if candidate didn't type
     if (answerBox && (!answerBox.value || answerBox.value.length < 20)) {
-      const q = mockQuestionsBank[currentMockIndex];
+      const q = activeQuestionsList[currentMockIndex] || mockQuestionsBank[0];
       answerBox.value = q.sample_star || '';
       window.updateWordCount();
       showToast('Voice answer transcribed into STAR text', 'success');
@@ -1094,40 +1215,17 @@ window.toggleVoiceRecording = function() {
 };
 
 window.cycleNextMockQuestion = function() {
-  currentMockIndex = (currentMockIndex + 1) % mockQuestionsBank.length;
-  const q = mockQuestionsBank[currentMockIndex];
-
-  const catEl = document.getElementById('mock-q-category');
-  const diffEl = document.getElementById('mock-q-difficulty');
-  const textEl = document.getElementById('mock-active-question');
-  const answerBox = document.getElementById('mock-candidate-answer');
-
-  if (catEl) catEl.textContent = q.category;
-  if (diffEl) diffEl.textContent = q.difficulty;
-  if (textEl) textEl.textContent = q.question;
-  if (answerBox) answerBox.value = '';
-  window.updateWordCount();
-
-  // Reset evaluation card
-  const emptyPlaceholder = document.getElementById('eval-empty-placeholder');
-  const evalContent = document.getElementById('eval-content-view');
-  const scoreBadge = document.getElementById('mock-score-badge');
-
-  if (emptyPlaceholder) emptyPlaceholder.style.display = 'block';
-  if (evalContent) evalContent.style.display = 'none';
-  if (scoreBadge) {
-    scoreBadge.textContent = 'Awaiting Input';
-    scoreBadge.style.color = 'var(--accent-cyan)';
-  }
+  currentMockIndex = (currentMockIndex + 1) % activeQuestionsList.length;
+  updateMockQuestionDisplay();
 };
 
 window.loadInterviewSampleAnswer = function() {
-  const q = mockQuestionsBank[currentMockIndex];
+  const q = activeQuestionsList[currentMockIndex] || mockQuestionsBank[0];
   const answerBox = document.getElementById('mock-candidate-answer');
   if (answerBox && q.sample_star) {
     answerBox.value = q.sample_star;
     window.updateWordCount();
-    showToast('Loaded expert STAR response template', 'info');
+    showToast(`Loaded ${q.company_tag || 'FAANG'} expert STAR response`, 'info');
   }
 };
 
@@ -1141,7 +1239,7 @@ window.updateWordCount = function() {
 };
 
 window.submitAnswerForEvaluation = async function() {
-  const q = mockQuestionsBank[currentMockIndex];
+  const q = activeQuestionsList[currentMockIndex] || mockQuestionsBank[0];
   const answerBox = document.getElementById('mock-candidate-answer');
   const answer = (answerBox ? answerBox.value : '').trim();
 
@@ -1150,7 +1248,7 @@ window.submitAnswerForEvaluation = async function() {
     return;
   }
 
-  showToast('Evaluating response with STAR rubric and key concepts...', 'info');
+  showToast('Evaluating response with STAR rubric & metrics verification...', 'info');
 
   try {
     const res = await fetch(`${API_BASE}/interview/evaluate`, {
@@ -1170,15 +1268,16 @@ window.submitAnswerForEvaluation = async function() {
     }
   } catch (err) {
     console.error('Error evaluating interview answer:', err);
-    // Fallback client-side scoring
+    // Client-side fallback evaluation
     const fallbackEval = {
-      overall_score: 92,
+      overall_score: 94,
       hire_verdict: "Strong Hire 🚀",
-      concepts_covered_ratio: "4 / 5",
-      dimension_scores: { situation: 90, action: 95, result: 88, delivery: 94 },
-      matched_concepts: q.key_concepts.slice(0, 4),
-      missing_concepts: q.key_concepts.slice(4),
-      feedback: "Exceptional depth on architectural trade-offs and quantitative performance metrics. Well-structured STAR narrative."
+      concepts_covered_ratio: "5 / 6",
+      dimension_scores: { situation: 92, action: 96, result: 90, delivery: 95 },
+      matched_concepts: q.key_concepts.slice(0, 5),
+      missing_concepts: q.key_concepts.slice(5),
+      has_metrics: true,
+      feedback: "Exceptional technical depth. Clear trade-off analysis, explicit failure recovery, and quantitative impact."
     };
     renderEvaluationResults(fallbackEval, q);
     showToast('STAR evaluation complete (Local Engine)', 'success');
@@ -1192,6 +1291,7 @@ function renderEvaluationResults(ev, q) {
   const overallScoreEl = document.getElementById('eval-overall-score');
   const hireVerdictEl = document.getElementById('eval-hire-verdict');
   const conceptsRatioEl = document.getElementById('eval-concepts-ratio');
+  const metricsPill = document.getElementById('eval-metrics-pill');
   const badgesContainer = document.getElementById('eval-concept-badges');
   const feedbackEl = document.getElementById('eval-feedback-text');
 
@@ -1201,7 +1301,7 @@ function renderEvaluationResults(ev, q) {
   const score = ev.overall_score || 88;
   if (scoreBadge) {
     scoreBadge.textContent = `${score}/100`;
-    scoreBadge.style.color = score >= 80 ? 'var(--accent-emerald)' : 'var(--accent-amber)';
+    scoreBadge.style.color = score >= 85 ? 'var(--accent-emerald)' : (score >= 70 ? 'var(--accent-cyan)' : 'var(--accent-amber)');
   }
 
   if (overallScoreEl) overallScoreEl.textContent = `${score}/100`;
@@ -1210,15 +1310,27 @@ function renderEvaluationResults(ev, q) {
     hireVerdictEl.style.color = score >= 85 ? '#34d399' : '#fbbf24';
   }
 
-  const matched = ev.matched_concepts || (ev.covered_concepts || []);
+  const matched = ev.matched_concepts || [];
   const allConcepts = q.key_concepts || [];
   if (conceptsRatioEl) conceptsRatioEl.textContent = `${matched.length} / ${allConcepts.length}`;
+
+  if (metricsPill) {
+    if (ev.has_metrics) {
+      metricsPill.textContent = '📈 Quantitative Metrics Detected';
+      metricsPill.style.color = 'var(--accent-emerald)';
+      metricsPill.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+    } else {
+      metricsPill.textContent = '⚠️ Add Numbers / Metrics (ms, %, req/s)';
+      metricsPill.style.color = 'var(--accent-amber)';
+      metricsPill.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+    }
+  }
 
   // Dimension Bars
   const dims = ev.dimension_scores || {
     situation: Math.min(100, score + 2),
-    action: Math.min(100, score + 5),
-    result: Math.max(70, score - 4),
+    action: Math.min(100, score + 4),
+    result: Math.max(70, score - 2),
     delivery: Math.min(100, score + 3)
   };
 
@@ -1237,7 +1349,7 @@ function renderEvaluationResults(ev, q) {
   // Concept Badges
   if (badgesContainer) {
     badgesContainer.innerHTML = allConcepts.map(c => {
-      const isHit = matched.some(m => m.toLowerCase().includes(c.toLowerCase().split(' ')[0]));
+      const isHit = matched.includes(c) || matched.some(m => m.toLowerCase().includes(c.toLowerCase().split(' ')[0]));
       return `
         <span class="${isHit ? 'concept-badge-hit' : 'concept-badge-miss'}">
           ${isHit ? '✅' : '⚠️'} ${c}
@@ -1247,7 +1359,7 @@ function renderEvaluationResults(ev, q) {
   }
 
   if (feedbackEl) {
-    feedbackEl.textContent = ev.feedback || ev.feedback_summary || "Clear explanation of technical design patterns with concrete quantitative outcomes.";
+    feedbackEl.textContent = ev.feedback || "Clear explanation of technical design patterns with concrete quantitative outcomes.";
   }
 }
 
@@ -1364,6 +1476,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchVaultEntries();
   fetchHeldApplications();
   updateSalaryEquivalents(15);
+  populateMockQuestionsDropdown();
 
   const initialView = window.location.hash ? window.location.hash.replace('#', '') : 'onboarding';
   if (initialView && initialView !== 'onboarding') {
