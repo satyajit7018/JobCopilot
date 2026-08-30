@@ -678,17 +678,19 @@
           </div>
           <div class="hud-pill" id="interview-session-status" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399;">
             <span class="hud-dot live" style="background: #10b981;"></span>
-            <span>Studio Ready • 9 Master Drills Active</span>
+            <span>Studio Ready • 12 Multi-Role Drills Active</span>
           </div>
         </div>
 
-        <!-- Category Selector Pills -->
+        <!-- Category & Role Selector Pills -->
         <div class="filter-pills" style="margin-bottom: 1.25rem;">
-          <button class="filter-pill active" data-qcat="all" onclick="filterMockQuestions('all', this)">All Master Drills (9)</button>
-          <button class="filter-pill" data-qcat="System Design" onclick="filterMockQuestions('System Design', this)">🏗️ System Design &amp; Scale (4)</button>
-          <button class="filter-pill" data-qcat="Architecture &amp; Concurrency" onclick="filterMockQuestions('Architecture & Concurrency', this)">⚡ Concurrency &amp; Databases (2)</button>
-          <button class="filter-pill" data-qcat="Incident Response" onclick="filterMockQuestions('Incident Response', this)">🚨 Outages &amp; Chaos (1)</button>
-          <button class="filter-pill" data-qcat="STAR Leadership" onclick="filterMockQuestions('STAR Leadership', this)">💼 Executive STAR Leadership (2)</button>
+          <button class="filter-pill active" data-qcat="all" onclick="filterMockQuestions('all', this)">All Master Drills (12)</button>
+          <button class="filter-pill" data-qcat="Backend & Distributed Systems" onclick="filterMockQuestions('Backend & Distributed Systems', this)">⚙️ Backend &amp; Distributed (5)</button>
+          <button class="filter-pill" data-qcat="Frontend & Full-Stack" onclick="filterMockQuestions('Frontend & Full-Stack', this)">💻 Frontend &amp; Full-Stack (2)</button>
+          <button class="filter-pill" data-qcat="AI / ML & Data" onclick="filterMockQuestions('AI / ML & Data', this)">🤖 AI / ML &amp; Data (2)</button>
+          <button class="filter-pill" data-qcat="DevOps & SRE" onclick="filterMockQuestions('DevOps & SRE', this)">🛠️ DevOps &amp; SRE (1)</button>
+          <button class="filter-pill" data-qcat="Incident Response" onclick="filterMockQuestions('Incident Response', this)">🚨 Outages &amp; Incidents (1)</button>
+          <button class="filter-pill" data-qcat="STAR Leadership" onclick="filterMockQuestions('STAR Leadership', this)">💼 Executive STAR (2)</button>
         </div>
 
         <!-- Studio Grid Layout -->
@@ -1163,6 +1165,50 @@
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem;">
           <span style="font-size: 12.5px; color: var(--accent-emerald); font-weight: 600;">✓ PDF Resume Compiled</span>
           <button class="btn btn-primary btn-sm" id="btn-copy-active-outreach" onclick="copyActiveOutreach()">Copy Active Text</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== INTERVIEW INVITATION CELEBRATION & MOCK PROMPT MODAL ==================== -->
+    <div class="modal-overlay" id="interview-invite-modal">
+      <div class="modal-box" style="max-width: 640px; border-color: rgba(16, 185, 129, 0.6); box-shadow: 0 0 35px rgba(16, 185, 129, 0.25);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 24px;">🎉</span>
+            <div>
+              <h3 style="font-size: 17px; font-weight: 800; color: #34d399;">Interview Invitation Confirmed!</h3>
+              <span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">INBOUND PIPELINE MATCH</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="window.closeInterviewInviteModal()">✕</button>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 16px; font-weight: 700; color: var(--text-primary);" id="invite-modal-company">Stripe</span>
+            <span class="hud-pill" id="invite-modal-track" style="color: var(--accent-cyan);">Backend &amp; Distributed</span>
+          </div>
+          <div style="font-size: 13.5px; color: var(--text-secondary); margin-bottom: 10px;">
+            Role: <strong style="color: #ffffff;" id="invite-modal-role">Senior Distributed Systems Engineer</strong>
+          </div>
+          <p style="font-size: 12.5px; color: #cbd5e1; line-height: 1.5; margin: 0;">
+            A recruiter has invited you for an interview! We have automatically generated a customized AI Mock Interview drill with system design rubrics, company tech stacks, and STAR evaluation specifically for this position.
+          </p>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <button class="btn btn-primary" id="btn-launch-tailored-interview" onclick="window.launchTailoredInterviewFromModal()" style="width: 100%; background: linear-gradient(135deg, #10b981, #06b6d4); font-size: 14px; padding: 10px 16px;">
+            <span>🎙️ Practice Tailored Mock Interview Now</span>
+          </button>
+          
+          <div style="display: flex; gap: 8px; justify-content: space-between;">
+            <a href="#" target="_blank" id="invite-modal-meeting-link" class="btn btn-secondary btn-sm" style="display: none; align-items: center; gap: 6px; color: #34d399; text-decoration: none;">
+              <span>📹 Open Video Meeting</span>
+            </a>
+            <button class="btn btn-secondary btn-sm" onclick="window.closeInterviewInviteModal()" style="margin-left: auto;">
+              <span>Dismiss &amp; Practice Later</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

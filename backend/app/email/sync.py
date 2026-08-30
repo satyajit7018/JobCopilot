@@ -115,6 +115,8 @@ class EmailSyncEngine:
                     "type": "EMAIL_RECEIVED",
                     "intent": intent.value,
                     "company": associated_job.company if associated_job else sender,
+                    "role_title": associated_job.title if associated_job else "Software Engineer",
+                    "job_id": associated_job_id,
                     "subject": subject,
                     "scheduling_links": scheduling_links,
                     "updated_status": updated_status

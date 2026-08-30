@@ -516,6 +516,44 @@ async def evaluate_interview_answer(payload: InterviewEvalRequest):
     }
 
 
+class InterviewInvitationTriggerRequest(BaseModel):
+    company: str
+    role_title: str
+    job_id: Optional[str] = None
+    meeting_url: Optional[str] = None
+
+
+@router.post("/interview/notify-invitation")
+async def trigger_interview_invitation_notification(payload: InterviewInvitationTriggerRequest):
+    """Triggers an interview invitation alert and provides role-customized mock interview questions."""
+    from app.core.interview_studio import InterviewStudioEngine
+    from app.api.ws_gateway import ws_manager
+
+    dossier = InterviewStudioEngine.generate_company_dossier(payload.company, payload.role_title)
+    questions = InterviewStudioEngine.generate_mock_questions(role_title=payload.role_title, category=None)
+    track = InterviewStudioEngine.infer_role_track(payload.role_title)
+
+    # Broadcast over WebSocket if connected
+    await ws_manager.broadcast({
+        "type": "INTERVIEW_INVITATION_RECEIVED",
+        "company": payload.company,
+        "role_title": payload.role_title,
+        "job_id": payload.job_id,
+        "role_track": track,
+        "meeting_url": payload.meeting_url,
+        "dossier": dossier,
+        "suggested_questions": questions
+    })
+
+    return {
+        "status": "success",
+        "message": f"Interview invitation alert generated for {payload.company} - {payload.role_title}",
+        "role_track": track,
+        "dossier": dossier,
+        "questions_count": len(questions)
+    }
+
+
 # --- Milestone 7: Salary Negotiation & Equity Modeler ---
 
 class OfferEvalRequest(BaseModel):

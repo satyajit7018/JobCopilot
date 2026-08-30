@@ -217,11 +217,16 @@ function handleIncomingWebSocketMessage(msg) {
     openHITLModal(msg);
     fetchHeldApplications();
   } else if (msg.type === 'CALL_LOGGED' || msg.type === 'APPLICATION_RESUMED') {
-    fetchJobsList();
+  } else if (msg.type === 'INTERVIEW_INVITATION_RECEIVED' || (msg.type === 'EMAIL_RECEIVED' && msg.intent === 'INTERVIEW_INVITE')) {
+    const comp = msg.company || 'Target Company';
+    const role = msg.role_title || 'Software Engineer';
+    const link = msg.meeting_url || (msg.scheduling_links && msg.scheduling_links[0]);
+    showToast(`🎉 Interview Invitation from ${comp} for ${role}!`, 'success');
+    window.openInterviewInviteModal(comp, role, link);
     fetchFunnelMetrics();
-    fetchHeldApplications();
-  } else if (msg.type === 'EMAIL_DISCOVERED') {
-    showToast(`Inbound Recruiter Email: ${msg.subject} (${msg.intent})`, 'info');
+    fetchJobsList();
+  } else if (msg.type === 'EMAIL_DISCOVERED' || msg.type === 'EMAIL_RECEIVED') {
+    showToast(`Inbound Recruiter Email: ${msg.subject || msg.company} (${msg.intent || 'Received'})`, 'info');
     fetchFunnelMetrics();
     fetchJobsList();
   }
@@ -657,8 +662,14 @@ function renderJobCardHTML(job) {
 
       ${gmeetLink ? `
         <a href="${gmeetLink}" target="_blank" class="gmeet-btn">
-          <span>📹 Join Google Meet</span>
+          <span>📹 Join Interview Meeting</span>
         </a>
+      ` : ''}
+
+      ${job.status === 'INTERVIEW' ? `
+        <button class="btn btn-secondary btn-sm" onclick="window.launchTailoredInterviewForJob('${job.company.replace(/'/g, "\\'")}', '${job.title.replace(/'/g, "\\'")}')" style="margin-top: 6px; width: 100%; background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe; font-size: 11.5px; padding: 4px 8px; justify-content: center;">
+          <span>🎙️ Practice Tailored Mock Interview</span>
+        </button>
       ` : ''}
 
       <div class="job-card-actions">
@@ -961,9 +972,11 @@ function renderEmailRadar(emails) {
 // VIEW 5: AI Mock Interview Studio & Live Audio Visualizer
 // ==========================================================================
 const mockQuestionsBank = [
+  // --- Track: Backend & Distributed Systems ---
   {
     id: "q_sys_stripe_1",
     category: "System Design",
+    role_track: "Backend & Distributed Systems",
     company_tag: "Stripe",
     difficulty: "Hard",
     question: "How would you design a distributed payment ledger and idempotency engine that guarantees zero double-billing across network retries at 100,000 TPS?",
@@ -973,6 +986,7 @@ const mockQuestionsBank = [
   {
     id: "q_sys_uber_2",
     category: "System Design",
+    role_track: "Backend & Distributed Systems",
     company_tag: "Uber",
     difficulty: "Hard",
     question: "How would you design a high-throughput geospatial ingestion pipeline to track millions of concurrent driver locations and calculate nearest-driver dispatch in real-time?",
@@ -982,6 +996,7 @@ const mockQuestionsBank = [
   {
     id: "q_sys_netflix_3",
     category: "System Design",
+    role_track: "Backend & Distributed Systems",
     company_tag: "Netflix",
     difficulty: "Hard",
     question: "Design a global content delivery infrastructure and video transcoding pipeline capable of serving adaptive bitrate streaming to 200 million users during live events.",
@@ -989,17 +1004,9 @@ const mockQuestionsBank = [
     sample_star: "We needed to broadcast live events to 2M concurrent viewers without buffering. I built an automated transcoding pipeline using asynchronous worker clusters that segmented MP4 video into multi-bitrate HLS chunks uploaded to S3. We configured global Cloudflare CDN edge caching with proactive pre-fetching of video manifests. When regional CDN nodes failed, automated circuit breakers rerouted traffic, maintaining a 99.98% stream availability."
   },
   {
-    id: "q_sys_meta_4",
-    category: "System Design",
-    company_tag: "Meta",
-    difficulty: "Hard",
-    question: "How would you design a real-time social feed with personalized ranking for users with millions of followers (handling the celebrity fan-out problem)?",
-    key_concepts: ["Fan-out on Write vs Read", "Hybrid Feed Pipeline", "Redis Tiered Cache", "Graph Database (TAO)", "Ranking Model Inference", "Kafka Stream"],
-    sample_star: "In our social app, posting from verified creators with >1M followers overwhelmed our database fan-out queue. I redesigned the feed with a hybrid model: regular users used fan-out on write, while high-follower accounts used fan-out on read with lazy client-side feed merging. We cached personalized timelines in Redis Cluster and ranked posts with an async inference service, reducing timeline load times by 78%."
-  },
-  {
     id: "q_con_rate_5",
     category: "Architecture & Concurrency",
+    role_track: "Backend & Distributed Systems",
     company_tag: "Universal",
     difficulty: "Medium",
     question: "How would you implement a distributed rate limiter supporting sliding window counters across multiple microservice regions without clock drift vulnerabilities?",
@@ -1009,24 +1016,87 @@ const mockQuestionsBank = [
   {
     id: "q_con_db_6",
     category: "Architecture & Concurrency",
+    role_track: "Backend & Distributed Systems",
     company_tag: "Universal",
     difficulty: "Hard",
     question: "Under heavy concurrent database write contention, how do you diagnose and eliminate database connection pool exhaustion and deadlocks?",
     key_concepts: ["Optimistic Concurrency Control", "Connection Pool Sizing", "AsyncIO Event Loop", "Read Replicas & Sharding", "WAL Checkpoints"],
     sample_star: "During a flash sale, our primary PostgreSQL instance reached 100% connection pool exhaustion with rampant row-level deadlocks. I diagnosed lock contention using pg_stat_activity and reorganized transaction statements to acquire row locks in deterministic order. I replaced pessimistic locks with optimistic concurrency using version tokens, moved read traffic to read replicas with PgBouncer connection pooling, reducing CPU from 98% to 34%."
   },
+
+  // --- Track: Frontend & Full-Stack ---
+  {
+    id: "q_fe_rendering_10",
+    category: "Frontend Architecture",
+    role_track: "Frontend & Full-Stack",
+    company_tag: "Vercel / Meta",
+    difficulty: "Hard",
+    question: "How do you optimize Core Web Vitals (LCP, INP, CLS) and design a high-performance Next.js application with React Server Components (RSC) and streaming SSR?",
+    key_concepts: ["React Server Components (RSC)", "Streaming SSR / Suspense", "Core Web Vitals (LCP/INP/CLS)", "Code Splitting & Dynamic Imports", "Edge Cache Middleware"],
+    sample_star: "Our e-commerce checkout had poor Core Web Vitals with an LCP of 4.2s and CLS of 0.28. I migrated the frontend to Next.js with React Server Components, streaming heavy product catalog data via React Suspense boundaries. I replaced bulky third-party scripts with Web Workers via Partytown and optimized image priority loading with AVIF formatting. This slashed LCP to 1.1s, brought CLS to 0.02, and improved checkout conversion by 14%."
+  },
+  {
+    id: "q_fe_state_11",
+    category: "Frontend Architecture",
+    role_track: "Frontend & Full-Stack",
+    company_tag: "Figma / Linear",
+    difficulty: "Hard",
+    question: "In a real-time collaborative web application, how do you architect client-side state management, optimistic UI updates, and WebSocket event synchronization without UI stutter?",
+    key_concepts: ["Zustand / Redux Toolkit", "Optimistic UI Rollbacks", "WebSocket Multiplexing", "Selector Memoization", "Virtual DOM Diffing"],
+    sample_star: "In our collaborative project board, concurrent updates from multiple users caused re-render lag and out-of-order state overwrites. I implemented a normalized Zustand store with custom shallow selectors to prevent cascading re-renders. When a user drags a card, we apply an optimistic UI update immediately while streaming a patch over WebSockets. If the server rejects the edit, state is safely rolled back using inverse delta diffs."
+  },
+
+  // --- Track: AI / Machine Learning & Data ---
+  {
+    id: "q_ai_rag_12",
+    category: "AI / ML Architecture",
+    role_track: "AI / ML & Data",
+    company_tag: "OpenAI / Anthropic",
+    difficulty: "Hard",
+    question: "How would you architect an enterprise multi-modal RAG (Retrieval-Augmented Generation) system handling millions of technical documents with sub-second hybrid vector search?",
+    key_concepts: ["Hybrid Search (Dense + BM25)", "Cross-Encoder Re-Ranking", "Vector Database (Pinecone/pgvector)", "Prompt Caching & Guardrails", "P99 Embedding SLA"],
+    sample_star: "Our internal legal research tool suffered from hallucination and slow 4.5s retrieval across 500,000 PDF documents. I architected a hybrid retrieval pipeline combining dense vector embeddings with BM25 keyword matching via Reciprocal Rank Fusion (RRF). Retrieved chunks were passed through a lightweight Cohere cross-encoder re-ranker before LLM synthesis with semantic prompt caching. This cut retrieval latency to 380ms and boosted answer factual accuracy to 98.4%."
+  },
+  {
+    id: "q_ai_finetune_13",
+    category: "AI / ML Architecture",
+    role_track: "AI / ML & Data",
+    company_tag: "Scale AI",
+    difficulty: "Hard",
+    question: "When fine-tuning open-source LLMs (e.g. Llama-3/Mistral) for domain-specific automation, how do you prevent catastrophic forgetting and optimize GPU memory during training?",
+    key_concepts: ["LoRA / QLoRA PEFT", "FP8 / 4-bit Quantization", "FlashAttention-2", "KV-Cache Optimization", "Continuous Eval (MMLU/Ragas)"],
+    sample_star: "We needed to adapt Llama-3-70B for medical clinical note extraction on a cluster of 8x A100 GPUs. I implemented QLoRA parameter-efficient fine-tuning with 4-bit NormalFloat quantization and FlashAttention-2, reducing peak VRAM by 65%. To avoid catastrophic forgetting, I mixed in 15% general alignment data and validated checkpoints using an automated Ragas evaluation suite, achieving state-of-the-art accuracy with zero regression."
+  },
+
+  // --- Track: DevOps / SRE & Cloud Platform ---
+  {
+    id: "q_devops_k8s_14",
+    category: "DevOps & Cloud",
+    role_track: "DevOps & SRE",
+    company_tag: "AWS / Datadog",
+    difficulty: "Hard",
+    question: "How would you architect a zero-downtime, multi-region Kubernetes disaster recovery setup with automated GitOps deployments and under 30-second failover?",
+    key_concepts: ["ArgoCD GitOps", "Canary Deployment (Istio)", "Multi-Region Anycast DNS", "Terraform State Locking", "SLI/SLO Error Budget"],
+    sample_star: "A single-region AWS outage previously caused 45 minutes of downtime for our SaaS platform. I designed an active-active multi-region Kubernetes infrastructure managed through ArgoCD GitOps pipelines. We deployed Istio service meshes with automated progressive canary releases. Route53 health checks and Cloudflare Anycast automatically rerouted traffic across regions in 18 seconds during simulated cluster failover drills."
+  },
+
+  // --- Track: Incident Response & Outages ---
   {
     id: "q_inc_thundering_7",
     category: "Incident Response",
+    role_track: "Backend & Distributed Systems",
     company_tag: "Universal",
     difficulty: "Hard",
     question: "Describe an incident involving a cascading failure or cache stampede (thundering herd) that you investigated. How did you stabilize production and prevent recurrence?",
     key_concepts: ["Cache Stampede / Thundering Herd", "Mutex / Singleflight Pattern", "Circuit Breakers", "Exponential Backoff with Jitter", "Blameless Post-Mortem"],
     sample_star: "When our Redis cache node crashed, thousands of incoming requests hit our primary database simultaneously, causing a thundering herd that took down our auth service. I quickly enabled a bypass singleflight mutex pattern so only one worker computed the cache miss while others waited. I added randomized TTL jitter (±15%) to prevent simultaneous expirations, drafted an incident RCA, and deployed automated chaos tests."
   },
+
+  // --- Track: Executive STAR Leadership ---
   {
     id: "q_lead_conflict_8",
     category: "STAR Leadership",
+    role_track: "Engineering Leadership",
     company_tag: "FAANG",
     difficulty: "Medium",
     question: "Tell me about a high-stakes technical disagreement you had with a Principal Engineer or Manager regarding architecture. How did you navigate it to a successful outcome?",
@@ -1036,6 +1106,7 @@ const mockQuestionsBank = [
   {
     id: "q_lead_ambiguity_9",
     category: "STAR Leadership",
+    role_track: "Engineering Leadership",
     company_tag: "FAANG",
     difficulty: "Medium",
     question: "Describe a project where you had to deliver critical technical outcomes under tight deadlines with highly ambiguous or frequently shifting product requirements.",
@@ -1053,12 +1124,86 @@ let visualizerAnimFrame = null;
 let recordingSeconds = 0;
 let recordingTimerInterval = null;
 
+// ==========================================================================
+// Interview Invitation Notification & Celebration Modal Handlers
+// ==========================================================================
+window.openInterviewInviteModal = function(company, role, meetingUrl = null) {
+  const modal = document.getElementById('interview-invite-modal');
+  const compEl = document.getElementById('invite-modal-company');
+  const roleEl = document.getElementById('invite-modal-role');
+  const trackEl = document.getElementById('invite-modal-track');
+  const meetingEl = document.getElementById('invite-modal-meeting-link');
+
+  state.pendingInterviewInvite = { company, role, meetingUrl };
+
+  if (compEl) compEl.textContent = company || 'Target Company';
+  if (roleEl) roleEl.textContent = role || 'Software Engineer';
+  
+  // Track inference
+  let track = "Backend & Distributed";
+  const r = (role || "").toLowerCase();
+  if (r.includes('front') || r.includes('react') || r.includes('next') || r.includes('full')) track = "Frontend & Full-Stack";
+  else if (r.includes('ai') || r.includes('ml') || r.includes('data')) track = "AI / ML & Data";
+  else if (r.includes('devops') || r.includes('sre') || r.includes('cloud')) track = "DevOps & SRE";
+  
+  if (trackEl) trackEl.textContent = track;
+
+  if (meetingEl) {
+    if (meetingUrl) {
+      meetingEl.href = meetingUrl;
+      meetingEl.style.display = 'inline-flex';
+    } else {
+      meetingEl.style.display = 'none';
+    }
+  }
+
+  if (modal) modal.classList.add('active');
+};
+
+window.closeInterviewInviteModal = function() {
+  const modal = document.getElementById('interview-invite-modal');
+  if (modal) modal.classList.remove('active');
+};
+
+window.launchTailoredInterviewFromModal = function() {
+  const invite = state.pendingInterviewInvite || { company: 'Stripe', role: 'Senior Backend Engineer' };
+  window.closeInterviewInviteModal();
+  window.launchTailoredInterviewForJob(invite.company, invite.role);
+};
+
+window.launchTailoredInterviewForJob = function(company, role) {
+  window.switchTab('interview');
+
+  const compInput = document.getElementById('mock-company-name');
+  const roleInput = document.getElementById('mock-role-title');
+
+  if (compInput) compInput.value = company;
+  if (roleInput) roleInput.value = role;
+
+  // Filter questions for this role track
+  const r = (role || "").toLowerCase();
+  let targetTrack = "Backend & Distributed Systems";
+  if (r.includes('front') || r.includes('react') || r.includes('next') || r.includes('full')) targetTrack = "Frontend & Full-Stack";
+  else if (r.includes('ai') || r.includes('ml') || r.includes('data')) targetTrack = "AI / ML & Data";
+  else if (r.includes('devops') || r.includes('sre') || r.includes('cloud')) targetTrack = "DevOps & SRE";
+
+  const matchingQuestions = mockQuestionsBank.filter(q => q.role_track === targetTrack || q.company_tag.toLowerCase() === company.toLowerCase());
+  activeQuestionsList = matchingQuestions.length > 0 ? matchingQuestions : [...mockQuestionsBank];
+  currentMockIndex = 0;
+
+  populateMockQuestionsDropdown();
+  updateMockQuestionDisplay();
+  window.loadInterviewQuestions();
+
+  showToast(`🎯 Studio configured for ${company} — ${role}!`, 'success');
+};
+
 // Populate dropdown selector
 function populateMockQuestionsDropdown() {
   const dropdown = document.getElementById('mock-question-dropdown');
   if (!dropdown) return;
   dropdown.innerHTML = activeQuestionsList.map((q, idx) => `
-    <option value="${q.id}">[${q.company_tag || q.category}] ${q.question.substring(0, 75)}...</option>
+    <option value="${q.id}">[${q.company_tag || q.role_track || q.category}] ${q.question.substring(0, 75)}...</option>
   `).join('');
   if (activeQuestionsList[currentMockIndex]) {
     dropdown.value = activeQuestionsList[currentMockIndex].id;
@@ -1072,7 +1217,10 @@ window.filterMockQuestions = function(category, btn) {
   if (category === 'all') {
     activeQuestionsList = [...mockQuestionsBank];
   } else {
-    activeQuestionsList = mockQuestionsBank.filter(q => q.category.toLowerCase() === category.toLowerCase());
+    activeQuestionsList = mockQuestionsBank.filter(q => 
+      (q.category && q.category.toLowerCase() === category.toLowerCase()) || 
+      (q.role_track && q.role_track.toLowerCase() === category.toLowerCase())
+    );
   }
 
   currentMockIndex = 0;
@@ -1099,7 +1247,7 @@ function updateMockQuestionDisplay() {
   const dropdown = document.getElementById('mock-question-dropdown');
 
   if (catEl) catEl.textContent = q.category;
-  if (compEl) compEl.textContent = q.company_tag || 'Universal';
+  if (compEl) compEl.textContent = q.company_tag || q.role_track || 'Universal';
   if (diffEl) diffEl.textContent = q.difficulty;
   if (textEl) textEl.textContent = q.question;
   if (dropdown) dropdown.value = q.id;

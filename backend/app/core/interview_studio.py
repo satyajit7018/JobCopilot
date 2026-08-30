@@ -1,7 +1,7 @@
 """
-JobCopilot - Advanced Mock Interview Studio & Company Architecture Dossier Generator
+JobCopilot - Advanced Multi-Role Mock Interview Studio & Company Architecture Dossier Generator
 Generates high-frequency technical and STAR leadership questions based on real FAANG,
-Stripe, Meta, Netflix, and Uber interview loops, with multi-dimensional rubric scoring.
+Stripe, Meta, Netflix, and Uber interview loops, across Backend, Frontend, AI/ML, DevOps, Mobile, and PM roles.
 """
 
 import re
@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 
 
 class InterviewStudioEngine:
-    """Simulates realistic technical interviews and evaluates engineering depth."""
+    """Simulates realistic technical interviews and evaluates engineering depth across multiple roles."""
 
     COMPANY_PROFILES = {
         "stripe": {
@@ -74,10 +74,11 @@ class InterviewStudioEngine:
     }
 
     MASTER_QUESTIONS = [
-        # Category 1: System Design & Scalability
+        # --- Track: Backend & Distributed Systems ---
         {
             "id": "q_sys_stripe_1",
             "category": "System Design",
+            "role_track": "Backend & Distributed Systems",
             "company_tag": "Stripe",
             "difficulty": "Hard",
             "question": "How would you design a distributed payment ledger and idempotency engine that guarantees zero double-billing across network retries at 100,000 TPS?",
@@ -87,6 +88,7 @@ class InterviewStudioEngine:
         {
             "id": "q_sys_uber_2",
             "category": "System Design",
+            "role_track": "Backend & Distributed Systems",
             "company_tag": "Uber",
             "difficulty": "Hard",
             "question": "How would you design a high-throughput geospatial ingestion pipeline to track millions of concurrent driver locations and calculate nearest-driver dispatch in real-time?",
@@ -96,6 +98,7 @@ class InterviewStudioEngine:
         {
             "id": "q_sys_netflix_3",
             "category": "System Design",
+            "role_track": "Backend & Distributed Systems",
             "company_tag": "Netflix",
             "difficulty": "Hard",
             "question": "Design a global content delivery infrastructure and video transcoding pipeline capable of serving adaptive bitrate streaming to 200 million users during live events.",
@@ -103,19 +106,9 @@ class InterviewStudioEngine:
             "sample_star": "We needed to broadcast live events to 2M concurrent viewers without buffering. I built an automated transcoding pipeline using asynchronous worker clusters that segmented MP4 video into multi-bitrate HLS chunks uploaded to S3. We configured global Cloudflare CDN edge caching with proactive pre-fetching of video manifests. When regional CDN nodes failed, automated circuit breakers rerouted traffic, maintaining a 99.98% stream availability."
         },
         {
-            "id": "q_sys_meta_4",
-            "category": "System Design",
-            "company_tag": "Meta",
-            "difficulty": "Hard",
-            "question": "How would you design a real-time social feed with personalized ranking for users with millions of followers (handling the celebrity fan-out problem)?",
-            "key_concepts": ["Fan-out on Write vs Read", "Hybrid Feed Pipeline", "Redis Tiered Cache", "Graph Database (TAO)", "Ranking Model Inference", "Kafka Stream"],
-            "sample_star": "In our social app, posting from verified creators with >1M followers overwhelmed our database fan-out queue. I redesigned the feed with a hybrid model: regular users used fan-out on write, while high-follower accounts used fan-out on read with lazy client-side feed merging. We cached personalized timelines in Redis Cluster and ranked posts with an async inference service, reducing timeline load times by 78%."
-        },
-
-        # Category 2: Concurrency & Database Internals
-        {
             "id": "q_con_rate_5",
             "category": "Architecture & Concurrency",
+            "role_track": "Backend & Distributed Systems",
             "company_tag": "Universal",
             "difficulty": "Medium",
             "question": "How would you implement a distributed rate limiter supporting sliding window counters across multiple microservice regions without clock drift vulnerabilities?",
@@ -125,6 +118,7 @@ class InterviewStudioEngine:
         {
             "id": "q_con_db_6",
             "category": "Architecture & Concurrency",
+            "role_track": "Backend & Distributed Systems",
             "company_tag": "Universal",
             "difficulty": "Hard",
             "question": "Under heavy concurrent database write contention, how do you diagnose and eliminate database connection pool exhaustion and deadlocks?",
@@ -132,10 +126,67 @@ class InterviewStudioEngine:
             "sample_star": "During a flash sale, our primary PostgreSQL instance reached 100% connection pool exhaustion with rampant row-level deadlocks. I diagnosed lock contention using pg_stat_activity and reorganized transaction statements to acquire row locks in deterministic order. I replaced pessimistic locks with optimistic concurrency using version tokens, moved read traffic to read replicas with PgBouncer connection pooling, reducing CPU from 98% to 34%."
         },
 
-        # Category 3: Incident Response & Chaos Engineering
+        # --- Track: Frontend & Full-Stack Engineer ---
+        {
+            "id": "q_fe_rendering_10",
+            "category": "Frontend Architecture",
+            "role_track": "Frontend & Full-Stack",
+            "company_tag": "Vercel / Meta",
+            "difficulty": "Hard",
+            "question": "How do you optimize Core Web Vitals (LCP, INP, CLS) and design a high-performance Next.js application with React Server Components (RSC) and streaming SSR?",
+            "key_concepts": ["React Server Components (RSC)", "Streaming SSR / Suspense", "Core Web Vitals (LCP/INP/CLS)", "Code Splitting & Dynamic Imports", "Edge Cache Middleware"],
+            "sample_star": "Our e-commerce checkout had poor Core Web Vitals with an LCP of 4.2s and CLS of 0.28. I migrated the frontend to Next.js with React Server Components, streaming heavy product catalog data via React Suspense boundaries. I replaced bulky third-party scripts with Web Workers via Partytown and optimized image priority loading with AVIF formatting. This slashed LCP to 1.1s, brought CLS to 0.02, and improved checkout conversion by 14%."
+        },
+        {
+            "id": "q_fe_state_11",
+            "category": "Frontend Architecture",
+            "role_track": "Frontend & Full-Stack",
+            "company_tag": "Figma / Linear",
+            "difficulty": "Hard",
+            "question": "In a real-time collaborative web application, how do you architect client-side state management, optimistic UI updates, and WebSocket event synchronization without UI stutter?",
+            "key_concepts": ["Zustand / Redux Toolkit", "Optimistic UI Rollbacks", "WebSocket Multiplexing", "Selector Memoization", "Virtual DOM Diffing"],
+            "sample_star": "In our collaborative project board, concurrent updates from multiple users caused re-render lag and out-of-order state overwrites. I implemented a normalized Zustand store with custom shallow selectors to prevent cascading re-renders. When a user drags a card, we apply an optimistic UI update immediately while streaming a patch over WebSockets. If the server rejects the edit, state is safely rolled back using inverse delta diffs."
+        },
+
+        # --- Track: AI / Machine Learning & Data ---
+        {
+            "id": "q_ai_rag_12",
+            "category": "AI / ML Architecture",
+            "role_track": "AI / ML & Data",
+            "company_tag": "OpenAI / Anthropic",
+            "difficulty": "Hard",
+            "question": "How would you architect an enterprise multi-modal RAG (Retrieval-Augmented Generation) system handling millions of technical documents with sub-second hybrid vector search?",
+            "key_concepts": ["Hybrid Search (Dense + BM25)", "Cross-Encoder Re-Ranking", "Vector Database (Pinecone/pgvector)", "Prompt Caching & Guardrails", "P99 Embedding SLA"],
+            "sample_star": "Our internal legal research tool suffered from hallucination and slow 4.5s retrieval across 500,000 PDF documents. I architected a hybrid retrieval pipeline combining dense vector embeddings with BM25 keyword matching via Reciprocal Rank Fusion (RRF). Retrieved chunks were passed through a lightweight Cohere cross-encoder re-ranker before LLM synthesis with semantic prompt caching. This cut retrieval latency to 380ms and boosted answer factual accuracy to 98.4%."
+        },
+        {
+            "id": "q_ai_finetune_13",
+            "category": "AI / ML Architecture",
+            "role_track": "AI / ML & Data",
+            "company_tag": "Scale AI",
+            "difficulty": "Hard",
+            "question": "When fine-tuning open-source LLMs (e.g. Llama-3/Mistral) for domain-specific automation, how do you prevent catastrophic forgetting and optimize GPU memory during training?",
+            "key_concepts": ["LoRA / QLoRA PEFT", "FP8 / 4-bit Quantization", "FlashAttention-2", "KV-Cache Optimization", "Continuous Eval (MMLU/Ragas)"],
+            "sample_star": "We needed to adapt Llama-3-70B for medical clinical note extraction on a cluster of 8x A100 GPUs. I implemented QLoRA parameter-efficient fine-tuning with 4-bit NormalFloat quantization and FlashAttention-2, reducing peak VRAM by 65%. To avoid catastrophic forgetting, I mixed in 15% general alignment data and validated checkpoints using an automated Ragas evaluation suite, achieving state-of-the-art accuracy with zero regression."
+        },
+
+        # --- Track: DevOps / SRE & Cloud Platform ---
+        {
+            "id": "q_devops_k8s_14",
+            "category": "DevOps & Cloud",
+            "role_track": "DevOps & SRE",
+            "company_tag": "AWS / Datadog",
+            "difficulty": "Hard",
+            "question": "How would you architect a zero-downtime, multi-region Kubernetes disaster recovery setup with automated GitOps deployments and under 30-second failover?",
+            "key_concepts": ["ArgoCD GitOps", "Canary Deployment (Istio)", "Multi-Region Anycast DNS", "Terraform State Locking", "SLI/SLO Error Budget"],
+            "sample_star": "A single-region AWS outage previously caused 45 minutes of downtime for our SaaS platform. I designed an active-active multi-region Kubernetes infrastructure managed through ArgoCD GitOps pipelines. We deployed Istio service meshes with automated progressive canary releases. Route53 health checks and Cloudflare Anycast automatically rerouted traffic across regions in 18 seconds during simulated cluster failover drills."
+        },
+
+        # --- Track: Incident Response & Post-Mortems ---
         {
             "id": "q_inc_thundering_7",
             "category": "Incident Response",
+            "role_track": "Backend & Distributed Systems",
             "company_tag": "Universal",
             "difficulty": "Hard",
             "question": "Describe an incident involving a cascading failure or cache stampede (thundering herd) that you investigated. How did you stabilize production and prevent recurrence?",
@@ -143,10 +194,11 @@ class InterviewStudioEngine:
             "sample_star": "When our Redis cache node crashed, thousands of incoming requests hit our primary database simultaneously, causing a thundering herd that took down our auth service. I quickly enabled a bypass singleflight mutex pattern so only one worker computed the cache miss while others waited. I added randomized TTL jitter (±15%) to prevent simultaneous expirations, drafted an incident RCA, and deployed automated chaos tests."
         },
 
-        # Category 4: Executive STAR Leadership & Behavioral
+        # --- Track: Executive STAR Leadership & Behavioral ---
         {
             "id": "q_lead_conflict_8",
             "category": "STAR Leadership",
+            "role_track": "Engineering Leadership",
             "company_tag": "FAANG",
             "difficulty": "Medium",
             "question": "Tell me about a high-stakes technical disagreement you had with a Principal Engineer or Manager regarding architecture. How did you navigate it to a successful outcome?",
@@ -156,6 +208,7 @@ class InterviewStudioEngine:
         {
             "id": "q_lead_ambiguity_9",
             "category": "STAR Leadership",
+            "role_track": "Engineering Leadership",
             "company_tag": "FAANG",
             "difficulty": "Medium",
             "question": "Describe a project where you had to deliver critical technical outcomes under tight deadlines with highly ambiguous or frequently shifting product requirements.",
@@ -165,17 +218,37 @@ class InterviewStudioEngine:
     ]
 
     @classmethod
+    def infer_role_track(cls, role_title: str) -> str:
+        """Infers the engineering track based on the job role title."""
+        r = (role_title or "").lower()
+        if any(w in r for w in ["front", "react", "next", "ui", "full stack", "fullstack", "web", "vue"]):
+            return "Frontend & Full-Stack"
+        elif any(w in r for w in ["ai", "ml", "machine learning", "data", "deep learning", "nlp", "llm", "vision"]):
+            return "AI / ML & Data"
+        elif any(w in r for w in ["devops", "sre", "reliability", "infrastructure", "cloud", "platform", "kubernetes"]):
+            return "DevOps & SRE"
+        elif any(w in r for w in ["mobile", "ios", "android", "swift", "kotlin", "flutter"]):
+            return "Mobile Engineering"
+        elif any(w in r for w in ["product manager", "pm", "technical pm", "growth pm"]):
+            return "Product Management"
+        elif any(w in r for w in ["lead", "manager", "director", "vp", "architect", "principal"]):
+            return "Engineering Leadership"
+        return "Backend & Distributed Systems"
+
+    @classmethod
     def generate_company_dossier(cls, company_name: str, role_title: str) -> Dict[str, Any]:
-        """Generates tailored architecture insights, tech stack, and round breakdowns for any company."""
+        """Generates tailored architecture insights, tech stack, and round breakdowns for any company and role."""
         comp_clean = company_name.strip()
         comp_key = comp_clean.lower()
         role_clean = role_title.strip()
+        track = cls.infer_role_track(role_clean)
 
         profile = cls.COMPANY_PROFILES.get(comp_key)
         if profile:
             return {
                 "company": comp_clean,
                 "role": role_clean,
+                "role_track": track,
                 "likely_tech_stack": profile["likely_tech_stack"],
                 "engineering_focus": profile["engineering_focus"],
                 "common_interview_rounds": profile["common_interview_rounds"],
@@ -186,16 +259,17 @@ class InterviewStudioEngine:
         return {
             "company": comp_clean,
             "role": role_clean,
+            "role_track": track,
             "likely_tech_stack": ["Python / Go / TypeScript", "FastAPI / gRPC / Next.js", "PostgreSQL / DynamoDB", "Redis Cluster", "Kafka / SQS", "Docker & Kubernetes", "AWS / GCP"],
-            "engineering_focus": f"Scalable distributed systems, high-throughput microservices, sub-100ms API latency, and bulletproof reliability tailored for {comp_clean}'s core domain.",
+            "engineering_focus": f"Scalable distributed systems, high-throughput microservices, sub-100ms API latency, and bulletproof reliability tailored for {comp_clean}'s core domain in {track}.",
             "common_interview_rounds": [
                 "Round 1: 30-min Recruiter Screen & High-Level Experience Overview",
-                "Round 2: 60-min Data Structures, Concurrency & Problem Solving",
-                "Round 3: 60-min Distributed System Design & Architectural Scalability",
+                f"Round 2: 60-min Deep Dive Coding & Technical Problem Solving ({track})",
+                f"Round 3: 60-min Architectural Design & Scalability for {comp_clean}",
                 "Round 4: 45-min Engineering Leadership, Conflict Resolution & STAR Behavioral"
             ],
             "key_preparation_tips": [
-                f"Prepare concrete quantitative examples: emphasize latency reductions, throughput numbers (RPS/TPS), and system reliability.",
+                f"Prepare concrete quantitative examples: emphasize latency reductions, throughput numbers (RPS/TPS), and system reliability in {track}.",
                 f"Deeply understand {comp_clean}'s core business model and the primary engineering bottlenecks in their architecture.",
                 "Structure all responses using the STAR method: Situation (20%), Task (10%), Action (50%), Result (20%)."
             ]
@@ -209,9 +283,9 @@ class InterviewStudioEngine:
         seniority: str = "Senior",
         category: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Returns tailored questions or master questions bank based on category."""
+        """Returns tailored questions or master questions bank based on category or inferred role."""
         if category and category.lower() != "all":
-            filtered = [q for q in cls.MASTER_QUESTIONS if q["category"].lower() == category.lower()]
+            filtered = [q for q in cls.MASTER_QUESTIONS if q["category"].lower() == category.lower() or q.get("role_track", "").lower() == category.lower()]
             if filtered:
                 return filtered
         elif category and category.lower() == "all":
@@ -226,6 +300,7 @@ class InterviewStudioEngine:
                 {
                     "id": "q_sys_1",
                     "category": "System Design",
+                    "role_track": "Backend & Distributed Systems",
                     "question": "How would you design a real-time event streaming and notification pipeline handling 50,000 requests per second with at-least-once delivery guarantees?",
                     "key_concepts": ["Message Broker (Kafka/RabbitMQ)", "Idempotency Keys", "Consumer Group Partitioning", "Dead Letter Queues (DLQ)", "P99 Latency SLA"],
                     "difficulty": "Hard"
@@ -233,6 +308,7 @@ class InterviewStudioEngine:
                 {
                     "id": "q_tech_2",
                     "category": "Architecture & Concurrency",
+                    "role_track": "Backend & Distributed Systems",
                     "question": f"In {top_skill} and {sec_skill}, how do you manage race conditions, connection pooling, and horizontal scaling under heavy database write contention?",
                     "key_concepts": ["Optimistic vs Pessimistic Locking", "Connection Pool Sizing", "AsyncIO / Event Loop", "Read Replicas & Sharding"],
                     "difficulty": "Medium"
@@ -240,11 +316,18 @@ class InterviewStudioEngine:
                 {
                     "id": "q_beh_3",
                     "category": "Engineering Leadership",
+                    "role_track": "Engineering Leadership",
                     "question": "Describe a situation where a critical production outage occurred or a technical decision caused a bottleneck. How did you diagnose, resolve, and prevent recurrence?",
                     "key_concepts": ["Root Cause Analysis (RCA)", "Observability / Metrics", "Zero-Downtime Rollback", "Blameless Post-Mortem"],
                     "difficulty": "Medium"
                 }
             ]
+
+        # Filter by role title inference if role_title is specific
+        track = cls.infer_role_track(role_title)
+        role_questions = [q for q in cls.MASTER_QUESTIONS if q.get("role_track") == track]
+        if role_questions and len(role_questions) >= 2:
+            return role_questions + [cls.MASTER_QUESTIONS[-2], cls.MASTER_QUESTIONS[-1]]
 
         return cls.MASTER_QUESTIONS
 
@@ -292,9 +375,9 @@ class InterviewStudioEngine:
         coverage_ratio = len(covered) / max(len(concepts), 1)
 
         # Calculate dimension scores
-        situation_score = min(100, int(60 + (25 if any(w in text_lower for w in ["problem", "outage", "challenge", "spike", "legacy", "bottleneck", "needed"]) else 0) + (15 if len(text) > 80 else 0)))
-        action_score = min(100, int(50 + (coverage_ratio * 40) + (10 if any(w in text_lower for w in ["architected", "built", "implemented", "designed", "introduced", "configured", "partition", "use"]) else 0)))
-        result_score = min(100, int(50 + (30 if has_metrics else 10) + (20 if any(w in text_lower for w in ["reduced", "improved", "eliminated", "scaled", "achieved", "delivered", "ensure", "tracking"]) else 0)))
+        situation_score = min(100, int(60 + (25 if any(w in text_lower for w in ["problem", "outage", "challenge", "spike", "legacy", "bottleneck", "needed", "had poor", "suffered"]) else 0) + (15 if len(text) > 80 else 0)))
+        action_score = min(100, int(50 + (coverage_ratio * 40) + (10 if any(w in text_lower for w in ["architected", "built", "implemented", "designed", "introduced", "configured", "partition", "use", "migrated"]) else 0)))
+        result_score = min(100, int(50 + (30 if has_metrics else 10) + (20 if any(w in text_lower for w in ["reduced", "improved", "eliminated", "scaled", "achieved", "delivered", "ensure", "tracking", "slashed", "boosted"]) else 0)))
         delivery_score = min(100, int(70 + (20 if 40 <= len(text.split()) <= 250 else 10) + (10 if not any(w in text_lower for w in ["um", "uh", "maybe", "i guess"]) else 0)))
 
         overall_score = max(int((situation_score * 0.25) + (action_score * 0.35) + (result_score * 0.25) + (delivery_score * 0.15)), int(50 + (coverage_ratio * 45)))
