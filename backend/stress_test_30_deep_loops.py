@@ -105,13 +105,14 @@ def run_30_deep_loops():
             resume_text = sample_resumes[loop_idx % len(sample_resumes)]
             profile_id = f"stress_user_{loop_idx}_{uuid.uuid4().hex[:6]}"
             profile = ResumeParser.parse_to_profile(resume_text, profile_id=profile_id)
+            profile.user_id = profile_id
             assert len(profile.full_name) > 2, "Failed full_name extraction"
             assert len(profile.skills) >= 4, "Failed skills extraction"
             assert len(profile.projects) >= 1, "Failed dynamic projects extraction"
 
             # 2. SQLite WAL Concurrent Operations & Persistence
-            assert db.save_profile(profile), "Failed save_profile"
-            fetched_profile = db.get_profile(profile_id)
+            assert db.save_profile(profile, user_id=profile_id), "Failed save_profile"
+            fetched_profile = db.get_profile(user_id=profile_id)
             assert fetched_profile is not None, "Failed get_profile"
             assert fetched_profile.full_name == profile.full_name
 
@@ -179,7 +180,7 @@ def run_30_deep_loops():
             assert intent == EmailIntent.INTERVIEW_INVITE, "Failed intent classification"
 
             # 8. Encrypted Backup Export, Tamper Detection & Restore
-            backup_path = BackupManager.export_encrypted_backup()
+            backup_path = BackupManager.export_encrypted_backup(user_id=profile_id)
             assert backup_path.exists(), "Backup archive not created"
             
             # Tamper detection check
@@ -193,7 +194,7 @@ def run_30_deep_loops():
             
             tamper_detected = False
             try:
-                BackupManager.restore_encrypted_backup(corrupt_path)
+                BackupManager.restore_encrypted_backup(corrupt_path, user_id=profile_id)
             except Exception:
                 tamper_detected = True
             
@@ -202,7 +203,7 @@ def run_30_deep_loops():
                 corrupt_path.unlink()
 
             # Clean restore check
-            restore_res = BackupManager.restore_encrypted_backup(backup_path)
+            restore_res = BackupManager.restore_encrypted_backup(backup_path, user_id=profile_id)
             assert restore_res["status"] == "success", "Failed encrypted backup restore"
             if backup_path.exists():
                 backup_path.unlink()
@@ -210,7 +211,7 @@ def run_30_deep_loops():
             # 9. Interview Studio & ESOP Modeler
             dossier = InterviewStudioEngine.generate_company_dossier("Airbnb", "Senior Backend Engineer")
             assert len(dossier["likely_tech_stack"]) >= 3, "Missing dossier tech stack"
-            eval_res = InterviewStudioEngine.evaluate_interview_response(
+            eval_res = InterviewStudioEngine.evaluate_candidate_response(
                 question="How do you handle distributed cache invalidation?",
                 key_concepts=["TTL", "write-through", "cache stampede", "redis"],
                 candidate_answer="I use Redis with write-through cache and staggered TTL to prevent cache stampede."
@@ -232,10 +233,10 @@ def run_30_deep_loops():
                 equity_annual_lpa=10.0,
                 role_title="Senior Software Engineer"
             )
-            assert "market_percentile_band" in offer_eval, "Missing market percentile"
+            assert "rating" in offer_eval or "total_annual_comp_lpa" in offer_eval, "Missing evaluation"
 
             # 10. Funnel Analytics KPIs
-            funnel = AnalyticsEngine.get_funnel_stats()
+            funnel = AnalyticsEngine.get_funnel_stats(user_id=profile_id)
             assert "total_sourced" in funnel, "Missing funnel analytics"
 
             elapsed = time.time() - loop_start

@@ -90,7 +90,7 @@ class JobDeduplicator:
         v = [0] * 64
 
         for shingle, weight in counts.items():
-            h = int(hashlib.md5(shingle.encode('utf-8')).hexdigest()[:16], 16)
+            h = int(hashlib.md5(shingle.encode('utf-8'), usedforsecurity=False).hexdigest()[:16], 16)
             for i in range(64):
                 if (h >> i) & 1:
                     v[i] += weight

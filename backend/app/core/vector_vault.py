@@ -178,9 +178,14 @@ class KnowledgeVault:
     ) -> Tuple[Optional[str], float, Optional[VaultEntry]]:
         """Queries the Knowledge Vault using deterministic slot resolution and hybrid search."""
         target_user = user_id or (profile.user_id if profile else "system_baseline")
-        entries = self._get_entries(user_id=target_user)
-        if not entries and target_user != "system_baseline":
-            entries = self._get_entries(user_id="system_baseline")
+        
+        user_entries = self._get_entries(user_id=target_user) if target_user != "system_baseline" else []
+        baseline_entries = self._get_entries(user_id="system_baseline")
+        
+        # User overrides take precedence over universal system baselines
+        user_keys = {e.slot_key for e in user_entries if e.slot_key}
+        entries = list(user_entries) + [b for b in baseline_entries if b.slot_key not in user_keys]
+        
         if not entries:
             return None, 0.0, None
 

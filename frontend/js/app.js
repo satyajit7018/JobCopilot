@@ -406,36 +406,36 @@ async function renderMultiResumeWorkshop() {
       <div class="multi-resume-card">
         <div class="multi-resume-card-header">
           <div>
-            <div style="font-weight: 700; font-size: 14.5px; color: var(--accent-cyan);">${role}</div>
+            <div style="font-weight: 700; font-size: 14.5px; color: var(--accent-cyan);">${escapeHTML(role)}</div>
             <div style="font-size: 11px; color: var(--text-muted);">ATS Tailored Variant</div>
           </div>
-          <span class="match-ring-badge match-high">${r.match_strength || '95%'} Match</span>
+          <span class="match-ring-badge match-high">${escapeHTML(r.match_strength || '95%')} Match</span>
         </div>
 
         <div style="margin-bottom: 0.75rem;">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Top Weighted Keywords</div>
           <div>
-            ${(r.tailored_skills || []).slice(0, 6).map(k => `<span class="keyword-badge">${k}</span>`).join('')}
+            ${(r.tailored_skills || []).slice(0, 6).map(k => `<span class="keyword-badge">${escapeHTML(k)}</span>`).join('')}
           </div>
         </div>
 
         <div style="margin-bottom: 0.75rem;">
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Promoted Projects</div>
           <div style="font-size: 12px; color: #e2e8f0; font-weight: 500;">
-            ${(r.reordered_projects || []).slice(0, 2).map(p => `• ${p}`).join('<br>')}
+            ${(r.reordered_projects || []).slice(0, 2).map(p => `• ${escapeHTML(p)}`).join('<br>')}
           </div>
         </div>
 
         <div>
           <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">Recommended Impact Bullets</div>
           <ul style="font-size: 11.5px; color: var(--text-secondary); padding-left: 14px; line-height: 1.4; margin: 0;">
-            ${(r.recommended_bullets || []).slice(0, 2).map(b => `<li>${b}</li>`).join('')}
+            ${(r.recommended_bullets || []).slice(0, 2).map(b => `<li>${escapeHTML(b)}</li>`).join('')}
           </ul>
         </div>
       </div>
     `).join('');
   } catch (err) {
-    els.multiResumeWorkshopContainer.innerHTML = `<p style="color: var(--accent-rose); font-size: 12px;">Failed to compile resumes: ${err.message}</p>`;
+    els.multiResumeWorkshopContainer.innerHTML = `<p style="color: var(--accent-rose); font-size: 12px;">Failed to compile resumes: ${escapeHTML(err.message)}</p>`;
   }
 }
 
@@ -832,16 +832,16 @@ window.openHeldAppsModal = function() {
   els.heldAppsList.innerHTML = state.heldJobs.map(h => `
     <div class="held-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-        <span style="font-weight: 700; font-size: 14px; color: var(--accent-cyan);">${h.company} — ${h.role_title}</span>
+        <span style="font-weight: 700; font-size: 14px; color: var(--accent-cyan);">${escapeHTML(h.company || '')} — ${escapeHTML(h.role_title || '')}</span>
         <span class="badge badge-critical" style="font-size: 10px;">Held Question</span>
       </div>
-      <div style="font-size: 13px; font-weight: 600; color: #f1f5f9; margin-bottom: 8px;">"${h.question_text}"</div>
+      <div style="font-size: 13px; font-weight: 600; color: #f1f5f9; margin-bottom: 8px;">"${escapeHTML(h.question_text || '')}"</div>
       <div class="form-group" style="margin-bottom: 8px;">
         <label class="form-label" style="font-size: 11px;">Authoritative Answer (AI suggested draft pre-filled):</label>
-        <textarea id="held-ans-${h.event_id}" class="form-textarea" rows="2">${h.ai_suggested_draft || ''}</textarea>
+        <textarea id="held-ans-${escapeHTML(h.event_id || '')}" class="form-textarea" rows="2">${escapeHTML(h.ai_suggested_draft || '')}</textarea>
       </div>
       <div style="display: flex; justify-content: flex-end;">
-        <button class="btn btn-primary btn-sm" onclick="resolveHeldApplication('${h.event_id}')">
+        <button class="btn btn-primary btn-sm" onclick="resolveHeldApplication('${escapeHTML(h.event_id || '')}')">
           ✓ Approve &amp; Submit Application
         </button>
       </div>
@@ -904,12 +904,12 @@ function renderVaultEntries(entries) {
   els.vaultEntriesList.innerHTML = entries.map(e => `
     <div style="background: rgba(10, 14, 24, 0.6); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 12px 14px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-        <span class="badge badge-info" style="font-size: 10px;">${e.slot_type}</span>
-        <span style="font-size: 11px; color: var(--text-muted);">Used ${e.usage_count}x</span>
+        <span class="badge badge-info" style="font-size: 10px;">${escapeHTML(e.slot_type || '')}</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Used ${escapeHTML(String(e.usage_count || 0))}x</span>
       </div>
-      <div style="font-weight: 600; font-size: 13px; color: #f1f5f9; margin-bottom: 4px;">${e.question_pattern}</div>
+      <div style="font-weight: 600; font-size: 13px; color: #f1f5f9; margin-bottom: 4px;">${escapeHTML(e.question_pattern || '')}</div>
       <div style="font-size: 12px; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px;">
-        ${e.answer_template}
+        ${escapeHTML(e.answer_template || '')}
       </div>
     </div>
   `).join('');
@@ -935,9 +935,9 @@ window.simulateVaultMatch = async function() {
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); padding: 12px;">
           <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
             <span style="font-weight: 700; color: #34d399; font-size: 13px;">Match Found (${Math.round((data.confidence || 0.95) * 100)}% Confidence)</span>
-            <span class="badge badge-low">${data.slot_key || 'CUSTOM'}</span>
+            <span class="badge badge-low">${escapeHTML(data.slot_key || 'CUSTOM')}</span>
           </div>
-          <div style="font-size: 13px; color: #f1f5f9;">${data.answer}</div>
+          <div style="font-size: 13px; color: #f1f5f9;">${escapeHTML(data.answer || '')}</div>
         </div>
       `;
     }
@@ -975,19 +975,20 @@ function renderEmailRadar(emails) {
     if (m.intent === 'REJECTION') badgeClass = 'badge-critical';
 
     const matchLink = (m.body_text || '').match(/(https?:\/\/(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com|calendly\.com)[^\s]+)/i);
-    const meetingUrl = matchLink ? matchLink[1] : null;
+    const rawMeetingUrl = matchLink ? matchLink[1] : null;
+    const meetingUrl = rawMeetingUrl ? sanitizeUrl(rawMeetingUrl) : null;
 
     return `
       <div class="glass-card" style="margin-bottom: 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
           <div>
-            <span style="font-weight: 700; font-size: 14px; color: #f1f5f9;">${m.sender}</span>
-            <span style="font-size: 11px; color: var(--text-muted); margin-left: 8px;">${m.received_at || 'Just now'}</span>
+            <span style="font-weight: 700; font-size: 14px; color: #f1f5f9;">${escapeHTML(m.sender || '')}</span>
+            <span style="font-size: 11px; color: var(--text-muted); margin-left: 8px;">${escapeHTML(m.received_at || 'Just now')}</span>
           </div>
-          <span class="badge ${badgeClass}">${m.intent}</span>
+          <span class="badge ${badgeClass}">${escapeHTML(m.intent || 'EMAIL')}</span>
         </div>
-        <div style="font-weight: 600; font-size: 13px; color: var(--accent-cyan); margin-bottom: 6px;">${m.subject}</div>
-        <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.4;">${m.body_text}</div>
+        <div style="font-weight: 600; font-size: 13px; color: var(--accent-cyan); margin-bottom: 6px;">${escapeHTML(m.subject || '')}</div>
+        <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.4;">${escapeHTML(m.body_text || '')}</div>
 
         ${meetingUrl ? `
           <div style="margin-top: 10px;">
