@@ -9,9 +9,9 @@ import json
 import base64
 from typing import Dict, Optional, Any
 from pathlib import Path
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # type: ignore
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC  # type: ignore
+from cryptography.hazmat.primitives import hashes  # type: ignore
 from app.core.config import VAULT_ENC_PATH, APP_DIR
 
 try:
