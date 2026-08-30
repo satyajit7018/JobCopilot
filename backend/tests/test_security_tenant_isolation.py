@@ -13,6 +13,7 @@ Validates all 18 hardening findings:
 """
 
 import os
+import uuid
 import pytest
 from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
@@ -231,10 +232,10 @@ def test_argon2id_password_hashing_and_auto_upgrade():
 
 def test_database_backed_rate_limiter():
     """Rate Limiting: Daily apply usage persists in database."""
-    test_user = "usr_rate_limit_test"
+    test_user = f"usr_rate_limit_test_{uuid.uuid4().hex[:8]}"
     db.create_user(User(
         user_id=test_user,
-        email="ratelimit@jobcopilot.test",
+        email=f"{test_user}@jobcopilot.test",
         password_hash="test",
         full_name="Rate Limit Test",
         role=UserRole.FREE,

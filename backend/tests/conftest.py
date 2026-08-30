@@ -44,7 +44,7 @@ def _create_authenticated_client(user_id: str, email: str, role: str = "PRO") ->
 @pytest.fixture(scope="session")
 def auth_client() -> TestClient:
     """Pre-authenticated TestClient carrying valid Bearer JWT access token."""
-    return _create_authenticated_client("usr_test_tenant_a", "test_a@jobcopilot.test", "PRO")
+    return _create_authenticated_client("usr_test_tenant_a", "test_candidate_a@jobcopilot.test", "PRO")
 
 
 @pytest.fixture(scope="session")
