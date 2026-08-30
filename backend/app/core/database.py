@@ -29,13 +29,16 @@ class DatabaseManager(DatabaseAdapter):
         self._run_migrations()
 
     def get_connection(self) -> sqlite3.Connection:
-        """Returns a thread-safe SQLite connection with WAL pragmas."""
+        """Returns a high-performance thread-safe SQLite connection with WAL pragmas."""
         conn = sqlite3.connect(str(self.db_path), timeout=10.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute("PRAGMA synchronous = NORMAL;")
         conn.execute("PRAGMA foreign_keys = ON;")
         conn.execute("PRAGMA busy_timeout = 5000;")
+        conn.execute("PRAGMA cache_size = -64000;")
+        conn.execute("PRAGMA mmap_size = 268435456;")
+        conn.execute("PRAGMA temp_store = MEMORY;")
         return conn
 
     def _init_pragmas(self):
@@ -43,6 +46,9 @@ class DatabaseManager(DatabaseAdapter):
             conn.execute("PRAGMA journal_mode = WAL;")
             conn.execute("PRAGMA synchronous = NORMAL;")
             conn.execute("PRAGMA busy_timeout = 5000;")
+            conn.execute("PRAGMA cache_size = -64000;")
+            conn.execute("PRAGMA mmap_size = 268435456;")
+            conn.execute("PRAGMA temp_store = MEMORY;")
             conn.commit()
 
     def _ensure_columns(self, conn: sqlite3.Connection, table_name: str, required_columns: Dict[str, str]):

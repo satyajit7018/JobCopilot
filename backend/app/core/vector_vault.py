@@ -13,11 +13,22 @@ from app.core.database import db
 
 
 class KnowledgeVault:
-    """Self-learning Knowledge Vault storing and resolving recruiter Q&As."""
+    """Self-learning Knowledge Vault storing and resolving recruiter Q&As with in-memory caching."""
 
     def __init__(self):
         self.matcher = SlotMatcher()
+        self._cached_entries: Optional[List[VaultEntry]] = None
         self._ensure_baseline_entries()
+
+    def _get_entries(self) -> List[VaultEntry]:
+        """Retrieves cached vault entries or reads from database."""
+        if self._cached_entries is None:
+            self._cached_entries = db.get_all_vault_entries()
+        return self._cached_entries
+
+    def _invalidate_cache(self):
+        """Invalidates in-memory entries cache upon updates."""
+        self._cached_entries = None
 
     def _ensure_baseline_entries(self):
         """Seeds baseline universal recruiter questions and refreshes vector dimensions."""
@@ -94,7 +105,7 @@ class KnowledgeVault:
         embedding = self.matcher.get_embedding(question)
 
         # Check if an entry with this slot_key already exists
-        existing_entries = db.get_all_vault_entries()
+        existing_entries = self._get_entries()
         for e in existing_entries:
             if (e.slot_key == slot_key and e.slot_type == slot_type) or e.question_pattern.lower() == question.lower():
                 e.slot_key = slot_key
@@ -104,6 +115,7 @@ class KnowledgeVault:
                 e.embedding = embedding
                 e.last_used_at = datetime.now().isoformat()
                 db.save_vault_entry(e)
+                self._invalidate_cache()
                 return e
 
         entry = VaultEntry(
@@ -118,6 +130,7 @@ class KnowledgeVault:
             last_used_at=datetime.now().isoformat()
         )
         db.save_vault_entry(entry)
+        self._invalidate_cache()
         return entry
 
     def _resolve_template(
@@ -160,7 +173,7 @@ class KnowledgeVault:
         similarity_threshold: float = 0.55
     ) -> Tuple[Optional[str], float, Optional[VaultEntry]]:
         """Queries the Knowledge Vault using deterministic slot resolution and hybrid search."""
-        entries = db.get_all_vault_entries()
+        entries = self._get_entries()
         if not entries:
             return None, 0.0, None
 

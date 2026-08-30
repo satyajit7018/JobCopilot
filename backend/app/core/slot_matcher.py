@@ -6,9 +6,17 @@ dense embeddings and lexical token matching with Reciprocal Rank Fusion (RRF).
 
 import re
 import math
+import functools
 from typing import List, Dict, Tuple, Optional
 from collections import Counter
 from app.core.models import SlotType
+
+_WORD_REGEX = re.compile(r'\b[a-zA-Z0-9]+\b')
+
+
+@functools.lru_cache(maxsize=4096)
+def _cached_tokenize(text: str) -> Tuple[str, ...]:
+    return tuple(_WORD_REGEX.findall(text.lower()))
 
 
 class SlotMatcher:
@@ -26,7 +34,7 @@ class SlotMatcher:
     ]
 
     def tokenize(self, text: str) -> List[str]:
-        return re.findall(r'\b[a-zA-Z0-9]+\b', text.lower())
+        return list(_cached_tokenize(text))
 
     def get_embedding(self, text: str) -> List[float]:
         """Computes normalized dense subword vector representation with semantic synonym expansion."""

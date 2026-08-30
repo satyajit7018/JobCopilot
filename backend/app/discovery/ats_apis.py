@@ -19,6 +19,10 @@ except ImportError:
     HAS_H2 = False
 
 
+_TAG_RE = re.compile(r'<[^>]+>')
+_WS_RE = re.compile(r'\s+')
+
+
 class ATSApiFeeders:
     """Fetches real-time job listings directly from ATS public REST APIs."""
 
@@ -33,8 +37,8 @@ class ATSApiFeeders:
         if not html_text:
             return ""
         unescaped = html.unescape(html_text)
-        cleaned = re.sub(r'<[^>]+>', ' ', unescaped)
-        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        cleaned = _TAG_RE.sub(' ', unescaped)
+        cleaned = _WS_RE.sub(' ', cleaned).strip()
         return cleaned
 
     @classmethod
