@@ -18,9 +18,9 @@ class EmailSyncEngine:
     """Synchronizes parsed email communications with the job tracking pipeline."""
 
     @classmethod
-    def find_associated_job(cls, sender: str, subject: str, body_text: str) -> Optional[JobListing]:
-        """Finds matching job in database by company domain or subject/body mentions."""
-        jobs = db.get_jobs()
+    def find_associated_job(cls, sender: str, subject: str, body_text: str, user_id: str = "") -> Optional[JobListing]:
+        """Finds matching job in database for the specified user."""
+        jobs = db.get_jobs(user_id=user_id)
         if not jobs:
             return None
 
@@ -53,13 +53,14 @@ class EmailSyncEngine:
         subject: str,
         body_html: str,
         body_text: Optional[str] = None,
+        user_id: str = "",
         ws_broadcast_callback = None
     ) -> Dict[str, Any]:
         """
         Full inbound processing pipeline:
         1. Strips tracking pixels & sanitizes HTML
         2. Classifies recruiter intent & extracts booking URLs
-        3. Correlates with active JobListing
+        3. Correlates with active JobListing for the user
         4. Updates job status and saves EmailMessage record
         """
         # 1. Sanitize & Parse
@@ -71,7 +72,7 @@ class EmailSyncEngine:
         scheduling_links = EmailClassifier.extract_scheduling_links(clean_text)
 
         # 3. Correlate with Job
-        associated_job = cls.find_associated_job(sender, subject, clean_text)
+        associated_job = cls.find_associated_job(sender, subject, clean_text, user_id=user_id)
         associated_job_id = associated_job.job_id if associated_job else None
 
         # 4. Update Pipeline Status
@@ -90,11 +91,12 @@ class EmailSyncEngine:
                 associated_job.status = ApplicationStatus.SUBMITTED
                 updated_status = "SUBMITTED"
             
-            db.save_job(associated_job)
+            db.save_job(associated_job, user_id=user_id or associated_job.user_id)
 
         # 5. Persist Email Record to SQLite
         email_record = EmailMessage(
             message_id=f"msg_{uuid.uuid4().hex[:10]}",
+            user_id=user_id,
             sender=sender,
             recipient=recipient,
             subject=subject,
@@ -106,7 +108,7 @@ class EmailSyncEngine:
             has_tracking_pixels=parsed["has_tracking_pixels"],
             processed=True
         )
-        db.save_email(email_record)
+        db.save_email(email_record, user_id=user_id)
 
         # 6. WebSocket Notification
         if ws_broadcast_callback:

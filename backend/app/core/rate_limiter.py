@@ -1,6 +1,7 @@
 """
 JobCopilot - Tiered Subscription & Rate Limiting Engine
 Enforces daily application caps, proxy routing access, and priority queue routing based on user subscription tier.
+Backed by persistent database storage (user_daily_usage table).
 
 Tiers:
 - FREE:  5 auto-applies/day,  standard discovery, local proxies
@@ -47,19 +48,28 @@ class TierConfig:
 
 
 class RateLimiter:
-    """Tracks and enforces daily usage quotas per user."""
+    """Tracks and enforces daily usage quotas per user with DB persistence."""
 
     def __init__(self):
-        # user_id -> {"date": "YYYY-MM-DD", "count": int}
-        self.usage_ledger: Dict[str, Dict[str, Any]] = {}
-        # user_id -> SubscriptionTier
         self.user_subscriptions: Dict[str, SubscriptionTier] = {}
 
     def _get_today_str(self) -> str:
         return time.strftime("%Y-%m-%d", time.gmtime())
 
     def get_user_tier(self, user_id: str) -> SubscriptionTier:
-        return self.user_subscriptions.get(user_id, SubscriptionTier.FREE)
+        if user_id in self.user_subscriptions:
+            return self.user_subscriptions[user_id]
+        from app.core.database import db
+        user = db.get_user_by_id(user_id)
+        if user and user.role:
+            role_val = user.role.value if hasattr(user.role, 'value') else str(user.role)
+            try:
+                tier = SubscriptionTier(role_val.upper())
+                self.user_subscriptions[user_id] = tier
+                return tier
+            except ValueError:
+                pass
+        return SubscriptionTier.FREE
 
     def set_user_tier(self, user_id: str, tier: SubscriptionTier) -> None:
         self.user_subscriptions[user_id] = tier
@@ -68,12 +78,9 @@ class RateLimiter:
         tier = self.get_user_tier(user_id)
         limit = TierConfig.LIMITS[tier]["daily_applies"]
         today = self._get_today_str()
-
-        record = self.usage_ledger.get(user_id, {"date": today, "count": 0})
-        if record["date"] != today:
-            return limit
-
-        return max(0, limit - record["count"])
+        from app.core.database import db
+        used = db.get_daily_usage(user_id, today)
+        return max(0, limit - used)
 
     def can_apply(self, user_id: str) -> bool:
         return self.get_remaining_applies(user_id) > 0
@@ -84,19 +91,17 @@ class RateLimiter:
             return False
 
         today = self._get_today_str()
-        record = self.usage_ledger.get(user_id, {"date": today, "count": 0})
-        if record["date"] != today:
-            record = {"date": today, "count": 0}
-
-        record["count"] += 1
-        self.usage_ledger[user_id] = record
+        from app.core.database import db
+        db.increment_daily_usage(user_id, today)
         return True
 
     def get_usage_summary(self, user_id: str) -> Dict[str, Any]:
         tier = self.get_user_tier(user_id)
         config = TierConfig.LIMITS[tier]
         remaining = self.get_remaining_applies(user_id)
-        applied_today = config["daily_applies"] - remaining if tier != SubscriptionTier.ELITE else self.usage_ledger.get(user_id, {}).get("count", 0)
+        today = self._get_today_str()
+        from app.core.database import db
+        applied_today = db.get_daily_usage(user_id, today)
 
         return {
             "user_id": user_id,

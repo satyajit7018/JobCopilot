@@ -260,6 +260,28 @@ class DatabaseManager(DatabaseAdapter):
                     "user_id": "TEXT NOT NULL DEFAULT 'default'"
                 })
 
+                # 10. Token Revocation Blacklist Table (F-08)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS revoked_tokens (
+                    jti TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    revoked_at TEXT NOT NULL,
+                    expires_at TEXT
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_revoked_tokens_jti ON revoked_tokens(jti);")
+
+                # 11. User Daily Rate Limiting Usage Table (F-13)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_daily_usage (
+                    user_id TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    apply_count INTEGER DEFAULT 0,
+                    PRIMARY KEY (user_id, date)
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_daily_usage_user_date ON user_daily_usage(user_id, date);")
+
                 conn.commit()
 
     # =========================================================================
@@ -327,16 +349,87 @@ class DatabaseManager(DatabaseAdapter):
                 updated_at=row["updated_at"]
             )
 
-    # =========================================================================
-    # Candidate Profile Operations (Multi-Tenant)
-    # =========================================================================
-    def save_profile(self, profile: CandidateProfile, user_id: str = "default") -> bool:
-        """Saves or replaces the Candidate Profile bound to user_id."""
+    def update_user_role(self, user_id: str, role: str) -> bool:
+        """Updates user subscription tier."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE users SET role = ?, updated_at = ? WHERE user_id = ?",
+                    (role, datetime.now().isoformat(), user_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+
+    def update_user_password(self, user_id: str, new_password_hash: str) -> bool:
+        """Updates user password hash (e.g. during Argon2id migration)."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE users SET password_hash = ?, updated_at = ? WHERE user_id = ?",
+                    (new_password_hash, datetime.now().isoformat(), user_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+
+    def revoke_token(self, jti: str, user_id: str, expires_at: Optional[str] = None) -> bool:
+        """Adds a token's jti to the revoked_tokens blacklist."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                now_str = datetime.now().isoformat()
+                cursor.execute("""
+                INSERT OR REPLACE INTO revoked_tokens (jti, user_id, revoked_at, expires_at)
+                VALUES (?, ?, ?, ?)
+                """, (jti, user_id, now_str, expires_at or ""))
+                conn.commit()
+                return True
+
+    def is_token_revoked(self, jti: str) -> bool:
+        """Checks whether a token's jti is in the revoked blacklist."""
+        if not jti:
+            return False
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1 FROM revoked_tokens WHERE jti = ? LIMIT 1", (jti,))
+            return cursor.fetchone() is not None
+
+    def get_daily_usage(self, user_id: str, date_str: str) -> int:
+        """Gets count of daily applications for a user on a given date (YYYY-MM-DD)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT apply_count FROM user_daily_usage WHERE user_id = ? AND date = ?", (user_id, date_str))
+            row = cursor.fetchone()
+            return int(row["apply_count"]) if row else 0
+
+    def increment_daily_usage(self, user_id: str, date_str: str) -> int:
+        """Increments daily application count atomically and returns new total."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO user_daily_usage (user_id, date, apply_count)
+                VALUES (?, ?, 1)
+                ON CONFLICT(user_id, date) DO UPDATE SET apply_count = apply_count + 1
+                """, (user_id, date_str))
+                conn.commit()
+                cursor.execute("SELECT apply_count FROM user_daily_usage WHERE user_id = ? AND date = ?", (user_id, date_str))
+                row = cursor.fetchone()
+                return int(row["apply_count"]) if row else 1
+
+    # =========================================================================
+    # Candidate Profile Operations (Multi-Tenant)
+    # =========================================================================
+    def save_profile(self, profile: CandidateProfile, user_id: str) -> bool:
+        """Saves or replaces the Candidate Profile strictly bound to user_id."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                profile.user_id = user_id
+                target_id = profile.id or user_id
+                profile.id = target_id
                 profile_dict = profile.dict()
-                target_id = profile.id or f"profile_{user_id}"
                 cursor.execute("""
                 INSERT OR REPLACE INTO profiles (id, user_id, data, updated_at)
                 VALUES (?, ?, ?, ?)
@@ -344,12 +437,14 @@ class DatabaseManager(DatabaseAdapter):
                 conn.commit()
                 return True
 
-    def get_profile(self, profile_id: str = "default_user", user_id: str = "default") -> Optional[CandidateProfile]:
-        """Retrieves candidate profile for the specified user."""
+    def get_profile(self, user_id: str, profile_id: Optional[str] = None) -> Optional[CandidateProfile]:
+        """Retrieves candidate profile strictly for the specified user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            # Check user_id match first, fallback to profile_id for backward compatibility
-            cursor.execute("SELECT data FROM profiles WHERE user_id = ? OR id = ? ORDER BY updated_at DESC LIMIT 1", (user_id, profile_id))
+            if profile_id:
+                cursor.execute("SELECT data FROM profiles WHERE user_id = ? AND id = ? ORDER BY updated_at DESC LIMIT 1", (user_id, profile_id))
+            else:
+                cursor.execute("SELECT data FROM profiles WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1", (user_id,))
             row = cursor.fetchone()
             if row:
                 data = json.loads(row["data"])
@@ -359,8 +454,8 @@ class DatabaseManager(DatabaseAdapter):
     # =========================================================================
     # Knowledge Vault Operations (Multi-Tenant)
     # =========================================================================
-    def save_vault_entry(self, entry: VaultEntry, user_id: str = "default") -> bool:
-        """Saves a slot QA entry and tracks version history for a user."""
+    def save_vault_entry(self, entry: VaultEntry, user_id: str) -> bool:
+        """Saves a slot QA entry and tracks version history strictly for a user."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -389,17 +484,17 @@ class DatabaseManager(DatabaseAdapter):
                 conn.commit()
                 return True
 
-    def get_vault_entries(self, user_id: str = "default") -> List[VaultEntry]:
-        """Retrieves all indexed slots for a user."""
+    def get_vault_entries(self, user_id: str) -> List[VaultEntry]:
+        """Retrieves all indexed slots strictly for the user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM vault WHERE user_id = ? OR user_id = 'default' ORDER BY usage_count DESC", (user_id,))
+            cursor.execute("SELECT * FROM vault WHERE user_id = ? ORDER BY usage_count DESC", (user_id,))
             rows = cursor.fetchall()
             entries = []
             for r in rows:
                 entries.append(VaultEntry(
                     qa_id=r["qa_id"],
-                    user_id=r["user_id"] if "user_id" in r.keys() else user_id,
+                    user_id=user_id,
                     slot_type=r["slot_type"],
                     slot_key=r["slot_key"],
                     question_pattern=r["question_pattern"],
@@ -414,16 +509,16 @@ class DatabaseManager(DatabaseAdapter):
 
     get_all_vault_entries = get_vault_entries
 
-    def get_vault_entry_by_key(self, slot_key: str, user_id: str = "default") -> Optional[VaultEntry]:
-        """Finds entry by slot key for a user."""
+    def get_vault_entry_by_key(self, slot_key: str, user_id: str) -> Optional[VaultEntry]:
+        """Finds entry by slot key strictly for the user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM vault WHERE (user_id = ? OR user_id = 'default') AND slot_key = ? LIMIT 1", (user_id, slot_key))
+            cursor.execute("SELECT * FROM vault WHERE user_id = ? AND slot_key = ? LIMIT 1", (user_id, slot_key))
             r = cursor.fetchone()
             if r:
                 return VaultEntry(
                     qa_id=r["qa_id"],
-                    user_id=r["user_id"] if "user_id" in r.keys() else user_id,
+                    user_id=user_id,
                     slot_type=r["slot_type"],
                     slot_key=r["slot_key"],
                     question_pattern=r["question_pattern"],
@@ -451,8 +546,8 @@ class DatabaseManager(DatabaseAdapter):
     # =========================================================================
     # Job Listings Operations (Multi-Tenant)
     # =========================================================================
-    def save_job(self, job: JobListing, user_id: str = "default") -> bool:
-        """Inserts or updates a job opportunity with atomic deduplication."""
+    def save_job(self, job: JobListing, user_id: str) -> bool:
+        """Inserts or updates a job opportunity strictly for the user with atomic deduplication."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -499,42 +594,37 @@ class DatabaseManager(DatabaseAdapter):
                 conn.commit()
                 return True
 
-    def get_jobs(self, status: Optional[ApplicationStatus] = None, user_id: str = "default") -> List[JobListing]:
-        """Returns jobs for the user ordered by priority score."""
+    def get_jobs(self, user_id: str, status: Optional[ApplicationStatus] = None) -> List[JobListing]:
+        """Returns jobs strictly for the specified user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             query = "SELECT * FROM jobs WHERE user_id = ?"
             params = [user_id]
             if status:
+                st_val = status.value if hasattr(status, 'value') else status
                 query += " AND status = ?"
-                params.append(status.value if hasattr(status, 'value') else status)
+                params.append(st_val)
             query += " ORDER BY priority_score DESC, match_score DESC"
 
             cursor.execute(query, params)
             rows = cursor.fetchall()
             return [self._row_to_job(r) for r in rows]
 
-    def get_job_by_id(self, job_id: str, user_id: str = "default") -> Optional[JobListing]:
-        """Retrieves a single job by ID."""
+    def get_job_by_id(self, job_id: str, user_id: str) -> Optional[JobListing]:
+        """Retrieves a single job by ID strictly for the specified user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            if user_id == "default":
-                cursor.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,))
-            else:
-                cursor.execute("SELECT * FROM jobs WHERE job_id = ? AND user_id = ?", (job_id, user_id))
+            cursor.execute("SELECT * FROM jobs WHERE job_id = ? AND user_id = ? LIMIT 1", (job_id, user_id))
             row = cursor.fetchone()
             return self._row_to_job(row) if row else None
 
     get_job = get_job_by_id
 
-    def get_job_by_fingerprint(self, fingerprint: str, user_id: str = "default") -> Optional[JobListing]:
-        """Checks for existing job by fingerprint."""
+    def get_job_by_fingerprint(self, fingerprint: str, user_id: str) -> Optional[JobListing]:
+        """Checks for existing job by fingerprint strictly for the specified user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            if user_id == "default":
-                cursor.execute("SELECT * FROM jobs WHERE fingerprint = ?", (fingerprint,))
-            else:
-                cursor.execute("SELECT * FROM jobs WHERE fingerprint = ? AND user_id = ?", (fingerprint, user_id))
+            cursor.execute("SELECT * FROM jobs WHERE fingerprint = ? AND user_id = ? LIMIT 1", (fingerprint, user_id))
             row = cursor.fetchone()
             return self._row_to_job(row) if row else None
 
@@ -542,7 +632,7 @@ class DatabaseManager(DatabaseAdapter):
         keys = r.keys()
         return JobListing(
             job_id=r["job_id"],
-            user_id=r["user_id"] if "user_id" in keys else "default",
+            user_id=r["user_id"] if "user_id" in keys else "",
             fingerprint=r["fingerprint"],
             platform=r["platform"],
             company=r["company"],
@@ -568,8 +658,8 @@ class DatabaseManager(DatabaseAdapter):
     # =========================================================================
     # HITL Operations (Multi-Tenant)
     # =========================================================================
-    def save_hitl_event(self, event: HITLEvent, user_id: str = "default") -> bool:
-        """Stores a human intervention event."""
+    def save_hitl_event(self, event: HITLEvent, user_id: str) -> bool:
+        """Stores a human intervention event strictly for the user."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -596,16 +686,16 @@ class DatabaseManager(DatabaseAdapter):
                 conn.commit()
                 return True
 
-    def get_pending_hitl(self, user_id: str = "default") -> List[HITLEvent]:
-        """Retrieves all pending HITL items for a user."""
+    def get_pending_hitl(self, user_id: str) -> List[HITLEvent]:
+        """Retrieves all pending HITL items strictly for a user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM hitl_events WHERE (user_id = ? OR user_id = 'default') AND status = 'PENDING' ORDER BY created_at ASC", (user_id,))
+            cursor.execute("SELECT * FROM hitl_events WHERE user_id = ? AND status = 'PENDING' ORDER BY created_at ASC", (user_id,))
             rows = cursor.fetchall()
             return [
                 HITLEvent(
                     event_id=r["event_id"],
-                    user_id=r["user_id"] if "user_id" in r.keys() else user_id,
+                    user_id=user_id,
                     job_id=r["job_id"],
                     company=r["company"],
                     role_title=r["role_title"],
@@ -623,17 +713,17 @@ class DatabaseManager(DatabaseAdapter):
 
     get_pending_hitl_events = get_pending_hitl
 
-    def get_hitl_event(self, event_id: str) -> Optional[HITLEvent]:
-        """Retrieves a single HITL event by ID."""
+    def get_hitl_event(self, event_id: str, user_id: str) -> Optional[HITLEvent]:
+        """Retrieves a single HITL event by ID strictly for the specified user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM hitl_events WHERE event_id = ?", (event_id,))
+            cursor.execute("SELECT * FROM hitl_events WHERE event_id = ? AND user_id = ? LIMIT 1", (event_id, user_id))
             row = cursor.fetchone()
             if not row:
                 return None
             return HITLEvent(
                 event_id=row["event_id"],
-                user_id=row["user_id"] if "user_id" in row.keys() else "default",
+                user_id=user_id,
                 job_id=row["job_id"],
                 company=row["company"],
                 role_title=row["role_title"],
@@ -647,24 +737,24 @@ class DatabaseManager(DatabaseAdapter):
                 resolved_at=row["resolved_at"] if "resolved_at" in row.keys() else None
             )
 
-    def resolve_hitl_event(self, event_id: str, user_answer: str, user_id: str = "default") -> bool:
-        """Atomically resolves a pending HITL question."""
+    def resolve_hitl_event(self, event_id: str, user_answer: str, user_id: str) -> bool:
+        """Atomically resolves a pending HITL question strictly for the user."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 now_str = datetime.now().isoformat()
                 cursor.execute("""
                 UPDATE hitl_events SET status = 'RESOLVED', user_answer = ?, resolved_at = ?
-                WHERE event_id = ? AND status = 'PENDING'
-                """, (user_answer, now_str, event_id))
+                WHERE event_id = ? AND user_id = ? AND status = 'PENDING'
+                """, (user_answer, now_str, event_id, user_id))
                 conn.commit()
                 return cursor.rowcount > 0
 
     # =========================================================================
     # Outreach & Email Operations (Multi-Tenant)
     # =========================================================================
-    def save_outreach(self, record: OutreachRecord, user_id: str = "default") -> bool:
-        """Saves a multi-channel outreach draft or sent message."""
+    def save_outreach(self, record: OutreachRecord, user_id: str) -> bool:
+        """Saves a multi-channel outreach draft strictly for the user."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -691,16 +781,16 @@ class DatabaseManager(DatabaseAdapter):
 
     save_outreach_record = save_outreach
 
-    def get_outreach(self, job_id: str, user_id: str = "default") -> List[OutreachRecord]:
-        """Retrieves all outreach records for a specific job."""
+    def get_outreach(self, job_id: str, user_id: str) -> List[OutreachRecord]:
+        """Retrieves all outreach records for a specific job strictly for the user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM outreach_records WHERE job_id = ? AND (user_id = ? OR user_id = 'default')", (job_id, user_id))
+            cursor.execute("SELECT * FROM outreach_records WHERE job_id = ? AND user_id = ?", (job_id, user_id))
             rows = cursor.fetchall()
             return [
                 OutreachRecord(
                     outreach_id=r["outreach_id"],
-                    user_id=r["user_id"] if "user_id" in r.keys() else user_id,
+                    user_id=user_id,
                     job_id=r["job_id"],
                     channel=r["channel"],
                     recipient_name=r["recipient_name"],
@@ -716,8 +806,8 @@ class DatabaseManager(DatabaseAdapter):
 
     get_outreach_records = get_outreach
 
-    def save_email(self, email: EmailMessage, user_id: str = "default") -> bool:
-        """Stores classified inbound recruiter email."""
+    def save_email(self, email: EmailMessage, user_id: str) -> bool:
+        """Stores classified inbound recruiter email strictly for the user."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -744,16 +834,16 @@ class DatabaseManager(DatabaseAdapter):
                 conn.commit()
                 return True
 
-    def get_emails(self, user_id: str = "default") -> List[EmailMessage]:
-        """Retrieves all tracked recruiter communications for a user."""
+    def get_emails(self, user_id: str) -> List[EmailMessage]:
+        """Retrieves all tracked recruiter communications strictly for a user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM emails WHERE user_id = ? OR user_id = 'default' ORDER BY received_at DESC", (user_id,))
+            cursor.execute("SELECT * FROM emails WHERE user_id = ? ORDER BY received_at DESC", (user_id,))
             rows = cursor.fetchall()
             return [
                 EmailMessage(
                     message_id=r["message_id"],
-                    user_id=r["user_id"] if "user_id" in r.keys() else user_id,
+                    user_id=user_id,
                     sender=r["sender"],
                     recipient=r["recipient"],
                     subject=r["subject"],
@@ -769,10 +859,10 @@ class DatabaseManager(DatabaseAdapter):
             ]
 
     # =========================================================================
-    # Job Checkpoint Recovery
+    # Job Checkpoint Recovery (Multi-Tenant)
     # =========================================================================
-    def save_checkpoint(self, checkpoint: JobCheckpoint, user_id: str = "default") -> bool:
-        """Saves current automation execution step for crash recovery."""
+    def save_checkpoint(self, checkpoint: JobCheckpoint, user_id: str) -> bool:
+        """Saves current automation execution step strictly for the user."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -794,16 +884,16 @@ class DatabaseManager(DatabaseAdapter):
                 conn.commit()
                 return True
 
-    def get_checkpoint(self, job_id: str, user_id: str = "default") -> Optional[JobCheckpoint]:
-        """Retrieves active checkpoint for recovery."""
+    def get_checkpoint(self, job_id: str, user_id: str) -> Optional[JobCheckpoint]:
+        """Retrieves active checkpoint strictly for the user."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM job_checkpoints WHERE job_id = ? AND (user_id = ? OR user_id = 'default')", (job_id, user_id))
+            cursor.execute("SELECT * FROM job_checkpoints WHERE job_id = ? AND user_id = ?", (job_id, user_id))
             row = cursor.fetchone()
             if row:
                 return JobCheckpoint(
                     job_id=row["job_id"],
-                    user_id=row["user_id"] if "user_id" in row.keys() else user_id,
+                    user_id=user_id,
                     current_step=row["current_step"],
                     total_steps=row["total_steps"],
                     filled_inputs=json.loads(row["filled_inputs"]),
@@ -813,34 +903,34 @@ class DatabaseManager(DatabaseAdapter):
                 )
             return None
 
-    def delete_checkpoint(self, job_id: str, user_id: str = "default"):
-        """Deletes checkpoint upon successful completion."""
+    def delete_checkpoint(self, job_id: str, user_id: str):
+        """Deletes checkpoint strictly for the user."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM job_checkpoints WHERE job_id = ? AND (user_id = ? OR user_id = 'default')", (job_id, user_id))
+                cursor.execute("DELETE FROM job_checkpoints WHERE job_id = ? AND user_id = ?", (job_id, user_id))
                 conn.commit()
 
     # =========================================================================
     # Funnel Analytics (Multi-Tenant)
     # =========================================================================
-    def get_funnel_metrics(self, user_id: str = "default") -> Dict[str, Any]:
-        """Computes live conversion funnel metrics for the user."""
+    def get_funnel_metrics(self, user_id: str) -> Dict[str, Any]:
+        """Computes conversion funnel metrics strictly for the authenticated tenant."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) as total FROM jobs WHERE user_id = ? OR user_id = 'default'", (user_id,))
+            cursor.execute("SELECT COUNT(*) as total FROM jobs WHERE user_id = ?", (user_id,))
             total_sourced = cursor.fetchone()["total"]
 
-            cursor.execute("SELECT COUNT(*) as applied FROM jobs WHERE (user_id = ? OR user_id = 'default') AND status IN ('SUBMITTED', 'RESPONDED', 'INTERVIEW', 'OFFER')", (user_id,))
+            cursor.execute("SELECT COUNT(*) as applied FROM jobs WHERE user_id = ? AND status IN ('SUBMITTED', 'RESPONDED', 'INTERVIEW', 'OFFER')", (user_id,))
             total_applied = cursor.fetchone()["applied"]
 
-            cursor.execute("SELECT COUNT(*) as interviews FROM jobs WHERE (user_id = ? OR user_id = 'default') AND status = 'INTERVIEW'", (user_id,))
+            cursor.execute("SELECT COUNT(*) as interviews FROM jobs WHERE user_id = ? AND status = 'INTERVIEW'", (user_id,))
             interviews = cursor.fetchone()["interviews"]
 
-            cursor.execute("SELECT COUNT(*) as offers FROM jobs WHERE (user_id = ? OR user_id = 'default') AND status = 'OFFER'", (user_id,))
+            cursor.execute("SELECT COUNT(*) as offers FROM jobs WHERE user_id = ? AND status = 'OFFER'", (user_id,))
             offers = cursor.fetchone()["offers"]
 
-            cursor.execute("SELECT COUNT(*) as responses FROM emails WHERE (user_id = ? OR user_id = 'default') AND intent IN ('INTERVIEW_INVITE', 'ASSESSMENT')", (user_id,))
+            cursor.execute("SELECT COUNT(*) as responses FROM emails WHERE user_id = ? AND intent IN ('INTERVIEW_INVITE', 'ASSESSMENT')", (user_id,))
             recruiter_responses = cursor.fetchone()["responses"]
 
             response_rate = (recruiter_responses / total_applied * 100) if total_applied > 0 else 0.0
@@ -856,3 +946,4 @@ class DatabaseManager(DatabaseAdapter):
 
 
 db = DatabaseManager()
+

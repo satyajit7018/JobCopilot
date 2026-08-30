@@ -123,8 +123,15 @@ class TestCareerAccelerationPillars:
     # 6. REST API Endpoints Integration
     @pytest.mark.asyncio
     async def test_career_acceleration_endpoints(self):
+        from datetime import timedelta
+        from app.api.auth import create_jwt_token
+        token = create_jwt_token(
+            {"sub": "usr_test_tenant_a", "email": "test_a@jobcopilot.test", "role": "PRO", "type": "access"},
+            timedelta(minutes=60)
+        )
+        headers = {"Authorization": f"Bearer {token}"}
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:
             # 1. Reverse Questions Endpoint
             r1 = await ac.get("/api/interview/reverse-questions?role=Senior+Backend+Engineer&company=Netflix")
             assert r1.status_code == 200

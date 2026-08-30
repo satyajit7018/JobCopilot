@@ -27,12 +27,14 @@ class HITLAgent:
         input_type: str = "text",
         options: Optional[List[str]] = None,
         ai_suggested_draft: str = "",
+        user_id: str = "default",
         ws_broadcast_callback = None
     ) -> HITLEvent:
         """Creates a pending HITL event in SQLite and broadcasts via WebSocket."""
         event_id = f"hitl_{uuid.uuid4().hex[:8]}"
         event = HITLEvent(
             event_id=event_id,
+            user_id=user_id,
             job_id=job_id,
             company=company,
             role_title=role_title,
@@ -43,7 +45,7 @@ class HITLAgent:
             status="PENDING",
             created_at=datetime.now().isoformat()
         )
-        db.save_hitl_event(event)
+        db.save_hitl_event(event, user_id=user_id)
 
         if ws_broadcast_callback:
             try:
@@ -61,21 +63,23 @@ class HITLAgent:
         cls,
         event_id: str,
         poll_interval: float = 0.5,
-        max_timeout: float = 300.0
+        max_timeout: float = 300.0,
+        user_id: str = "default"
     ) -> Optional[str]:
         """Polls database until user resolves the HITL event in the UI modal."""
         elapsed = 0.0
         while elapsed < max_timeout:
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT status, user_answer, question_text FROM hitl_events WHERE event_id = ?", (event_id,))
+                cursor.execute("SELECT status, user_answer, question_text FROM hitl_events WHERE event_id = ? AND user_id = ?", (event_id, user_id))
                 row = cursor.fetchone()
                 if row and row["status"] == "RESOLVED" and row["user_answer"]:
                     user_ans = row["user_answer"]
                     # Automatically index into Knowledge Vault permanently
                     vault.learn_answer(
                         question=row["question_text"],
-                        answer_template=user_ans
+                        answer_template=user_ans,
+                        user_id=user_id
                     )
                     return user_ans
             await asyncio.sleep(poll_interval)

@@ -2,19 +2,27 @@
 JobCopilot - API Endpoints
 REST and WebSocket handlers for Onboarding, Questionnaire, Knowledge Vault,
 Job Pipeline, Real-Time HITL Alerts, Dynamic Tailored Resumes, and Triple-Threat Outreach.
+Enforces default-deny authentication, multi-tenant isolation, and fail-closed security.
 """
 
 import os
 import shutil
 import uuid
+import base64
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends
+from fastapi import (
+    APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks,
+    WebSocket, WebSocketDisconnect, Depends, Request
+)
 from pydantic import BaseModel
 
 from app.core.config import RESUMES_DIR, DEFAULT_SUBMISSION_MODE
-from app.core.models import CandidateProfile, VaultEntry, JobListing, HITLEvent, ApplicationStatus, User
+from app.core.models import (
+    CandidateProfile, VaultEntry, JobListing, HITLEvent, ApplicationStatus,
+    User, UserRole, TokenResponse
+)
 from app.core.database import db
 from app.core.resume_parser import ResumeParser
 from app.core.questionnaire import QuestionnaireEngine
@@ -25,39 +33,71 @@ from app.core.resume_tailor import ResumeTailor
 from app.core.cover_letter import CoverLetterGenerator
 from app.core.outreach_generator import OutreachGenerator
 from app.discovery.orchestrator import discovery_orchestrator
-from app.api.auth import router as auth_router, get_current_user_optional, get_current_user
+from app.api.auth import (
+    router as auth_router, get_current_user, hash_password,
+    create_jwt_token, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
+)
+from datetime import timedelta
+
+# =========================================================================
+# Router Architecture: Public (Allowlisted) vs Protected (Default-Deny)
+# =========================================================================
+public_router = APIRouter()
+public_router.include_router(auth_router)
+
+protected_router = APIRouter(dependencies=[Depends(get_current_user)])
 
 router = APIRouter(prefix="/api")
-router.include_router(auth_router)
 
 
-# --- WebSocket Connection Manager for Real-Time Bot Logs & HITL Events ---
-class ConnectionManager:
+# --- WebSocket Connection Manager for Multi-Tenant Real-Time Streaming ---
+class MultiTenantWebSocketGateway:
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+        self.all_connections: List[WebSocket] = []
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, user_id: Optional[str] = None):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        self.all_connections.append(websocket)
+        if user_id:
+            if user_id not in self.active_connections:
+                self.active_connections[user_id] = []
+            self.active_connections[user_id].append(websocket)
 
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+    def disconnect(self, websocket: WebSocket, user_id: Optional[str] = None):
+        if websocket in self.all_connections:
+            self.all_connections.remove(websocket)
+        if user_id and user_id in self.active_connections:
+            if websocket in self.active_connections[user_id]:
+                self.active_connections[user_id].remove(websocket)
+            if not self.active_connections[user_id]:
+                del self.active_connections[user_id]
 
-    async def broadcast(self, message: Dict[str, Any]):
-        for connection in self.active_connections:
+    async def send_to_user(self, user_id: str, message: Dict[str, Any]):
+        for ws in self.active_connections.get(user_id, []):
+            try:
+                await ws.send_json(message)
+            except Exception:
+                pass
+
+    async def broadcast(self, message: Dict[str, Any], user_id: Optional[str] = None):
+        if user_id and user_id in self.active_connections:
+            await self.send_to_user(user_id, message)
+            return
+
+        for connection in list(self.all_connections):
             try:
                 await connection.send_json(message)
             except Exception:
                 pass
 
 
-ws_manager = ConnectionManager()
+ws_manager = MultiTenantWebSocketGateway()
 
 
 # --- Models for Request Payloads ---
 class QuestionnaireSubmitRequest(BaseModel):
-    profile_id: str = "default_user"
+    profile_id: Optional[str] = None
     answers: Dict[str, Any]
 
 
@@ -78,52 +118,176 @@ class VaultTestMatchRequest(BaseModel):
     question: str
     company: str = "Stripe"
     role: str = "Senior Software Engineer"
-    profile_id: str = "default_user"
+    profile_id: Optional[str] = None
 
 
-# --- Endpoints ---
+# =========================================================================
+# Public Allowlisted Endpoints
+# =========================================================================
 
-@router.get("/health")
+@public_router.get("/health")
 async def health_check():
+    """Public healthcheck endpoint."""
     return {"status": "ok", "version": "1.0.0", "storage": "sqlite_wal"}
 
 
-class LoginRequest(BaseModel):
-    master_password: Optional[str] = None
+# --- Google SSO Authentication (F-07 Cryptographic Verification) ---
+class GoogleSSORequest(BaseModel):
+    id_token: Optional[str] = None
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    google_id: Optional[str] = None
+    avatar_url: Optional[str] = None
+    auto_login_permissions: bool = True
 
 
-@router.get("/auth/status")
-async def auth_status():
-    """Returns local vault encryption status and master key presence."""
+@public_router.post("/auth/google-sso", response_model=TokenResponse)
+async def google_sso_auth(payload: GoogleSSORequest):
+    """Authenticates candidate with Google ID token and issues signed JWT."""
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+
+    google_client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+    email = payload.email
+    full_name = payload.full_name or "Google User"
+
+    if payload.id_token:
+        try:
+            id_info = id_token.verify_oauth2_token(
+                payload.id_token,
+                google_requests.Request(),
+                google_client_id
+            )
+            if id_info.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
+                raise HTTPException(status_code=401, detail="Invalid token issuer.")
+            email = id_info.get("email", email)
+            full_name = id_info.get("name", full_name)
+        except ValueError as e:
+            raise HTTPException(status_code=401, detail=f"Google token verification failed: {str(e)}")
+    elif os.getenv("ENV", "").lower() == "production":
+        raise HTTPException(status_code=401, detail="Google ID token required in production.")
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Missing verified email address.")
+
+    user = db.get_user_by_email(email)
+    if not user:
+        user_id = f"usr_{uuid.uuid4().hex[:12]}"
+        user = User(
+            user_id=user_id,
+            email=email,
+            password_hash=hash_password(uuid.uuid4().hex),
+            full_name=full_name,
+            role=UserRole.FREE,
+            is_active=True
+        )
+        db.create_user(user)
+    else:
+        user_id = user.user_id
+
+    # Create default candidate profile if absent
+    profile = db.get_profile(user_id=user_id)
+    if not profile:
+        profile = CandidateProfile(
+            id=user_id,
+            user_id=user_id,
+            full_name=full_name,
+            email=email,
+            phone="+1-000-000-0000",
+            location="Remote"
+        )
+        db.save_profile(profile, user_id=user_id)
+
+    role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
+    access_token = create_jwt_token(
+        {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access"},
+        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    refresh_token = create_jwt_token(
+        {"sub": user.user_id, "type": "refresh"},
+        timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user_id=user.user_id,
+        email=user.email,
+        role=role_str
+    )
+
+
+# --- Stripe Billing Webhook (F-04 Signature-Verified, Fail-Closed) ---
+@public_router.post("/billing/webhook")
+async def stripe_webhook_handler(request: Request):
+    """Receives Stripe subscription updates and adjusts tenant tier accordingly (Fail-Closed)."""
+    import stripe
+    from app.core.rate_limiter import rate_limiter, SubscriptionTier
+
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    if not webhook_secret:
+        raise HTTPException(status_code=503, detail="Billing webhook not configured")
+
+    payload = await request.body()
+    sig_header = request.headers.get("Stripe-Signature")
+    if not sig_header:
+        raise HTTPException(status_code=400, detail="Missing Stripe-Signature header")
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+    except (ValueError, stripe.SignatureVerificationError) as e:
+        raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
+
+    event_type = event.get("type", "")
+    data_object = event.get("data", {}).get("object", {})
+    user_id = data_object.get("metadata", {}).get("user_id")
+    tier_str = data_object.get("metadata", {}).get("tier", "PRO").upper()
+
+    if not user_id:
+        return {"status": "ignored", "reason": "No user_id in metadata"}
+
+    if event_type in ["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated"]:
+        tier = SubscriptionTier.ELITE if tier_str == "ELITE" else SubscriptionTier.PRO
+        rate_limiter.set_user_tier(user_id, tier)
+        db.update_user_role(user_id, tier.value)
+        return {"status": "success", "user_id": user_id, "active_tier": tier.value}
+    elif event_type in ["customer.subscription.deleted"]:
+        rate_limiter.set_user_tier(user_id, SubscriptionTier.FREE)
+        db.update_user_role(user_id, "FREE")
+        return {"status": "success", "user_id": user_id, "active_tier": SubscriptionTier.FREE.value}
+
+    return {"status": "ignored", "event_type": event_type}
+
+
+# =========================================================================
+# Protected Endpoints (Require Bearer JWT Access Token)
+# =========================================================================
+
+@protected_router.get("/auth/status")
+async def auth_status(current_user: User = Depends(get_current_user)):
+    """Returns local vault encryption status and user authentication state."""
     return {
         "status": "success",
         "is_authenticated": True,
         "encryption": "Argon2id + AES-256-GCM",
         "keychain_storage": "OS_KEYCHAIN_SECURE",
-        "user_id": "default_user"
+        "user_id": current_user.user_id,
+        "email": current_user.email,
+        "role": current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
     }
 
 
-@router.post("/auth/login")
-async def auth_login(payload: LoginRequest):
-    """Unlocks or registers the master vault key."""
-    pwd = payload.master_password or cred_vault.get_or_create_master_key()
-    return {
-        "status": "success",
-        "message": "Vault successfully unlocked with Argon2id + AES-256-GCM",
-        "session_token": "jobcopilot_local_secure_session"
-    }
-
-
-@router.post("/upload-resume")
+@protected_router.post("/upload-resume")
 async def upload_resume(
     file: Optional[UploadFile] = File(None),
     raw_text: Optional[str] = Form(None),
-    profile_id: str = Form("default_user"),
-    current_user: User = Depends(get_current_user_optional)
+    profile_id: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_user)
 ):
     """Uploads and parses a resume (PDF, DOCX, or text) and auto-prefills questionnaire."""
     user_id = current_user.user_id
+    target_profile_id = profile_id or user_id
+
     if file:
         MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
         contents = await file.read()
@@ -133,18 +297,17 @@ async def upload_resume(
         file_path = RESUMES_DIR / f"{user_id}_{safe_filename}"
         with open(file_path, "wb") as buffer:
             buffer.write(contents)
-        profile = ResumeParser.parse_to_profile(str(file_path), profile_id=profile_id)
+        profile = ResumeParser.parse_to_profile(str(file_path), profile_id=target_profile_id)
     elif raw_text:
-        profile = ResumeParser.parse_to_profile(raw_text, profile_id=profile_id)
+        profile = ResumeParser.parse_to_profile(raw_text, profile_id=target_profile_id)
     else:
         raise HTTPException(status_code=400, detail="No resume file or raw text provided.")
 
+    profile.id = target_profile_id
     profile.user_id = user_id
-    # Save to SQLite and seed the Knowledge Vault
     db.save_profile(profile, user_id=user_id)
     vault.seed_from_profile(profile)
 
-    # Generate 70% prefilled questionnaire
     prefilled_data = QuestionnaireEngine.prefill_from_profile(profile)
     questions_schema = QuestionnaireEngine.get_questions_schema()
 
@@ -156,19 +319,25 @@ async def upload_resume(
     }
 
 
-@router.get("/profile")
-async def get_profile(profile_id: str = "default_user", current_user: User = Depends(get_current_user_optional)):
-    """Retrieves current candidate profile."""
-    profile = db.get_profile(profile_id, user_id=current_user.user_id)
+@protected_router.get("/profile")
+async def get_profile(
+    profile_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Retrieves current candidate profile for authenticated tenant."""
+    profile = db.get_profile(user_id=current_user.user_id, profile_id=profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Candidate profile not found. Please upload a resume.")
     return {"status": "success", "profile": profile.dict()}
 
 
-@router.get("/questionnaire")
-async def get_questionnaire(profile_id: str = "default_user", current_user: User = Depends(get_current_user_optional)):
-    """Retrieves the 8 baseline recruiter questions schema and prefilled answers."""
-    profile = db.get_profile(profile_id, user_id=current_user.user_id)
+@protected_router.get("/questionnaire")
+async def get_questionnaire(
+    profile_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Retrieves the recruiter questions schema and prefilled answers."""
+    profile = db.get_profile(user_id=current_user.user_id, profile_id=profile_id)
     schema = QuestionnaireEngine.get_questions_schema()
     prefilled = QuestionnaireEngine.prefill_from_profile(profile) if profile else {}
     return {
@@ -177,22 +346,27 @@ async def get_questionnaire(profile_id: str = "default_user", current_user: User
     }
 
 
-@router.post("/questionnaire")
-async def submit_questionnaire(payload: QuestionnaireSubmitRequest, current_user: User = Depends(get_current_user_optional)):
+@protected_router.post("/questionnaire")
+async def submit_questionnaire(
+    payload: QuestionnaireSubmitRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Applies user-confirmed answers to profile and Knowledge Vault."""
     user_id = current_user.user_id
-    profile = db.get_profile(payload.profile_id, user_id=user_id)
+    target_id = payload.profile_id or user_id
+    profile = db.get_profile(user_id=user_id, profile_id=target_id)
     if not profile:
         profile = CandidateProfile(
-            id=payload.profile_id,
+            id=target_id,
             user_id=user_id,
-            full_name=payload.answers.get("full_name", "Candidate Name"),
-            email=payload.answers.get("email", "candidate@example.com"),
-            phone=payload.answers.get("phone", "+91 0000000000"),
-            location=payload.answers.get("location", "Remote / India")
+            full_name=payload.answers.get("full_name", current_user.full_name or "Candidate"),
+            email=payload.answers.get("email", current_user.email),
+            phone=payload.answers.get("phone", "+1-000-000-0000"),
+            location=payload.answers.get("location", "Remote")
         )
 
     updated_profile = QuestionnaireEngine.apply_answers_to_profile(profile, payload.answers)
+    updated_profile.id = target_id
     updated_profile.user_id = user_id
     db.save_profile(updated_profile, user_id=user_id)
     vault.seed_from_profile(updated_profile)
@@ -204,9 +378,9 @@ async def submit_questionnaire(payload: QuestionnaireSubmitRequest, current_user
     }
 
 
-@router.get("/vault")
-async def get_vault_entries(current_user: User = Depends(get_current_user_optional)):
-    """Returns all indexed Q&A slots with usage counts and last used timestamps."""
+@protected_router.get("/vault")
+async def get_vault_entries(current_user: User = Depends(get_current_user)):
+    """Returns all indexed Q&A slots for the authenticated tenant."""
     entries = db.get_vault_entries(user_id=current_user.user_id)
     return {
         "count": len(entries),
@@ -214,8 +388,11 @@ async def get_vault_entries(current_user: User = Depends(get_current_user_option
     }
 
 
-@router.post("/vault/learn")
-async def learn_vault_entry(payload: VaultLearnRequest, current_user: User = Depends(get_current_user_optional)):
+@protected_router.post("/vault/learn")
+async def learn_vault_entry(
+    payload: VaultLearnRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Manually teaches or updates a Q&A slot."""
     entry = vault.learn_answer(
         question=payload.question,
@@ -228,10 +405,13 @@ async def learn_vault_entry(payload: VaultLearnRequest, current_user: User = Dep
     return {"status": "success", "entry": entry.dict()}
 
 
-@router.post("/vault/test-match")
-async def test_vault_match(payload: VaultTestMatchRequest, current_user: User = Depends(get_current_user_optional)):
-    """Tests real-time question resolution against the Knowledge Vault for UI playground."""
-    profile = db.get_profile(payload.profile_id, user_id=current_user.user_id)
+@protected_router.post("/vault/test-match")
+async def test_vault_match(
+    payload: VaultTestMatchRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Tests real-time question resolution against the Knowledge Vault."""
+    profile = db.get_profile(user_id=current_user.user_id, profile_id=payload.profile_id)
     answer, confidence, entry = vault.get_answer_for_question(
         question=payload.question,
         profile=profile,
@@ -252,18 +432,19 @@ async def test_vault_match(payload: VaultTestMatchRequest, current_user: User = 
     }
 
 
-# --- 0-Day Discovery Endpoints ---
-
-@router.post("/discovery/run")
-async def run_discovery(profile_id: str = "default_user", current_user: User = Depends(get_current_user_optional)):
+@protected_router.post("/discovery/run")
+async def run_discovery(
+    profile_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
     """Triggers an async 0-day job discovery cycle across ATS APIs and VC boards."""
-    profile = db.get_profile(profile_id, user_id=current_user.user_id)
+    profile = db.get_profile(user_id=current_user.user_id, profile_id=profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Candidate profile not found.")
 
     await ws_manager.broadcast({"type": "BOT_LOG", "message": "Starting 0-day multi-source job discovery cycle..."})
     
-    result = await discovery_orchestrator.run_discovery_cycle(profile)
+    result = await discovery_orchestrator.run_discovery_cycle(profile, user_id=current_user.user_id)
     
     await ws_manager.broadcast({
         "type": "DISCOVERY_COMPLETED",
@@ -274,8 +455,8 @@ async def run_discovery(profile_id: str = "default_user", current_user: User = D
     return result
 
 
-@router.get("/discovery/status")
-async def get_discovery_status():
+@protected_router.get("/discovery/status")
+async def get_discovery_status(current_user: User = Depends(get_current_user)):
     """Returns current discovery metrics."""
     return {
         "is_running": discovery_orchestrator.is_running,
@@ -285,9 +466,12 @@ async def get_discovery_status():
     }
 
 
-@router.get("/jobs")
-async def get_jobs(status: Optional[str] = None, current_user: User = Depends(get_current_user_optional)):
-    """Returns all tracked job applications, optionally filtered by status."""
+@protected_router.get("/jobs")
+async def get_jobs(
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Returns all tracked job applications for the authenticated tenant."""
     jobs = db.get_jobs(status=status, user_id=current_user.user_id)
     return {
         "count": len(jobs),
@@ -295,22 +479,21 @@ async def get_jobs(status: Optional[str] = None, current_user: User = Depends(ge
     }
 
 
-# --- Tailored Resume & Triple-Threat Outreach Generation Endpoint ---
-
-@router.post("/jobs/{job_id}/tailor")
-async def generate_tailored_assets(job_id: str, profile_id: str = "default_user"):
-    """Compiles a bespoke tailored PDF resume, cover letter, and triple-threat outreach for a job."""
-    profile = db.get_profile(profile_id)
+@protected_router.post("/jobs/{job_id}/tailor")
+async def generate_tailored_assets(
+    job_id: str,
+    profile_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Compiles a tailored PDF resume, cover letter, and outreach package for a job."""
+    profile = db.get_profile(user_id=current_user.user_id, profile_id=profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found.")
 
-    # Find job in database
-    jobs = db.get_jobs()
-    job = next((j for j in jobs if j.job_id == job_id), None)
+    job = db.get_job_by_id(job_id, user_id=current_user.user_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found.")
 
-    # 1. Compile Tailored PDF Resume
     pdf_path, content_hash, tailored_profile = await ResumeTailor.compile_tailored_resume_for_job(
         profile=profile,
         job_id=job.job_id,
@@ -319,7 +502,6 @@ async def generate_tailored_assets(job_id: str, profile_id: str = "default_user"
         company_name=job.company
     )
 
-    # 2. Generate Anti-AI Cover Letter
     cover_letter = CoverLetterGenerator.generate_cover_letter(
         profile=tailored_profile,
         company_name=job.company,
@@ -327,7 +509,6 @@ async def generate_tailored_assets(job_id: str, profile_id: str = "default_user"
         job_description=job.description
     )
 
-    # 3. Generate Triple-Threat Outreach Package
     outreach_pkg = OutreachGenerator.create_triple_threat_package(
         profile=profile,
         job_id=job.job_id,
@@ -348,21 +529,23 @@ async def generate_tailored_assets(job_id: str, profile_id: str = "default_user"
 
 
 class AlumniReferralRequest(BaseModel):
-    candidate_name: str = "Satyajit Nayak"
+    candidate_name: str = "Candidate"
     company_name: str
     role_title: str
     contact_name: str = "Fellow Alumni"
-    common_ground: str = "our shared university background"
+    common_ground: str = "our shared background"
 
 
-@router.post("/outreach/alumni-referral")
-async def generate_alumni_referral(payload: AlumniReferralRequest):
+@protected_router.post("/outreach/alumni-referral")
+async def generate_alumni_referral(
+    payload: AlumniReferralRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Generates 280-char LinkedIn connection note and email for alumni referral outreach."""
-    from app.core.outreach_generator import OutreachGenerator
     return {
         "status": "success",
         "pitch": OutreachGenerator.generate_alumni_referral_pitch(
-            candidate_name=payload.candidate_name,
+            candidate_name=payload.candidate_name or current_user.full_name,
             company_name=payload.company_name,
             role_title=payload.role_title,
             contact_name=payload.contact_name,
@@ -372,7 +555,7 @@ async def generate_alumni_referral(payload: AlumniReferralRequest):
 
 
 class RecruiterNudgeRequest(BaseModel):
-    candidate_name: str = "Satyajit Nayak"
+    candidate_name: str = "Candidate"
     company_name: str
     role_title: str
     recruiter_name: str = "Recruiter"
@@ -380,14 +563,16 @@ class RecruiterNudgeRequest(BaseModel):
     recent_highlight: Optional[str] = None
 
 
-@router.post("/outreach/recruiter-nudge")
-async def generate_recruiter_nudge_endpoint(payload: RecruiterNudgeRequest):
+@protected_router.post("/outreach/recruiter-nudge")
+async def generate_recruiter_nudge_endpoint(
+    payload: RecruiterNudgeRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Generates polite, high-converting recruiter follow-up message."""
-    from app.core.outreach_generator import OutreachGenerator
     return {
         "status": "success",
         "nudge": OutreachGenerator.generate_recruiter_followup_nudge(
-            candidate_name=payload.candidate_name,
+            candidate_name=payload.candidate_name or current_user.full_name,
             company_name=payload.company_name,
             role_title=payload.role_title,
             recruiter_name=payload.recruiter_name,
@@ -397,9 +582,9 @@ async def generate_recruiter_nudge_endpoint(payload: RecruiterNudgeRequest):
     }
 
 
-@router.get("/hitl/pending")
-async def get_pending_hitl(current_user: User = Depends(get_current_user_optional)):
-    """Returns all pending HITL questions requiring human input."""
+@protected_router.get("/hitl/pending")
+async def get_pending_hitl(current_user: User = Depends(get_current_user)):
+    """Returns all pending HITL questions for authenticated tenant."""
     events = db.get_pending_hitl(user_id=current_user.user_id)
     return {
         "count": len(events),
@@ -407,23 +592,24 @@ async def get_pending_hitl(current_user: User = Depends(get_current_user_optiona
     }
 
 
-@router.post("/hitl/resolve")
-async def resolve_hitl(payload: HITLResolveRequest, current_user: User = Depends(get_current_user_optional)):
-    """Atomically resolves a pending HITL question and permanently saves it to the vault."""
-    with db.get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT question_text FROM hitl_events WHERE event_id = ? AND (user_id = ? OR user_id = 'default')", (payload.event_id, current_user.user_id))
-        row = cursor.fetchone()
-        if not row:
-            raise HTTPException(status_code=400, detail="Event already resolved or not found.")
-        
-        cursor.execute("UPDATE hitl_events SET status = 'RESOLVED', user_answer = ?, resolved_at = ? WHERE event_id = ?", (payload.user_answer, datetime.now().isoformat(), payload.event_id))
-        conn.commit()
+@protected_router.post("/hitl/resolve")
+async def resolve_hitl(
+    payload: HITLResolveRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Atomically resolves a pending HITL question strictly for the authenticated tenant."""
+    evt = db.get_hitl_event(payload.event_id, user_id=current_user.user_id)
+    if not evt:
+        raise HTTPException(status_code=404, detail="Event not found or not owned by user.")
 
-        if payload.save_to_vault:
-            entry = vault.learn_answer(row["question_text"], payload.user_answer)
-            entry.user_id = current_user.user_id
-            db.save_vault_entry(entry, user_id=current_user.user_id)
+    success = db.resolve_hitl_event(payload.event_id, payload.user_answer, user_id=current_user.user_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Event already resolved or failed to update.")
+
+    if payload.save_to_vault:
+        entry = vault.learn_answer(evt.question_text, payload.user_answer)
+        entry.user_id = current_user.user_id
+        db.save_vault_entry(entry, user_id=current_user.user_id)
 
     await ws_manager.broadcast({
         "type": "HITL_RESOLVED",
@@ -434,11 +620,14 @@ async def resolve_hitl(payload: HITLResolveRequest, current_user: User = Depends
     return {"status": "success", "message": "HITL event resolved and indexed permanently."}
 
 
-# --- Autonomous Bot Execution Endpoint ---
-
-@router.post("/bot/apply/{job_id}")
-async def apply_to_job(job_id: str, profile_id: str = "default_user", mode: Optional[str] = None, current_user: User = Depends(get_current_user_optional)):
-    """Executes full autonomous stealth application workflow for a specific job with rate limiting."""
+@protected_router.post("/bot/apply/{job_id}")
+async def apply_to_job(
+    job_id: str,
+    profile_id: Optional[str] = None,
+    mode: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Executes full autonomous stealth application workflow with persistent rate limiting."""
     from app.core.rate_limiter import rate_limiter
     if not rate_limiter.can_apply(current_user.user_id):
         raise HTTPException(
@@ -450,7 +639,8 @@ async def apply_to_job(job_id: str, profile_id: str = "default_user", mode: Opti
     runner = AutonomousJobRunner(mode=mode or DEFAULT_SUBMISSION_MODE)
     result = await runner.execute_application(
         job_id=job_id,
-        profile_id=profile_id,
+        profile_id=profile_id or current_user.user_id,
+        user_id=current_user.user_id,
         ws_broadcast_callback=ws_manager.broadcast
     )
     if result.get("status") == "success":
@@ -458,19 +648,20 @@ async def apply_to_job(job_id: str, profile_id: str = "default_user", mode: Opti
     return result
 
 
-# --- Email Radar & Inbound Parser Endpoints ---
-
 class InboundEmailPayload(BaseModel):
     sender: str
-    recipient: str = "default_user@jobcopilot.local"
+    recipient: str = "candidate@jobcopilot.local"
     subject: str
     body_html: str
     body_text: Optional[str] = None
 
 
-@router.post("/email/inbound")
-async def receive_inbound_email(payload: InboundEmailPayload, current_user: User = Depends(get_current_user_optional)):
-    """Processes incoming recruiter email, strips tracking pixels, classifies intent, and syncs pipeline."""
+@protected_router.post("/email/inbound")
+async def receive_inbound_email(
+    payload: InboundEmailPayload,
+    current_user: User = Depends(get_current_user)
+):
+    """Processes incoming recruiter email and syncs pipeline for authenticated tenant."""
     from app.email.sync import EmailSyncEngine
     result = await EmailSyncEngine.process_inbound_email(
         sender=payload.sender,
@@ -478,48 +669,56 @@ async def receive_inbound_email(payload: InboundEmailPayload, current_user: User
         subject=payload.subject,
         body_html=payload.body_html,
         body_text=payload.body_text,
+        user_id=current_user.user_id,
         ws_broadcast_callback=ws_manager.broadcast
     )
     return result
 
 
-@router.get("/email/messages")
-async def list_email_messages(current_user: User = Depends(get_current_user_optional)):
-    """Returns all parsed recruiter communications."""
+@protected_router.get("/email/messages")
+async def list_email_messages(current_user: User = Depends(get_current_user)):
+    """Returns all parsed recruiter communications for authenticated tenant."""
     emails = db.get_emails(user_id=current_user.user_id)
     return {"count": len(emails), "messages": [e.dict() for e in emails]}
 
 
-@router.post("/email/followup/{job_id}")
-async def generate_job_followup(job_id: str, stage_days: int = 7, profile_id: str = "default_user", current_user: User = Depends(get_current_user_optional)):
-    """Generates and saves a 7-day or 14-day follow-up draft for a submitted application."""
+@protected_router.post("/email/followup/{job_id}")
+async def generate_job_followup(
+    job_id: str,
+    stage_days: int = 7,
+    profile_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Generates and saves a follow-up draft for a submitted application."""
     from app.email.followup import FollowUpEngine
-    profile = db.get_profile(profile_id, user_id=current_user.user_id)
+    profile = db.get_profile(user_id=current_user.user_id, profile_id=profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found.")
 
-    res = FollowUpEngine.generate_and_save_followup(profile, job_id, stage_days=stage_days)
+    res = FollowUpEngine.generate_and_save_followup(profile, job_id, stage_days=stage_days, user_id=current_user.user_id)
     if not res:
         raise HTTPException(status_code=404, detail="Job not found.")
     return {"status": "success", "followup": res}
 
 
-# --- Funnel Analytics Endpoint ---
-
-@router.get("/analytics/funnel")
-async def get_funnel_analytics(current_user: User = Depends(get_current_user_optional)):
-    """Returns aggregated pipeline funnel metrics and telemetry."""
+@protected_router.get("/analytics/funnel")
+async def get_funnel_analytics(current_user: User = Depends(get_current_user)):
+    """Returns aggregated pipeline funnel metrics for authenticated tenant."""
     from app.core.analytics import AnalyticsEngine
     return {
         "status": "success",
-        "metrics": AnalyticsEngine.get_funnel_metrics()
+        "metrics": AnalyticsEngine.get_funnel_metrics(user_id=current_user.user_id)
     }
 
 
-# --- Milestone 7: Mock Interview Studio & Architecture Dossiers ---
+# --- Mock Interview Studio Endpoints ---
 
-@router.get("/interview/dossier")
-async def get_company_dossier(company: str, role: str = "Senior Software Engineer"):
+@protected_router.get("/interview/dossier")
+async def get_company_dossier(
+    company: str,
+    role: str = "Senior Software Engineer",
+    current_user: User = Depends(get_current_user)
+):
     """Generates technical architecture dossier and interview rounds for target company."""
     from app.core.interview_studio import InterviewStudioEngine
     return {
@@ -528,15 +727,16 @@ async def get_company_dossier(company: str, role: str = "Senior Software Enginee
     }
 
 
-@router.get("/interview/questions")
+@protected_router.get("/interview/questions")
 async def get_mock_questions(
     role: str = "Senior Software Engineer",
-    profile_id: str = "default_user",
-    category: Optional[str] = None
+    profile_id: Optional[str] = None,
+    category: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """Generates role-specific mock technical, system design, and STAR leadership questions."""
     from app.core.interview_studio import InterviewStudioEngine
-    profile = db.get_profile(profile_id)
+    profile = db.get_profile(user_id=current_user.user_id, profile_id=profile_id)
     skills = profile.skills if profile else ["Python", "Distributed Systems"]
     return {
         "status": "success",
@@ -551,9 +751,12 @@ class InterviewEvalRequest(BaseModel):
     key_concepts: Optional[List[str]] = None
 
 
-@router.post("/interview/evaluate")
-async def evaluate_interview_answer(payload: InterviewEvalRequest):
-    """Evaluates candidate response with multi-dimensional STAR scoring and metrics verification."""
+@protected_router.post("/interview/evaluate")
+async def evaluate_interview_answer(
+    payload: InterviewEvalRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Evaluates candidate response with multi-dimensional STAR scoring."""
     from app.core.interview_studio import InterviewStudioEngine
     ans = payload.candidate_answer or payload.answer or ""
     return {
@@ -573,17 +776,18 @@ class InterviewInvitationTriggerRequest(BaseModel):
     meeting_url: Optional[str] = None
 
 
-@router.post("/interview/notify-invitation")
-async def trigger_interview_invitation_notification(payload: InterviewInvitationTriggerRequest):
+@protected_router.post("/interview/notify-invitation")
+async def trigger_interview_invitation_notification(
+    payload: InterviewInvitationTriggerRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Triggers an interview invitation alert and provides role-customized mock interview questions."""
     from app.core.interview_studio import InterviewStudioEngine
-    from app.api.ws_gateway import ws_manager
 
     dossier = InterviewStudioEngine.generate_company_dossier(payload.company, payload.role_title)
     questions = InterviewStudioEngine.generate_mock_questions(role_title=payload.role_title, category=None)
     track = InterviewStudioEngine.infer_role_track(payload.role_title)
 
-    # Broadcast over WebSocket if connected
     await ws_manager.broadcast({
         "type": "INTERVIEW_INVITATION_RECEIVED",
         "company": payload.company,
@@ -604,9 +808,13 @@ async def trigger_interview_invitation_notification(payload: InterviewInvitation
     }
 
 
-@router.get("/interview/reverse-questions")
-async def get_reverse_interview_questions(role: str = "Senior Software Engineer", company: str = "Target Company"):
-    """Generates strategic questions to ask the hiring manager at the end of the interview."""
+@protected_router.get("/interview/reverse-questions")
+async def get_reverse_interview_questions(
+    role: str = "Senior Software Engineer",
+    company: str = "Target Company",
+    current_user: User = Depends(get_current_user)
+):
+    """Generates strategic questions to ask the hiring manager."""
     from app.core.interview_studio import InterviewStudioEngine
     return {
         "status": "success",
@@ -622,8 +830,11 @@ class InterviewerReconRequest(BaseModel):
     background_text: str = ""
 
 
-@router.post("/interview/interviewer-recon")
-async def analyze_interviewer_recon(payload: InterviewerReconRequest):
+@protected_router.post("/interview/interviewer-recon")
+async def analyze_interviewer_recon(
+    payload: InterviewerReconRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Infers interviewer persona, technical biases, and strategic preparation advice."""
     from app.core.interview_studio import InterviewStudioEngine
     return {
@@ -636,9 +847,12 @@ async def analyze_interviewer_recon(payload: InterviewerReconRequest):
     }
 
 
-@router.get("/interview/engineering-intel")
-async def get_company_engineering_intel_endpoint(company: str):
-    """Fetches company public engineering blog initiatives and architecture highlights."""
+@protected_router.get("/interview/engineering-intel")
+async def get_company_engineering_intel_endpoint(
+    company: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Fetches company public engineering blog initiatives."""
     from app.core.interview_studio import InterviewStudioEngine
     return {
         "status": "success",
@@ -646,7 +860,7 @@ async def get_company_engineering_intel_endpoint(company: str):
     }
 
 
-# --- Milestone 7: Salary Negotiation & Equity Modeler ---
+# --- Salary Negotiation & Equity Modeler Endpoints ---
 
 class OfferEvalRequest(BaseModel):
     base_salary_lpa: float
@@ -655,8 +869,11 @@ class OfferEvalRequest(BaseModel):
     role_title: str = "Senior Software Engineer"
 
 
-@router.post("/negotiation/evaluate")
-async def evaluate_offer_compensation(payload: OfferEvalRequest):
+@protected_router.post("/negotiation/evaluate")
+async def evaluate_offer_compensation(
+    payload: OfferEvalRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Benchmarks job offer against market percentiles."""
     from app.core.negotiation import SalaryNegotiationEngine
     return {
@@ -677,8 +894,11 @@ class EquityModelRequest(BaseModel):
     strike_price: float = 0.0
 
 
-@router.post("/negotiation/equity")
-async def model_equity(payload: EquityModelRequest):
+@protected_router.post("/negotiation/equity")
+async def model_equity(
+    payload: EquityModelRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Models startup ESOP ownership and future exit returns."""
     from app.core.negotiation import SalaryNegotiationEngine
     return {
@@ -696,16 +916,19 @@ class MultiOfferCompareRequest(BaseModel):
     offers: List[Dict[str, Any]]
 
 
-@router.post("/salary/compare-offers")
-@router.post("/negotiation/compare-offers")
-async def compare_offers_endpoint(payload: MultiOfferCompareRequest):
+@protected_router.post("/salary/compare-offers")
+@protected_router.post("/negotiation/compare-offers")
+async def compare_offers_endpoint(
+    payload: MultiOfferCompareRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Compares multiple offers with 4-year TC progression and liquidation analysis."""
     from app.core.negotiation import SalaryNegotiationEngine
     return SalaryNegotiationEngine.compare_multiple_offers(payload.offers)
 
 
 class AdvancedCounterOfferRequest(BaseModel):
-    candidate_name: str = "Satyajit Nayak"
+    candidate_name: Optional[str] = None
     target_company: str
     role_title: str
     current_base: str
@@ -716,15 +939,18 @@ class AdvancedCounterOfferRequest(BaseModel):
     competing_tc: Optional[str] = None
 
 
-@router.post("/salary/counter-script")
-@router.post("/negotiation/advanced-counter")
-async def generate_advanced_counter_script_endpoint(payload: AdvancedCounterOfferRequest):
+@protected_router.post("/salary/counter-script")
+@protected_router.post("/negotiation/advanced-counter")
+async def generate_advanced_counter_script_endpoint(
+    payload: AdvancedCounterOfferRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Generates tailored executive negotiation email and phone talking points."""
     from app.core.negotiation import SalaryNegotiationEngine
     return {
         "status": "success",
         "scripts": SalaryNegotiationEngine.generate_advanced_counter_script(
-            candidate_name=payload.candidate_name,
+            candidate_name=payload.candidate_name or current_user.full_name,
             target_company=payload.target_company,
             role_title=payload.role_title,
             current_base=payload.current_base,
@@ -738,7 +964,7 @@ async def generate_advanced_counter_script_endpoint(payload: AdvancedCounterOffe
 
 
 class CounterOfferRequest(BaseModel):
-    candidate_name: str = "Satyajit Nayak"
+    candidate_name: Optional[str] = None
     company_name: str
     role_title: str
     offered_tc: str
@@ -746,12 +972,15 @@ class CounterOfferRequest(BaseModel):
     leverage_points: Optional[List[str]] = None
 
 
-@router.post("/negotiation/counter-offer")
-async def generate_counter_offer(payload: CounterOfferRequest):
+@protected_router.post("/negotiation/counter-offer")
+async def generate_counter_offer(
+    payload: CounterOfferRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Generates an Anti-AI counter-offer negotiation email."""
     from app.core.negotiation import SalaryNegotiationEngine
     script = SalaryNegotiationEngine.generate_counter_offer_script(
-        candidate_name=payload.candidate_name,
+        candidate_name=payload.candidate_name or current_user.full_name,
         company_name=payload.company_name,
         role_title=payload.role_title,
         offered_tc=payload.offered_tc,
@@ -761,10 +990,12 @@ async def generate_counter_offer(payload: CounterOfferRequest):
     return {"status": "success", "counter_offer_script": script}
 
 
-# --- Milestone 7: Zero-Collision Calendar Availability ---
-
-@router.get("/calendar/availability")
-async def get_calendar_availability(timezone: str = "IST", days: int = 4):
+@protected_router.get("/calendar/availability")
+async def get_calendar_availability(
+    timezone: str = "IST",
+    days: int = 4,
+    current_user: User = Depends(get_current_user)
+):
     """Calculates non-conflicting interview scheduling windows."""
     from app.core.calendar_sync import CalendarAvailabilityEngine
     slots = CalendarAvailabilityEngine.get_open_slots(timezone_str=timezone, days_ahead=days)
@@ -777,13 +1008,13 @@ async def get_calendar_availability(timezone: str = "IST", days: int = 4):
     }
 
 
-# --- Milestone 8: Disaster Recovery & Encrypted Backup Endpoints ---
+# --- Backup Endpoints (F-06 Tenant Scoped & Buffer Based) ---
 
-@router.post("/backup/export")
-async def export_backup():
-    """Exports full encrypted archive (.jobcopilot.enc) of local state."""
+@protected_router.post("/backup/export")
+async def export_backup(current_user: User = Depends(get_current_user)):
+    """Exports encrypted archive (.jobcopilot.enc) scoped to authenticated tenant."""
     from app.core.backup import BackupManager
-    path = BackupManager.export_encrypted_backup()
+    path = BackupManager.export_encrypted_backup(user_id=current_user.user_id)
     return {
         "status": "success",
         "backup_path": str(path),
@@ -791,80 +1022,50 @@ async def export_backup():
     }
 
 
-class RestoreBackupRequest(BaseModel):
-    backup_file_path: str
+class RestoreBackupPayload(BaseModel):
+    encrypted_data_b64: Optional[str] = None
 
 
-@router.post("/backup/restore")
-async def restore_backup(payload: RestoreBackupRequest):
-    """Restores database state from an encrypted backup archive."""
+@protected_router.post("/backup/restore")
+async def restore_backup(
+    file: Optional[UploadFile] = File(None),
+    payload: Optional[RestoreBackupPayload] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Restores database state strictly for the caller's tenant from uploaded backup buffer."""
     from app.core.backup import BackupManager
-    target_path = Path(payload.backup_file_path).resolve()
-    if not target_path.exists():
-        raise HTTPException(status_code=404, detail="Backup file not found.")
-    if not target_path.name.endswith(".jobcopilot.enc"):
-        raise HTTPException(status_code=400, detail="Invalid backup file format. Expected .jobcopilot.enc archive.")
-    res = BackupManager.restore_encrypted_backup(target_path)
-    return res
+    if file:
+        contents = await file.read()
+        res = BackupManager.restore_encrypted_backup_buffer(contents, user_id=current_user.user_id)
+        return res
+    elif payload and payload.encrypted_data_b64:
+        contents = base64.b64decode(payload.encrypted_data_b64)
+        res = BackupManager.restore_encrypted_backup_buffer(contents, user_id=current_user.user_id)
+        return res
+    else:
+        raise HTTPException(status_code=400, detail="Must provide backup file upload or encrypted_data_b64 payload.")
 
 
-# --- Google SSO Authentication ---
-class GoogleSSORequest(BaseModel):
-    email: str
-    full_name: str
-    google_id: Optional[str] = None
-    avatar_url: Optional[str] = None
-    auto_login_permissions: bool = True
-
-
-@router.post("/auth/google-sso")
-async def google_sso_auth(payload: GoogleSSORequest):
-    """Authenticates candidate with Google profile and initializes vault session."""
-    import uuid
-    profile = db.get_profile("default_user") or CandidateProfile(
-        profile_id="default_user",
-        full_name=payload.full_name,
-        email=payload.email
-    )
-    profile.full_name = payload.full_name
-    profile.email = payload.email
-    db.save_profile(profile)
-    
-    # Store session token in vault
-    token = f"g_sso_{uuid.uuid4().hex[:16]}"
-    cred_vault.store_credential("google_auth", {
-        "email": payload.email,
-        "token": token,
-        "auto_login_enabled": payload.auto_login_permissions
-    })
-    
-    return {
-        "status": "success",
-        "session_token": token,
-        "user": {
-            "email": payload.email,
-            "full_name": payload.full_name,
-            "avatar_url": payload.avatar_url,
-            "auto_login_permissions": payload.auto_login_permissions
-        }
-    }
-
-
-# --- Multi-Role ATS Resume Workshop ---
 class MultiRoleTailorRequest(BaseModel):
     roles: List[str]
-    profile_id: str = "default_user"
+    profile_id: Optional[str] = None
 
 
-@router.post("/resumes/tailor-multi")
-async def tailor_resumes_for_multiple_roles(payload: MultiRoleTailorRequest):
-    """Compiles ATS-tailored resume summaries and keyword mappings for multiple target roles."""
-    profile = db.get_profile(payload.profile_id)
+@protected_router.post("/resumes/tailor-multi")
+async def tailor_resumes_for_multiple_roles(
+    payload: MultiRoleTailorRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Compiles ATS-tailored resume summaries for multiple target roles."""
+    profile = db.get_profile(user_id=current_user.user_id, profile_id=payload.profile_id)
     if not profile:
         profile = CandidateProfile(
-            profile_id=payload.profile_id,
-            full_name="Candidate",
-            email="candidate@example.com",
+            id=current_user.user_id,
+            user_id=current_user.user_id,
+            full_name=current_user.full_name or "Candidate",
+            email=current_user.email,
+            phone="+1-000-000-0000",
+            location="Remote",
             skills=["Python", "FastAPI", "React", "PostgreSQL", "Docker"]
         )
 
@@ -886,23 +1087,22 @@ async def tailor_resumes_for_multiple_roles(payload: MultiRoleTailorRequest):
     return {"status": "success", "resumes": results}
 
 
-# --- Manual Recruiter Direct Call Logger ---
 class LogDirectCallRequest(BaseModel):
     company: str
     role_title: str
     recruiter_name: Optional[str] = "Recruiter"
-    status: str = "INTERVIEW"  # RESPONDED, INTERVIEW, OFFER, REJECTED
+    status: str = "INTERVIEW"
     call_notes: Optional[str] = None
     scheduled_interview_time: Optional[str] = None
     meeting_link: Optional[str] = None
 
 
-@router.post("/jobs/log-call")
-async def log_direct_recruiter_call(payload: LogDirectCallRequest):
-    """Manually records an offline phone screening, recruiter call, or DM response."""
-    import uuid
-    
-    # Map status
+@protected_router.post("/jobs/log-call")
+async def log_direct_recruiter_call(
+    payload: LogDirectCallRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Manually records an offline recruiter call or phone screen."""
     status_enum = ApplicationStatus.INTERVIEW
     if payload.status.upper() == "OFFER":
         status_enum = ApplicationStatus.OFFER
@@ -913,6 +1113,7 @@ async def log_direct_recruiter_call(payload: LogDirectCallRequest):
 
     job = JobListing(
         job_id=f"job_manual_{uuid.uuid4().hex[:8]}",
+        user_id=current_user.user_id,
         fingerprint=f"fp_{uuid.uuid4().hex[:12]}",
         platform="DIRECT_CALL",
         company=payload.company,
@@ -923,9 +1124,8 @@ async def log_direct_recruiter_call(payload: LogDirectCallRequest):
         match_score=0.92,
         notes=f"Recruiter: {payload.recruiter_name} | Notes: {payload.call_notes or 'Logged via Direct Call CRM'}"
     )
-    db.save_job(job)
+    db.save_job(job, user_id=current_user.user_id)
 
-    # Broadcast event
     await ws_manager.broadcast({
         "type": "CALL_LOGGED",
         "company": payload.company,
@@ -944,11 +1144,10 @@ async def log_direct_recruiter_call(payload: LogDirectCallRequest):
     }
 
 
-# --- Held Applications Queue & Non-Blocking HITL Resumption ---
-@router.get("/jobs/held")
-async def get_held_applications():
-    """Retrieves all applications currently paused on novel questions."""
-    pending_events = db.get_pending_hitl_events()
+@protected_router.get("/jobs/held")
+async def get_held_applications(current_user: User = Depends(get_current_user)):
+    """Retrieves all applications currently paused on novel questions for authenticated tenant."""
+    pending_events = db.get_pending_hitl_events(user_id=current_user.user_id)
     held_jobs = []
     for evt in pending_events:
         held_jobs.append({
@@ -971,35 +1170,29 @@ class ResolveHeldApplicationRequest(BaseModel):
     save_to_vault: bool = True
 
 
-@router.post("/hitl/resolve-held")
-async def resolve_held_application(payload: ResolveHeldApplicationRequest):
+@protected_router.post("/hitl/resolve-held")
+async def resolve_held_application(
+    payload: ResolveHeldApplicationRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Atomically resolves held application, saves Q&A to vault, and resumes submission."""
-    from datetime import datetime
-    evt = db.get_hitl_event(payload.event_id)
+    evt = db.get_hitl_event(payload.event_id, user_id=current_user.user_id)
     if not evt:
         raise HTTPException(status_code=404, detail="Held HITL Event not found.")
 
-    # 1. Resolve event in DB
-    db.resolve_hitl_event(payload.event_id, payload.user_answer)
+    db.resolve_hitl_event(payload.event_id, payload.user_answer, user_id=current_user.user_id)
 
-    # 2. Persist to Knowledge Vault for future auto-fills
     if payload.save_to_vault:
-        vault.learn_question(
-            question=evt.question_text,
-            answer=payload.user_answer,
-            source="HITL_HELD_RESOLUTION",
-            company=evt.company,
-            role=evt.role_title
-        )
+        entry = vault.learn_answer(evt.question_text, payload.user_answer)
+        entry.user_id = current_user.user_id
+        db.save_vault_entry(entry, user_id=current_user.user_id)
 
-    # 3. Advance job status to SUBMITTED
-    job = db.get_job(evt.job_id)
+    job = db.get_job_by_id(evt.job_id, user_id=current_user.user_id)
     if job:
         job.status = ApplicationStatus.SUBMITTED
         job.applied_at = datetime.now().isoformat()
-        db.save_job(job)
+        db.save_job(job, user_id=current_user.user_id)
 
-    # Broadcast unhold & completion
     await ws_manager.broadcast({
         "type": "APPLICATION_RESUMED",
         "job_id": evt.job_id,
@@ -1015,9 +1208,7 @@ async def resolve_held_application(payload: ResolveHeldApplicationRequest):
     }
 
 
-# =========================================================================
-# SaaS Phase 3: Monetization & Subscription Endpoints
-# =========================================================================
+# --- SaaS Billing Endpoints ---
 
 class CheckoutRequest(BaseModel):
     tier: str = "PRO"
@@ -1025,8 +1216,8 @@ class CheckoutRequest(BaseModel):
     cancel_url: Optional[str] = None
 
 
-@router.get("/billing/plan")
-async def get_billing_plan(current_user: User = Depends(get_current_user_optional)):
+@protected_router.get("/billing/plan")
+async def get_billing_plan(current_user: User = Depends(get_current_user)):
     """Returns the current user's subscription tier, limits, and daily apply balance."""
     from app.core.rate_limiter import rate_limiter
     return {
@@ -1035,8 +1226,11 @@ async def get_billing_plan(current_user: User = Depends(get_current_user_optiona
     }
 
 
-@router.post("/billing/checkout")
-async def create_checkout_session(payload: CheckoutRequest, current_user: User = Depends(get_current_user_optional)):
+@protected_router.post("/billing/checkout")
+async def create_checkout_session(
+    payload: CheckoutRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Generates a Stripe checkout session for upgrading subscription tier."""
     requested_tier = payload.tier.upper()
     if requested_tier not in ["PRO", "ELITE"]:
@@ -1051,22 +1245,7 @@ async def create_checkout_session(payload: CheckoutRequest, current_user: User =
     }
 
 
-@router.post("/billing/webhook")
-async def stripe_webhook_handler(payload: Dict[str, Any]):
-    """Receives Stripe subscription updates and adjusts tenant tier accordingly."""
-    from app.core.rate_limiter import rate_limiter, SubscriptionTier
-    event_type = payload.get("type", "")
-    data_object = payload.get("data", {}).get("object", {})
-    user_id = data_object.get("metadata", {}).get("user_id", "default")
-    tier_str = data_object.get("metadata", {}).get("tier", "PRO").upper()
-
-    if event_type in ["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated"]:
-        tier = SubscriptionTier.ELITE if tier_str == "ELITE" else SubscriptionTier.PRO
-        rate_limiter.set_user_tier(user_id, tier)
-        return {"status": "success", "user_id": user_id, "active_tier": tier.value}
-    elif event_type in ["customer.subscription.deleted"]:
-        rate_limiter.set_user_tier(user_id, SubscriptionTier.FREE)
-        return {"status": "success", "user_id": user_id, "active_tier": SubscriptionTier.FREE.value}
-
-    return {"status": "ignored", "event_type": event_type}
+# Assemble Unified Master Router (F-01 Router-Level Protection)
+router.include_router(public_router)
+router.include_router(protected_router)
 

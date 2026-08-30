@@ -36,6 +36,7 @@ class CredentialVault:
     def __init__(self, vault_path: Path = VAULT_ENC_PATH):
         self.vault_path = Path(vault_path)
         self.salt_path = APP_DIR / "vault.salt"
+        self._key_cache: Dict[str, bytes] = {}
         self._init_salt()
 
     def _init_salt(self):
@@ -50,7 +51,11 @@ class CredentialVault:
                 self.salt = f.read()
 
     def get_or_create_master_key(self) -> str:
-        """Retrieves master key from OS Keychain or creates a secure random 32-byte key."""
+        """Retrieves master key from ENV, OS Keychain, or creates a secure random 32-byte key."""
+        env_key = os.getenv("JOBCOPILOT_MASTER_KEY")
+        if env_key:
+            return env_key
+
         if HAS_KEYRING:
             try:
                 stored_key = keyring.get_password(self.KEYRING_SERVICE, self.KEYRING_USERNAME)
@@ -62,7 +67,10 @@ class CredentialVault:
             except Exception:
                 pass
 
-        # Fallback to local machine identifier if keyring is unavailable in headless CI
+        if os.getenv("ENV", "").lower() == "production":
+            raise RuntimeError("JOBCOPILOT_MASTER_KEY environment variable required in production.")
+
+        # Fallback to local machine identifier if keyring is unavailable in headless CI/dev
         fallback_file = APP_DIR / ".master.key"
         if fallback_file.exists():
             with open(fallback_file, "r") as f:
@@ -77,12 +85,17 @@ class CredentialVault:
         return new_key
 
     def _derive_key(self, master_password: str) -> bytes:
-        """Derives a 256-bit key using Argon2id (or PBKDF2 as fallback)."""
+        """Derives a 256-bit key using Argon2id (or PBKDF2 as fallback) with memory caching."""
+        if master_password in self._key_cache:
+            return self._key_cache[master_password]
+
         password_bytes = master_password.encode('utf-8')
+        derived: Optional[bytes] = None
+
         if HAS_ARGON2:
             try:
                 # Argon2id: 64MB memory, 3 iterations, 4 parallelism
-                return hash_secret_raw(
+                derived = hash_secret_raw(
                     secret=password_bytes,
                     salt=self.salt,
                     time_cost=3,
@@ -94,14 +107,18 @@ class CredentialVault:
             except Exception:
                 pass
 
-        # PBKDF2 Fallback (100,000 iterations)
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=self.salt,
-            iterations=100000,
-        )
-        return kdf.derive(password_bytes)
+        if not derived:
+            # PBKDF2 Fallback (100,000 iterations)
+            kdf = PBKDF2HMAC(
+                algorithm=hashes.SHA256(),
+                length=32,
+                salt=self.salt,
+                iterations=100000,
+            )
+            derived = kdf.derive(password_bytes)
+
+        self._key_cache[master_password] = derived
+        return derived
 
     def encrypt_data(self, data: Any, master_password: Optional[str] = None) -> Dict[str, str]:
         """Encrypts arbitrary JSON-serializable data with AES-256-GCM."""

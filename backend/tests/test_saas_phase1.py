@@ -86,7 +86,7 @@ class TestSaaSPhase1:
         refresh_token = login_data["refresh_token"]
 
         # 4. Token Refresh
-        refresh_res = client.post(f"/api/auth/refresh?refresh_token_str={refresh_token}")
+        refresh_res = client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
         assert refresh_res.status_code == 200
         refreshed_data = refresh_res.json()
         assert "access_token" in refreshed_data

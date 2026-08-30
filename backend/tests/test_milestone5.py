@@ -27,6 +27,8 @@ class TestMilestone5:
         self.db_path = tmp_path / "test_m5.db"
         self.db = DatabaseManager(self.db_path)
         self.profile = CandidateProfile(
+            id="usr_m5",
+            user_id="usr_m5",
             full_name="Satyajit Nayak",
             email="scorpionsatyajit@gmail.com",
             phone="+91 7008053476",
@@ -34,7 +36,7 @@ class TestMilestone5:
             skills=["Python", "FastAPI", "PyTorch"],
             projects=[Project(name="Medical AI System", description="Diagnostic tool", metrics="96.19% accuracy")]
         )
-        self.db.save_profile(self.profile)
+        self.db.save_profile(self.profile, user_id="usr_m5")
 
     # 1. Test Privacy-First Parser & Tracking Pixel Stripper
     def test_email_parser_pixel_stripping(self):
@@ -90,6 +92,7 @@ class TestMilestone5:
         job_id = f"job_m5_{uuid.uuid4().hex[:6]}"
         job = JobListing(
             job_id=job_id,
+            user_id="usr_m5",
             fingerprint="fp_m5_test",
             platform="Greenhouse",
             company="LinearCorp",
@@ -97,7 +100,7 @@ class TestMilestone5:
             url="https://boards.greenhouse.io/linearcorp/jobs/1",
             status=ApplicationStatus.SUBMITTED
         )
-        self.db.save_job(job)
+        self.db.save_job(job, user_id="usr_m5")
 
         import app.email.sync
         orig_db = app.email.sync.db
@@ -108,7 +111,8 @@ class TestMilestone5:
                 sender="recruiting@linearcorp.com",
                 recipient="scorpionsatyajit@gmail.com",
                 subject="Interview with LinearCorp for Backend Engineer",
-                body_html="<p>We want to invite you to interview! Book here: https://calendly.com/linearcorp/screen</p>"
+                body_html="<p>We want to invite you to interview! Book here: https://calendly.com/linearcorp/screen</p>",
+                user_id="usr_m5"
             )
 
             assert res["status"] == "success"
@@ -117,7 +121,7 @@ class TestMilestone5:
             assert res["updated_pipeline_status"] == "INTERVIEW"
 
             # Check DB status
-            updated_job = next((j for j in self.db.get_jobs() if j.job_id == job_id), None)
+            updated_job = self.db.get_job_by_id(job_id, user_id="usr_m5")
             assert updated_job is not None
             assert updated_job.status == ApplicationStatus.INTERVIEW
 

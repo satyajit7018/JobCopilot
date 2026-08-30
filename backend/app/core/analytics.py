@@ -13,15 +13,15 @@ class AnalyticsEngine:
     """Computes holistic pipeline conversion metrics and telemetry."""
 
     @classmethod
-    def get_funnel_stats(cls) -> Dict[str, Any]:
+    def get_funnel_stats(cls, user_id: str = "") -> Dict[str, Any]:
         """Convenience alias for get_funnel_metrics."""
-        return cls.get_funnel_metrics()
+        return cls.get_funnel_metrics(user_id=user_id)
 
     @classmethod
-    def get_funnel_metrics(cls) -> Dict[str, Any]:
-        """Calculates stage counts, conversion rates, and platform breakdowns."""
-        jobs = db.get_jobs()
-        vault_entries = db.get_all_vault_entries()
+    def get_funnel_metrics(cls, user_id: str = "") -> Dict[str, Any]:
+        """Calculates stage counts, conversion rates, and platform breakdowns for user."""
+        jobs = db.get_jobs(user_id=user_id)
+        vault_entries = db.get_vault_entries(user_id=user_id)
 
         total_sourced = len(jobs)
         total_applied = sum(1 for j in jobs if j.status in [

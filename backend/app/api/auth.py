@@ -1,6 +1,7 @@
 """
 JobCopilot - Multi-Tenant Authentication & Identity System
-Provides JWT Access/Refresh Token rotation, Argon2id/PBKDF2 password hashing,
+Provides JWT Access/Refresh Token rotation with token blacklist revocation,
+Argon2id password hashing with legacy PBKDF2 upgrade,
 FastAPI security dependencies, and tenant session resolution.
 """
 
@@ -12,21 +13,41 @@ import base64
 import json
 import uuid
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 from fastapi import APIRouter, HTTPException, Depends, Header, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+try:
+    from argon2 import PasswordHasher
+    from argon2.exceptions import VerifyMismatchError
+    _ph = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4, hash_len=32)
+    HAS_ARGON2 = True
+except ImportError:
+    _ph = None
+    HAS_ARGON2 = False
+
 from app.core.models import (
     User, UserRole, UserRegisterRequest, UserLoginRequest,
-    TokenResponse, UserResponse
+    RefreshTokenRequest, TokenResponse, UserResponse
 )
 from app.core.database import db
 
-# Configuration
-JWT_SECRET = os.getenv("JWT_SECRET", "jobcopilot-super-secret-saas-jwt-signing-key-32b")
+# =========================================================================
+# Fail-Closed JWT Configuration (F-05)
+# =========================================================================
+RAW_JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
+ENV = os.getenv("ENV", "development").lower()
+
+if ENV == "production":
+    if not RAW_JWT_SECRET or RAW_JWT_SECRET == "jobcopilot-super-secret-saas-jwt-signing-key-32b" or len(RAW_JWT_SECRET) < 32:
+        raise RuntimeError(
+            "FATAL: In production, JWT_SECRET must be set to a cryptographically secure string of at least 32 characters."
+        )
+
+JWT_SECRET: str = RAW_JWT_SECRET or "jobcopilot-super-secret-saas-jwt-signing-key-32b"
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 15  # Short-lived access tokens (F-08)
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -34,30 +55,57 @@ security = HTTPBearer(auto_error=False)
 
 
 # =========================================================================
-# Password Hashing Engine (Argon2id with PBKDF2-HMAC-SHA256 Fallback)
+# Password Hashing Engine (Argon2id with PBKDF2 Legacy Migration)
 # =========================================================================
-def hash_password(password: str) -> str:
-    """Hashes password using PBKDF2-HMAC-SHA256 with 100,000 iterations and 16-byte salt."""
+def _hash_password_legacy(password: str) -> str:
+    """Explicit PBKDF2 hash for backward-compatibility and migration testing."""
     salt = os.urandom(16)
-    key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+    key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 600000)
     salt_b64 = base64.b64encode(salt).decode('utf-8')
     key_b64 = base64.b64encode(key).decode('utf-8')
-    return f"pbkdf2_sha256$100000${salt_b64}${key_b64}"
+    return f"pbkdf2_sha256$600000${salt_b64}${key_b64}"
 
 
-def verify_password(password: str, hashed: str) -> bool:
-    """Verifies a plain password against the stored hash in constant time."""
+def hash_password(password: str) -> str:
+    """Hashes password using Argon2id (or PBKDF2 if Argon2 is unavailable)."""
+    if HAS_ARGON2 and _ph is not None:
+        return _ph.hash(password)
+    return _hash_password_legacy(password)
+
+
+def verify_password(password: str, hashed: str) -> Tuple[bool, bool]:
+    """
+    Verifies a plain password against stored hash.
+    Returns tuple: (is_valid: bool, needs_rehash: bool)
+    """
+    if not hashed:
+        return False, False
+    
+    # 1. Argon2id Hash
+    if hashed.startswith("$argon2"):
+        if HAS_ARGON2 and _ph is not None:
+            try:
+                _ph.verify(hashed, password)
+                needs_rehash = _ph.check_needs_rehash(hashed)
+                return True, needs_rehash
+            except Exception:
+                return False, False
+        return False, False
+
+    # 2. Legacy PBKDF2 Hash
     try:
         parts = hashed.split('$')
-        if len(parts) != 4 or parts[0] != "pbkdf2_sha256":
-            return False
-        iterations = int(parts[1])
-        salt = base64.b64decode(parts[2].encode('utf-8'))
-        expected_key = base64.b64decode(parts[3].encode('utf-8'))
-        computed_key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, iterations)
-        return hmac.compare_digest(computed_key, expected_key)
+        if len(parts) == 4 and parts[0] == "pbkdf2_sha256":
+            iterations = int(parts[1])
+            salt = base64.b64decode(parts[2].encode('utf-8'))
+            expected_key = base64.b64decode(parts[3].encode('utf-8'))
+            computed_key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, iterations)
+            is_valid = hmac.compare_digest(computed_key, expected_key)
+            return is_valid, True  # Needs rehash to Argon2id
     except Exception:
-        return False
+        pass
+
+    return False, False
 
 
 # =========================================================================
@@ -73,11 +121,12 @@ def _b64url_decode(s: str) -> bytes:
 
 
 def create_jwt_token(payload: Dict[str, Any], expires_delta: timedelta) -> str:
-    """Generates a standard signed JWT HS256 token with unique jti."""
+    """Generates a standard signed JWT HS256 token with full 32-hex unique jti."""
     header = {"alg": "HS256", "typ": "JWT"}
     now = int(time.time())
     payload_copy = payload.copy()
-    payload_copy["jti"] = uuid.uuid4().hex[:12]
+    if "jti" not in payload_copy:
+        payload_copy["jti"] = uuid.uuid4().hex  # Full 32-character hex (F-08)
     payload_copy["iat"] = now
     payload_copy["exp"] = now + int(expires_delta.total_seconds())
 
@@ -117,76 +166,99 @@ def decode_jwt_token(token: str) -> Dict[str, Any]:
 
 
 # =========================================================================
-# FastAPI Security Dependencies
+# FastAPI Security Dependencies (F-01, F-02, F-08)
 # =========================================================================
 async def get_current_user_optional(
-    auth: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    x_user_id: Optional[str] = Header(None, alias="X-User-Id")
-) -> User:
+    auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
+) -> Optional[User]:
     """
-    Resolves the authenticated user from JWT Bearer token.
-    Falls back gracefully to default single-tenant user for local dev and testing.
+    Resolves the authenticated user from JWT Bearer token if present.
+    Returns None if no token or token is invalid.
     """
     if auth and auth.credentials:
         try:
             payload = decode_jwt_token(auth.credentials)
-            user_id = payload.get("sub")
-            if user_id:
-                user = db.get_user_by_id(user_id)
-                if user and user.is_active:
-                    return user
+            if payload.get("type") == "access":
+                jti = payload.get("jti")
+                if jti and db.is_token_revoked(jti):
+                    return None
+                user_id = payload.get("sub")
+                if user_id:
+                    user = db.get_user_by_id(user_id)
+                    if user and user.is_active:
+                        return user
         except Exception:
             pass
 
-    if x_user_id:
-        user = db.get_user_by_id(x_user_id)
-        if user:
-            return user
+    # Gated dev escape hatch (F-02)
+    if os.getenv("JOBCOPILOT_DEV_AUTH") == "1" and os.getenv("ENV", "").lower() != "production":
         return User(
-            user_id=x_user_id,
-            email=f"{x_user_id}@jobcopilot.local",
+            user_id="dev_user",
+            email="dev@jobcopilot.local",
             password_hash="",
-            full_name=x_user_id.capitalize(),
+            full_name="Dev User",
             role=UserRole.FREE
         )
 
-    # Fallback to local default user for backward compatibility
-    return User(
-        user_id="default",
-        email="candidate@jobcopilot.local",
-        password_hash="",
-        full_name="Default Candidate",
-        role=UserRole.FREE
-    )
+    return None
 
 
 async def get_current_user(
     auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> User:
-    """Strict authenticated user dependency requiring a valid JWT token."""
+    """
+    Strict authenticated user dependency requiring a valid, unrevoked JWT access token.
+    Raises 401 Unauthorized if missing, expired, revoked, or of wrong type.
+    """
     if not auth or not auth.credentials:
+        # Check dev escape hatch if explicitly enabled in non-production
+        if os.getenv("JOBCOPILOT_DEV_AUTH") == "1" and os.getenv("ENV", "").lower() != "production":
+            return User(
+                user_id="dev_user",
+                email="dev@jobcopilot.local",
+                password_hash="",
+                full_name="Dev User",
+                role=UserRole.FREE
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required. Please provide a valid Bearer token.",
             headers={"WWW-Authenticate": "Bearer"}
         )
+
     payload = decode_jwt_token(auth.credentials)
+    
+    # Assert token type is strictly 'access' (F-08)
+    if payload.get("type") != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type. Access token required."
+        )
+
+    # Check token revocation blacklist (F-08)
+    jti = payload.get("jti")
+    if jti and db.is_token_revoked(jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked."
+        )
+
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid token payload.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
     
     user = db.get_user_by_id(user_id)
     if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="User account not found or disabled.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account not found or disabled.")
     return user
 
 
 # =========================================================================
-# Auth API Endpoints
+# Auth API Endpoints (Public Allowlist: /register, /login, /refresh)
 # =========================================================================
 @router.post("/register", response_model=TokenResponse)
 async def register_user(req: UserRegisterRequest):
-    """Registers a new multi-tenant SaaS user account."""
+    """Registers a new multi-tenant SaaS user account with Argon2id password hashing."""
     clean_email = req.email.lower().strip()
     if not clean_email or "@" not in clean_email:
         raise HTTPException(status_code=400, detail="Invalid email address.")
@@ -238,10 +310,22 @@ async def login_user(req: UserLoginRequest):
     """Authenticates user credentials and issues signed JWT access and refresh tokens."""
     clean_email = req.email.lower().strip()
     user = db.get_user_by_email(clean_email)
-    if not user or not verify_password(req.password, user.password_hash):
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password.")
+    
+    is_valid, needs_rehash = verify_password(req.password, user.password_hash)
+    if not is_valid:
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User account is deactivated.")
+
+    # Seamless automatic upgrade from PBKDF2 to Argon2id on successful login
+    if needs_rehash:
+        try:
+            new_hash = hash_password(req.password)
+            db.update_user_password(user.user_id, new_hash)
+        except Exception:
+            pass
 
     role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
     access_token = create_jwt_token(
@@ -263,16 +347,29 @@ async def login_user(req: UserLoginRequest):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(refresh_token_str: str):
-    """Rotates refresh token and issues a new access token."""
-    payload = decode_jwt_token(refresh_token_str)
-    if payload.get("type") != "refresh":
+async def refresh_token(payload: RefreshTokenRequest):
+    """Rotates refresh token in request body (F-14), revokes old token, and issues a new access token (F-08)."""
+    token_payload = decode_jwt_token(payload.refresh_token)
+    if token_payload.get("type") != "refresh":
         raise HTTPException(status_code=400, detail="Invalid token type for refresh.")
     
-    user_id = payload.get("sub")
+    old_jti = token_payload.get("jti")
+    user_id = token_payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token subject.")
+
+    # Prevent refresh token replay attacks (F-08)
+    if old_jti and db.is_token_revoked(old_jti):
+        raise HTTPException(status_code=401, detail="Refresh token has been revoked or already used.")
+
     user = db.get_user_by_id(user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or inactive.")
+
+    # Revoke old refresh token on rotation
+    if old_jti:
+        exp_str = str(token_payload.get("exp", ""))
+        db.revoke_token(old_jti, user.user_id, exp_str)
 
     role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
     new_access_token = create_jwt_token(
@@ -293,8 +390,26 @@ async def refresh_token(refresh_token_str: str):
     )
 
 
+@router.post("/logout")
+async def logout_user(
+    current_user: User = Depends(get_current_user),
+    auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
+):
+    """Revokes the current access token in the database blacklist."""
+    if auth and auth.credentials:
+        try:
+            payload = decode_jwt_token(auth.credentials)
+            jti = payload.get("jti")
+            if jti:
+                exp_str = str(payload.get("exp", ""))
+                db.revoke_token(jti, current_user.user_id, exp_str)
+        except Exception:
+            pass
+    return {"status": "success", "message": "Successfully logged out and token revoked."}
+
+
 @router.get("/me", response_model=UserResponse)
-async def get_my_profile(current_user: User = Depends(get_current_user_optional)):
+async def get_my_profile(current_user: User = Depends(get_current_user)):
     """Returns the authenticated candidate's identity and subscription tier."""
     role_str = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
     return UserResponse(

@@ -74,6 +74,7 @@ class TestMilestone1:
         def worker(idx):
             job = JobListing(
                 job_id=f"job_concurrent_{idx}",
+                user_id="usr_milestone1",
                 fingerprint=f"fp_concurrent_{idx}",
                 platform="Greenhouse",
                 company=f"Company_{idx}",
@@ -82,30 +83,31 @@ class TestMilestone1:
                 salary_range="180k - 220k USD",
                 seniority_level="Staff"
             )
-            self.db.save_job(job)
+            self.db.save_job(job, user_id="usr_milestone1")
 
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
         for t in threads: t.start()
         for t in threads: t.join()
 
-        jobs = self.db.get_jobs()
+        jobs = self.db.get_jobs(user_id="usr_milestone1")
         assert len(jobs) == 8
 
     # 3. Test Atomic HITL Resolution
     def test_hitl_atomic_resolution(self):
         event = HITLEvent(
             event_id="evt_test_atomic",
+            user_id="usr_milestone1",
             job_id="job_concurrent_0",
             company="Anthropic",
             role_title="Research Engineer",
             question_text="Are you willing to relocate to SF?"
         )
-        self.db.save_hitl_event(event)
+        self.db.save_hitl_event(event, user_id="usr_milestone1")
 
         # First resolution
-        assert self.db.resolve_hitl_event("evt_test_atomic", "Yes, fully willing to relocate.") is True
+        assert self.db.resolve_hitl_event("evt_test_atomic", "Yes, fully willing to relocate.", user_id="usr_milestone1") is True
         # Second duplicate resolution must fail
-        assert self.db.resolve_hitl_event("evt_test_atomic", "Duplicate answer") is False
+        assert self.db.resolve_hitl_event("evt_test_atomic", "Duplicate answer", user_id="usr_milestone1") is False
 
     # 4. Test Cryptographic Vault
     def test_credential_vault_encryption(self):

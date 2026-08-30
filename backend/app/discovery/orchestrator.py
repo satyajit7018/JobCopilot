@@ -41,11 +41,13 @@ class DiscoveryOrchestrator:
         self,
         profile: Optional[CandidateProfile] = None,
         companies: Optional[List[str]] = None,
-        max_jobs_per_source: int = 50
+        max_jobs_per_source: int = 50,
+        user_id: str = ""
     ) -> Dict[str, Any]:
-        """Runs a complete parallel discovery cycle across all feeds."""
+        """Runs a complete parallel discovery cycle across all feeds for the user."""
         if not profile:
-            profile = db.get_profile("default_user")
+            if user_id:
+                profile = db.get_profile(user_id=user_id)
             if not profile:
                 return {"status": "error", "message": "No profile found. Please upload a resume first."}
 
@@ -125,10 +127,10 @@ class DiscoveryOrchestrator:
                         candidate_expected_ctc=profile.preferences.expected_ctc
                     )
 
-                    user_id = getattr(profile, "user_id", "default") or "default"
+                    target_user = user_id or getattr(profile, "user_id", "")
                     job = JobListing(
                         job_id=f"job_{uuid.uuid4().hex[:12]}",
-                        user_id=user_id,
+                        user_id=target_user,
                         fingerprint=fingerprint,
                         platform=lead.get("platform", "Direct"),
                         company=company,
@@ -146,7 +148,7 @@ class DiscoveryOrchestrator:
                     )
 
                     # Persist to Multi-Tenant DB
-                    if db.save_job(job, user_id=user_id):
+                    if db.save_job(job, user_id=target_user):
                         saved_jobs.append(job)
 
             self.total_matched += len(saved_jobs)

@@ -20,19 +20,13 @@ class KnowledgeVault:
         self._cached_entries: Optional[List[VaultEntry]] = None
         self._ensure_baseline_entries()
 
-    def _get_entries(self) -> List[VaultEntry]:
-        """Retrieves cached vault entries or reads from database."""
-        if self._cached_entries is None:
-            self._cached_entries = db.get_all_vault_entries()
-        return self._cached_entries
-
-    def _invalidate_cache(self):
-        """Invalidates in-memory entries cache upon updates."""
-        self._cached_entries = None
+    def _get_entries(self, user_id: str = "system_baseline") -> List[VaultEntry]:
+        """Retrieves cached vault entries or reads from database for user."""
+        return db.get_vault_entries(user_id=user_id)
 
     def _ensure_baseline_entries(self):
         """Seeds baseline universal recruiter questions and refreshes vector dimensions."""
-        existing = db.get_all_vault_entries()
+        existing = db.get_vault_entries(user_id="system_baseline")
         vocab_len = len(self.matcher.VOCABULARY)
 
         baselines = [
@@ -54,25 +48,26 @@ class KnowledgeVault:
 
         if not existing:
             for question, slot_type, slot_key, template in baselines:
-                self.learn_answer(question, template, slot_type=slot_type, slot_key=slot_key)
+                self.learn_answer(question, template, slot_type=slot_type, slot_key=slot_key, user_id="system_baseline")
         else:
             # Refresh embeddings if vocabulary changed
             for entry in existing:
                 if len(entry.embedding) != vocab_len:
                     entry.embedding = self.matcher.get_embedding(entry.question_pattern)
-                    db.save_vault_entry(entry)
+                    db.save_vault_entry(entry, user_id="system_baseline")
 
     def seed_from_profile(self, profile: CandidateProfile):
         """Seeds the Knowledge Vault with rich, specialized slots directly from a candidate profile."""
         prefs = profile.preferences
         notice_str = f"{prefs.notice_period_days} days" if prefs.notice_period_days > 0 else "0 days (Immediate)"
+        uid = profile.user_id or "default"
 
         # 1. Update Core Recruiter Preferences Slots
-        self.learn_answer("What is your expected CTC / compensation?", prefs.expected_ctc, slot_type=SlotType.EXACT_PARAM, slot_key="expected_ctc")
-        self.learn_answer("What is your current CTC / salary?", prefs.current_ctc, slot_type=SlotType.EXACT_PARAM, slot_key="current_ctc")
-        self.learn_answer("What is your notice period / earliest start date?", notice_str, slot_type=SlotType.EXACT_PARAM, slot_key="notice_period_days")
-        self.learn_answer("Are you open to relocation?", "Yes, willing to relocate" if prefs.willing_to_relocate else "No, remote only", slot_type=SlotType.EXACT_PARAM, slot_key="willing_to_relocate")
-        self.learn_answer("Do you require visa sponsorship?", "Yes, require visa sponsorship" if prefs.requires_sponsorship else "No, legally authorized without sponsorship", slot_type=SlotType.EXACT_PARAM, slot_key="requires_sponsorship")
+        self.learn_answer("What is your expected CTC / compensation?", prefs.expected_ctc, slot_type=SlotType.EXACT_PARAM, slot_key="expected_ctc", user_id=uid)
+        self.learn_answer("What is your current CTC / salary?", prefs.current_ctc, slot_type=SlotType.EXACT_PARAM, slot_key="current_ctc", user_id=uid)
+        self.learn_answer("What is your notice period / earliest start date?", notice_str, slot_type=SlotType.EXACT_PARAM, slot_key="notice_period_days", user_id=uid)
+        self.learn_answer("Are you open to relocation?", "Yes, willing to relocate" if prefs.willing_to_relocate else "No, remote only", slot_type=SlotType.EXACT_PARAM, slot_key="willing_to_relocate", user_id=uid)
+        self.learn_answer("Do you require visa sponsorship?", "Yes, require visa sponsorship" if prefs.requires_sponsorship else "No, legally authorized without sponsorship", slot_type=SlotType.EXACT_PARAM, slot_key="requires_sponsorship", user_id=uid)
 
         # 2. Seed Skill-Specific Experience Slots
         yoe = prefs.years_of_experience
@@ -81,7 +76,8 @@ class KnowledgeVault:
                 f"How many years of experience do you have with {skill}?",
                 f"{yoe:.1f} years" if yoe >= 1.0 else "1 year",
                 slot_type=SlotType.TECH_YEARS,
-                slot_key=f"TECH_YEARS:{skill}"
+                slot_key=f"TECH_YEARS:{skill}",
+                user_id=uid
             )
 
         # 3. Seed Career Narrative
@@ -90,22 +86,30 @@ class KnowledgeVault:
                 "Why are you looking for a new role?",
                 prefs.why_looking_for_role,
                 slot_type=SlotType.PARAMETRIC_ESSAY,
-                slot_key="why_looking_for_role"
+                slot_key="why_looking_for_role",
+                user_id=uid
             )
 
     def learn_question(self, question: str, answer: str, **kwargs) -> VaultEntry:
         """Alias for learn_answer."""
-        return self.learn_answer(question=question, answer_template=answer)
+        return self.learn_answer(question=question, answer_template=answer, **kwargs)
 
-    def learn_answer(self, question: str, answer_template: str, slot_type: Optional[SlotType] = None, slot_key: Optional[str] = None) -> VaultEntry:
-        """Stores or updates a Q&A slot in the Knowledge Vault."""
+    def learn_answer(
+        self,
+        question: str,
+        answer_template: str,
+        slot_type: Optional[SlotType] = None,
+        slot_key: Optional[str] = None,
+        user_id: str = "default"
+    ) -> VaultEntry:
+        """Stores or updates a Q&A slot in the Knowledge Vault for user."""
         if not slot_type or not slot_key:
             slot_type, slot_key = self.matcher.detect_slot_type(question)
 
         embedding = self.matcher.get_embedding(question)
 
-        # Check if an entry with this slot_key already exists
-        existing_entries = self._get_entries()
+        # Check if an entry with this slot_key already exists for this user
+        existing_entries = self._get_entries(user_id=user_id)
         for e in existing_entries:
             if (e.slot_key == slot_key and e.slot_type == slot_type) or e.question_pattern.lower() == question.lower():
                 e.slot_key = slot_key
@@ -114,12 +118,12 @@ class KnowledgeVault:
                 e.question_pattern = question
                 e.embedding = embedding
                 e.last_used_at = datetime.now().isoformat()
-                db.save_vault_entry(e)
-                self._invalidate_cache()
+                db.save_vault_entry(e, user_id=user_id)
                 return e
 
         entry = VaultEntry(
             qa_id=f"qa_{uuid.uuid4().hex[:8]}",
+            user_id=user_id,
             slot_type=slot_type,
             slot_key=slot_key,
             question_pattern=question,
@@ -129,8 +133,7 @@ class KnowledgeVault:
             usage_count=1,
             last_used_at=datetime.now().isoformat()
         )
-        db.save_vault_entry(entry)
-        self._invalidate_cache()
+        db.save_vault_entry(entry, user_id=user_id)
         return entry
 
     def _resolve_template(
@@ -170,10 +173,14 @@ class KnowledgeVault:
         company: str = "the company",
         role: str = "Software Engineer",
         domain: str = "Technology",
-        similarity_threshold: float = 0.55
+        similarity_threshold: float = 0.55,
+        user_id: str = ""
     ) -> Tuple[Optional[str], float, Optional[VaultEntry]]:
         """Queries the Knowledge Vault using deterministic slot resolution and hybrid search."""
-        entries = self._get_entries()
+        target_user = user_id or (profile.user_id if profile else "system_baseline")
+        entries = self._get_entries(user_id=target_user)
+        if not entries and target_user != "system_baseline":
+            entries = self._get_entries(user_id="system_baseline")
         if not entries:
             return None, 0.0, None
 
@@ -213,20 +220,19 @@ class KnowledgeVault:
         question: str,
         profile: Optional[CandidateProfile] = None,
         context: Optional[Dict[str, Any]] = None,
-        similarity_threshold: float = 0.55
+        similarity_threshold: float = 0.55,
+        user_id: str = ""
     ) -> Tuple[Optional[str], float, Optional[VaultEntry]]:
-        """Convenience wrapper for querying the vault with optional context dictionary."""
+        """High-level wrapper for dynamic question resolution."""
         ctx = context or {}
-        company = ctx.get("company", "the company")
-        role = ctx.get("role", "Software Engineer")
-        domain = ctx.get("domain", "Technology")
         return self.query_answer(
             question=question,
             profile=profile,
-            company=company,
-            role=role,
-            domain=domain,
-            similarity_threshold=similarity_threshold
+            company=ctx.get("company", "the company"),
+            role=ctx.get("role", "Software Engineer"),
+            domain=ctx.get("domain", "Technology"),
+            similarity_threshold=similarity_threshold,
+            user_id=user_id
         )
 
 

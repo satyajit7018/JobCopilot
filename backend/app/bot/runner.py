@@ -39,16 +39,16 @@ class AutonomousJobRunner:
     async def execute_application(
         self,
         job_id: str,
-        profile_id: str = "default_user",
+        profile_id: Optional[str] = None,
+        user_id: str = "",
         ws_broadcast_callback = None
     ) -> Dict[str, Any]:
         """Runs full autonomous application workflow for a specific job."""
-        profile = db.get_profile(profile_id)
+        profile = db.get_profile(user_id=user_id, profile_id=profile_id)
         if not profile:
             return {"status": "error", "message": "Profile not found."}
 
-        jobs = db.get_jobs()
-        job = next((j for j in jobs if j.job_id == job_id), None)
+        job = db.get_job_by_id(job_id=job_id, user_id=user_id)
         if not job:
             return {"status": "error", "message": "Job not found."}
 
@@ -97,7 +97,7 @@ class AutonomousJobRunner:
             job.submission_mode = self.mode
             job.applied_at = now_str
             job.confirmation_screenshot_path = str(screenshot_file)
-            db.save_job(job)
+            db.save_job(job, user_id=user_id or job.user_id)
             await log(f"🛡️ {self.mode} Mode: Form filled and verified! Application recorded for {job.company}.")
             return {
                 "status": "success",
@@ -160,7 +160,7 @@ class AutonomousJobRunner:
                     job.status = ApplicationStatus.SUBMITTED
                     job.submission_mode = "DRY_RUN"
                     job.applied_at = now_str
-                    db.save_job(job)
+                    db.save_job(job, user_id=user_id or job.user_id)
                 else:
                     await log("Submitting application...")
                     submit_btn = await page.query_selector("button[type='submit'], input[type='submit'], button:has-text('Submit')")
@@ -170,7 +170,7 @@ class AutonomousJobRunner:
                     job.status = ApplicationStatus.SUBMITTED
                     job.submission_mode = "LIVE"
                     job.applied_at = now_str
-                    db.save_job(job)
+                    db.save_job(job, user_id=user_id or job.user_id)
                     CheckpointManager.clear(job.job_id)
 
                 await browser.close()

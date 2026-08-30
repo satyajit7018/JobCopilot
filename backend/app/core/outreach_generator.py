@@ -90,10 +90,12 @@ class OutreachGenerator:
         """
         Creates and stores the complete Triple-Threat outreach package in SQLite.
         """
+        uid = profile.user_id or "default"
         # 1. LinkedIn InMail Note
         li_content = cls.generate_linkedin_inmail_note(profile, company_name, job_title, manager_name)
         li_record = OutreachRecord(
             outreach_id=f"out_li_{uuid.uuid4().hex[:8]}",
+            user_id=uid,
             job_id=job_id,
             channel=OutreachChannel.LINKEDIN_INMAIL,
             recipient_name=manager_name,
@@ -101,12 +103,13 @@ class OutreachGenerator:
             message_content=li_content,
             status="DRAFT"
         )
-        db.save_outreach_record(li_record)
+        db.save_outreach_record(li_record, user_id=uid)
 
         # 2. Direct Cold Email
         email_data = cls.generate_cold_email_to_lead(profile, company_name, job_title, manager_name)
         email_record = OutreachRecord(
             outreach_id=f"out_em_{uuid.uuid4().hex[:8]}",
+            user_id=uid,
             job_id=job_id,
             channel=OutreachChannel.COLD_EMAIL,
             recipient_name=manager_name,
@@ -114,7 +117,7 @@ class OutreachGenerator:
             message_content=f"Subject: {email_data['subject']}\n\n{email_data['body']}",
             status="DRAFT"
         )
-        db.save_outreach_record(email_record)
+        db.save_outreach_record(email_record, user_id=uid)
 
         return {
             "job_id": job_id,

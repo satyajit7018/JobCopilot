@@ -155,7 +155,7 @@ class TestMilestone4:
 
         # Resolve
         from app.core.database import db
-        db.resolve_hitl_event(event.event_id, "Citizen / Permanent Resident")
+        db.resolve_hitl_event(event.event_id, "Citizen / Permanent Resident", user_id="default")
 
-        ans = await HITLAgent.wait_for_resolution(event.event_id, poll_interval=0.05, max_timeout=2.0)
+        ans = await HITLAgent.wait_for_resolution(event.event_id, poll_interval=0.05, max_timeout=2.0, user_id="default")
         assert ans == "Citizen / Permanent Resident"

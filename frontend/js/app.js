@@ -11,7 +11,34 @@ const API_BASE = window.location.origin.includes('localhost') || window.location
   ? `${window.location.origin}/api`
   : '/api';
 
-const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+// --- Security Sanitization & Authentication Helpers (F-11) ---
+function escapeHTML(str) {
+  if (!str && str !== 0) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function sanitizeUrl(url) {
+  if (!url) return '#';
+  const clean = String(url).trim();
+  if (/^https?:\/\//i.test(clean) || /^mailto:/i.test(clean)) {
+    return escapeHTML(clean);
+  }
+  return '#';
+}
+
+async function authFetch(url, options = {}) {
+  const token = localStorage.getItem('jobcopilot_access_token');
+  const headers = { ...(options.headers || {}) };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return await fetch(url, { ...options, headers });
+}
 
 // Global Reactive State
 const state = {
@@ -177,7 +204,10 @@ function showToast(message, type = 'info') {
 // ==========================================================================
 function initWebSocket() {
   try {
-    state.ws = new WebSocket(WS_URL);
+    const WS_BASE = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+    const token = localStorage.getItem('jobcopilot_access_token');
+    const wsUrl = token ? `${WS_BASE}?token=${encodeURIComponent(token)}` : WS_BASE;
+    state.ws = new WebSocket(wsUrl);
 
     state.ws.onopen = () => {
       if (els.wsStatusText) els.wsStatusText.textContent = 'Sync: Connected';
@@ -639,42 +669,45 @@ function renderJobCardHTML(job) {
   if (matchPct >= 80) matchBadgeClass = 'match-high';
   else if (matchPct >= 65) matchBadgeClass = 'match-mid';
 
-  const platform = job.platform || 'Direct';
-  const location = job.location || 'Remote';
+  const company = escapeHTML(job.company || 'Company');
+  const title = escapeHTML(job.title || 'Role');
+  const platform = escapeHTML(job.platform || 'Direct');
+  const location = escapeHTML(job.location || 'Remote');
+  const jobId = escapeHTML(job.job_id || '');
 
   // Extract GMeet / Zoom link if present in notes
   let gmeetLink = null;
   const matchLink = (job.notes || '').match(/(https?:\/\/(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com)[^\s]+)/i);
-  if (matchLink) gmeetLink = matchLink[1];
+  if (matchLink) gmeetLink = sanitizeUrl(matchLink[1]);
 
   return `
-    <div class="job-card" id="card-${job.job_id}">
+    <div class="job-card" id="card-${jobId}">
       <div class="job-card-top">
-        <div class="job-company">${job.company}</div>
+        <div class="job-company">${company}</div>
         <span class="match-ring-badge ${matchBadgeClass}">${matchPct}% Match</span>
       </div>
-      <div class="job-title">${job.title}</div>
+      <div class="job-title">${title}</div>
       <div class="job-tags">
         <span class="job-tag">${platform}</span>
         <span class="job-tag">${location}</span>
-        ${job.salary_range ? `<span class="job-tag" style="color: var(--accent-emerald);">${job.salary_range}</span>` : ''}
+        ${job.salary_range ? `<span class="job-tag" style="color: var(--accent-emerald);">${escapeHTML(job.salary_range)}</span>` : ''}
       </div>
 
-      ${gmeetLink ? `
-        <a href="${gmeetLink}" target="_blank" class="gmeet-btn">
+      ${gmeetLink && gmeetLink !== '#' ? `
+        <a href="${gmeetLink}" target="_blank" rel="noopener noreferrer" class="gmeet-btn">
           <span>📹 Join Interview Meeting</span>
         </a>
       ` : ''}
 
       ${job.status === 'INTERVIEW' ? `
-        <button class="btn btn-secondary btn-sm" onclick="window.launchTailoredInterviewForJob('${job.company.replace(/'/g, "\\'")}', '${job.title.replace(/'/g, "\\'")}')" style="margin-top: 6px; width: 100%; background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe; font-size: 11.5px; padding: 4px 8px; justify-content: center;">
+        <button class="btn btn-secondary btn-sm" onclick="window.launchTailoredInterviewForJob('${company.replace(/'/g, "\\'")}', '${title.replace(/'/g, "\\'")}')" style="margin-top: 6px; width: 100%; background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe; font-size: 11.5px; padding: 4px 8px; justify-content: center;">
           <span>🎙️ Practice Tailored Mock Interview</span>
         </button>
       ` : ''}
 
       <div class="job-card-actions">
-        <button class="btn btn-primary btn-sm" onclick="applyToJob('${job.job_id}')" style="flex: 1;">⚡ Apply</button>
-        <button class="btn btn-secondary btn-sm" onclick="tailorJobAssets('${job.job_id}')">Tailor</button>
+        <button class="btn btn-primary btn-sm" onclick="applyToJob('${jobId}')" style="flex: 1;">⚡ Apply</button>
+        <button class="btn btn-secondary btn-sm" onclick="tailorJobAssets('${jobId}')">Tailor</button>
       </div>
     </div>
   `;

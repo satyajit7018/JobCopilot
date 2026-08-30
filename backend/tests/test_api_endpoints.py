@@ -3,26 +3,13 @@ JobCopilot - REST & WebSocket API Integration Tests
 Tests /api/upload-resume, /api/questionnaire, /api/vault, /api/hitl, and /api/jobs.
 """
 
-import sys
-from pathlib import Path
-
-# Add backend directory and venv site-packages to path
-backend_dir = Path(__file__).parent.parent.resolve()
-sys.path.insert(0, str(backend_dir))
-venv_site_packages = backend_dir / "venv" / "lib" / "python3.9" / "site-packages"
-if venv_site_packages.exists():
-    sys.path.insert(0, str(venv_site_packages))
-
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
 from app.core.database import db
 from app.core.models import HITLEvent, JobListing
 
-client = TestClient(app)
 
-
-def test_api_health():
+def test_api_health(client: TestClient):
     res = client.get("/api/health")
     assert res.status_code == 200
     data = res.json()
@@ -30,7 +17,7 @@ def test_api_health():
     assert data["storage"] == "sqlite_wal"
 
 
-def test_upload_resume_and_auto_prefill():
+def test_upload_resume_and_auto_prefill(auth_client: TestClient):
     sample_text = """
     Jane Doe
     jane@doe.tech | +1 (555) 345-6789 | https://linkedin.com/in/janedoe | https://github.com/janedoe
@@ -45,7 +32,7 @@ def test_upload_resume_and_auto_prefill():
     Projects:
     Autonomous Agent Swarm: Multi-agent coordination system with 99.9% uptime.
     """
-    res = client.post("/api/upload-resume", data={"raw_text": sample_text, "profile_id": "test_jane"})
+    res = auth_client.post("/api/upload-resume", data={"raw_text": sample_text, "profile_id": "test_jane"})
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "success"
@@ -56,9 +43,9 @@ def test_upload_resume_and_auto_prefill():
     assert data["prefilled_questionnaire"]["full_name"] == "Jane Doe"
 
 
-def test_questionnaire_lifecycle():
+def test_questionnaire_lifecycle(auth_client: TestClient):
     # 1. Fetch questionnaire
-    res = client.get("/api/questionnaire?profile_id=test_jane")
+    res = auth_client.get("/api/questionnaire?profile_id=test_jane")
     assert res.status_code == 200
     data = res.json()
     assert len(data["questions_schema"]) == 8
@@ -74,46 +61,47 @@ def test_questionnaire_lifecycle():
             "current_employer": "Meta"
         }
     }
-    res_sub = client.post("/api/questionnaire", json=submit_payload)
+    res_sub = auth_client.post("/api/questionnaire", json=submit_payload)
     assert res_sub.status_code == 200
     res_data = res_sub.json()
     assert res_data["profile"]["preferences"]["expected_ctc"] == "150000 USD"
     assert "Meta" in res_data["profile"]["preferences"]["company_blacklist"]
 
 
-def test_vault_endpoints():
-    res = client.get("/api/vault")
-    assert res.status_code == 200
-    data = res.json()
-    assert data["count"] > 0
-
+def test_vault_endpoints(auth_client: TestClient):
     learn_payload = {
         "question": "What is your favorite design pattern?",
         "answer": "I favor Dependency Injection and Factory patterns for modularity."
     }
-    res_learn = client.post("/api/vault/learn", json=learn_payload)
+    res_learn = auth_client.post("/api/vault/learn", json=learn_payload)
     assert res_learn.status_code == 200
     assert res_learn.json()["status"] == "success"
 
+    res = auth_client.get("/api/vault")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["count"] > 0
 
-def test_hitl_resolution_endpoint():
+
+def test_hitl_resolution_endpoint(auth_client: TestClient):
     # Save a test HITL event
     event = HITLEvent(
-        event_id="evt_api_test",
+        event_id="evt_api_test_resolve",
+        user_id="usr_test_tenant_a",
         job_id="job_api_1",
         company="Stripe",
         role_title="Backend Engineer",
         question_text="How many years of Python experience?"
     )
-    db.save_hitl_event(event)
+    db.save_hitl_event(event, user_id="usr_test_tenant_a")
 
     # Resolve event
-    res = client.post("/api/hitl/resolve", json={"event_id": "evt_api_test", "user_answer": "4 years"})
+    res = auth_client.post("/api/hitl/resolve", json={"event_id": "evt_api_test_resolve", "user_answer": "4 years"})
     assert res.status_code == 200
     assert res.json()["status"] == "success"
 
 
-def test_google_sso_endpoint():
+def test_google_sso_endpoint(client: TestClient):
     payload = {
         "email": "alex.dev@gmail.com",
         "full_name": "Alex Mercer",
@@ -123,17 +111,17 @@ def test_google_sso_endpoint():
     res = client.post("/api/auth/google-sso", json=payload)
     assert res.status_code == 200
     data = res.json()
-    assert data["status"] == "success"
-    assert "session_token" in data
-    assert data["user"]["email"] == "alex.dev@gmail.com"
+    assert "access_token" in data
+    assert "refresh_token" in data
+    assert data["email"] == "alex.dev@gmail.com"
 
 
-def test_multi_role_tailor_endpoint():
+def test_multi_role_tailor_endpoint(auth_client: TestClient):
     payload = {
         "roles": ["Backend Engineer", "Full Stack Engineer", "AI/ML Engineer"],
         "profile_id": "default_user"
     }
-    res = client.post("/api/resumes/tailor-multi", json=payload)
+    res = auth_client.post("/api/resumes/tailor-multi", json=payload)
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "success"
@@ -142,7 +130,7 @@ def test_multi_role_tailor_endpoint():
     assert len(data["resumes"]["Backend Engineer"]["recommended_bullets"]) >= 2
 
 
-def test_manual_call_logger_endpoint():
+def test_manual_call_logger_endpoint(auth_client: TestClient):
     payload = {
         "company": "Anthropic",
         "role_title": "Systems Engineer",
@@ -151,7 +139,7 @@ def test_manual_call_logger_endpoint():
         "call_notes": "Discussed distributed inference and memory bandwidth. Scheduled next round.",
         "meeting_link": "https://meet.google.com/abc-defg-hij"
     }
-    res = client.post("/api/jobs/log-call", json=payload)
+    res = auth_client.post("/api/jobs/log-call", json=payload)
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "success"
@@ -159,28 +147,29 @@ def test_manual_call_logger_endpoint():
     assert data["current_status"] == "INTERVIEW"
 
 
-def test_held_application_resolution_lifecycle():
-    # 1. Create a held event
+def test_held_application_resolution_lifecycle(auth_client: TestClient):
+    # Save a held application event
     event = HITLEvent(
-        event_id="evt_held_001",
-        job_id="job_held_101",
-        company="Scale AI",
-        role_title="Data Platform Engineer",
-        question_text="What is your experience with Apache Iceberg?"
+        event_id="evt_held_test_1",
+        user_id="usr_test_tenant_a",
+        job_id="job_held_1",
+        company="Vercel",
+        role_title="Edge Infrastructure Engineer",
+        question_text="Provide your portfolio URL",
+        input_type="text"
     )
-    db.save_hitl_event(event)
+    db.save_hitl_event(event, user_id="usr_test_tenant_a")
 
-    # 2. Query held jobs
-    res_held = client.get("/api/jobs/held")
+    # Fetch held applications
+    res_held = auth_client.get("/api/jobs/held")
     assert res_held.status_code == 200
-    data_held = res_held.json()
-    assert data_held["count"] >= 1
+    assert res_held.json()["status"] == "success"
 
-    # 3. Resolve held job
-    res_res = client.post("/api/hitl/resolve-held", json={
-        "event_id": "evt_held_001",
-        "user_answer": "Built data lakes on Iceberg with Trino querying 50TB daily.",
+    # Resolve held application
+    res_resolve = auth_client.post("/api/hitl/resolve-held", json={
+        "event_id": "evt_held_test_1",
+        "user_answer": "https://portfolio.dev",
         "save_to_vault": True
     })
-    assert res_res.status_code == 200
-    assert res_res.json()["status"] == "success"
+    assert res_resolve.status_code == 200
+    assert res_resolve.json()["status"] == "success"

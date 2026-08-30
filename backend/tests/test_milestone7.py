@@ -82,8 +82,15 @@ class TestMilestone7:
     # 5. Test REST Endpoints
     @pytest.mark.asyncio
     async def test_milestone7_endpoints(self):
+        from datetime import timedelta
+        from app.api.auth import create_jwt_token
+        token = create_jwt_token(
+            {"sub": "usr_test_tenant_a", "email": "test_a@jobcopilot.test", "role": "PRO", "type": "access"},
+            timedelta(minutes=60)
+        )
+        headers = {"Authorization": f"Bearer {token}"}
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:
             # Dossier
             r1 = await ac.get("/api/interview/dossier?company=Uber&role=Staff+Engineer")
             assert r1.status_code == 200

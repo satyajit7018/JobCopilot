@@ -55,9 +55,9 @@ class FollowUpEngine:
         }
 
     @classmethod
-    def find_pending_followup_jobs(cls, days_threshold: int = 7) -> List[JobListing]:
-        """Identifies applications submitted >= days_threshold with no recruiter response."""
-        jobs = db.get_jobs()
+    def find_pending_followup_jobs(cls, user_id: str = "", days_threshold: int = 7) -> List[JobListing]:
+        """Identifies applications submitted >= days_threshold with no recruiter response for user."""
+        jobs = db.get_jobs(user_id=user_id)
         pending = []
         now = datetime.now()
 
@@ -79,17 +79,19 @@ class FollowUpEngine:
         profile: CandidateProfile,
         job_id: str,
         stage_days: int = 7,
-        recipient_email: Optional[str] = None
+        recipient_email: Optional[str] = None,
+        user_id: str = ""
     ) -> Optional[Dict[str, Any]]:
         """Generates a follow-up draft and persists it to SQLite outreach_records."""
-        jobs = db.get_jobs()
-        job = next((j for j in jobs if j.job_id == job_id), None)
+        target_user = user_id or profile.user_id
+        job = db.get_job_by_id(job_id=job_id, user_id=target_user)
         if not job:
             return None
 
         email_data = cls.generate_followup_email(profile, job, stage_days=stage_days)
         record = OutreachRecord(
             outreach_id=f"out_fu_{uuid.uuid4().hex[:8]}",
+            user_id=target_user,
             job_id=job.job_id,
             channel=OutreachChannel.COLD_EMAIL,
             recipient_name=job.company + " Recruiting",
@@ -97,7 +99,7 @@ class FollowUpEngine:
             message_content=f"Subject: {email_data['subject']}\n\n{email_data['body']}",
             status="DRAFT"
         )
-        db.save_outreach_record(record)
+        db.save_outreach_record(record, user_id=target_user)
 
         return {
             "outreach_id": record.outreach_id,
