@@ -673,27 +673,197 @@
       <section id="view-interview" class="view-panel">
         <div class="view-header">
           <div class="view-title-group">
-            <h1>AI Mock Interview Studio</h1>
-            <p class="view-subtitle">STAR-method evaluation, system design scoring rubrics, and target company architecture dossiers.</p>
+            <h1>🎙️ AI Mock Interview Studio &amp; Audio Visualizer</h1>
+            <p class="view-subtitle">Live waveform voice analysis, real-time STAR scoring rubrics, and target company architecture dossiers.</p>
+          </div>
+          <div class="hud-pill" id="interview-session-status" style="background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); color: #34d399;">
+            <span class="hud-dot live" style="background: #10b981;"></span>
+            <span>Studio Ready</span>
           </div>
         </div>
 
+        <!-- Studio Grid Layout -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+          
+          <!-- Card 1: Interactive Audio Visualizer & Question Prompter -->
+          <div class="glass-card" style="margin-bottom: 0;">
+            <div class="glass-card-header">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">🎙️</span>
+                <h3 class="glass-card-title">Live Voice Answer &amp; Audio Frequency Visualizer</h3>
+              </div>
+              <span class="hud-pill" id="audio-rec-badge" style="display: none; background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.6); color: #f87171;">
+                <span class="hud-dot" style="background: #ef4444; animation: pulse 1s infinite;"></span>
+                <span id="audio-rec-timer">00:00</span>
+              </span>
+            </div>
+
+            <!-- Question Prompter Box -->
+            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-cyan);" id="mock-q-category">System Design</span>
+                <span class="hud-pill" id="mock-q-difficulty" style="font-size: 10.5px; padding: 1px 6px;">Hard</span>
+              </div>
+              <div id="mock-active-question" style="font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.5;">
+                How would you design a real-time event streaming and notification pipeline handling 50,000 requests per second with at-least-once delivery guarantees?
+              </div>
+            </div>
+
+            <!-- Waveform Canvas Container -->
+            <div style="position: relative; background: #030712; border: 1px solid rgba(0, 242, 254, 0.25); border-radius: var(--radius-md); height: 120px; overflow: hidden; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 20px rgba(0,0,0,0.8);">
+              <canvas id="audio-visualizer-canvas" width="600" height="120" style="width: 100%; height: 100%; display: block;"></canvas>
+              <div id="visualizer-overlay-hint" style="position: absolute; color: var(--text-muted); font-size: 12px; pointer-events: none; font-family: 'JetBrains Mono', monospace;">
+                Click "Start Recording" or type your response
+              </div>
+            </div>
+
+            <!-- Controls & Action Buttons -->
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap;">
+              <button class="btn btn-primary" id="btn-toggle-mic" onclick="toggleVoiceRecording()" style="flex: 1; min-width: 180px;">
+                <span id="mic-btn-icon">🎙️</span>
+                <span id="mic-btn-label">Start Voice Answer</span>
+              </button>
+
+              <button class="btn btn-secondary" onclick="cycleNextMockQuestion()" title="Next Question">
+                <span>Next Question ➡️</span>
+              </button>
+
+              <button class="btn btn-secondary" onclick="loadInterviewSampleAnswer()" title="Load Sample Technical Answer">
+                <span>💡 Sample STAR</span>
+              </button>
+            </div>
+
+            <!-- Real-time Speech-to-Text / Written Response Area -->
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label class="form-label" style="margin-bottom: 0;">Speech-to-Text Transcript / Refinement</label>
+                <span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="transcript-word-count">0 words</span>
+              </div>
+              <textarea id="mock-candidate-answer" class="form-textarea" rows="4" placeholder="Speak into your microphone or type your technical response here... Describe the Situation, Task, Action you took, and measurable Results." oninput="updateWordCount()"></textarea>
+            </div>
+
+            <button class="btn btn-primary" style="width: 100%; background: linear-gradient(135deg, #10b981, #06b6d4);" onclick="submitAnswerForEvaluation()">
+              <span>⚡ Evaluate STAR Response &amp; Key Concepts</span>
+            </button>
+          </div>
+
+          <!-- Card 2: Instant STAR Score & Rubric Analysis HUD -->
+          <div class="glass-card" style="margin-bottom: 0;">
+            <div class="glass-card-header">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">📊</span>
+                <h3 class="glass-card-title">STAR Scoring &amp; Technical Depth Evaluation</h3>
+              </div>
+              <span class="hud-pill" id="mock-score-badge" style="color: var(--accent-cyan); font-weight: 700;">Awaiting Input</span>
+            </div>
+
+            <!-- Scoring HUD Container -->
+            <div id="mock-eval-results-container">
+              
+              <!-- Empty State Placeholder -->
+              <div id="eval-empty-placeholder" style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
+                <div style="font-size: 42px; margin-bottom: 12px; opacity: 0.6;">🎯</div>
+                <div style="font-size: 15px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;">No Evaluation Yet</div>
+                <p style="font-size: 12.5px; max-width: 320px; margin: 0 auto; line-height: 1.5;">Record your voice answer or type your response, then click Evaluate to receive instant STAR metrics, key concept coverage, and AI feedback.</p>
+              </div>
+
+              <!-- Dynamic Score Results (Hidden by default) -->
+              <div id="eval-content-view" style="display: none;">
+                
+                <!-- Overall Score Gauge Banner -->
+                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.25rem;">
+                  <div>
+                    <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Overall STAR Rating</div>
+                    <div style="font-size: 28px; font-weight: 800; color: var(--accent-emerald); font-family: 'Outfit', sans-serif;" id="eval-overall-score">92/100</div>
+                    <div style="font-size: 12px; color: #a7f3d0;" id="eval-hire-verdict">Strong Hire 🚀</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 2px;">Key Concepts Covered</div>
+                    <div style="font-size: 20px; font-weight: 700; color: var(--accent-cyan); font-family: 'JetBrains Mono', monospace;" id="eval-concepts-ratio">4 / 5</div>
+                  </div>
+                </div>
+
+                <!-- 4-Dimension Rubric Progress Bars -->
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.25rem;">
+                  <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                      <span style="color: var(--text-secondary);">1. Situation &amp; Problem Framing (25%)</span>
+                      <span style="font-weight: 700; color: var(--accent-cyan);" id="bar-val-situation">90%</span>
+                    </div>
+                    <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div id="bar-fill-situation" style="height: 100%; width: 90%; background: var(--accent-cyan); border-radius: 3px; transition: width 0.8s ease;"></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                      <span style="color: var(--text-secondary);">2. Action &amp; Technical Depth (35%)</span>
+                      <span style="font-weight: 700; color: var(--accent-emerald);" id="bar-val-action">95%</span>
+                    </div>
+                    <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div id="bar-fill-action" style="height: 100%; width: 95%; background: var(--accent-emerald); border-radius: 3px; transition: width 0.8s ease;"></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                      <span style="color: var(--text-secondary);">3. Result &amp; Measurable Impact (25%)</span>
+                      <span style="font-weight: 700; color: var(--accent-amber);" id="bar-val-result">88%</span>
+                    </div>
+                    <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div id="bar-fill-result" style="height: 100%; width: 88%; background: var(--accent-amber); border-radius: 3px; transition: width 0.8s ease;"></div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px;">
+                      <span style="color: var(--text-secondary);">4. Delivery, Tone &amp; Brevity (15%)</span>
+                      <span style="font-weight: 700; color: #c084fc;" id="bar-val-delivery">94%</span>
+                    </div>
+                    <div style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+                      <div id="bar-fill-delivery" style="height: 100%; width: 94%; background: #c084fc; border-radius: 3px; transition: width 0.8s ease;"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Concept Coverage Badges -->
+                <div style="margin-bottom: 1.25rem;">
+                  <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">Key Concepts Detected</div>
+                  <div id="eval-concept-badges" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                </div>
+
+                <!-- Actionable AI Feedback Box -->
+                <div style="background: rgba(30, 41, 59, 0.6); border-left: 3px solid var(--accent-cyan); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 12px 14px;">
+                  <div style="font-size: 12px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 4px;">💡 AI Coach Feedback</div>
+                  <div id="eval-feedback-text" style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5;"></div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 3: Target Company Architecture Dossier Generator -->
         <div class="glass-card">
           <div class="glass-card-header">
-            <h3 class="glass-card-title">Company Architecture Dossier &amp; Questions</h3>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">🏢</span>
+              <h3 class="glass-card-title">Target Company Architecture Dossier &amp; System Design Breakdown</h3>
+            </div>
+            <span class="hud-pill" style="color: var(--accent-indigo);">Deep Synthesis</span>
           </div>
           <div class="form-grid" style="margin-bottom: 1.25rem;">
             <div class="form-group">
               <label class="form-label">Company Name</label>
-              <input type="text" id="mock-company-name" class="form-input" value="Stripe">
+              <input type="text" id="mock-company-name" class="form-input" value="Stripe" placeholder="e.g. Stripe, OpenAI, Google, Meta">
             </div>
             <div class="form-group">
-              <label class="form-label">Target Role</label>
-              <input type="text" id="mock-role-title" class="form-input" value="Senior Backend Engineer">
+              <label class="form-label">Target Role Title</label>
+              <input type="text" id="mock-role-title" class="form-input" value="Senior Backend Engineer" placeholder="e.g. Senior Distributed Systems Engineer">
             </div>
           </div>
-          <button class="btn btn-primary" onclick="loadInterviewQuestions()">
-            <span>Generate Interview Dossier</span>
+          <button class="btn btn-secondary" onclick="loadInterviewQuestions()">
+            <span>⚡ Generate Architectural Dossier &amp; 4-Round Rubric</span>
           </button>
           <div id="interview-dossier-container" style="margin-top: 1.5rem;"></div>
         </div>
