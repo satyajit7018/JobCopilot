@@ -10,8 +10,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+
 from app.core.settings import settings
 from app.api.middleware import SecurityHeadersMiddleware, RequestTracingMiddleware
+from app.api.auth import limiter
 from app.api.endpoints import router as api_router, ws_manager
 
 app = FastAPI(
@@ -19,6 +23,10 @@ app = FastAPI(
     description="Universal Autonomous Job Hunting, Self-Learning Application & Career Operating System",
     version="1.0.0"
 )
+
+# Wire Slowapi Limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 1. Tracing & Latency Logger
 app.add_middleware(RequestTracingMiddleware)

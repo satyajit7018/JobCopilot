@@ -283,6 +283,23 @@ class DatabaseManager(DatabaseAdapter):
                 """)
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_daily_usage_user_date ON user_daily_usage(user_id, date);")
 
+                # 12. Login Attempts Table (Brute-Force & Lockout Defense)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS login_attempts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL,
+                    ip TEXT NOT NULL,
+                    attempted_at TEXT NOT NULL,
+                    success INTEGER NOT NULL
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_login_attempts_email ON login_attempts(email);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip);")
+
+                self._ensure_columns(conn, "users", {
+                    "email_verified": "INTEGER DEFAULT 0"
+                })
+
                 conn.commit()
 
     # =========================================================================
@@ -295,8 +312,8 @@ class DatabaseManager(DatabaseAdapter):
                 try:
                     cursor = conn.cursor()
                     cursor.execute("""
-                    INSERT INTO users (user_id, email, password_hash, full_name, role, is_active, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (user_id, email, password_hash, full_name, role, is_active, email_verified, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (
                         user.user_id,
                         user.email.lower().strip(),
@@ -304,6 +321,7 @@ class DatabaseManager(DatabaseAdapter):
                         user.full_name,
                         user.role.value if hasattr(user.role, 'value') else str(user.role),
                         1 if user.is_active else 0,
+                        1 if user.email_verified else 0,
                         user.created_at,
                         user.updated_at
                     ))
@@ -327,6 +345,7 @@ class DatabaseManager(DatabaseAdapter):
                 full_name=row["full_name"] or "",
                 role=row["role"] or "FREE",
                 is_active=bool(row["is_active"]),
+                email_verified=bool(row["email_verified"]) if "email_verified" in row.keys() else False,
                 created_at=row["created_at"],
                 updated_at=row["updated_at"]
             )
@@ -346,6 +365,7 @@ class DatabaseManager(DatabaseAdapter):
                 full_name=row["full_name"] or "",
                 role=row["role"] or "FREE",
                 is_active=bool(row["is_active"]),
+                email_verified=bool(row["email_verified"]) if "email_verified" in row.keys() else False,
                 created_at=row["created_at"],
                 updated_at=row["updated_at"]
             )
@@ -395,6 +415,57 @@ class DatabaseManager(DatabaseAdapter):
             cursor = conn.cursor()
             cursor.execute("SELECT 1 FROM revoked_tokens WHERE jti = ? LIMIT 1", (jti,))
             return cursor.fetchone() is not None
+
+    def prune_revoked_tokens(self) -> int:
+        """Removes expired tokens from the revocation blacklist."""
+        now_str = datetime.now().isoformat()
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM revoked_tokens WHERE expires_at != '' AND expires_at < ?", (now_str,))
+                deleted = cursor.rowcount
+                conn.commit()
+                return deleted
+
+    def record_login_attempt(self, email: str, ip: str, success: bool) -> None:
+        """Records an authentication attempt for lockout and brute-force tracking."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT INTO login_attempts (email, ip, attempted_at, success)
+                VALUES (?, ?, ?, ?)
+                """, (email.lower().strip(), ip, datetime.now().isoformat(), 1 if success else 0))
+                conn.commit()
+
+    def check_login_lockout(self, email: str, ip: str, max_failures: int = 5, lockout_minutes: int = 15) -> bool:
+        """Returns True if email or IP has exceeded consecutive failure threshold."""
+        from datetime import timedelta
+        cutoff = (datetime.now() - timedelta(minutes=lockout_minutes)).isoformat()
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT success FROM login_attempts
+            WHERE (email = ? OR ip = ?) AND attempted_at >= ?
+            ORDER BY attempted_at DESC
+            LIMIT ?
+            """, (email.lower().strip(), ip, cutoff, max_failures))
+            rows = cursor.fetchall()
+            if len(rows) >= max_failures and all(r["success"] == 0 for r in rows):
+                return True
+            return False
+
+    def set_email_verified(self, user_id: str, verified: bool = True) -> bool:
+        """Marks user email as verified."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE users SET email_verified = ?, updated_at = ? WHERE user_id = ?",
+                    (1 if verified else 0, datetime.now().isoformat(), user_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
 
     def get_daily_usage(self, user_id: str, date_str: str) -> int:
         """Gets count of daily applications for a user on a given date (YYYY-MM-DD)."""

@@ -27,17 +27,24 @@ except ImportError:
     _ph = None
     HAS_ARGON2 = False
 
+from starlette.requests import Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+from app.core.settings import settings
+from app.core.mailer import mailer
 from app.core.models import (
     User, UserRole, UserRegisterRequest, UserLoginRequest,
-    RefreshTokenRequest, TokenResponse, UserResponse
+    RefreshTokenRequest, TokenResponse, UserResponse,
+    VerifyEmailRequest, RequestPasswordResetRequest, ResetPasswordRequest
 )
 from app.core.database import db
 
 # =========================================================================
 # Fail-Closed JWT Configuration (F-05)
 # =========================================================================
-RAW_JWT_SECRET = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
-ENV = os.getenv("ENV", "development").lower()
+RAW_JWT_SECRET = settings.JWT_SECRET
+ENV = settings.ENV.lower()
 
 if ENV == "production":
     if not RAW_JWT_SECRET or RAW_JWT_SECRET == "jobcopilot-super-secret-saas-jwt-signing-key-32b" or len(RAW_JWT_SECRET) < 32:
@@ -46,10 +53,11 @@ if ENV == "production":
         )
 
 JWT_SECRET: str = RAW_JWT_SECRET or "jobcopilot-super-secret-saas-jwt-signing-key-32b"
-JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15  # Short-lived access tokens (F-08)
-REFRESH_TOKEN_EXPIRE_DAYS = 7
+JWT_ALGORITHM = settings.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS
 
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security = HTTPBearer(auto_error=False)
 
@@ -257,35 +265,48 @@ async def get_current_user(
 # Auth API Endpoints (Public Allowlist: /register, /login, /refresh)
 # =========================================================================
 @router.post("/register", response_model=TokenResponse)
-async def register_user(req: UserRegisterRequest):
-    """Registers a new multi-tenant SaaS user account with Argon2id password hashing."""
+@limiter.limit("5/minute")
+async def register_user(request: Request, req: UserRegisterRequest):
+    """Registers a new multi-tenant candidate account with Argon2id password hashing."""
     clean_email = req.email.lower().strip()
     if not clean_email or "@" not in clean_email:
-        raise HTTPException(status_code=400, detail="Invalid email address.")
-    if len(req.password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+        raise HTTPException(status_code=400, detail="A valid email address is required.")
+    
+    if len(req.password) < settings.PASSWORD_MIN_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password must be at least {settings.PASSWORD_MIN_LENGTH} characters."
+        )
 
     existing = db.get_user_by_email(clean_email)
     if existing:
         raise HTTPException(status_code=409, detail="An account with this email already exists.")
 
+    hashed_pw = hash_password(req.password)
     new_user_id = f"usr_{uuid.uuid4().hex[:12]}"
-    hashed = hash_password(req.password)
     now_str = datetime.now().isoformat()
 
     new_user = User(
         user_id=new_user_id,
         email=clean_email,
-        password_hash=hashed,
+        password_hash=hashed_pw,
         full_name=req.full_name or clean_email.split('@')[0],
         role=UserRole.FREE,
         is_active=True,
+        email_verified=False,
         created_at=now_str,
         updated_at=now_str
     )
 
     if not db.create_user(new_user):
         raise HTTPException(status_code=500, detail="Failed to create user record.")
+
+    # Send verification email token
+    verify_token = create_jwt_token(
+        {"sub": new_user_id, "email": clean_email, "type": "verify_email"},
+        timedelta(hours=24)
+    )
+    mailer.send_verification_email(clean_email, verify_token)
 
     access_token = create_jwt_token(
         {"sub": new_user_id, "email": clean_email, "role": "FREE", "type": "access"},
@@ -306,18 +327,33 @@ async def register_user(req: UserRegisterRequest):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login_user(req: UserLoginRequest):
-    """Authenticates user credentials and issues signed JWT access and refresh tokens."""
+@limiter.limit("15/minute")
+async def login_user(request: Request, req: UserLoginRequest):
+    """Authenticates user credentials, enforces brute-force lockout, and issues JWT tokens."""
     clean_email = req.email.lower().strip()
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    # Check brute-force lockout
+    if db.check_login_lockout(clean_email, client_ip):
+        raise HTTPException(
+            status_code=401,
+            detail="Account temporarily locked due to multiple failed login attempts. Please try again in 15 minutes."
+        )
+
     user = db.get_user_by_email(clean_email)
     if not user:
+        db.record_login_attempt(clean_email, client_ip, success=False)
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     
     is_valid, needs_rehash = verify_password(req.password, user.password_hash)
     if not is_valid:
+        db.record_login_attempt(clean_email, client_ip, success=False)
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User account is deactivated.")
+
+    # Record successful attempt to reset failed counter
+    db.record_login_attempt(clean_email, client_ip, success=True)
 
     # Seamless automatic upgrade from PBKDF2 to Argon2id on successful login
     if needs_rehash:
@@ -347,8 +383,9 @@ async def login_user(req: UserLoginRequest):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(payload: RefreshTokenRequest):
-    """Rotates refresh token in request body (F-14), revokes old token, and issues a new access token (F-08)."""
+@limiter.limit("10/minute")
+async def refresh_token(request: Request, payload: RefreshTokenRequest):
+    """Rotates refresh token, revokes old token, and issues a new access token."""
     token_payload = decode_jwt_token(payload.refresh_token)
     if token_payload.get("type") != "refresh":
         raise HTTPException(status_code=400, detail="Invalid token type for refresh.")
@@ -371,6 +408,9 @@ async def refresh_token(payload: RefreshTokenRequest):
         exp_str = str(token_payload.get("exp", ""))
         db.revoke_token(old_jti, user.user_id, exp_str)
 
+    # Opportunistically prune expired revoked tokens
+    db.prune_revoked_tokens()
+
     role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
     new_access_token = create_jwt_token(
         {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access"},
@@ -388,6 +428,74 @@ async def refresh_token(payload: RefreshTokenRequest):
         email=user.email,
         role=role_str
     )
+
+
+@router.post("/verify-email")
+async def verify_email(req: VerifyEmailRequest):
+    """Verifies user email from a signed verification token."""
+    payload = decode_jwt_token(req.token)
+    if payload.get("type") != "verify_email":
+        raise HTTPException(status_code=400, detail="Invalid verification token type.")
+    
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Invalid token subject.")
+    
+    db.set_email_verified(user_id, True)
+    return {"status": "success", "message": "Email address verified successfully!"}
+
+
+@router.post("/request-reset")
+@limiter.limit("3/minute")
+async def request_password_reset(request: Request, req: RequestPasswordResetRequest):
+    """Initiates a secure password reset workflow without user enumeration."""
+    clean_email = req.email.lower().strip()
+    user = db.get_user_by_email(clean_email)
+    if user:
+        reset_token = create_jwt_token(
+            {"sub": user.user_id, "email": clean_email, "type": "reset_password"},
+            timedelta(minutes=15)
+        )
+        mailer.send_password_reset_email(clean_email, reset_token)
+
+    return {
+        "status": "success",
+        "message": "If an account with this email exists, a password reset link has been sent."
+    }
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(request: Request, req: ResetPasswordRequest):
+    """Completes password reset using a single-use signed token."""
+    if len(req.new_password) < settings.PASSWORD_MIN_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"New password must be at least {settings.PASSWORD_MIN_LENGTH} characters."
+        )
+
+    payload = decode_jwt_token(req.token)
+    if payload.get("type") != "reset_password":
+        raise HTTPException(status_code=400, detail="Invalid reset token type.")
+    
+    jti = payload.get("jti")
+    if jti and db.is_token_revoked(jti):
+        raise HTTPException(status_code=401, detail="Reset token has already been used or revoked.")
+
+    user_id = payload.get("sub")
+    user = db.get_user_by_id(user_id) if user_id else None
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    # Update password with Argon2id hash
+    new_hash = hash_password(req.new_password)
+    db.update_user_password(user.user_id, new_hash)
+
+    # Revoke single-use reset token
+    if jti:
+        db.revoke_token(jti, user.user_id, str(payload.get("exp", "")))
+
+    return {"status": "success", "message": "Password reset successfully. You can now log in."}
 
 
 @router.post("/logout")
@@ -417,5 +525,6 @@ async def get_my_profile(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         full_name=current_user.full_name,
         role=role_str,
+        email_verified=current_user.email_verified,
         created_at=current_user.created_at
     )
