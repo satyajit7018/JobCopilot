@@ -657,6 +657,50 @@ class InboundEmailPayload(BaseModel):
     body_text: Optional[str] = None
 
 
+@public_router.post("/email/inbound-webhook")
+async def receive_inbound_email_webhook(request: Request):
+    """
+    Public webhook receiver for external email providers (Postmark, SendGrid, Mailgun).
+    Verifies HMAC-SHA256 signature and attributes incoming email to tenant via subaddress.
+    """
+    from app.email.inbound_provider import InboundEmailProvider
+    from app.email.sync import EmailSyncEngine
+
+    body_bytes = await request.body()
+    sig_header = (
+        request.headers.get("X-JobCopilot-Signature")
+        or request.headers.get("X-Postmark-Signature")
+        or request.headers.get("X-SendGrid-Signature")
+    )
+
+    if not InboundEmailProvider.verify_webhook_signature(body_bytes, sig_header):
+        raise HTTPException(status_code=403, detail="Invalid webhook signature.")
+
+    try:
+        import json
+        payload_json = json.loads(body_bytes.decode('utf-8'))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload.")
+
+    parsed = InboundEmailProvider.parse_webhook_payload(payload_json)
+    tenant_user_id = parsed["user_id"]
+    if not tenant_user_id or tenant_user_id == "default":
+        recipient_user = db.get_user_by_email(parsed["recipient"])
+        if recipient_user:
+            tenant_user_id = recipient_user.user_id
+
+    result = await EmailSyncEngine.process_inbound_email(
+        sender=parsed["sender"],
+        recipient=parsed["recipient"],
+        subject=parsed["subject"],
+        body_html=parsed["body_html"],
+        body_text=parsed["body_text"],
+        user_id=tenant_user_id,
+        ws_broadcast_callback=ws_manager.broadcast
+    )
+    return {"status": "success", "user_id": tenant_user_id, "result": result}
+
+
 @protected_router.post("/email/inbound")
 async def receive_inbound_email(
     payload: InboundEmailPayload,
