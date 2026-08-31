@@ -684,28 +684,29 @@ class DatabaseManager(DatabaseAdapter):
     # Job Listings Operations (Multi-Tenant)
     # =========================================================================
     def save_job(self, job: JobListing, user_id: str) -> bool:
-        """Inserts or updates a job opportunity strictly for the user with atomic deduplication."""
+        """Inserts or updates a job opportunity strictly for the user with tenant-isolated deduplication."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                # Check if this specific user already has this job
+                cursor.execute(
+                    "SELECT job_id FROM jobs WHERE user_id = ? AND (job_id = ? OR fingerprint = ?) LIMIT 1",
+                    (user_id, job.job_id, job.fingerprint)
+                )
+                existing = cursor.fetchone()
+                target_job_id = existing["job_id"] if existing else job.job_id
+                job.job_id = target_job_id
+                job.user_id = user_id
+
                 cursor.execute("""
-                INSERT INTO jobs (
+                INSERT OR REPLACE INTO jobs (
                     job_id, user_id, fingerprint, platform, company, title, location, url,
                     description, salary_range, seniority_level, posted_date, match_score,
                     priority_score, match_reasons, missing_skills, status, submission_mode,
                     applied_at, application_id, confirmation_screenshot_path, notes
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(fingerprint) DO UPDATE SET
-                    match_score = excluded.match_score,
-                    priority_score = excluded.priority_score,
-                    status = excluded.status,
-                    submission_mode = coalesce(excluded.submission_mode, jobs.submission_mode),
-                    applied_at = coalesce(excluded.applied_at, jobs.applied_at),
-                    application_id = coalesce(excluded.application_id, jobs.application_id),
-                    confirmation_screenshot_path = coalesce(excluded.confirmation_screenshot_path, jobs.confirmation_screenshot_path),
-                    notes = coalesce(excluded.notes, jobs.notes)
                 """, (
-                    job.job_id,
+                    target_job_id,
                     user_id,
                     job.fingerprint,
                     job.platform,
