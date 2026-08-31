@@ -443,7 +443,7 @@ async def run_discovery(
     if not profile:
         raise HTTPException(status_code=404, detail="Candidate profile not found.")
 
-    await ws_manager.broadcast({"type": "BOT_LOG", "message": "Starting 0-day multi-source job discovery cycle..."})
+    await ws_manager.broadcast({"type": "BOT_LOG", "message": "Starting 0-day multi-source job discovery cycle..."}, user_id=current_user.user_id)
     
     result = await discovery_orchestrator.run_discovery_cycle(profile, user_id=current_user.user_id)
     
@@ -451,7 +451,7 @@ async def run_discovery(
         "type": "DISCOVERY_COMPLETED",
         "total_sourced": result.get("total_sourced", 0),
         "matched_and_saved": result.get("matched_and_saved", 0)
-    })
+    }, user_id=current_user.user_id)
     
     return result
 

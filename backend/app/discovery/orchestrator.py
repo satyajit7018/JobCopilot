@@ -37,6 +37,32 @@ class DiscoveryOrchestrator:
         self.total_discovered = 0
         self.total_matched = 0
 
+    async def _fetch_all_raw_leads(self, target_companies: List[str]) -> List[Dict[str, Any]]:
+        """Fetches raw job openings from all ATS APIs and VC feeds concurrently."""
+        raw_leads: List[Dict[str, Any]] = []
+        try:
+            import h2  # type: ignore
+            has_h2 = True
+        except ImportError:
+            has_h2 = False
+
+        async with httpx.AsyncClient(http2=has_h2, timeout=10.0) as client:
+            tasks = []
+            for comp in target_companies:
+                tasks.append(ATSApiFeeders.fetch_greenhouse_jobs(comp, client))
+                tasks.append(ATSApiFeeders.fetch_lever_jobs(comp, client))
+                tasks.append(ATSApiFeeders.fetch_ashby_jobs(comp, client))
+
+            tasks.append(VCBoardFeeders.fetch_yc_fast_track_jobs())
+            tasks.append(VCBoardFeeders.fetch_hn_who_is_hiring(max_posts=15, client=client))
+            tasks.append(PlatformScrapers.fetch_wellfound_mock_or_feed("Engineer"))
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for res in results:
+                if isinstance(res, list):
+                    raw_leads.extend(res)
+        return raw_leads
+
     async def run_discovery_cycle(
         self,
         profile: Optional[CandidateProfile] = None,
@@ -55,38 +81,8 @@ class DiscoveryOrchestrator:
         self.last_run_at = datetime.now().isoformat()
         target_companies = companies or self.CURATED_TECH_COMPANIES
 
-        raw_leads: List[Dict[str, Any]] = []
-
         try:
-            # 1. Fetch from Direct ATS APIs & VC Boards Concurrently
-            try:
-                import h2  # type: ignore
-                has_h2 = True
-            except ImportError:
-                has_h2 = False
-
-            async with httpx.AsyncClient(http2=has_h2, timeout=10.0) as client:
-                tasks = []
-
-                # Direct ATS Feeds
-                for comp in target_companies:
-                    tasks.append(ATSApiFeeders.fetch_greenhouse_jobs(comp, client))
-                    tasks.append(ATSApiFeeders.fetch_lever_jobs(comp, client))
-                    tasks.append(ATSApiFeeders.fetch_ashby_jobs(comp, client))
-
-                # YC & Fast-Track Boards
-                tasks.append(VCBoardFeeders.fetch_yc_fast_track_jobs())
-                tasks.append(VCBoardFeeders.fetch_hn_who_is_hiring(max_posts=15, client=client))
-
-                # Wellfound Feeds
-                tasks.append(PlatformScrapers.fetch_wellfound_mock_or_feed("Engineer"))
-
-                results = await asyncio.gather(*tasks, return_exceptions=True)
-
-                for res in results:
-                    if isinstance(res, list):
-                        raw_leads.extend(res)
-
+            raw_leads = await self._fetch_all_raw_leads(target_companies)
             self.total_discovered += len(raw_leads)
 
             # 2. Deduplicate, Blacklist Check, Score & Save
