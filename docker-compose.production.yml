@@ -9,6 +9,7 @@ services:
     restart: always
     environment:
       - DB_MODE=sqlite
+      - JOBCOPILOT_DATA_DIR=/data
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_BACKEND=local
       - USE_CELERY=true
@@ -29,6 +30,7 @@ services:
     command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "-Q", "priority.high,priority.normal,priority.low"]
     environment:
       - DB_MODE=sqlite
+      - JOBCOPILOT_DATA_DIR=/data
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_BACKEND=local
       - USE_CELERY=true

@@ -15,4 +15,5 @@ services:
       - SUBMISSION_MODE=DRY_RUN
       - HOST=0.0.0.0
       - PORT=8000
+      - JOBCOPILOT_DATA_DIR=/app/backend/data
     restart: unless-stopped
