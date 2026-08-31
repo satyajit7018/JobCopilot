@@ -3,7 +3,8 @@
 **The Autonomous Career Operating System & Distributed Multi-Tenant SaaS Platform.**
 
 [![CI/CD Pipeline](https://github.com/satyajit7018/JobCopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/satyajit7018/JobCopilot/actions/workflows/ci.yml)
-[![Tests Passing](https://img.shields.io/badge/tests-65%20passed-brightgreen.svg)](https://github.com/satyajit7018/JobCopilot)
+[![Tests Passing](https://img.shields.io/badge/tests-90%2B%20passed-brightgreen.svg)](https://github.com/satyajit7018/JobCopilot)
+[![Security Audited](https://img.shields.io/badge/security-PII%20Encrypted%20%7C%20CSP%20%7C%20Argon2id-blue.svg)](https://github.com/satyajit7018/JobCopilot)
 [![Stress Audit](https://img.shields.io/badge/stress--audit-30%2F30%20(100%25)-blueviolet.svg)](https://github.com/satyajit7018/JobCopilot)
 [![Docker Ready](https://img.shields.io/badge/docker-compose%20ready-0db7ed.svg)](https://github.com/satyajit7018/JobCopilot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -70,7 +71,8 @@ flowchart TD
 
     subgraph DistributedSaaS [Distributed Cloud & Multi-Tenant Engine]
         DB[(DatabaseAdapter: SQLite WAL / PostgreSQL RDS)]
-        Vault[(Argon2id + AES-256-GCM Vault)]
+        Vault[(Argon2id + AES-256-GCM PII Vault)]
+        LLM[Provider-Agnostic LLM: OpenAI / Anthropic / Local]
         Redis[(Redis 7 Cluster)]
         CeleryWorker[Celery Distributed Task Workers]
         S3Storage[(AWS S3 / Cloudflare R2 Storage)]
@@ -81,6 +83,7 @@ flowchart TD
 
     CandidateJourney <--> WSGateway
     CandidateJourney <--> DB
+    D <--> LLM
     E --> CeleryWorker
     CeleryWorker <--> Redis
     CeleryWorker <--> ProxyPool
@@ -99,7 +102,7 @@ flowchart TD
 | **4** | **20+ Canonical Questionnaire** | Multi-currency CTC live slider, Notice Period, Work Authorization, Visa Sponsorship, Stealth Employer Blacklisting, and `⏭️ Skip & Fill Later`. |
 | **5** | **Multi-Role ATS Resume Workshop** | Live side-by-side tailored resume variant builder with promoted projects, keyword match badges, and custom bullet reordering. |
 | **6 & 7** | **Non-Blocking Apply & Held Queue** | Unindexed questions pause only that specific job and trigger topbar `⏸️ N Held Applications`. 1-click approval submits and indexes Q&As. |
-| **8** | **Email Radar & Direct Call Logger** | IMAP IDLE intent classification (Interviews, Assessments, Offers, Rejections) + manual phone screen CRM logger. |
+| **8** | **Email Radar & Direct Call Logger** | Inbound webhook subaddress routing (`radar+usr@jobcopilot.app`) + intent classification + manual phone screen CRM logger. |
 | **9** | **1-Click Video Meeting Launcher** | Extracted meeting links render a direct **`📹 Join Google Meet`** / **`📹 Join Zoom`** button on *Interviewing* cards. |
 | **10** | **🎙️ Voice Interview Studio & Glass Booth** | Real-time Web Speech API transcription, WPM Cadence Radar, Filler Word Scanner, and STAR scoring rubric in a distraction-free modal. |
 | **11** | **💰 Multi-Offer 4-Year TC Modeler** | Side-by-side compensation comparison, equity vesting schedules, and executive anti-AI counter-offer email generator. |
@@ -135,12 +138,15 @@ flowchart TD
 
 ## ☁️ Distributed Multi-Tenant SaaS Features
 
-### 1. Multi-Tenant Security & Isolation
-- **Argon2id + JWT Security**: Modern password hashing with cryptographic salt and JWT access/refresh token rotation.
+### 1. Multi-Tenant Security & Defense-in-Depth
+- **Argon2id + JWT Security**: Modern password hashing with cryptographic salt and JWT access/refresh token rotation with single-use revocation.
+- **Transparent PII Encryption at Rest**: Sensitive candidate fields (phone, compensation expectations, current employer, location) are encrypted with AES-256-GCM.
+- **Security Headers & CSP Middleware**: Full Content Security Policy, HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and slowapi brute-force lockout.
 - **Strict Tenant Data Isolation**: All database queries enforce `WHERE user_id = ?` to guarantee zero cross-tenant data leakage.
-- **`DatabaseAdapter` Layer**: Seamless switching between local SQLite (with WAL mode + 256MB MMAP) and PostgreSQL (Supabase / AWS RDS).
 
-### 2. Distributed Cloud Architecture
+### 2. Distributed Cloud Architecture & Providers
+- **Provider-Agnostic LLM Engine (`llm_client.py`)**: Seamless support for OpenAI, Anthropic Claude, and 100% offline rule-based deterministic fallback.
+- **Inbound Email Webhook Radar (`inbound_provider.py`)**: Subaddress tenant attribution (`radar+usr_123@jobcopilot.app`) with HMAC-SHA256 signature verification.
 - **Object Storage (`object_storage.py`)**: Unified file driver for Local FileSystem, AWS S3, and Cloudflare R2 with pre-signed secure download URLs.
 - **Residential Proxy Rotator (`proxy_rotator.py`)**: Multi-provider residential IP rotation supporting Bright Data, Oxylabs, and custom pools.
 - **Celery + Redis Task Engine (`celery_app.py`)**: Distributed asynchronous background task queues with prioritized routing and local in-memory fallback.
@@ -151,14 +157,14 @@ flowchart TD
   - **`FREE`**: 5 applies/day, standard feeds.
   - **`PRO` ($29/mo)**: 30 applies/day, 0-day priority feeds, triple-threat outreach.
   - **`ELITE` ($79/mo)**: Unlimited applies, residential proxy rotation, priority queue routing.
-- **Stripe Billing Integration**: Automated checkout session generator (`POST /api/billing/checkout`) and webhook lifecycle listener (`POST /api/billing/webhook`).
+- **Stripe Billing Integration**: Real Stripe Checkout Session creation (`POST /api/billing/checkout`), Customer Portal sessions (`POST /api/billing/portal`), and webhook lifecycle listener (`POST /api/billing/webhook`).
 
 ---
 
 ## 🧪 Testing & Verification
 
 ```bash
-# Run full 65-test integration test suite
+# Run full automated test suite
 backend/venv/bin/pytest backend/tests/ -v
 
 # Run 30-loop deep subsystem stress audit
