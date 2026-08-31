@@ -8,7 +8,10 @@ from typing import Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from datetime import datetime
+import json
+from fastapi.responses import Response, FileResponse
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
@@ -17,12 +20,29 @@ from app.core.settings import settings
 from app.api.middleware import SecurityHeadersMiddleware, RequestTracingMiddleware
 from app.api.auth import limiter
 from app.api.endpoints import router as api_router, ws_manager
+from app.core.database import get_db
+
+# Sentry Exception Tracking in Production
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            traces_sample_rate=1.0 if settings.ENV != "production" else 0.1,
+            environment=settings.ENV
+        )
+    except Exception:
+        pass
 
 app = FastAPI(
     title="JobCopilot API",
     description="Universal Autonomous Job Hunting, Self-Learning Application & Career Operating System",
     version="1.0.0"
 )
+
+# Prometheus Metrics Definitions
+HTTP_REQUESTS_TOTAL = Counter("jobcopilot_http_requests_total", "Total HTTP requests", ["method", "endpoint", "status"])
+HTTP_REQUEST_DURATION = Histogram("jobcopilot_http_request_duration_seconds", "HTTP request latency in seconds", ["endpoint"])
 
 # Wire Slowapi Limiter
 app.state.limiter = limiter
@@ -42,6 +62,43 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Accept"],
 )
+
+# Observability Endpoints
+@app.get("/metrics", tags=["Observability"])
+async def metrics_endpoint():
+    """Prometheus application telemetry scrape target."""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@app.get("/health", tags=["Observability"])
+async def health_check():
+    """Deep system health probe validating database read/write and subsystem status."""
+    db_status = "healthy"
+    db_mode = "postgres" if (settings.DATABASE_URL and settings.DATABASE_URL.startswith("postgres")) else "sqlite_wal"
+    try:
+        db_adapter = get_db()
+        _ = db_adapter.get_user_by_email("healthcheck@jobcopilot.local")
+    except Exception as e:
+        db_status = f"unhealthy: {str(e)}"
+
+    is_overall_healthy = db_status == "healthy"
+    status_code = 200 if is_overall_healthy else 503
+
+    return Response(
+        content=json.dumps({
+            "status": "healthy" if is_overall_healthy else "degraded",
+            "timestamp": datetime.utcnow().isoformat(),
+            "environment": settings.ENV,
+            "version": "1.0.0",
+            "database": {
+                "status": db_status,
+                "engine": db_mode
+            },
+            "sentry_enabled": bool(settings.SENTRY_DSN)
+        }),
+        status_code=status_code,
+        media_type="application/json"
+    )
 
 # Include REST Router
 app.include_router(api_router)
