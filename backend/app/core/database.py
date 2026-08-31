@@ -1084,3 +1084,15 @@ class DatabaseManager(DatabaseAdapter):
 
 db = DatabaseManager()
 
+
+def get_db() -> DatabaseAdapter:
+    """Returns active database adapter (PostgreSQL if configured, else SQLite WAL engine)."""
+    from app.core.settings import settings
+    if settings.DATABASE_URL and settings.DATABASE_URL.startswith("postgres"):
+        try:
+            from app.core.postgres_adapter import PostgresDatabaseAdapter
+            return PostgresDatabaseAdapter(settings.DATABASE_URL)
+        except Exception:
+            return db
+    return db
+
