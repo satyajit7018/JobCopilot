@@ -4,6 +4,7 @@ Benchmarks job offers against market percentiles, simulates startup equity
 growth multiples, and generates professional counter-offer scripts.
 """
 
+import re
 from typing import List, Dict, Any, Optional
 from app.core.cover_letter import CoverLetterGenerator
 
@@ -233,11 +234,20 @@ class SalaryNegotiationEngine:
             f"Best regards,\n{candidate_name}"
         )
 
+        clean_base = re.sub(r'[^\d.]', '', target_base.replace(',', ''))
+        try:
+            parsed_base = float(clean_base) if clean_base else 10.0
+            if parsed_base >= 1000 and 'lpa' not in target_base.lower():
+                parsed_base = parsed_base / 1000.0
+        except ValueError:
+            parsed_base = 10.0
+        sign_on_k = max(1, int(parsed_base * 0.2))
+
         phone_talking_points = (
             f"1. Express strong enthusiasm: '{target_company} is my absolute #1 preference because of the team and architecture challenges.'\n"
             f"2. Anchor on value & benchmarks: 'Based on my track record and standard P85 market compensation for {role_title}, I am targeting {target_base} base.'\n"
             f"3. Offer immediate close: 'If you can meet me at {target_base} base + {target_equity} equity, I will cancel all other interview loops and sign today.'\n"
-            f"4. If base is firm: 'If base is locked by band policy, can we bridge the gap with a ${int(float(target_base.replace('$','').replace('k','').replace('LPA','').strip() or '10') * 0.2)}k sign-on bonus or additional stock grant?'"
+            f"4. If base is firm: 'If base is locked by band policy, can we bridge the gap with a ${sign_on_k}k sign-on bonus or additional stock grant?'"
         )
 
         return {
