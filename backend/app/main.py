@@ -47,17 +47,39 @@ app.add_middleware(
 app.include_router(api_router)
 
 
-# WebSocket Route for Real-Time Streaming (Bot Logs, HITL Alerts, Kanban status)
+# WebSocket Route for Strict Authenticated Real-Time Streaming
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
+    """
+    Strict Authenticated WebSocket Gateway.
+    Requires unrevoked, valid JWT Bearer access token passed via query parameter (?token=...).
+    Closes with 4001 (Unauthorized) if token is missing, invalid, or revoked.
+    """
     from app.api.auth import decode_jwt_token
-    user_id = None
-    if token:
-        try:
-            payload = decode_jwt_token(token)
-            user_id = payload.get("sub")
-        except Exception:
-            pass
+    from app.core.database import db
+
+    if not token:
+        await websocket.close(code=4001, reason="Authentication required. Provide token query parameter.")
+        return
+
+    try:
+        payload = decode_jwt_token(token)
+        if payload.get("type") != "access":
+            await websocket.close(code=4001, reason="Invalid token type.")
+            return
+
+        jti = payload.get("jti")
+        if jti and db.is_token_revoked(jti):
+            await websocket.close(code=4001, reason="Token has been revoked.")
+            return
+
+        user_id = payload.get("sub")
+        if not user_id:
+            await websocket.close(code=4001, reason="Invalid token subject.")
+            return
+    except Exception:
+        await websocket.close(code=4001, reason="Invalid authentication token.")
+        return
 
     await ws_manager.connect(websocket, user_id=user_id)
     try:
