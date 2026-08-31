@@ -18,6 +18,7 @@ from fastapi import (
 )
 from pydantic import BaseModel
 
+from app.core.settings import settings
 from app.core.config import RESUMES_DIR, DEFAULT_SUBMISSION_MODE
 from app.core.models import (
     CandidateProfile, VaultEntry, JobListing, HITLEvent, ApplicationStatus,
@@ -1216,6 +1217,10 @@ class CheckoutRequest(BaseModel):
     cancel_url: Optional[str] = None
 
 
+class CustomerPortalRequest(BaseModel):
+    return_url: Optional[str] = None
+
+
 @protected_router.get("/billing/plan")
 async def get_billing_plan(current_user: User = Depends(get_current_user)):
     """Returns the current user's subscription tier, limits, and daily apply balance."""
@@ -1231,17 +1236,70 @@ async def create_checkout_session(
     payload: CheckoutRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Generates a Stripe checkout session for upgrading subscription tier."""
+    """Generates a real Stripe Checkout Session for subscription tier upgrade."""
     requested_tier = payload.tier.upper()
     if requested_tier not in ["PRO", "ELITE"]:
         raise HTTPException(status_code=400, detail="Invalid subscription tier. Choose PRO or ELITE.")
 
-    checkout_url = f"https://checkout.stripe.com/pay/cs_live_{current_user.user_id}_{requested_tier}"
+    if settings.STRIPE_SECRET_KEY:
+        import stripe
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        price_id = settings.STRIPE_PRO_PRICE_ID if requested_tier == "PRO" else settings.STRIPE_ELITE_PRICE_ID
+        success_url = payload.success_url or f"http://localhost:{settings.FRONTEND_PORT}/#billing-success?session_id={{CHECKOUT_SESSION_ID}}"
+        cancel_url = payload.cancel_url or f"http://localhost:{settings.FRONTEND_PORT}/#billing"
+
+        try:
+            session = stripe.checkout.Session.create(
+                mode="subscription",
+                payment_method_types=["card"],
+                line_items=[{"price": price_id, "quantity": 1}],
+                success_url=success_url,
+                cancel_url=cancel_url,
+                client_reference_id=current_user.user_id,
+                customer_email=current_user.email,
+                metadata={"user_id": current_user.user_id, "tier": requested_tier}
+            )
+            checkout_url = session.url or f"https://checkout.stripe.com/pay/{session.id}"
+            session_id = session.id
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Stripe API error: {str(e)}")
+    else:
+        session_id = f"cs_sim_{current_user.user_id}_{requested_tier}"
+        checkout_url = f"https://checkout.stripe.com/pay/{session_id}"
+
     return {
         "status": "success",
+        "session_id": session_id,
         "checkout_url": checkout_url,
         "tier": requested_tier,
         "amount_usd": 29 if requested_tier == "PRO" else 79
+    }
+
+
+@protected_router.post("/billing/portal")
+async def create_customer_portal_session(
+    payload: CustomerPortalRequest = CustomerPortalRequest(),
+    current_user: User = Depends(get_current_user)
+):
+    """Creates a Stripe Billing Customer Portal session for user subscription management."""
+    return_url = payload.return_url or f"http://localhost:{settings.FRONTEND_PORT}/#billing"
+    if settings.STRIPE_SECRET_KEY:
+        import stripe
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        try:
+            portal_session = stripe.billing_portal.Session.create(
+                customer=current_user.user_id,
+                return_url=return_url
+            )
+            portal_url = portal_session.url
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Stripe Customer Portal error: {str(e)}")
+    else:
+        portal_url = f"https://billing.stripe.com/p/session/sim_{current_user.user_id}"
+
+    return {
+        "status": "success",
+        "portal_url": portal_url
     }
 
 
