@@ -6,8 +6,11 @@ HackerNews 'Who is Hiring?' threads, and top tier VC portfolio boards.
 
 import re
 import asyncio
+import logging
 from typing import List, Dict, Any, Optional
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 class VCBoardFeeders:
@@ -59,8 +62,8 @@ class VCBoardFeeders:
                                 parsed = cls._parse_hn_comment(cdata["text"], cdata["id"])
                                 if parsed:
                                     jobs.append(parsed)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"HN Who is Hiring fetch error: {e}")
         finally:
             if should_close:
                 await client.aclose()

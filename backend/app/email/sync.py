@@ -5,6 +5,7 @@ updates pipeline status automatically, and persists sanitized records to SQLite.
 """
 
 import uuid
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple, List
 
@@ -12,6 +13,8 @@ from app.core.models import EmailMessage, EmailIntent, ApplicationStatus, JobLis
 from app.core.database import db
 from app.email.parser import EmailParser
 from app.email.classifier import EmailClassifier
+
+logger = logging.getLogger(__name__)
 
 
 class EmailSyncEngine:
@@ -123,8 +126,8 @@ class EmailSyncEngine:
                     "scheduling_links": scheduling_links,
                     "updated_status": updated_status
                 })
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"WebSocket broadcast error in EmailSyncEngine: {e}")
 
         return {
             "status": "success",

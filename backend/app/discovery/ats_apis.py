@@ -7,10 +7,13 @@ Extracts 0-day openings directly from public JSON APIs in < 150ms per company.
 import re
 import html
 import asyncio
+import logging
 from typing import List, Dict, Any, Optional
 import httpx
 
 from app.core.models import JobListing, ApplicationStatus
+
+logger = logging.getLogger(__name__)
 
 try:
     import h2
@@ -74,8 +77,8 @@ class ATSApiFeeders:
                             "description": description,
                             "posted_date": updated_at
                         })
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Greenhouse fetch error for {company_slug}: {e}")
 
         if client:
             await _fetch(client)
@@ -119,8 +122,8 @@ class ATSApiFeeders:
                                 "description": description,
                                 "posted_date": str(created_at) if created_at else None
                             })
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Lever fetch error for {company_slug}: {e}")
 
         if client:
             await _fetch(client)
@@ -163,8 +166,8 @@ class ATSApiFeeders:
                             "description": description,
                             "posted_date": str(published_at) if published_at else None
                         })
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Ashby fetch error for {company_slug}: {e}")
 
         if client:
             await _fetch(client)

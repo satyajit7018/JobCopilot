@@ -5,12 +5,15 @@ follow-up drafts with Anti-AI cliché filtering and value-add project updates.
 """
 
 import uuid
+import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
 from app.core.models import CandidateProfile, JobListing, ApplicationStatus, OutreachRecord, OutreachChannel
 from app.core.database import db
 from app.core.cover_letter import CoverLetterGenerator
+
+logger = logging.getLogger(__name__)
 
 
 class FollowUpEngine:
@@ -69,8 +72,8 @@ class FollowUpEngine:
                         applied_date = datetime.fromisoformat(job.applied_at)
                         if (now - applied_date).days >= days_threshold:
                             pending.append(job)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing applied_at for job {job.job_id}: {e}")
         return pending
 
     @classmethod
