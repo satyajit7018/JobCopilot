@@ -31,8 +31,12 @@ async def test_discovery_cycle_multi_tenant_isolation():
         email=f"{user_a}@test.com",
         phone="+1-555-0100",
         location="Remote",
-        skills=["Python", "FastAPI", "PostgreSQL"],
-        preferences=RecruiterPreferences(target_roles=["Backend Engineer"])
+        skills=["Python", "FastAPI", "PostgreSQL", "Docker", "AWS"],
+        preferences=RecruiterPreferences(
+            target_roles=["Backend Software Engineer", "Software Engineer"],
+            years_of_experience=4.0,
+            remote_preference="Remote"
+        )
     )
     db.save_profile(profile_a, user_id=user_a)
 
@@ -49,7 +53,7 @@ async def test_discovery_cycle_multi_tenant_isolation():
             "title": "Backend Software Engineer",
             "location": "Remote",
             "url": "https://stripe.com/jobs/123",
-            "description": "Building high-performance Python and FastAPI payment services.",
+            "description": "Seeking a Backend Software Engineer experienced in Python, FastAPI, and PostgreSQL.",
             "salary_range": "$170,000 - $210,000"
         }
     ]
