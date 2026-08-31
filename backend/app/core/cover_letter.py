@@ -90,3 +90,27 @@ class CoverLetterGenerator:
 
         full_letter = f"{p1}\n\n{p2}\n\n{p3}"
         return cls.sanitize_anti_ai(full_letter)
+
+    @classmethod
+    async def generate_cover_letter_async(
+        cls,
+        profile: CandidateProfile,
+        company_name: str,
+        job_title: str,
+        job_description: str = "",
+        domain: str = "Technology"
+    ) -> str:
+        """Generates cover letter via configured LLM with automatic deterministic fallback."""
+        from app.core.llm_client import llm_client
+
+        fallback = lambda: cls.generate_cover_letter(profile, company_name, job_title, job_description, domain)
+        prompt = (
+            f"Generate a concise, direct 3-paragraph engineering cover letter for {profile.full_name} "
+            f"applying to the {job_title} role at {company_name}.\n"
+            f"Candidate skills: {', '.join(profile.skills[:6])}.\n"
+            f"Job Description excerpt: {job_description[:300]}.\n"
+            f"Do not use banned clichés (delve, tapestry, beacon, thrilled to apply, esteemed company)."
+        )
+        system_prompt = "You are an expert technical resume and cover letter writer. Output plain text only."
+        raw_text = await llm_client.generate_completion(prompt, system_prompt=system_prompt, fallback_fn=fallback)
+        return cls.sanitize_anti_ai(raw_text)
