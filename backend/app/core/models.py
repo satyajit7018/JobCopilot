@@ -129,6 +129,7 @@ class User(BaseModel):
     full_name: str = ""
     role: UserRole = UserRole.FREE
     is_active: bool = True
+    email_verified: bool = False
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
@@ -165,7 +166,21 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     role: str
+    email_verified: bool = False
     created_at: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class RequestPasswordResetRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
 
 
 class CandidateProfile(BaseModel):
