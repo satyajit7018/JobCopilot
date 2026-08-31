@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from app.core.settings import settings
+from app.api.middleware import SecurityHeadersMiddleware, RequestTracingMiddleware
 from app.api.endpoints import router as api_router, ws_manager
 
 app = FastAPI(
@@ -18,18 +20,19 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS with explicit origins
+# 1. Tracing & Latency Logger
+app.add_middleware(RequestTracingMiddleware)
+
+# 2. Strict Security Headers (CSP, HSTS, X-Frame-Options)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# 3. CORS Policy
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173"
-    ],
+    allow_origins=settings.ALLOWED_ORIGINS if isinstance(settings.ALLOWED_ORIGINS, list) else [settings.ALLOWED_ORIGINS],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Accept"],
 )
 
 # Include REST Router
