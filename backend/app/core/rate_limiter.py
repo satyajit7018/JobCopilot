@@ -71,8 +71,28 @@ class RateLimiter:
                 pass
         return SubscriptionTier.FREE
 
-    def set_user_tier(self, user_id: str, tier: SubscriptionTier) -> None:
+    def invalidate_cache(self, user_id: Optional[str] = None) -> None:
+        """Invalidates in-memory subscription tier cache for a specific user or all users."""
+        if user_id:
+            self.user_subscriptions.pop(user_id, None)
+        else:
+            self.user_subscriptions.clear()
+
+    def set_user_tier(self, user_id: str, tier: SubscriptionTier, sync_db: bool = True) -> None:
+        """Sets user tier in-memory and optionally synchronizes to database."""
         self.user_subscriptions[user_id] = tier
+        if sync_db:
+            try:
+                from app.core.database import db
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE users SET role = ?, updated_at = ? WHERE user_id = ?",
+                        (tier.value, time.strftime("%Y-%m-%dT%H:%M:%S"), user_id)
+                    )
+                    conn.commit()
+            except Exception:
+                pass
 
     def get_remaining_applies(self, user_id: str) -> int:
         tier = self.get_user_tier(user_id)
