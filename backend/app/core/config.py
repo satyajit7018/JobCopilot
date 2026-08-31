@@ -1,34 +1,27 @@
 """
 JobCopilot - Core Configuration & Local Path Setup
-Local-first, privacy-respecting storage paths and system settings.
+Backward-compatible re-exports backed by the centralized typed Settings engine.
 """
 
-import os
 from pathlib import Path
+from app.core.settings import settings
 
-# Local-first user directory: ~/.jobcopilot/ or custom JOBCOPILOT_DATA_DIR
-APP_DIR = Path(os.environ.get("JOBCOPILOT_DATA_DIR", os.path.expanduser("~/.jobcopilot")))
-APP_DIR.mkdir(parents=True, exist_ok=True)
-
-DB_PATH = APP_DIR / "jobcopilot.db"
-VAULT_ENC_PATH = APP_DIR / "vault.enc"
-PROFILES_DIR = APP_DIR / "profiles"
-PROFILES_DIR.mkdir(parents=True, exist_ok=True)
-
-RESUMES_DIR = APP_DIR / "resumes"
-RESUMES_DIR.mkdir(parents=True, exist_ok=True)
-
-DATA_DIR = APP_DIR
-BACKUPS_DIR = APP_DIR / "backups"
-BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+# Paths re-exported from settings
+APP_DIR = settings.app_dir
+DB_PATH = settings.db_path
+VAULT_ENC_PATH = settings.vault_enc_path
+PROFILES_DIR = settings.profiles_dir
+RESUMES_DIR = settings.resumes_dir
+DATA_DIR = settings.app_dir
+BACKUPS_DIR = settings.backups_dir
 
 # Default Application Settings
 DEFAULT_MATCH_THRESHOLD = 0.60
 DEFAULT_DAILY_CAP = 30
 DEFAULT_FRESHNESS_DAYS = 30
 DEFAULT_BUSINESS_HOURS = {"start": "08:30", "end": "17:30"}
-DEFAULT_SUBMISSION_MODE = "FULL_AUTO"  # or "REVIEW_MODE"
+DEFAULT_SUBMISSION_MODE = "FULL_AUTO"
 
-API_PORT = 8000
-FRONTEND_PORT = 5173
-CDP_PORT = 9222
+API_PORT = settings.API_PORT
+FRONTEND_PORT = settings.FRONTEND_PORT
+CDP_PORT = settings.CDP_PORT

@@ -8,6 +8,8 @@ import os
 import random
 from typing import Optional, Dict, Any, List
 
+from app.core.settings import settings
+
 
 class ProxyRotator:
     """Provides rotation and configuration for Playwright browser contexts."""
@@ -34,7 +36,7 @@ class ProxyRotator:
         if self.provider == "brightdata":
             host = os.environ.get("BRIGHTDATA_HOST", "brd.superproxy.io:22225")
             user = os.environ.get("BRIGHTDATA_USER", "lum-customer-hl_default-zone-residential")
-            password = os.environ.get("BRIGHTDATA_PASSWORD", "secret")
+            password = os.environ.get("BRIGHTDATA_PASSWORD", settings.PROXY_PASSWORD)
             session = session_id or str(random.randint(10000, 99999))
             return {
                 "server": f"http://{host}",
@@ -45,7 +47,7 @@ class ProxyRotator:
         if self.provider == "oxylabs":
             host = os.environ.get("OXYLABS_HOST", "pr.oxylabs.io:7777")
             user = os.environ.get("OXYLABS_USER", "customer-user")
-            password = os.environ.get("OXYLABS_PASSWORD", "secret")
+            password = os.environ.get("OXYLABS_PASSWORD", settings.PROXY_PASSWORD)
             return {
                 "server": f"http://{host}",
                 "username": f"customer-{user}-cc-us",
