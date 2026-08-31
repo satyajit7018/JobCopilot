@@ -16,6 +16,7 @@ from app.core.models import (
     ApplicationStatus, OutreachRecord, OutreachChannel, EmailMessage, JobCheckpoint
 )
 from app.core.db_adapter import DatabaseAdapter
+from app.core.credential_vault import cred_vault
 
 
 class DatabaseManager(DatabaseAdapter):
@@ -419,10 +420,50 @@ class DatabaseManager(DatabaseAdapter):
                 return int(row["apply_count"]) if row else 1
 
     # =========================================================================
-    # Candidate Profile Operations (Multi-Tenant)
+    # Candidate Profile Operations (Multi-Tenant with PII Encryption at Rest)
     # =========================================================================
+    @staticmethod
+    def _encrypt_profile_dict(p_dict: Dict[str, Any]) -> Dict[str, Any]:
+        encrypted = dict(p_dict)
+        if encrypted.get("phone"):
+            encrypted["phone"] = cred_vault.encrypt_field(encrypted["phone"])
+        if encrypted.get("location"):
+            encrypted["location"] = cred_vault.encrypt_field(encrypted["location"])
+        if "preferences" in encrypted and isinstance(encrypted["preferences"], dict):
+            prefs = dict(encrypted["preferences"])
+            if prefs.get("expected_ctc"):
+                prefs["expected_ctc"] = cred_vault.encrypt_field(prefs["expected_ctc"])
+            if prefs.get("current_employer"):
+                prefs["current_employer"] = cred_vault.encrypt_field(prefs["current_employer"])
+            if prefs.get("why_looking_for_role"):
+                prefs["why_looking_for_role"] = cred_vault.encrypt_field(prefs["why_looking_for_role"])
+            encrypted["preferences"] = prefs
+        encrypted["_pii_encrypted"] = True
+        return encrypted
+
+    @staticmethod
+    def _decrypt_profile_dict(p_dict: Dict[str, Any]) -> Dict[str, Any]:
+        if not p_dict.get("_pii_encrypted"):
+            return p_dict
+        decrypted = dict(p_dict)
+        if decrypted.get("phone"):
+            decrypted["phone"] = cred_vault.decrypt_field(decrypted["phone"])
+        if decrypted.get("location"):
+            decrypted["location"] = cred_vault.decrypt_field(decrypted["location"])
+        if "preferences" in decrypted and isinstance(decrypted["preferences"], dict):
+            prefs = dict(decrypted["preferences"])
+            if prefs.get("expected_ctc"):
+                prefs["expected_ctc"] = cred_vault.decrypt_field(prefs["expected_ctc"])
+            if prefs.get("current_employer"):
+                prefs["current_employer"] = cred_vault.decrypt_field(prefs["current_employer"])
+            if prefs.get("why_looking_for_role"):
+                prefs["why_looking_for_role"] = cred_vault.decrypt_field(prefs["why_looking_for_role"])
+            decrypted["preferences"] = prefs
+        decrypted.pop("_pii_encrypted", None)
+        return decrypted
+
     def save_profile(self, profile: CandidateProfile, user_id: str) -> bool:
-        """Saves or replaces the Candidate Profile strictly bound to user_id."""
+        """Saves Candidate Profile with transparent AES-256-GCM PII encryption at rest."""
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -430,15 +471,16 @@ class DatabaseManager(DatabaseAdapter):
                 target_id = profile.id or user_id
                 profile.id = target_id
                 profile_dict = profile.dict()
+                enc_dict = self._encrypt_profile_dict(profile_dict)
                 cursor.execute("""
                 INSERT OR REPLACE INTO profiles (id, user_id, data, updated_at)
                 VALUES (?, ?, ?, ?)
-                """, (target_id, user_id, json.dumps(profile_dict), profile.updated_at))
+                """, (target_id, user_id, json.dumps(enc_dict), profile.updated_at))
                 conn.commit()
                 return True
 
     def get_profile(self, user_id: str, profile_id: Optional[str] = None) -> Optional[CandidateProfile]:
-        """Retrieves candidate profile strictly for the specified user."""
+        """Retrieves candidate profile strictly for user and transparently decrypts PII."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             if profile_id:
@@ -447,9 +489,33 @@ class DatabaseManager(DatabaseAdapter):
                 cursor.execute("SELECT data FROM profiles WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1", (user_id,))
             row = cursor.fetchone()
             if row:
-                data = json.loads(row["data"])
-                return CandidateProfile(**data)
+                raw_dict = json.loads(row["data"])
+                dec_dict = self._decrypt_profile_dict(raw_dict)
+                return CandidateProfile(**dec_dict)
             return None
+
+    def migrate_plaintext_profiles(self) -> int:
+        """One-shot backfill helper to encrypt any legacy plaintext profile rows."""
+        migrated = 0
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, user_id, data, updated_at FROM profiles")
+                rows = cursor.fetchall()
+                for r in rows:
+                    try:
+                        data = json.loads(r["data"])
+                        if not data.get("_pii_encrypted"):
+                            enc = self._encrypt_profile_dict(data)
+                            cursor.execute(
+                                "UPDATE profiles SET data = ? WHERE id = ? AND user_id = ?",
+                                (json.dumps(enc), r["id"], r["user_id"])
+                            )
+                            migrated += 1
+                    except Exception:
+                        pass
+                conn.commit()
+        return migrated
 
     # =========================================================================
     # Knowledge Vault Operations (Multi-Tenant)
