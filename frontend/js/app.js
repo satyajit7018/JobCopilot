@@ -22,6 +22,39 @@ function escapeHTML(str) {
     .replace(/'/g, '&#039;');
 }
 
+/**
+ * Programmatic Safe DOM Builder Helper (XSS-Free)
+ * Constructs DOM nodes safely without innerHTML interpolation.
+ */
+function el(tag, attrs = {}, ...children) {
+  const element = document.createElement(tag);
+  for (const [key, val] of Object.entries(attrs || {})) {
+    if (key.startsWith('on') && typeof val === 'function') {
+      element.addEventListener(key.slice(2).toLowerCase(), val);
+    } else if (key === 'className' || key === 'class') {
+      element.className = val;
+    } else if (key === 'style' && typeof val === 'object') {
+      Object.assign(element.style, val);
+    } else if (key === 'dataset' && typeof val === 'object') {
+      Object.assign(element.dataset, val);
+    } else if (val !== null && val !== undefined) {
+      element.setAttribute(key, val);
+    }
+  }
+  for (const child of children.flat()) {
+    if (child === null || child === undefined) continue;
+    if (typeof child === 'string' || typeof child === 'number') {
+      element.appendChild(document.createTextNode(String(child)));
+    } else if (child instanceof Node) {
+      element.appendChild(child);
+    }
+  }
+  return element;
+}
+
+window.el = el;
+window.escapeHTML = escapeHTML;
+
 function sanitizeUrl(url) {
   if (!url) return '#';
   const clean = String(url).trim();
