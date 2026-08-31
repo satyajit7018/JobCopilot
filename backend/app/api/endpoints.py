@@ -649,6 +649,59 @@ async def apply_to_job(
     return result
 
 
+@protected_router.post("/jobs/apply-async/{job_id}", status_code=202)
+@protected_router.post("/bot/apply-async/{job_id}", status_code=202)
+async def apply_to_job_async(
+    job_id: str,
+    mode: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Dispatches asynchronous application task to Celery/Redis background worker queue.
+    Returns HTTP 202 Accepted with a unique task_id for progress polling.
+    """
+    from app.core.rate_limiter import rate_limiter
+    from app.core.celery_app import TaskManager
+
+    if not rate_limiter.can_apply(current_user.user_id):
+        raise HTTPException(
+            status_code=429,
+            detail="Daily application limit reached for your plan. Please upgrade to Pro or Elite to continue applying."
+        )
+
+    task_id = TaskManager.dispatch_apply_task(
+        job_id=job_id,
+        user_id=current_user.user_id,
+        submission_mode=mode or DEFAULT_SUBMISSION_MODE
+    )
+
+    rate_limiter.record_apply(current_user.user_id)
+
+    return {
+        "status": "ACCEPTED",
+        "task_id": task_id,
+        "job_id": job_id,
+        "poll_url": f"/api/tasks/{task_id}",
+        "message": "Application task queued successfully. Poll poll_url for progress."
+    }
+
+
+@protected_router.get("/tasks/{task_id}")
+async def get_task_status_endpoint(
+    task_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Polls progress and completion status for an asynchronous background task."""
+    from app.core.celery_app import TaskManager
+    task_info = TaskManager.get_task_status(task_id, user_id=current_user.user_id)
+    if not task_info:
+        raise HTTPException(status_code=404, detail="Task not found or access denied.")
+    return {
+        "status": "success",
+        "task": task_info
+    }
+
+
 class InboundEmailPayload(BaseModel):
     sender: str
     recipient: str = "candidate@jobcopilot.local"
