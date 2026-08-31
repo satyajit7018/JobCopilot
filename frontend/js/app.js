@@ -31,13 +31,77 @@ function sanitizeUrl(url) {
   return '#';
 }
 
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+function onRefreshed(token) {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+}
+
+async function refreshAccessToken() {
+  const refreshToken = localStorage.getItem('jobcopilot_refresh_token');
+  if (!refreshToken) return null;
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    });
+    if (!res.ok) {
+      localStorage.removeItem('jobcopilot_access_token');
+      localStorage.removeItem('jobcopilot_refresh_token');
+      return null;
+    }
+    const data = await res.json();
+    if (data.access_token) {
+      localStorage.setItem('jobcopilot_access_token', data.access_token);
+      if (data.refresh_token) {
+        localStorage.setItem('jobcopilot_refresh_token', data.refresh_token);
+      }
+      return data.access_token;
+    }
+  } catch (err) {
+    console.error('JWT Token Refresh Error:', err);
+  }
+  return null;
+}
+
 async function authFetch(url, options = {}) {
-  const token = localStorage.getItem('jobcopilot_access_token');
+  let token = localStorage.getItem('jobcopilot_access_token');
   const headers = { ...(options.headers || {}) };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  return await fetch(url, { ...options, headers });
+  let response = await fetch(url, { ...options, headers });
+
+  // Automatic silent refresh on 401 Unauthorized
+  if (response.status === 401 && localStorage.getItem('jobcopilot_refresh_token')) {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      const newToken = await refreshAccessToken();
+      isRefreshing = false;
+      if (newToken) {
+        onRefreshed(newToken);
+        headers['Authorization'] = `Bearer ${newToken}`;
+        return await fetch(url, { ...options, headers });
+      }
+    } else {
+      const retryPromise = new Promise(resolve => {
+        refreshSubscribers.push(newToken => {
+          if (newToken) {
+            headers['Authorization'] = `Bearer ${newToken}`;
+            resolve(fetch(url, { ...options, headers }));
+          } else {
+            resolve(response);
+          }
+        });
+      });
+      return await retryPromise;
+    }
+  }
+
+  return response;
 }
 
 // Global Reactive State
@@ -298,12 +362,23 @@ window.triggerGoogleSSO = async function() {
       })
     });
     const data = await res.json();
-    if (data.status === 'success') {
-      state.currentUser = data.user;
-      if (els.userDisplayName) els.userDisplayName.textContent = data.user.full_name;
-      if (els.authEmailDisplay) els.authEmailDisplay.textContent = data.user.email;
-      showToast(`Signed in successfully as ${data.user.full_name}!`, 'success');
-      appendTerminalLog('AUTH', `Google Single Sign-On session active for ${data.user.email}`, false, true);
+    if (data.access_token) {
+      localStorage.setItem('jobcopilot_access_token', data.access_token);
+      if (data.refresh_token) {
+        localStorage.setItem('jobcopilot_refresh_token', data.refresh_token);
+      }
+      state.currentUser = {
+        email: data.email || 'alex.mercer.dev@gmail.com',
+        full_name: 'Alex Mercer',
+        user_id: data.user_id,
+        role: data.role
+      };
+      if (els.userDisplayName) els.userDisplayName.textContent = state.currentUser.full_name;
+      if (els.authEmailDisplay) els.authEmailDisplay.textContent = state.currentUser.email;
+      showToast(`Signed in successfully as ${state.currentUser.full_name}!`, 'success');
+      appendTerminalLog('AUTH', `Google Single Sign-On session active for ${state.currentUser.email}`, false, true);
+    } else {
+      showToast(`Google SSO error: ${data.detail || 'Authentication failed'}`, 'error');
     }
   } catch (err) {
     showToast(`Google SSO error: ${err.message}`, 'error');
@@ -394,7 +469,7 @@ async function renderMultiResumeWorkshop() {
   els.multiResumeWorkshopContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Compiling ATS-tailored resume variants for selected roles...</p>';
 
   try {
-    const res = await fetch(`${API_BASE}/resumes/tailor-multi`, {
+    const res = await authFetch(`${API_BASE}/resumes/tailor-multi`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ roles: state.selectedRoles, profile_id: 'default_user' })
@@ -500,7 +575,7 @@ async function handleFileUpload(file) {
   formData.append('profile_id', 'default_user');
 
   try {
-    const res = await fetch(`${API_BASE}/upload-resume`, {
+    const res = await authFetch(`${API_BASE}/upload-resume`, {
       method: 'POST',
       body: formData
     });
@@ -580,7 +655,7 @@ if (els.questionnaireForm) {
     };
 
     try {
-      const res = await fetch(`${API_BASE}/questionnaire`, {
+      const res = await authFetch(`${API_BASE}/questionnaire`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profile_id: 'default_user', answers: answers })
@@ -602,7 +677,7 @@ if (els.questionnaireForm) {
 // ==========================================================================
 async function fetchJobsList() {
   try {
-    const res = await fetch(`${API_BASE}/jobs`);
+    const res = await authFetch(`${API_BASE}/jobs`);
     const data = await res.json();
     state.jobsList = data.jobs || [];
     renderKanbanBoard();
@@ -719,7 +794,7 @@ window.applyToJob = async function(jobId) {
   appendTerminalLog('BOT', `Launching Playwright Chromium session for Job ID: ${jobId}`);
 
   try {
-    const res = await fetch(`${API_BASE}/bot/apply/${jobId}`, {
+    const res = await authFetch(`${API_BASE}/bot/apply/${jobId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     });
@@ -742,7 +817,7 @@ window.triggerDiscoveryCycle = async function() {
   appendTerminalLog('DISCOVERY', 'Polling 0-day feeds (<2 hours fresh)...');
 
   try {
-    const res = await fetch(`${API_BASE}/discovery/run`, { method: 'POST' });
+    const res = await authFetch(`${API_BASE}/discovery/run`, { method: 'POST' });
     const data = await res.json();
     showToast(`Discovered ${data.count || 12} new 0-day openings!`, 'success');
     appendTerminalLog('DISCOVERY', `Ingested ${data.count || 12} job postings. SimHash deduplication complete.`, false, true);
@@ -772,7 +847,7 @@ window.submitDirectCall = async function(e) {
   const notes = document.getElementById('call-notes').value.trim();
 
   try {
-    const res = await fetch(`${API_BASE}/jobs/log-call`, {
+    const res = await authFetch(`${API_BASE}/jobs/log-call`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -803,7 +878,7 @@ window.submitDirectCall = async function(e) {
 // ==========================================================================
 async function fetchHeldApplications() {
   try {
-    const res = await fetch(`${API_BASE}/jobs/held`);
+    const res = await authFetch(`${API_BASE}/jobs/held`);
     const data = await res.json();
     state.heldJobs = data.held_applications || [];
 
@@ -861,7 +936,7 @@ window.resolveHeldApplication = async function(eventId) {
   showToast('Resuming held application & indexing question in Knowledge Vault...', 'info');
 
   try {
-    const res = await fetch(`${API_BASE}/hitl/resolve-held`, {
+    const res = await authFetch(`${API_BASE}/hitl/resolve-held`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ event_id: eventId, user_answer: answer, save_to_vault: true })
@@ -888,7 +963,7 @@ window.resolveHeldApplication = async function(eventId) {
 // ==========================================================================
 async function fetchVaultEntries() {
   try {
-    const res = await fetch(`${API_BASE}/vault`);
+    const res = await authFetch(`${API_BASE}/vault`);
     const data = await res.json();
     state.vaultEntries = data.entries || [];
     if (els.badgeVaultCount) els.badgeVaultCount.textContent = `${state.vaultEntries.length}+`;
@@ -924,7 +999,7 @@ window.simulateVaultMatch = async function() {
   showToast('Querying vector vault...', 'info');
 
   try {
-    const res = await fetch(`${API_BASE}/vault/match`, {
+    const res = await authFetch(`${API_BASE}/vault/match`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: prompt, company: 'Stripe', role: 'Senior Software Engineer' })
@@ -952,7 +1027,7 @@ window.simulateVaultMatch = async function() {
 window.syncEmailRadar = async function() {
   showToast('Connecting to IMAP IDLE push radar...', 'info');
   try {
-    const res = await fetch(`${API_BASE}/email/sync`, { method: 'POST' });
+    const res = await authFetch(`${API_BASE}/email/sync`, { method: 'POST' });
     const data = await res.json();
     const emails = data.emails || [];
     renderEmailRadar(emails);
@@ -1607,7 +1682,7 @@ window.fetchReverseInterviewQuestions = async function() {
   container.innerHTML = '<div style="color: var(--accent-cyan); font-size: 12.5px;">Generating strategic questions for hiring manager...</div>';
 
   try {
-    const res = await fetch(`${API_BASE}/interview/reverse-questions?role=${encodeURIComponent(role)}&company=${encodeURIComponent(comp)}`);
+    const res = await authFetch(`${API_BASE}/interview/reverse-questions?role=${encodeURIComponent(role)}&company=${encodeURIComponent(comp)}`);
     const data = await res.json();
     if (data.status === 'success' && data.questions) {
       container.innerHTML = `
@@ -1639,12 +1714,12 @@ window.analyzeInterviewerSleuth = async function() {
 
   try {
     const [reconRes, intelRes] = await Promise.all([
-      fetch(`${API_BASE}/interview/interviewer-recon`, {
+      authFetch(`${API_BASE}/interview/interviewer-recon`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ interviewer_name: name, interviewer_role: role })
       }),
-      fetch(`${API_BASE}/interview/engineering-intel?company=${encodeURIComponent(comp)}`)
+      authFetch(`${API_BASE}/interview/engineering-intel?company=${encodeURIComponent(comp)}`)
     ]);
 
     const reconData = await reconRes.json();
@@ -1708,7 +1783,7 @@ window.runMultiOfferComparison = async function() {
   if (!container) return;
 
   try {
-    const res = await fetch(`${API_BASE}/salary/compare-offers`, {
+    const res = await authFetch(`${API_BASE}/salary/compare-offers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ offers: [o1, o2] })
@@ -1757,7 +1832,7 @@ window.generateAdvancedCounterScript = async function() {
   container.innerHTML = '<div style="color: var(--accent-cyan); font-size: 12.5px;">Generating executive negotiation email and phone script...</div>';
 
   try {
-    const res = await fetch(`${API_BASE}/salary/counter-script`, {
+    const res = await authFetch(`${API_BASE}/salary/counter-script`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1828,7 +1903,7 @@ window.copyActiveOutreach = function() {
 window.tailorJobAssets = async function(jobId) {
   showToast(`Tailoring Triple-Threat outreach for Job #${jobId}...`, 'info');
   try {
-    const res = await fetch(`${API_BASE}/jobs/tailor/${jobId}`, { method: 'POST' });
+    const res = await authFetch(`${API_BASE}/jobs/tailor/${jobId}`, { method: 'POST' });
     const data = await res.json();
 
     if (data.status === 'success') {
@@ -1847,7 +1922,7 @@ window.tailorJobAssets = async function(jobId) {
       // Generate Alumni & Nudge
       try {
         const [alumRes, nudgeRes] = await Promise.all([
-          fetch(`${API_BASE}/outreach/alumni-referral`, {
+          authFetch(`${API_BASE}/outreach/alumni-referral`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1856,7 +1931,7 @@ window.tailorJobAssets = async function(jobId) {
               role_title: data.title
             })
           }),
-          fetch(`${API_BASE}/outreach/recruiter-nudge`, {
+          authFetch(`${API_BASE}/outreach/recruiter-nudge`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1895,7 +1970,7 @@ window.submitAnswerForEvaluation = async function() {
   showToast('Evaluating response with STAR rubric & metrics verification...', 'info');
 
   try {
-    const res = await fetch(`${API_BASE}/interview/evaluate`, {
+    const res = await authFetch(`${API_BASE}/interview/evaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2036,7 +2111,7 @@ window.loadInterviewQuestions = async function() {
   container.innerHTML = '<div style="color: var(--accent-cyan); font-size: 13px;">Synthesizing company engineering architecture dossier...</div>';
 
   try {
-    const res = await fetch(`${API_BASE}/interview/dossier?company=${encodeURIComponent(company)}&role=${encodeURIComponent(role)}`);
+    const res = await authFetch(`${API_BASE}/interview/dossier?company=${encodeURIComponent(company)}&role=${encodeURIComponent(role)}`);
     const data = await res.json();
 
     if (data.status === 'success') {
@@ -2080,7 +2155,7 @@ window.loadInterviewQuestions = async function() {
 // ==========================================================================
 async function fetchFunnelMetrics() {
   try {
-    const res = await fetch(`${API_BASE}/analytics/funnel`);
+    const res = await authFetch(`${API_BASE}/analytics/funnel`);
     const data = await res.json();
     const m = data.metrics || {};
 
@@ -2097,7 +2172,7 @@ async function fetchFunnelMetrics() {
 window.exportEncryptedBackup = async function() {
   showToast('Creating AES-256-GCM encrypted backup archive...', 'info');
   try {
-    const res = await fetch(`${API_BASE}/backup/export`, { method: 'POST' });
+    const res = await authFetch(`${API_BASE}/backup/export`, { method: 'POST' });
     const data = await res.json();
     if (data.status === 'success') {
       showToast(`Backup exported: ${data.filename}`, 'success');
