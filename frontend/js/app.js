@@ -915,17 +915,87 @@ function renderKanbanBoard() {
   if (els.cardsOffer) els.cardsOffer.innerHTML = columns.offer.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No offers recorded.</p>';
 }
 
+function getCompanyAvatarData(company) {
+  const compLower = (company || '').toLowerCase();
+  let bg = 'linear-gradient(135deg, #6366f1, #8b5cf6)';
+  let icon = '⚡';
+  let initial = (company || 'C').slice(0, 2).toUpperCase();
+
+  if (compLower.includes('swiggy')) { bg = 'linear-gradient(135deg, #fc8019, #e23744)'; icon = '🍔'; }
+  else if (compLower.includes('razorpay')) { bg = 'linear-gradient(135deg, #0c2340, #0284c7)'; icon = '💳'; }
+  else if (compLower.includes('zepto')) { bg = 'linear-gradient(135deg, #ff3366, #9333ea)'; icon = '⚡'; }
+  else if (compLower.includes('cred')) { bg = 'linear-gradient(135deg, #111827, #374151)'; icon = '💎'; }
+  else if (compLower.includes('phonepe')) { bg = 'linear-gradient(135deg, #5f259f, #9333ea)'; icon = '📱'; }
+  else if (compLower.includes('postman')) { bg = 'linear-gradient(135deg, #ff6c37, #f97316)'; icon = '🚀'; }
+  else if (compLower.includes('stripe')) { bg = 'linear-gradient(135deg, #635bff, #00d4ff)'; icon = '⚡'; }
+  else if (compLower.includes('browserstack')) { bg = 'linear-gradient(135deg, #009688, #0284c7)'; icon = '🌐'; }
+  else if (compLower.includes('groww')) { bg = 'linear-gradient(135deg, #00d09c, #0ea5e9)'; icon = '📈'; }
+  else if (compLower.includes('juspay')) { bg = 'linear-gradient(135deg, #059669, #0284c7)'; icon = '🔒'; }
+  else if (compLower.includes('sarvam')) { bg = 'linear-gradient(135deg, #8b5cf6, #ec4899)'; icon = '🤖'; }
+
+  return { bg, icon, initial };
+}
+
+function renderMatchGaugeSVG(pct) {
+  const radius = 17;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (pct / 100) * circumference;
+  let strokeColor = '#10b981';
+  let glowColor = 'rgba(16, 185, 129, 0.4)';
+  if (pct < 65) { strokeColor = '#f59e0b'; glowColor = 'rgba(245, 158, 11, 0.4)'; }
+  else if (pct < 80) { strokeColor = '#06b6d4'; glowColor = 'rgba(6, 182, 212, 0.4)'; }
+
+  return `
+    <div class="match-gauge-wrap" title="${pct}% Match Score">
+      <svg class="match-gauge-svg" width="46" height="46" viewBox="0 0 46 46">
+        <circle cx="23" cy="23" r="${radius}" stroke="rgba(255,255,255,0.08)" stroke-width="3.5" fill="transparent"/>
+        <circle cx="23" cy="23" r="${radius}" stroke="${strokeColor}" stroke-width="3.5" stroke-dasharray="${circumference}" stroke-dashoffset="${strokeDashoffset}" stroke-linecap="round" fill="transparent" transform="rotate(-90 23 23)" style="filter: drop-shadow(0 0 4px ${glowColor});"/>
+      </svg>
+      <div class="match-gauge-text">
+        <span class="match-gauge-num" style="color: ${strokeColor};">${pct}%</span>
+        <span class="match-gauge-label">Match</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderStageProgressLine(status) {
+  const stages = [
+    { key: 'DISCOVERED', label: 'Discovered' },
+    { key: 'QUEUED', label: 'Queued' },
+    { key: 'SUBMITTED', label: 'Applied' },
+    { key: 'INTERVIEW', label: 'Interview' },
+    { key: 'OFFER', label: 'Offer' }
+  ];
+  const stageIndex = stages.findIndex(s => s.key === status);
+  const activeIdx = stageIndex >= 0 ? stageIndex : 0;
+
+  return `
+    <div class="job-stage-tracker">
+      ${stages.map((st, i) => {
+        const isDone = i < activeIdx;
+        const isActive = i === activeIdx;
+        const cls = isActive ? 'node-active' : (isDone ? 'node-done' : 'node-pending');
+        return `
+          <div class="stage-node-wrap ${cls}">
+            <div class="stage-node-dot"></div>
+            <span class="stage-node-name">${st.label}</span>
+          </div>
+          ${i < stages.length - 1 ? `<div class="stage-track-line ${i < activeIdx ? 'line-done' : ''}"></div>` : ''}
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
 function renderJobCardHTML(job) {
   const matchPct = Math.round((job.match_score || 0) * 100);
-  let matchBadgeClass = 'match-low';
-  if (matchPct >= 80) matchBadgeClass = 'match-high';
-  else if (matchPct >= 65) matchBadgeClass = 'match-mid';
-
   const company = escapeHTML(job.company || 'Company');
   const title = escapeHTML(job.title || 'Role');
   const platform = escapeHTML(job.platform || 'Direct');
   const location = escapeHTML(job.location || 'Remote');
   const jobId = escapeHTML(job.job_id || '');
+  const salaryRange = escapeHTML(job.salary_range || '');
 
   // Detect Indian platform badge classes
   let platformBadgeClass = '';
@@ -935,6 +1005,8 @@ function renderJobCardHTML(job) {
   else if (platLower.includes('cuvette')) platformBadgeClass = 'badge-cuvette';
   else if (platLower.includes('cutshort')) platformBadgeClass = 'badge-cutshort';
 
+  const avatar = getCompanyAvatarData(job.company);
+
   // Extract GMeet / Zoom link if present in notes
   let gmeetLink = null;
   const matchLink = (job.notes || '').match(/(https?:\/\/(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com)[^\s]+)/i);
@@ -942,32 +1014,43 @@ function renderJobCardHTML(job) {
 
   return `
     <div class="job-card" id="card-${jobId}">
-      <div class="job-card-top">
-        <div class="job-company">${company}</div>
-        <span class="match-ring-badge ${matchBadgeClass}">${matchPct}% Match</span>
+      <div class="job-card-header">
+        <div class="job-card-brand">
+          <div class="company-avatar-box" style="background: ${avatar.bg};">
+            <span>${avatar.icon}</span>
+          </div>
+          <div class="job-brand-info">
+            <div class="job-company">${company}</div>
+            <div class="job-location-sub">${location}</div>
+          </div>
+        </div>
+        ${renderMatchGaugeSVG(matchPct)}
       </div>
+
       <div class="job-title">${title}</div>
-      <div class="job-tags">
+
+      <div class="job-tags-row">
         <span class="job-tag ${platformBadgeClass}">${platform}</span>
-        <span class="job-tag">${location}</span>
-        ${job.salary_range ? `<span class="job-tag" style="color: var(--accent-emerald);">${escapeHTML(job.salary_range)}</span>` : ''}
+        ${salaryRange ? `<span class="job-salary-pill">⚡ ${salaryRange}</span>` : ''}
       </div>
+
+      ${renderStageProgressLine(job.status)}
 
       ${gmeetLink && gmeetLink !== '#' ? `
         <a href="${gmeetLink}" target="_blank" rel="noopener noreferrer" class="gmeet-btn">
-          <span>📹 Join Interview Meeting</span>
+          <span>📹 Join Live Interview Meeting</span>
         </a>
       ` : ''}
 
       ${job.status === 'INTERVIEW' ? `
-        <button class="btn btn-secondary btn-sm" onclick="window.launchTailoredInterviewForJob('${company.replace(/'/g, "\\'")}', '${title.replace(/'/g, "\\'")}')" style="margin-top: 6px; width: 100%; background: rgba(99, 102, 241, 0.2); border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe; font-size: 11.5px; padding: 4px 8px; justify-content: center;">
-          <span>🎙️ Practice Tailored Mock Interview</span>
+        <button class="btn btn-secondary btn-sm" onclick="window.launchTailoredInterviewForJob('${company.replace(/'/g, "\\'")}', '${title.replace(/'/g, "\\'")}')" style="margin-top: 8px; width: 100%; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.25)); border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe; font-size: 11.5px; padding: 6px 10px; justify-content: center;">
+          <span>🎙️ Practice Voice Mock Interview</span>
         </button>
       ` : ''}
 
       <div class="job-card-actions">
-        <button class="btn btn-primary btn-sm" onclick="applyToJob('${jobId}')" style="flex: 1;">⚡ Apply</button>
-        <button class="btn btn-secondary btn-sm" onclick="tailorJobAssets('${jobId}')">Tailor</button>
+        <button class="btn btn-primary btn-sm" onclick="applyToJob('${jobId}')" style="flex: 1.2;">⚡ Apply Now</button>
+        <button class="btn btn-secondary btn-sm" onclick="tailorJobAssets('${jobId}')" style="flex: 1;">🎯 Tailor</button>
       </div>
     </div>
   `;
