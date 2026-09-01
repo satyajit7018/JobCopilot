@@ -2,15 +2,42 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>JobCopilot OS — Universal Autonomous Job Application Cockpit</title>
   <meta name="description" content="State-of-the-art autonomous job hunting operating system with 0-day ATS discovery, stealth automation, and self-learning Knowledge Vault.">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="JobCopilot">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+
+  <!-- Mobile Top Header Bar for Phones -->
+  <header class="mobile-top-bar">
+    <div class="mobile-top-left" onclick="window.switchTab('onboarding')">
+      <div class="mobile-logo-icon">⚡</div>
+      <div>
+        <div class="mobile-brand-title">JobCopilot</div>
+        <div class="mobile-brand-subtitle">STEALTH CAREER OS</div>
+      </div>
+    </div>
+    <div class="mobile-top-right">
+      <button class="btn-mobile-install" id="btn-mobile-top-install" onclick="window.openInstallModal()">
+        <span>📱 Install App</span>
+      </button>
+      <button class="btn-mobile-drawer" id="btn-mobile-menu" onclick="window.toggleMobileDrawer()" aria-label="Open Menu">
+        <span>☰</span>
+      </button>
+    </div>
+  </header>
 
   <div class="cockpit-layout">
     
@@ -556,6 +583,26 @@
             <button class="filter-pill" data-filter="ASHBY" onclick="filterPipeline('ASHBY', this)">Ashby</button>
             <button class="filter-pill" data-filter="YC" onclick="filterPipeline('YC', this)">YC</button>
           </div>
+        </div>
+
+        <!-- Mobile Pipeline Stage Segment Filter -->
+        <div class="mobile-pipeline-segments">
+          <button class="mob-segment active" data-stage="ALL" onclick="window.switchMobileKanbanStage('ALL', this)">All</button>
+          <button class="mob-segment" data-stage="DISCOVERED" onclick="window.switchMobileKanbanStage('DISCOVERED', this)">
+            Discovered <span class="mob-seg-count" id="mob-seg-count-discovered">0</span>
+          </button>
+          <button class="mob-segment" data-stage="QUEUED" onclick="window.switchMobileKanbanStage('QUEUED', this)">
+            Queued <span class="mob-seg-count" id="mob-seg-count-queued">0</span>
+          </button>
+          <button class="mob-segment" data-stage="SUBMITTED" onclick="window.switchMobileKanbanStage('SUBMITTED', this)">
+            Applied <span class="mob-seg-count" id="mob-seg-count-submitted">0</span>
+          </button>
+          <button class="mob-segment" data-stage="INTERVIEW" onclick="window.switchMobileKanbanStage('INTERVIEW', this)">
+            Interview <span class="mob-seg-count" id="mob-seg-count-interview">0</span>
+          </button>
+          <button class="mob-segment" data-stage="OFFER" onclick="window.switchMobileKanbanStage('OFFER', this)">
+            Offers <span class="mob-seg-count" id="mob-seg-count-offer">0</span>
+          </button>
         </div>
 
         <!-- Multi-Column Interactive Kanban Board (Step 8 & 9: GMeet buttons & call status) -->
@@ -1485,6 +1532,177 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal: Install Android App & Download APK -->
+    <div class="modal-overlay" id="modal-install-app" style="display: none;">
+      <div class="modal-dialog glass-card" style="max-width: 520px; border-color: rgba(99, 102, 241, 0.4);">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 28px;">📱</div>
+            <div>
+              <h3 class="modal-title" style="font-size: 18px;">Install JobCopilot on Android</h3>
+              <div style="font-size: 12px; color: var(--accent-cyan);">Fast PWA &amp; Standalone Mobile Experience</div>
+            </div>
+          </div>
+          <button class="btn-close" onclick="window.closeInstallModal()">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding: 1rem 0;">
+          
+          <!-- 1-Click Native PWA Install Banner -->
+          <div class="pwa-install-banner" id="pwa-install-banner">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <img src="/icons/icon-192.png" width="48" height="48" style="border-radius: 12px;" alt="JobCopilot Icon">
+              <div>
+                <div style="font-weight: 700; color: #fff; font-size: 15px;">JobCopilot Mobile App</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">Full-screen, offline-ready, instant push alerts</div>
+              </div>
+            </div>
+            <button class="btn btn-primary" id="btn-trigger-pwa-install" onclick="window.triggerNativePWAInstall()" style="margin-top: 1rem; width: 100%; justify-content: center; font-size: 14.5px; padding: 11px;">
+              <span>⚡ 1-Tap Install on Android</span>
+            </button>
+          </div>
+
+          <!-- Step-by-Step Guides for Android Browsers -->
+          <div style="margin-top: 1.25rem;">
+            <div style="font-weight: 600; font-size: 13px; margin-bottom: 0.6rem; color: var(--text-primary);">
+              Android Browser Installation:
+            </div>
+
+            <div class="install-step-card">
+              <div class="install-step-badge">Chrome / Edge</div>
+              <div class="install-step-text">
+                Tap the <strong>three dots (⋮)</strong> menu in top-right ➔ Select <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong>.
+              </div>
+            </div>
+
+            <div class="install-step-card">
+              <div class="install-step-badge">Samsung Internet</div>
+              <div class="install-step-text">
+                Tap the <strong>Install (↓) icon</strong> in the address bar or tap bottom menu ➔ <strong>"Add page to" ➔ "Home screen"</strong>.
+              </div>
+            </div>
+
+            <div class="install-step-card">
+              <div class="install-step-badge">Firefox Android</div>
+              <div class="install-step-text">
+                Tap the <strong>three dots (⋮)</strong> menu ➔ Select <strong>"Install"</strong>.
+              </div>
+            </div>
+          </div>
+
+          <!-- Standalone APK & Developer Build Box -->
+          <div style="margin-top: 1rem; background: rgba(10, 14, 24, 0.7); border: 1px dashed rgba(99, 102, 241, 0.3); border-radius: var(--radius-sm); padding: 10px 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <span style="font-size: 12px; font-weight: 600; color: var(--accent-indigo);">📦 Build Standalone Android APK / TWA</span>
+              <span class="hud-pill" style="font-size: 9.5px;">CLI</span>
+            </div>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #a5b4fc; background: #000; padding: 7px; border-radius: 4px; overflow-x: auto;">
+              ./scripts/build_android_apk.sh
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: flex-end;">
+          <button class="btn btn-secondary" onclick="window.closeInstallModal()">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Slide-Out Drawer Overlay & Panel -->
+    <div class="mobile-drawer-overlay" id="mobile-drawer-overlay" onclick="window.toggleMobileDrawer(false)"></div>
+    <aside class="mobile-drawer" id="mobile-drawer">
+      <div class="mobile-drawer-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="mobile-logo-icon">⚡</div>
+          <span style="font-weight: 700; font-family: 'Outfit', sans-serif;">JobCopilot Menu</span>
+        </div>
+        <button class="btn-drawer-close" onclick="window.toggleMobileDrawer(false)">✕</button>
+      </div>
+      <div class="mobile-drawer-body">
+        <div class="mobile-drawer-section">
+          <div class="drawer-section-title">Core Subsystems</div>
+          <button class="drawer-nav-item" onclick="window.switchTab('onboarding'); window.toggleMobileDrawer(false)">
+            <span>✨ Smart Onboarding</span>
+          </button>
+          <button class="drawer-nav-item" onclick="window.switchTab('pipeline'); window.toggleMobileDrawer(false)">
+            <span>🎯 0-Day Pipeline</span>
+          </button>
+          <button class="drawer-nav-item" onclick="window.switchTab('vault'); window.toggleMobileDrawer(false)">
+            <span>🧠 Knowledge Vault</span>
+          </button>
+          <button class="drawer-nav-item" onclick="window.switchTab('email'); window.toggleMobileDrawer(false)">
+            <span>📬 Email Radar</span>
+          </button>
+          <button class="drawer-nav-item" onclick="window.switchTab('interview-studio'); window.toggleMobileDrawer(false)">
+            <span>🎙️ Interview Studio</span>
+          </button>
+          <button class="drawer-nav-item" onclick="window.switchTab('negotiation'); window.toggleMobileDrawer(false)">
+            <span>💰 Levels.fyi ESOP Modeler</span>
+          </button>
+          <button class="drawer-nav-item" onclick="window.switchTab('accelerator'); window.toggleMobileDrawer(false)">
+            <span>🚀 Career Accelerator</span>
+          </button>
+          <button class="drawer-nav-item" onclick="window.switchTab('billing'); window.toggleMobileDrawer(false)">
+            <span>💳 Subscription Quotas</span>
+          </button>
+          <button class="drawer-nav-item" onclick="window.switchTab('backups'); window.toggleMobileDrawer(false)">
+            <span>🛡️ Encrypted Backups</span>
+          </button>
+        </div>
+        
+        <div class="mobile-drawer-section">
+          <div class="drawer-section-title">Android App &amp; Settings</div>
+          <button class="drawer-nav-item highlight-btn" onclick="window.openInstallModal(); window.toggleMobileDrawer(false)">
+            <span>📱 Install Android App</span>
+          </button>
+          <button class="drawer-nav-item" onclick="window.testMobileNotifications(); window.toggleMobileDrawer(false)">
+            <span>🔔 Enable Push Alerts</span>
+          </button>
+        </div>
+
+        <div class="mobile-drawer-section" style="margin-top: auto; border-top: 1px solid var(--border-subtle); padding-top: 1rem;">
+          <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 0.5rem;" id="mob-user-email-display">
+            Active Session
+          </div>
+          <button class="btn btn-secondary btn-sm" style="width: 100%;" onclick="window.logoutUser()">
+            <span>🚪 Sign Out</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Mobile Floating Bottom Navigation Bar -->
+    <nav class="mobile-bottom-nav">
+      <button class="mobile-nav-tab active" data-view="onboarding" onclick="window.switchTab('onboarding')">
+        <span class="mobile-nav-icon">✨</span>
+        <span class="mobile-nav-label">Home</span>
+      </button>
+      <button class="mobile-nav-tab" data-view="pipeline" onclick="window.switchTab('pipeline')">
+        <span class="mobile-nav-icon">🎯</span>
+        <span class="mobile-nav-label">Pipeline</span>
+        <span class="mobile-nav-badge" id="mob-badge-pipeline" style="display: none;">0</span>
+      </button>
+      <button class="mobile-nav-tab" data-view="vault" onclick="window.switchTab('vault')">
+        <span class="mobile-nav-icon">🧠</span>
+        <span class="mobile-nav-label">Vault</span>
+        <span class="mobile-nav-badge" id="mob-badge-vault">20+</span>
+      </button>
+      <button class="mobile-nav-tab" data-view="email" onclick="window.switchTab('email')">
+        <span class="mobile-nav-icon">📬</span>
+        <span class="mobile-nav-label">Radar</span>
+        <span class="mobile-nav-badge" id="mob-badge-email" style="display: none;">0</span>
+      </button>
+      <button class="mobile-nav-tab" data-view="interview-studio" onclick="window.switchTab('interview-studio')">
+        <span class="mobile-nav-icon">🎙️</span>
+        <span class="mobile-nav-label">Studio</span>
+      </button>
+      <button class="mobile-nav-tab" id="btn-mob-more" onclick="window.toggleMobileDrawer()">
+        <span class="mobile-nav-icon">☰</span>
+        <span class="mobile-nav-label">More</span>
+      </button>
+    </nav>
 
     <!-- Live Toast Alerts -->
     <div class="toast-container" id="toast-container"></div>
