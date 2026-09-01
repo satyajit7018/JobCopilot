@@ -865,6 +865,10 @@ function renderKanbanBoard() {
 
     if (filter === 'ALL') return true;
     if (filter === 'HIGH_MATCH') return (j.match_score || 0) >= 0.75;
+    if (filter === 'NAUKRI') return (j.platform || '').toLowerCase().includes('naukri');
+    if (filter === 'INSTAHYRE') return (j.platform || '').toLowerCase().includes('instahyre');
+    if (filter === 'CUVETTE') return (j.platform || '').toLowerCase().includes('cuvette');
+    if (filter === 'CUTSHORT') return (j.platform || '').toLowerCase().includes('cutshort');
     if (filter === 'GREENHOUSE') return (j.platform || '').toLowerCase().includes('greenhouse');
     if (filter === 'LEVER') return (j.platform || '').toLowerCase().includes('lever');
     if (filter === 'ASHBY') return (j.platform || '').toLowerCase().includes('ashby');
@@ -923,6 +927,14 @@ function renderJobCardHTML(job) {
   const location = escapeHTML(job.location || 'Remote');
   const jobId = escapeHTML(job.job_id || '');
 
+  // Detect Indian platform badge classes
+  let platformBadgeClass = '';
+  const platLower = platform.toLowerCase();
+  if (platLower.includes('naukri')) platformBadgeClass = 'badge-naukri';
+  else if (platLower.includes('instahyre')) platformBadgeClass = 'badge-instahyre';
+  else if (platLower.includes('cuvette')) platformBadgeClass = 'badge-cuvette';
+  else if (platLower.includes('cutshort')) platformBadgeClass = 'badge-cutshort';
+
   // Extract GMeet / Zoom link if present in notes
   let gmeetLink = null;
   const matchLink = (job.notes || '').match(/(https?:\/\/(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com)[^\s]+)/i);
@@ -936,7 +948,7 @@ function renderJobCardHTML(job) {
       </div>
       <div class="job-title">${title}</div>
       <div class="job-tags">
-        <span class="job-tag">${platform}</span>
+        <span class="job-tag ${platformBadgeClass}">${platform}</span>
         <span class="job-tag">${location}</span>
         ${job.salary_range ? `<span class="job-tag" style="color: var(--accent-emerald);">${escapeHTML(job.salary_range)}</span>` : ''}
       </div>
