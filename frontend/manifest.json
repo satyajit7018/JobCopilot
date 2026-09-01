@@ -1,0 +1,74 @@
+{
+  "name": "JobCopilot — Universal Autonomous Job Hunting OS",
+  "short_name": "JobCopilot",
+  "description": "State-of-the-art autonomous job hunting operating system with 0-day ATS discovery, stealth automation, and self-learning Knowledge Vault.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#06080d",
+  "theme_color": "#6366f1",
+  "categories": ["productivity", "business", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "0-Day Pipeline",
+      "short_name": "Pipeline",
+      "description": "Track active applications and auto-applied jobs",
+      "url": "/?view=pipeline",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Knowledge Vault",
+      "short_name": "Vault",
+      "description": "Smart self-learning Q&A answers and essays",
+      "url": "/?view=vault",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Email Radar",
+      "short_name": "Radar",
+      "description": "Recruiter interview invites and tracking pixel radar",
+      "url": "/?view=email",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Interview Studio",
+      "short_name": "Studio",
+      "description": "AI Mock voice interview and company dossiers",
+      "url": "/?view=studio",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
