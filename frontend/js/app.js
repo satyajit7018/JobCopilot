@@ -301,9 +301,16 @@ function showToast(message, type = 'info') {
 // ==========================================================================
 function initWebSocket() {
   try {
-    const WS_BASE = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
     const token = localStorage.getItem('jobcopilot_access_token');
-    const wsUrl = token ? `${WS_BASE}?token=${encodeURIComponent(token)}` : WS_BASE;
+    if (!token) {
+      if (els.wsStatusText) els.wsStatusText.textContent = 'Sync: Offline (Login Required)';
+      return;
+    }
+    if (state.ws && (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    const WS_BASE = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+    const wsUrl = `${WS_BASE}?token=${encodeURIComponent(token)}`;
     state.ws = new WebSocket(wsUrl);
 
     state.ws.onopen = () => {
@@ -320,9 +327,13 @@ function initWebSocket() {
       }
     };
 
-    state.ws.onclose = () => {
+    state.ws.onclose = (event) => {
+      if (event.code === 4001) {
+        if (els.wsStatusText) els.wsStatusText.textContent = 'Sync: Offline (Unauthorized)';
+        return;
+      }
       if (els.wsStatusText) els.wsStatusText.textContent = 'Sync: Reconnecting...';
-      setTimeout(initWebSocket, 3000);
+      setTimeout(initWebSocket, 5000);
     };
 
     state.ws.onerror = (err) => {
@@ -410,6 +421,7 @@ window.triggerGoogleSSO = async function() {
       if (els.authEmailDisplay) els.authEmailDisplay.textContent = state.currentUser.email;
       showToast(`Signed in successfully as ${state.currentUser.full_name}!`, 'success');
       appendTerminalLog('AUTH', `Google Single Sign-On session active for ${state.currentUser.email}`, false, true);
+      initWebSocket();
     } else {
       showToast(`Google SSO error: ${data.detail || 'Authentication failed'}`, 'error');
     }
@@ -419,17 +431,128 @@ window.triggerGoogleSSO = async function() {
 };
 
 // ==========================================================================
-// Multi-Step Onboarding Navigation & Skip Logic (Step 4 & 5)
+// PWA & Android Installation Management
+// ==========================================================================
+let deferredInstallPrompt = null;
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => {
+        console.log('[JobCopilot PWA] ServiceWorker registered with scope:', reg.scope);
+      })
+      .catch((err) => {
+        console.warn('[JobCopilot PWA] ServiceWorker registration failed:', err);
+      });
+  });
+}
+
+// Intercept Native Android PWA Install Event
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  console.log('[JobCopilot PWA] beforeinstallprompt event captured');
+  const installBanner = document.getElementById('pwa-install-banner');
+  if (installBanner) installBanner.style.display = 'block';
+  const topInstallBtn = document.getElementById('btn-mobile-top-install');
+  if (topInstallBtn) topInstallBtn.style.display = 'inline-flex';
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  showToast('🎉 JobCopilot successfully installed on your device!', 'success');
+  const topInstallBtn = document.getElementById('btn-mobile-top-install');
+  if (topInstallBtn) topInstallBtn.style.display = 'none';
+  window.closeInstallModal();
+});
+
+window.openInstallModal = function() {
+  const modal = document.getElementById('modal-install-app');
+  if (modal) modal.style.display = 'flex';
+};
+
+window.closeInstallModal = function() {
+  const modal = document.getElementById('modal-install-app');
+  if (modal) modal.style.display = 'none';
+};
+
+window.triggerNativePWAInstall = async function() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    console.log(`[JobCopilot PWA] Install outcome: ${outcome}`);
+    if (outcome === 'accepted') {
+      showToast('Installing JobCopilot App...', 'success');
+    }
+    deferredInstallPrompt = null;
+    window.closeInstallModal();
+  } else {
+    showToast('To install: Tap your browser menu (⋮) and choose "Install app" or "Add to Home Screen".', 'info');
+  }
+};
+
+window.toggleMobileDrawer = function(forceOpen) {
+  const drawer = document.getElementById('mobile-drawer');
+  const overlay = document.getElementById('mobile-drawer-overlay');
+  if (!drawer || !overlay) return;
+
+  const isOpen = forceOpen !== undefined ? forceOpen : !drawer.classList.contains('active');
+  drawer.classList.toggle('active', isOpen);
+  overlay.classList.toggle('active', isOpen);
+};
+
+window.switchMobileKanbanStage = function(stage, btnElement) {
+  const board = document.getElementById('kanban-board-container');
+  if (!board) return;
+
+  document.querySelectorAll('.mob-segment').forEach(btn => btn.classList.remove('active'));
+  if (btnElement) btnElement.classList.add('active');
+
+  if (stage === 'ALL') {
+    board.removeAttribute('data-active-stage');
+  } else {
+    board.setAttribute('data-active-stage', stage);
+  }
+};
+
+window.testMobileNotifications = async function() {
+  if (!('Notification' in window)) {
+    showToast('Notifications are not supported in this browser.', 'error');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    showToast('🔔 Push Notifications Enabled!', 'success');
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'TEST_NOTIFICATION' });
+    }
+    new Notification('JobCopilot Live Radar', {
+      body: 'Recruiter radar is active and monitoring 0-day opportunities.',
+      icon: '/icons/icon-192.png'
+    });
+  } else {
+    showToast('Notification permission was denied.', 'warning');
+  }
+};
+
+// ==========================================================================
+// Multi-Step Onboarding Navigation & Responsive Synchronizer
 // ==========================================================================
 window.switchTab = function(viewId) {
+  if (viewId === 'studio') viewId = 'interview-studio';
+  if (viewId === 'interview') viewId = 'interview-studio';
+
   els.navTabs.forEach(t => {
+    t.classList.toggle('active', t.getAttribute('data-view') === viewId);
+  });
+  document.querySelectorAll('.mobile-nav-tab').forEach(t => {
     t.classList.toggle('active', t.getAttribute('data-view') === viewId);
   });
   els.viewPanels.forEach(p => {
     p.classList.toggle('active', p.id === `view-${viewId}`);
   });
   window.location.hash = viewId;
-  if (viewId === 'interview') {
+  if (viewId === 'interview-studio' || viewId === 'interview') {
     setTimeout(initVisualizerCanvas, 50);
   }
 };
@@ -763,6 +886,23 @@ function renderKanbanBoard() {
   if (els.countInterview) els.countInterview.textContent = columns.interview.length;
   if (els.countOffer) els.countOffer.textContent = columns.offer.length;
   if (els.badgePipelineCount) els.badgePipelineCount.textContent = filtered.length;
+
+  // Sync Mobile UI Counters & Badges
+  const mobBadge = document.getElementById('mob-badge-pipeline');
+  if (mobBadge) {
+    mobBadge.textContent = filtered.length;
+    mobBadge.style.display = filtered.length > 0 ? 'inline-block' : 'none';
+  }
+  const mobSegDisc = document.getElementById('mob-seg-count-discovered');
+  if (mobSegDisc) mobSegDisc.textContent = columns.discovered.length;
+  const mobSegQueued = document.getElementById('mob-seg-count-queued');
+  if (mobSegQueued) mobSegQueued.textContent = columns.queued.length;
+  const mobSegSub = document.getElementById('mob-seg-count-submitted');
+  if (mobSegSub) mobSegSub.textContent = columns.submitted.length;
+  const mobSegInt = document.getElementById('mob-seg-count-interview');
+  if (mobSegInt) mobSegInt.textContent = columns.interview.length;
+  const mobSegOff = document.getElementById('mob-seg-count-offer');
+  if (mobSegOff) mobSegOff.textContent = columns.offer.length;
 
   if (els.cardsDiscovered) els.cardsDiscovered.innerHTML = columns.discovered.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No leads discovered.</p>';
   if (els.cardsQueued) els.cardsQueued.innerHTML = columns.queued.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">Queue is empty.</p>';
