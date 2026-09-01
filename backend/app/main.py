@@ -149,11 +149,32 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
         ws_manager.disconnect(websocket, user_id=user_id)
 
 
-# Mount Static Frontend
+# Mount Static Frontend & PWA Routes
 frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"
 if frontend_dir.exists():
     app.mount("/css", StaticFiles(directory=str(frontend_dir / "css")), name="css")
     app.mount("/js", StaticFiles(directory=str(frontend_dir / "js")), name="js")
+    icons_dir = frontend_dir / "icons"
+    if icons_dir.exists():
+        app.mount("/icons", StaticFiles(directory=str(icons_dir)), name="icons")
+
+    @app.get("/manifest.json")
+    async def serve_manifest():
+        manifest_file = frontend_dir / "manifest.json"
+        if manifest_file.exists():
+            return FileResponse(str(manifest_file), media_type="application/manifest+json")
+        return Response(status_code=404)
+
+    @app.get("/sw.js")
+    async def serve_service_worker():
+        sw_file = frontend_dir / "sw.js"
+        if sw_file.exists():
+            return FileResponse(
+                str(sw_file),
+                media_type="application/javascript",
+                headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"}
+            )
+        return Response(status_code=404)
 
     @app.get("/")
     async def serve_frontend():

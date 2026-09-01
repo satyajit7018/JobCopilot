@@ -29,6 +29,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
+            "manifest-src 'self'; "
+            "worker-src 'self'; "
             "connect-src 'self' ws: wss: http: https:;"
         )
 
@@ -42,7 +44,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
         # 5. Permissions Policy
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
 
         # 6. HSTS in Production
         if settings.ENV.lower() == "production":
