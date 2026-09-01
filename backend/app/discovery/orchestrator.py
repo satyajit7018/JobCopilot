@@ -25,8 +25,13 @@ class DiscoveryOrchestrator:
     """Coordinates multi-source 0-day job discovery and matching."""
 
     CURATED_TECH_COMPANIES = [
-        "stripe", "retool", "perplexity", "postman", "linear",
-        "scale", "whatnot", "brex", "curative", "vercel",
+        # Top Indian Unicorns & High-Scale Tech Employers
+        "swiggy", "razorpay", "zepto", "cred", "phonepe",
+        "browserstack", "postman", "meesho", "groww", "juspay",
+        "zomato", "flipkart", "dream11", "inmobi", "sarvam-ai",
+        # Global High-Growth Tech & YC Companies
+        "stripe", "retool", "perplexity", "linear",
+        "scale", "whatnot", "brex", "vercel",
         "supabase", "sentry", "datadog", "figma", "notion"
     ]
 
@@ -38,7 +43,7 @@ class DiscoveryOrchestrator:
         self.total_matched = 0
 
     async def _fetch_all_raw_leads(self, target_companies: List[str]) -> List[Dict[str, Any]]:
-        """Fetches raw job openings from all ATS APIs and VC feeds concurrently."""
+        """Fetches raw job openings from Indian tech portals, ATS APIs, and VC feeds concurrently."""
         raw_leads: List[Dict[str, Any]] = []
         try:
             import h2  # type: ignore
@@ -53,8 +58,15 @@ class DiscoveryOrchestrator:
                 tasks.append(ATSApiFeeders.fetch_lever_jobs(comp, client))
                 tasks.append(ATSApiFeeders.fetch_ashby_jobs(comp, client))
 
+            # VC & Fast-Track Boards
             tasks.append(VCBoardFeeders.fetch_yc_fast_track_jobs())
             tasks.append(VCBoardFeeders.fetch_hn_who_is_hiring(max_posts=15, client=client))
+
+            # Indian Tech Portals & Startup Feeds (Prioritized)
+            tasks.append(PlatformScrapers.fetch_naukri_india_feed("Software Engineer"))
+            tasks.append(PlatformScrapers.fetch_instahyre_india_feed("Engineer"))
+            tasks.append(PlatformScrapers.fetch_cuvette_india_feed("Engineer"))
+            tasks.append(PlatformScrapers.fetch_cutshort_india_feed("Engineer"))
             tasks.append(PlatformScrapers.fetch_wellfound_mock_or_feed("Engineer"))
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -113,14 +125,15 @@ class DiscoveryOrchestrator:
 
                 # Filter by candidate match threshold
                 if match_score >= self.min_match_threshold:
-                    # Compute Priority Score (0-100)
+                    # Compute Priority Score (0-100) with Indian tech hub boost
                     priority_score = PriorityRanker.calculate_priority_score(
                         match_score=match_score,
                         platform=lead.get("platform", "Direct"),
                         company=company,
                         freshness_days=1,
                         salary_range=salary,
-                        candidate_expected_ctc=profile.preferences.expected_ctc
+                        candidate_expected_ctc=profile.preferences.expected_ctc,
+                        location=location
                     )
 
                     target_user = user_id or getattr(profile, "user_id", "")
