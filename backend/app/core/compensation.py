@@ -24,11 +24,11 @@ class CompensationConverter:
 
     @classmethod
     def parse_to_base_inr(cls, ctc_string: str) -> float:
-        """Parses strings like '15 LPA', '₹15,00,000', '$120,000', '120k', '€85,000' into annual INR."""
+        """Parses strings like '15 LPA', '24 - 38 LPA', '₹15,00,000', '$120,000 - $160,000', '120k', '€85,000' into annual INR."""
         if not ctc_string:
             return 1500000.0  # Default 15 LPA
 
-        text = ctc_string.lower().strip().replace(',', '')
+        text = str(ctc_string).lower().strip().replace(',', '')
 
         # Detect currency
         currency = "INR"
@@ -40,20 +40,33 @@ class CompensationConverter:
             currency = "GBP"
         elif "cad" in text or "c$" in text:
             currency = "CAD"
+        elif "aud" in text or "a$" in text:
+            currency = "AUD"
+        elif "sgd" in text or "s$" in text:
+            currency = "SGD"
         elif "₹" in text or "inr" in text or "lpa" in text or "lakh" in text:
             currency = "INR"
 
-        # Extract numeric value
-        num_match = re.search(r'[\d\.]+', text)
-        if not num_match:
+        # Extract numeric values (supports ranges like 28 - 35 or 120000 - 150000)
+        num_matches = re.findall(r'[\d\.]+', text)
+        if not num_matches:
             return 1500000.0
-        val = float(num_match.group(0))
+
+        nums = [float(n) for n in num_matches if n != '.']
+        if not nums:
+            return 1500000.0
+
+        # If a range is present (e.g. 28 - 35), compute midpoint
+        if len(nums) >= 2 and ("-" in text or "to" in text):
+            val = (nums[0] + nums[1]) / 2.0
+        else:
+            val = nums[0]
 
         # Handle Indian LPA
         if currency == "INR":
             if "lpa" in text or "lakh" in text or "lac" in text or val < 100.0:
-                return val * 100000.0
-            return val
+                return max(0.0, val * 100000.0)
+            return max(0.0, val)
 
         # Handle 'k' multiplier (e.g. 120k)
         if "k" in text and val < 1000.0:
@@ -61,7 +74,7 @@ class CompensationConverter:
 
         # Convert foreign currency to INR
         rate = cls.FX_RATES_TO_INR.get(currency, 83.5)
-        return val * rate
+        return max(0.0, val * rate)
 
     @classmethod
     def parse_ctc(cls, ctc_string: str) -> float:

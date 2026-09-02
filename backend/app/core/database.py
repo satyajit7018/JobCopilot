@@ -229,7 +229,7 @@ class DatabaseManager(DatabaseAdapter):
                 CREATE TABLE IF NOT EXISTS jobs (
                     job_id TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL DEFAULT 'default',
-                    fingerprint TEXT UNIQUE NOT NULL,
+                    fingerprint TEXT NOT NULL,
                     platform TEXT NOT NULL,
                     company TEXT NOT NULL,
                     title TEXT NOT NULL,
@@ -251,6 +251,50 @@ class DatabaseManager(DatabaseAdapter):
                     notes TEXT
                 )
                 """)
+
+                # Check if legacy table has global UNIQUE constraint on fingerprint
+                cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='jobs';")
+                schema_row = cursor.fetchone()
+                if schema_row and "fingerprint TEXT UNIQUE" in schema_row["sql"]:
+                    cursor.execute("PRAGMA foreign_keys=OFF;")
+                    cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS jobs_migration_tmp (
+                        job_id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL DEFAULT 'default',
+                        fingerprint TEXT NOT NULL,
+                        platform TEXT NOT NULL,
+                        company TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        location TEXT NOT NULL,
+                        url TEXT NOT NULL,
+                        description TEXT,
+                        salary_range TEXT,
+                        seniority_level TEXT,
+                        posted_date TEXT,
+                        match_score REAL DEFAULT 0.0,
+                        priority_score REAL DEFAULT 0.0,
+                        match_reasons JSON,
+                        missing_skills JSON,
+                        status TEXT NOT NULL,
+                        submission_mode TEXT,
+                        applied_at TEXT,
+                        application_id TEXT,
+                        confirmation_screenshot_path TEXT,
+                        notes TEXT
+                    );
+                    """)
+                    cursor.execute("""
+                    INSERT OR IGNORE INTO jobs_migration_tmp SELECT 
+                        job_id, user_id, fingerprint, platform, company, title, location, url,
+                        description, salary_range, seniority_level, posted_date, match_score,
+                        priority_score, match_reasons, missing_skills, status, submission_mode,
+                        applied_at, application_id, confirmation_screenshot_path, notes
+                    FROM jobs;
+                    """)
+                    cursor.execute("DROP TABLE jobs;")
+                    cursor.execute("ALTER TABLE jobs_migration_tmp RENAME TO jobs;")
+                    cursor.execute("PRAGMA foreign_keys=ON;")
+
                 self._ensure_columns(conn, "jobs", {
                     "user_id": "TEXT NOT NULL DEFAULT 'default'",
                     "salary_range": "TEXT",

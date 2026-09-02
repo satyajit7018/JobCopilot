@@ -144,26 +144,38 @@ class KnowledgeVault:
         role: str,
         domain: str
     ) -> str:
-        """Substitutes dynamic template variables into final human answer."""
-        resolved = template.replace("{company}", company).replace("{role}", role).replace("{domain}", domain)
+        """Substitutes dynamic template variables into final human answer with strict null-safety."""
+        resolved = (template or "").replace("{company}", str(company or "the company")).replace("{role}", str(role or "Software Engineer")).replace("{domain}", str(domain or "Technology"))
         if profile:
             prefs = profile.preferences
-            resolved = resolved.replace("{expected_ctc}", prefs.expected_ctc)
-            resolved = resolved.replace("{current_ctc}", prefs.current_ctc)
-            resolved = resolved.replace("{notice_period_days}", str(prefs.notice_period_days))
-            resolved = resolved.replace("{earliest_start_date}", prefs.earliest_start_date)
-            resolved = resolved.replace("{work_authorization}", prefs.work_authorization)
-            resolved = resolved.replace("{sponsorship_answer}", "Yes" if prefs.requires_sponsorship else "No")
-            resolved = resolved.replace("{relocation_answer}", "Yes, open to relocate" if prefs.willing_to_relocate else "No, remote only")
-            resolved = resolved.replace("{remote_preference}", prefs.remote_preference)
-            resolved = resolved.replace("{years_of_experience}", f"{prefs.years_of_experience:.1f}")
-            resolved = resolved.replace("{top_skills}", ", ".join(profile.skills[:5]))
-            resolved = resolved.replace("{full_name}", profile.full_name)
-            resolved = resolved.replace("{email}", profile.email)
-            resolved = resolved.replace("{phone}", profile.phone)
-            resolved = resolved.replace("{location}", profile.location)
-            resolved = resolved.replace("{github_url}", profile.github_url or "https://github.com")
-            resolved = resolved.replace("{linkedin_url}", profile.linkedin_url or "https://linkedin.com")
+            expected_ctc = str(getattr(prefs, "expected_ctc", "") or "15 LPA")
+            current_ctc = str(getattr(prefs, "current_ctc", "") or "12 LPA")
+            notice_days = str(getattr(prefs, "notice_period_days", 0) or 0)
+            earliest_date = str(getattr(prefs, "earliest_start_date", "") or "Immediate")
+            work_auth = str(getattr(prefs, "work_authorization", "") or "Authorized")
+            req_spon = bool(getattr(prefs, "requires_sponsorship", False))
+            open_reloc = bool(getattr(prefs, "willing_to_relocate", False))
+            remote_pref = str(getattr(prefs, "remote_preference", "") or "Remote")
+            yoe = float(getattr(prefs, "years_of_experience", 0.0) or 0.0)
+            skills = profile.skills if isinstance(profile.skills, list) else []
+            top_skills = ", ".join(str(s) for s in skills[:5]) if skills else "Python, FastAPI, Backend Systems"
+
+            resolved = resolved.replace("{expected_ctc}", expected_ctc)
+            resolved = resolved.replace("{current_ctc}", current_ctc)
+            resolved = resolved.replace("{notice_period_days}", notice_days)
+            resolved = resolved.replace("{earliest_start_date}", earliest_date)
+            resolved = resolved.replace("{work_authorization}", work_auth)
+            resolved = resolved.replace("{sponsorship_answer}", "Yes" if req_spon else "No")
+            resolved = resolved.replace("{relocation_answer}", "Yes, open to relocate" if open_reloc else "No, remote only")
+            resolved = resolved.replace("{remote_preference}", remote_pref)
+            resolved = resolved.replace("{years_of_experience}", f"{yoe:.1f}")
+            resolved = resolved.replace("{top_skills}", top_skills)
+            resolved = resolved.replace("{full_name}", str(profile.full_name or "Candidate"))
+            resolved = resolved.replace("{email}", str(profile.email or ""))
+            resolved = resolved.replace("{phone}", str(profile.phone or ""))
+            resolved = resolved.replace("{location}", str(profile.location or "Remote"))
+            resolved = resolved.replace("{github_url}", str(profile.github_url or "https://github.com"))
+            resolved = resolved.replace("{linkedin_url}", str(profile.linkedin_url or "https://linkedin.com"))
         return resolved
 
     def query_answer(
