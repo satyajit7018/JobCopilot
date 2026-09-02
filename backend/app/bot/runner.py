@@ -184,6 +184,9 @@ class AutonomousJobRunner:
                     "filled_fields_count": len(filled_data),
                     "screenshot": str(screenshot_file),
                     "tailored_pdf": str(pdf_path),
+                    "tailored_resume_path": str(pdf_path),
+                    "cover_letter": cover_letter,
+                    "outreach": outreach_pkg,
                     "outreach_package": outreach_pkg
                 }
 
