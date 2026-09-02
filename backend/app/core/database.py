@@ -18,6 +18,96 @@ from app.core.models import (
 from app.core.db_adapter import DatabaseAdapter
 from app.core.credential_vault import cred_vault
 
+SAMPLE_PREVIEW_JOBS_CATALOG: Dict[str, Dict[str, Any]] = {
+    "sample_swiggy_01": {
+        "company": "Swiggy",
+        "title": "SDE II (Logistics & Delivery Platform)",
+        "location": "Bangalore, 2 yrs exp",
+        "platform": "Naukri",
+        "url": "https://www.naukri.com/swiggy-sde-2",
+        "description": "Building high-throughput, low-latency microservices with Python, Go, and Kafka for Swiggy's delivery dispatch engine.",
+        "salary_range": "₹28-35 LPA",
+        "match_score": 0.94,
+        "priority_score": 92.0,
+        "status": ApplicationStatus.DISCOVERED
+    },
+    "sample_razorpay_02": {
+        "company": "Razorpay",
+        "title": "Backend Eng. (Payments Settlements)",
+        "location": "Remote (India)",
+        "platform": "Instahyre",
+        "url": "https://www.instahyre.com/razorpay-backend-eng",
+        "description": "Scalable payment ledger systems, idempotent API handling, and distributed database transactions.",
+        "salary_range": "₹24-30 LPA",
+        "match_score": 0.91,
+        "priority_score": 89.0,
+        "status": ApplicationStatus.DISCOVERED
+    },
+    "sample_zepto_03": {
+        "company": "Zepto",
+        "title": "Lead Eng. (Realtime Search & Indexing)",
+        "location": "Mumbai / Bangalore",
+        "platform": "Cuvette",
+        "url": "https://cuvette.tech/zepto-lead-eng",
+        "description": "Sub-10ms search indexing, catalog ranking algorithms, and elastic search clusters.",
+        "salary_range": "₹40-50 LPA",
+        "match_score": 0.91,
+        "priority_score": 90.0,
+        "status": ApplicationStatus.QUEUED
+    },
+    "sample_postman_04": {
+        "company": "Postman",
+        "title": "Product Engineer (API Tooling)",
+        "location": "Bangalore",
+        "platform": "Cutshort",
+        "url": "https://cutshort.io/postman-product-eng",
+        "description": "Building next-generation API testing, collaboration, and developer tooling workflows.",
+        "salary_range": "₹32-38 LPA",
+        "match_score": 0.88,
+        "priority_score": 86.0,
+        "status": ApplicationStatus.SUBMITTED
+    },
+    "sample_cred_05": {
+        "company": "CRED",
+        "title": "UI/UX Full Stack SDE (Growth)",
+        "location": "Bangalore",
+        "platform": "Instahyre",
+        "url": "https://www.instahyre.com/cred-fullstack-sde",
+        "description": "High-fidelity micro-interactions, responsive frontend architecture, and robust Python backend services.",
+        "salary_range": "₹30-45 LPA",
+        "match_score": 0.88,
+        "priority_score": 87.0,
+        "status": ApplicationStatus.INTERVIEW,
+        "notes": "https://meet.google.com/abc-defg-hij"
+    },
+    "sample_flipkart_06": {
+        "company": "Flipkart",
+        "title": "SDE-3 (Distributed Systems Architecture)",
+        "location": "Bangalore",
+        "platform": "Naukri",
+        "url": "https://www.naukri.com/flipkart-sde-3",
+        "description": "High-scale inventory ordering systems, async message buses, and fault-tolerant architecture.",
+        "salary_range": "₹35-50 LPA",
+        "match_score": 0.88,
+        "priority_score": 88.0,
+        "status": ApplicationStatus.INTERVIEW,
+        "notes": "Round 2 System Design Scheduled"
+    },
+    "sample_phonepe_07": {
+        "company": "PhonePe",
+        "title": "SDE-3 (UPI Core High-Throughput Engine)",
+        "location": "Bangalore / Pune",
+        "platform": "Naukri",
+        "url": "https://www.naukri.com/phonepe-sde-3",
+        "description": "High-concurrency payment processing, distributed locks, and real-time bank gateway integration.",
+        "salary_range": "₹35 LPA",
+        "match_score": 0.89,
+        "priority_score": 89.0,
+        "status": ApplicationStatus.OFFER,
+        "notes": "Official offer letter received"
+    }
+}
+
 
 class DatabaseManager(DatabaseAdapter):
     """Thread-safe Multi-Tenant SQLite Database Manager with WAL mode and atomic user isolation."""
@@ -31,22 +121,22 @@ class DatabaseManager(DatabaseAdapter):
 
     def get_connection(self) -> sqlite3.Connection:
         """Returns a high-performance thread-safe SQLite connection with WAL pragmas."""
-        conn = sqlite3.connect(str(self.db_path), timeout=10.0)
+        conn = sqlite3.connect(str(self.db_path), timeout=15.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute("PRAGMA synchronous = NORMAL;")
         conn.execute("PRAGMA foreign_keys = ON;")
-        conn.execute("PRAGMA busy_timeout = 5000;")
+        conn.execute("PRAGMA busy_timeout = 10000;")
         conn.execute("PRAGMA cache_size = -64000;")
         conn.execute("PRAGMA mmap_size = 268435456;")
         conn.execute("PRAGMA temp_store = MEMORY;")
         return conn
 
     def _init_pragmas(self):
-        with sqlite3.connect(str(self.db_path), timeout=10.0) as conn:
+        with sqlite3.connect(str(self.db_path), timeout=15.0) as conn:
             conn.execute("PRAGMA journal_mode = WAL;")
             conn.execute("PRAGMA synchronous = NORMAL;")
-            conn.execute("PRAGMA busy_timeout = 5000;")
+            conn.execute("PRAGMA busy_timeout = 10000;")
             conn.execute("PRAGMA cache_size = -64000;")
             conn.execute("PRAGMA mmap_size = 268435456;")
             conn.execute("PRAGMA temp_store = MEMORY;")
@@ -177,6 +267,7 @@ class DatabaseManager(DatabaseAdapter):
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_priority ON jobs(priority_score DESC);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_user_status ON jobs(user_id, status);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_jobs_user_priority ON jobs(user_id, priority_score DESC);")
+                cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_user_fingerprint ON jobs(user_id, fingerprint);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_vault_slot_key ON vault(slot_key);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_vault_user_key ON vault(user_id, slot_key);")
 
@@ -699,12 +790,34 @@ class DatabaseManager(DatabaseAdapter):
                 job.user_id = user_id
 
                 cursor.execute("""
-                INSERT OR REPLACE INTO jobs (
+                INSERT INTO jobs (
                     job_id, user_id, fingerprint, platform, company, title, location, url,
                     description, salary_range, seniority_level, posted_date, match_score,
                     priority_score, match_reasons, missing_skills, status, submission_mode,
                     applied_at, application_id, confirmation_screenshot_path, notes
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                    user_id=excluded.user_id,
+                    fingerprint=excluded.fingerprint,
+                    platform=excluded.platform,
+                    company=excluded.company,
+                    title=excluded.title,
+                    location=excluded.location,
+                    url=excluded.url,
+                    description=excluded.description,
+                    salary_range=excluded.salary_range,
+                    seniority_level=excluded.seniority_level,
+                    posted_date=excluded.posted_date,
+                    match_score=excluded.match_score,
+                    priority_score=excluded.priority_score,
+                    match_reasons=excluded.match_reasons,
+                    missing_skills=excluded.missing_skills,
+                    status=excluded.status,
+                    submission_mode=excluded.submission_mode,
+                    applied_at=excluded.applied_at,
+                    application_id=excluded.application_id,
+                    confirmation_screenshot_path=excluded.confirmation_screenshot_path,
+                    notes=excluded.notes
                 """, (
                     target_job_id,
                     user_id,
@@ -749,12 +862,37 @@ class DatabaseManager(DatabaseAdapter):
             return [self._row_to_job(r) for r in rows]
 
     def get_job_by_id(self, job_id: str, user_id: str) -> Optional[JobListing]:
-        """Retrieves a single job by ID strictly for the specified user."""
+        """Retrieves a single job by ID strictly for the specified user with self-healing preview resolution."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM jobs WHERE job_id = ? AND user_id = ? LIMIT 1", (job_id, user_id))
             row = cursor.fetchone()
-            return self._row_to_job(row) if row else None
+            if row:
+                return self._row_to_job(row)
+
+        # Self-healing fallback for preview job leads
+        if job_id in SAMPLE_PREVIEW_JOBS_CATALOG:
+            raw = SAMPLE_PREVIEW_JOBS_CATALOG[job_id]
+            seed_job = JobListing(
+                job_id=job_id,
+                user_id=user_id,
+                fingerprint=f"fp_{job_id}_{user_id}",
+                platform=raw["platform"],
+                company=raw["company"],
+                title=raw["title"],
+                location=raw["location"],
+                url=raw["url"],
+                description=raw["description"],
+                salary_range=raw.get("salary_range"),
+                match_score=raw.get("match_score", 0.9),
+                priority_score=raw.get("priority_score", 88.0),
+                status=raw.get("status", ApplicationStatus.DISCOVERED),
+                notes=raw.get("notes", "")
+            )
+            self.save_job(seed_job, user_id=user_id)
+            return seed_job
+
+        return None
 
     get_job = get_job_by_id
 
