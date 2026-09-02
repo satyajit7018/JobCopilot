@@ -97,6 +97,28 @@ class PlatformScrapers:
                 "description": "Designing high-scale distributed data pipelines on Apache Spark, Kafka, and Snowflake to process flight pricing streams.",
                 "salary_range": "22 - 35 LPA",
                 "posted_date": "2026-08-30"
+            },
+            {
+                "external_id": "naukri_ind_05",
+                "platform": "Naukri",
+                "company": "Lenskart",
+                "title": "Python Backend Developer (Omnichannel Systems)",
+                "location": "Gurgaon / Delhi NCR / Remote",
+                "url": "https://www.naukri.com/job-listings-python-backend-lenskart-105",
+                "description": "Building microservices for optical store inventory management, order processing, and payment webhook integrations using Python, FastAPI, Flask, and SQL.",
+                "salary_range": "8 - 14 LPA",
+                "posted_date": "2026-09-02"
+            },
+            {
+                "external_id": "naukri_ind_06",
+                "platform": "Naukri",
+                "company": "Zepto",
+                "title": "Junior Backend Engineer (Catalog & Dark Stores)",
+                "location": "Bangalore / Mumbai, India",
+                "url": "https://www.naukri.com/job-listings-junior-backend-zepto-106",
+                "description": "Building real-time inventory caching, catalog synchronization, and order processing endpoints using Python, Redis, Docker, and PostgreSQL.",
+                "salary_range": "10 - 16 LPA",
+                "posted_date": "2026-09-02"
             }
         ]
         return sample_naukri_leads
@@ -142,12 +164,23 @@ class PlatformScrapers:
                 "external_id": "insta_ind_04",
                 "platform": "Instahyre",
                 "company": "Groww",
-                "title": "Backend SDE-1 / SDE-2 (Mutual Funds & Stocks)",
+                "title": "Backend SDE-1 (Mutual Funds & Stocks)",
                 "location": "Bangalore, India",
                 "url": "https://www.instahyre.com/job-204-backend-engineer-groww",
                 "description": "Building low-latency order execution systems, KYC verification pipelines, and market data feeds using Python, FastAPI, and Postgres.",
-                "salary_range": "20 - 36 LPA",
+                "salary_range": "10 - 16 LPA",
                 "posted_date": "2026-09-01"
+            },
+            {
+                "external_id": "insta_ind_05",
+                "platform": "Instahyre",
+                "company": "Classplus",
+                "title": "Backend Software Engineer - SDE 1",
+                "location": "Noida / Delhi NCR / Remote",
+                "url": "https://www.instahyre.com/job-205-sde1-classplus",
+                "description": "Designing high-scale student assessment APIs, live streaming chat infrastructure, and analytics using Python, Django, FastAPI, and Redis.",
+                "salary_range": "9 - 15 LPA",
+                "posted_date": "2026-09-02"
             }
         ]
         return sample_instahyre_leads
@@ -181,13 +214,24 @@ class PlatformScrapers:
             {
                 "external_id": "cuv_ind_03",
                 "platform": "Cuvette",
-                "company": "Korbit Tech",
-                "title": "Full Stack Engineer (AI Code Reviewer)",
-                "location": "Hyderabad / Remote (India)",
-                "url": "https://cuvette.tech/app/jobs/korbit-fullstack-engineer",
-                "description": "Building automated pull request reviewers with Python, React, FastAPI, AST parsers, and LLM fine-tuning.",
-                "salary_range": "15 - 28 LPA",
-                "posted_date": "2026-09-01"
+                "company": "Devtron",
+                "title": "Junior Cloud & DevOps Software Engineer",
+                "location": "Bangalore / Remote (India)",
+                "url": "https://cuvette.tech/app/jobs/devtron-junior-cloud-engineer",
+                "description": "Developing Kubernetes continuous delivery platforms, Helm chart orchestrators, and automated CI/CD runners with Python, Docker, Go, and GitHub Actions.",
+                "salary_range": "8 - 14 LPA",
+                "posted_date": "2026-09-02"
+            },
+            {
+                "external_id": "cuv_ind_04",
+                "platform": "Cuvette",
+                "company": "100xEngineers",
+                "title": "AI Application Engineer (GenAI & Agentic Workflows)",
+                "location": "Bangalore / Remote (India)",
+                "url": "https://cuvette.tech/app/jobs/100xengineers-ai-app-engineer",
+                "description": "Building multi-agent autonomous coding pipelines, RAG systems, and structured reasoning engines with Python, LangChain, Qdrant, and FastAPI.",
+                "salary_range": "10 - 16 LPA",
+                "posted_date": "2026-09-02"
             }
         ]
         return sample_cuvette_leads
@@ -217,6 +261,17 @@ class PlatformScrapers:
                 "description": "Building ultra-reliable payment switches handling 100M+ daily transactions using PureScript, Haskell, Rust, and Python.",
                 "salary_range": "25 - 45 LPA",
                 "posted_date": "2026-09-01"
+            },
+            {
+                "external_id": "cutshort_ind_03",
+                "platform": "Cutshort",
+                "company": "HyperVerge",
+                "title": "Junior AI / Computer Vision Engineer",
+                "location": "Bangalore / Remote",
+                "url": "https://cutshort.io/job/hyperverge-junior-ai-engineer",
+                "description": "Developing real-time face verification, document OCR, and fraud detection SDKs using Python, PyTorch, OpenCV, and FastAPI.",
+                "salary_range": "10 - 15 LPA",
+                "posted_date": "2026-09-02"
             }
         ]
         return sample_cutshort_leads
