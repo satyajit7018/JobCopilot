@@ -15,7 +15,8 @@ from app.tasks.apply_task import enqueue_apply_job, run_apply_job_sync
 from app.core.postgres_adapter import PostgresDatabaseAdapter
 from app.core.models import (
     User, CandidateProfile, VaultEntry, JobListing,
-    HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, OutreachChannel, EmailIntent
+    HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, OutreachChannel, EmailIntent,
+    ApplyLedgerEntry, ApplyLedgerStatus
 )
 from app.core.interview_studio import InterviewStudioEngine
 from app.core.credential_vault import cred_vault
@@ -173,6 +174,34 @@ def test_postgres_adapter_mocked():
         metrics = adapter.get_funnel_metrics(user_id="usr_pg_1")
         assert metrics["total_sourced"] == 10
         assert metrics["total_applied"] == 5
+
+        # 9. Apply Ledger (PostgreSQL)
+        ledger_entry = ApplyLedgerEntry(
+            ledger_id="led_pg_1", user_id="usr_pg_1", job_id="job_pg_1", job_fingerprint="fp_1",
+            status=ApplyLedgerStatus.SUBMITTED, attempt_count=1, confirmation_id="CONF-PG-1"
+        )
+        adapter.save_apply_ledger_entry(ledger_entry, user_id="usr_pg_1")
+        mock_cursor.fetchone.side_effect = None
+        mock_cursor.fetchone.return_value = (
+            "led_pg_1", "usr_pg_1", "job_pg_1", "fp_1", "SUBMITTED", 1, 3, None, None, "CONF-PG-1", None, "idem_1",
+            "2026-09-01T00:00:00", "2026-09-01T00:00:00"
+        )
+        ret_led = adapter.get_apply_ledger_entry("led_pg_1", user_id="usr_pg_1")
+        assert ret_led is not None
+        assert ret_led.confirmation_id == "CONF-PG-1"
+
+        ret_fp = adapter.get_active_ledger_by_fingerprint("fp_1", user_id="usr_pg_1")
+        assert ret_fp is not None
+
+        ret_job_led = adapter.get_ledger_for_job("job_pg_1", user_id="usr_pg_1")
+        assert ret_job_led is not None
+
+        mock_cursor.fetchall.return_value = [
+            ("led_pg_1", "usr_pg_1", "job_pg_1", "fp_1", "SUBMITTED", 1, 3, None, None, "CONF-PG-1", None, "idem_1",
+             "2026-09-01T00:00:00", "2026-09-01T00:00:00")
+        ]
+        ledgers = adapter.list_user_apply_ledger("usr_pg_1", limit=10, offset=0, status="SUBMITTED")
+        assert len(ledgers) == 1
 
 
 def test_credential_vault_methods():

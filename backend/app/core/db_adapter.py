@@ -83,6 +83,22 @@ class DatabaseAdapter(ABC):
     def get_funnel_metrics(self, user_id: str) -> Dict[str, Any]:
         pass
 
+    # Apply Ledger Methods (with safe base defaults)
+    def save_apply_ledger_entry(self, entry: Any, user_id: str) -> bool:
+        return True
+
+    def get_apply_ledger_entry(self, ledger_id: str, user_id: str) -> Optional[Any]:
+        return None
+
+    def get_active_ledger_by_fingerprint(self, fingerprint: str, user_id: str) -> Optional[Any]:
+        return None
+
+    def get_ledger_for_job(self, job_id: str, user_id: str) -> Optional[Any]:
+        return None
+
+    def list_user_apply_ledger(self, user_id: str, limit: int = 50, offset: int = 0, status: Optional[str] = None) -> List[Any]:
+        return []
+
 
 def get_db_adapter() -> DatabaseAdapter:
     """Factory function returning SQLite or PostgreSQL adapter based on DB_MODE."""

@@ -10,9 +10,10 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from app.core.config import DEFAULT_SUBMISSION_MODE
-from app.core.models import User, ApplicationStatus
+from app.core.models import User, ApplicationStatus, ApplyLedgerStatus, ApplyLedgerEntry
 from app.core.database import db
 from app.core.vector_vault import vault
+from app.bot.apply_ledger import apply_ledger
 from app.api.auth import get_current_user
 from app.api.ws_gateway import ws_manager
 
@@ -114,7 +115,15 @@ async def apply_to_job(
     mode: Optional[str] = None,
     current_user: User = Depends(get_current_user)
 ):
-    """Executes full autonomous stealth application workflow with persistent rate limiting."""
+    """Executes full autonomous stealth application workflow with persistent rate limiting and idempotency."""
+    # Check Idempotent Apply Ledger before executing
+    existing_ledger = apply_ledger.get_ledger_for_job(current_user.user_id, job_id)
+    if existing_ledger:
+        if existing_ledger.status == ApplyLedgerStatus.SUBMITTED:
+            raise HTTPException(status_code=409, detail=f"Application already submitted on {existing_ledger.updated_at}.")
+        if existing_ledger.status == ApplyLedgerStatus.IN_PROGRESS:
+            raise HTTPException(status_code=409, detail="Application is currently actively executing.")
+
     from app.core.rate_limiter import rate_limiter
     if not rate_limiter.can_apply(current_user.user_id):
         raise HTTPException(
@@ -130,6 +139,8 @@ async def apply_to_job(
         user_id=current_user.user_id,
         ws_broadcast_callback=ws_manager.broadcast
     )
+    if result.get("status") == "conflict":
+        raise HTTPException(status_code=409, detail=result.get("message", "Application blocked by idempotency ledger."))
     if result.get("status") == "success":
         rate_limiter.record_apply(current_user.user_id)
     return result
@@ -143,9 +154,17 @@ async def apply_to_job_async(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Dispatches asynchronous application task to Celery/Redis background worker queue.
+    Dispatches asynchronous application task to Celery/Redis background worker queue with idempotency checks.
     Returns HTTP 202 Accepted with a unique task_id for progress polling.
     """
+    # Check Idempotent Apply Ledger
+    existing_ledger = apply_ledger.get_ledger_for_job(current_user.user_id, job_id)
+    if existing_ledger:
+        if existing_ledger.status == ApplyLedgerStatus.SUBMITTED:
+            raise HTTPException(status_code=409, detail=f"Application already submitted on {existing_ledger.updated_at}.")
+        if existing_ledger.status == ApplyLedgerStatus.IN_PROGRESS:
+            raise HTTPException(status_code=409, detail="Application is currently actively executing.")
+
     from app.core.rate_limiter import rate_limiter
     from app.core.celery_app import TaskManager
 
@@ -185,4 +204,55 @@ async def get_task_status_endpoint(
     return {
         "status": "success",
         "task": task_info
+    }
+
+
+@router.get("/bot/ledger")
+async def get_apply_ledger(
+    limit: int = 50,
+    offset: int = 0,
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Returns paginated application audit ledger history for authenticated tenant."""
+    entries = apply_ledger.list_user_ledger(user_id=current_user.user_id, limit=limit, offset=offset, status=status)
+    return {
+        "count": len(entries),
+        "limit": limit,
+        "offset": offset,
+        "entries": [e.dict() for e in entries]
+    }
+
+
+@router.get("/bot/ledger/{job_id}")
+async def get_job_ledger(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Retrieves apply ledger entry for a specific job."""
+    entry = apply_ledger.get_ledger_for_job(user_id=current_user.user_id, job_id=job_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="No ledger record found for this job.")
+    return {
+        "status": "success",
+        "ledger": entry.dict()
+    }
+
+
+@router.get("/hitl/{event_id}/evidence")
+async def get_hitl_evidence(
+    event_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Returns visual evidence (screenshot path, DOM snapshot, field selector) for a HITL challenge."""
+    evt = db.get_hitl_event(event_id, user_id=current_user.user_id)
+    if not evt:
+        raise HTTPException(status_code=404, detail="HITL event not found.")
+    return {
+        "status": "success",
+        "event_id": evt.event_id,
+        "input_type": evt.input_type,
+        "screenshot_path": evt.screenshot_path,
+        "dom_snapshot": evt.dom_snapshot,
+        "field_selector": evt.field_selector
     }

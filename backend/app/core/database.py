@@ -13,7 +13,8 @@ from datetime import datetime
 from app.core.config import DB_PATH
 from app.core.models import (
     User, CandidateProfile, VaultEntry, JobListing, HITLEvent,
-    ApplicationStatus, OutreachRecord, OutreachChannel, EmailMessage, JobCheckpoint
+    ApplicationStatus, OutreachRecord, OutreachChannel, EmailMessage, JobCheckpoint,
+    ApplyLedgerEntry, ApplyLedgerStatus
 )
 from app.core.db_adapter import DatabaseAdapter
 from app.core.credential_vault import cred_vault
@@ -329,12 +330,18 @@ class DatabaseManager(DatabaseAdapter):
                     ai_suggested_draft TEXT,
                     user_answer TEXT,
                     status TEXT NOT NULL,
+                    screenshot_path TEXT,
+                    dom_snapshot TEXT,
+                    field_selector TEXT,
                     created_at TEXT NOT NULL,
                     resolved_at TEXT
                 )
                 """)
                 self._ensure_columns(conn, "hitl_events", {
                     "user_id": "TEXT NOT NULL DEFAULT 'default'",
+                    "screenshot_path": "TEXT",
+                    "dom_snapshot": "TEXT",
+                    "field_selector": "TEXT",
                     "resolved_at": "TEXT"
                 })
 
@@ -430,6 +437,40 @@ class DatabaseManager(DatabaseAdapter):
                 """)
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_login_attempts_email ON login_attempts(email);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON login_attempts(ip);")
+
+                # 13. Apply Ledger Table (Idempotent Audit Ledger)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS apply_ledger (
+                    ledger_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL DEFAULT 'default',
+                    job_id TEXT NOT NULL,
+                    job_fingerprint TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    attempt_count INTEGER DEFAULT 1,
+                    max_retries INTEGER DEFAULT 3,
+                    last_error_category TEXT,
+                    last_error_message TEXT,
+                    confirmation_id TEXT,
+                    screenshot_path TEXT,
+                    idempotency_key TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """)
+                self._ensure_columns(conn, "apply_ledger", {
+                    "user_id": "TEXT NOT NULL DEFAULT 'default'",
+                    "job_fingerprint": "TEXT NOT NULL DEFAULT ''",
+                    "attempt_count": "INTEGER DEFAULT 1",
+                    "max_retries": "INTEGER DEFAULT 3",
+                    "last_error_category": "TEXT",
+                    "last_error_message": "TEXT",
+                    "confirmation_id": "TEXT",
+                    "screenshot_path": "TEXT",
+                    "idempotency_key": "TEXT"
+                })
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_apply_ledger_user_job ON apply_ledger(user_id, job_id);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_apply_ledger_user_fingerprint ON apply_ledger(user_id, job_fingerprint);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_apply_ledger_status ON apply_ledger(status);")
 
                 self._ensure_columns(conn, "users", {
                     "email_verified": "INTEGER DEFAULT 0"
@@ -986,8 +1027,9 @@ class DatabaseManager(DatabaseAdapter):
                 cursor.execute("""
                 INSERT OR REPLACE INTO hitl_events (
                     event_id, user_id, job_id, company, role_title, question_text,
-                    input_type, options, ai_suggested_draft, user_answer, status, created_at, resolved_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    input_type, options, ai_suggested_draft, user_answer, status,
+                    screenshot_path, dom_snapshot, field_selector, created_at, resolved_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     event.event_id,
                     user_id,
@@ -1000,11 +1042,35 @@ class DatabaseManager(DatabaseAdapter):
                     event.ai_suggested_draft,
                     event.user_answer,
                     event.status,
+                    event.screenshot_path,
+                    event.dom_snapshot,
+                    event.field_selector,
                     event.created_at,
                     event.resolved_at
                 ))
                 conn.commit()
                 return True
+
+    def _row_to_hitl_event(self, r: sqlite3.Row, user_id: str) -> HITLEvent:
+        keys = r.keys()
+        return HITLEvent(
+            event_id=r["event_id"],
+            user_id=user_id,
+            job_id=r["job_id"],
+            company=r["company"],
+            role_title=r["role_title"],
+            question_text=r["question_text"],
+            input_type=r["input_type"],
+            options=json.loads(r["options"]) if r["options"] else [],
+            ai_suggested_draft=r["ai_suggested_draft"] or "",
+            user_answer=r["user_answer"],
+            status=r["status"],
+            screenshot_path=r["screenshot_path"] if "screenshot_path" in keys else None,
+            dom_snapshot=r["dom_snapshot"] if "dom_snapshot" in keys else None,
+            field_selector=r["field_selector"] if "field_selector" in keys else None,
+            created_at=r["created_at"],
+            resolved_at=r["resolved_at"] if "resolved_at" in keys else None
+        )
 
     def get_pending_hitl(self, user_id: str) -> List[HITLEvent]:
         """Retrieves all pending HITL items strictly for a user."""
@@ -1012,24 +1078,7 @@ class DatabaseManager(DatabaseAdapter):
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM hitl_events WHERE user_id = ? AND status = 'PENDING' ORDER BY created_at ASC", (user_id,))
             rows = cursor.fetchall()
-            return [
-                HITLEvent(
-                    event_id=r["event_id"],
-                    user_id=user_id,
-                    job_id=r["job_id"],
-                    company=r["company"],
-                    role_title=r["role_title"],
-                    question_text=r["question_text"],
-                    input_type=r["input_type"],
-                    options=json.loads(r["options"]) if r["options"] else [],
-                    ai_suggested_draft=r["ai_suggested_draft"] or "",
-                    user_answer=r["user_answer"],
-                    status=r["status"],
-                    created_at=r["created_at"],
-                    resolved_at=r["resolved_at"] if "resolved_at" in r.keys() else None
-                )
-                for r in rows
-            ]
+            return [self._row_to_hitl_event(r, user_id) for r in rows]
 
     get_pending_hitl_events = get_pending_hitl
 
@@ -1041,21 +1090,7 @@ class DatabaseManager(DatabaseAdapter):
             row = cursor.fetchone()
             if not row:
                 return None
-            return HITLEvent(
-                event_id=row["event_id"],
-                user_id=user_id,
-                job_id=row["job_id"],
-                company=row["company"],
-                role_title=row["role_title"],
-                question_text=row["question_text"],
-                input_type=row["input_type"],
-                options=json.loads(row["options"]) if row["options"] else [],
-                ai_suggested_draft=row["ai_suggested_draft"] or "",
-                user_answer=row["user_answer"],
-                status=row["status"],
-                created_at=row["created_at"],
-                resolved_at=row["resolved_at"] if "resolved_at" in row.keys() else None
-            )
+            return self._row_to_hitl_event(row, user_id)
 
     def resolve_hitl_event(self, event_id: str, user_answer: str, user_id: str) -> bool:
         """Atomically resolves a pending HITL question strictly for the user."""
@@ -1069,6 +1104,118 @@ class DatabaseManager(DatabaseAdapter):
                 """, (user_answer, now_str, event_id, user_id))
                 conn.commit()
                 return cursor.rowcount > 0
+
+    # =========================================================================
+    # Apply Ledger Operations (Multi-Tenant)
+    # =========================================================================
+    def save_apply_ledger_entry(self, entry: ApplyLedgerEntry, user_id: str) -> bool:
+        """Saves or updates an idempotent apply ledger record."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT OR REPLACE INTO apply_ledger (
+                    ledger_id, user_id, job_id, job_fingerprint, status,
+                    attempt_count, max_retries, last_error_category, last_error_message,
+                    confirmation_id, screenshot_path, idempotency_key, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    entry.ledger_id,
+                    user_id,
+                    entry.job_id,
+                    entry.job_fingerprint,
+                    entry.status.value if hasattr(entry.status, "value") else str(entry.status),
+                    entry.attempt_count,
+                    entry.max_retries,
+                    entry.last_error_category,
+                    entry.last_error_message,
+                    entry.confirmation_id,
+                    entry.screenshot_path,
+                    entry.idempotency_key,
+                    entry.created_at,
+                    entry.updated_at
+                ))
+                conn.commit()
+                return True
+
+    def _row_to_apply_ledger(self, r: sqlite3.Row) -> ApplyLedgerEntry:
+        keys = r.keys()
+        raw_status = r["status"]
+        status_val = ApplyLedgerStatus.INITIATED
+        for st in ApplyLedgerStatus:
+            if st.value == raw_status:
+                status_val = st
+                break
+
+        return ApplyLedgerEntry(
+            ledger_id=r["ledger_id"],
+            user_id=r["user_id"] if "user_id" in keys else "default",
+            job_id=r["job_id"],
+            job_fingerprint=r["job_fingerprint"],
+            status=status_val,
+            attempt_count=r["attempt_count"] if "attempt_count" in keys else 1,
+            max_retries=r["max_retries"] if "max_retries" in keys else 3,
+            last_error_category=r["last_error_category"] if "last_error_category" in keys else None,
+            last_error_message=r["last_error_message"] if "last_error_message" in keys else None,
+            confirmation_id=r["confirmation_id"] if "confirmation_id" in keys else None,
+            screenshot_path=r["screenshot_path"] if "screenshot_path" in keys else None,
+            idempotency_key=r["idempotency_key"] if "idempotency_key" in keys else None,
+            created_at=r["created_at"],
+            updated_at=r["updated_at"]
+        )
+
+    def get_apply_ledger_entry(self, ledger_id: str, user_id: str) -> Optional[ApplyLedgerEntry]:
+        """Retrieves a single ledger entry by ledger ID strictly for user."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM apply_ledger WHERE ledger_id = ? AND user_id = ? LIMIT 1", (ledger_id, user_id))
+            row = cursor.fetchone()
+            return self._row_to_apply_ledger(row) if row else None
+
+    def get_active_ledger_by_fingerprint(self, fingerprint: str, user_id: str) -> Optional[ApplyLedgerEntry]:
+        """Finds most recent ledger record for a job fingerprint."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT * FROM apply_ledger 
+            WHERE job_fingerprint = ? AND user_id = ? 
+            ORDER BY updated_at DESC LIMIT 1
+            """, (fingerprint, user_id))
+            row = cursor.fetchone()
+            return self._row_to_apply_ledger(row) if row else None
+
+    def get_ledger_for_job(self, job_id: str, user_id: str) -> Optional[ApplyLedgerEntry]:
+        """Finds most recent ledger record for a job ID."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT * FROM apply_ledger 
+            WHERE job_id = ? AND user_id = ? 
+            ORDER BY updated_at DESC LIMIT 1
+            """, (job_id, user_id))
+            row = cursor.fetchone()
+            return self._row_to_apply_ledger(row) if row else None
+
+    def list_user_apply_ledger(
+        self,
+        user_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        status: Optional[str] = None
+    ) -> List[ApplyLedgerEntry]:
+        """Lists ledger history for a user with optional status filtering."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = "SELECT * FROM apply_ledger WHERE user_id = ?"
+            params: list = [user_id]
+            if status:
+                query += " AND status = ?"
+                params.append(status)
+            query += " ORDER BY updated_at DESC LIMIT ? OFFSET ?"
+            params.extend([limit, offset])
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            return [self._row_to_apply_ledger(r) for r in rows]
 
     # =========================================================================
     # Outreach & Email Operations (Multi-Tenant)

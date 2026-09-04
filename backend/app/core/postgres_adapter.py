@@ -11,7 +11,8 @@ from datetime import datetime
 
 from app.core.models import (
     User, CandidateProfile, VaultEntry, JobListing,
-    HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint
+    HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint,
+    ApplyLedgerEntry, ApplyLedgerStatus
 )
 from app.core.db_adapter import DatabaseAdapter
 from app.core.credential_vault import cred_vault
@@ -124,6 +125,9 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     ai_suggested_draft TEXT,
                     user_answer TEXT,
                     status VARCHAR(64) NOT NULL,
+                    screenshot_path TEXT,
+                    dom_snapshot TEXT,
+                    field_selector VARCHAR(255),
                     created_at VARCHAR(64) NOT NULL,
                     resolved_at VARCHAR(64)
                 );
@@ -171,6 +175,25 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     attempted_at VARCHAR(64) NOT NULL,
                     success INTEGER NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS apply_ledger (
+                    ledger_id VARCHAR(64) PRIMARY KEY,
+                    user_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                    job_id VARCHAR(64) NOT NULL,
+                    job_fingerprint VARCHAR(255) NOT NULL,
+                    status VARCHAR(64) NOT NULL,
+                    attempt_count INTEGER DEFAULT 1,
+                    max_retries INTEGER DEFAULT 3,
+                    last_error_category VARCHAR(64),
+                    last_error_message TEXT,
+                    confirmation_id VARCHAR(128),
+                    screenshot_path TEXT,
+                    idempotency_key VARCHAR(128),
+                    created_at VARCHAR(64) NOT NULL,
+                    updated_at VARCHAR(64) NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_pg_apply_ledger_user_job ON apply_ledger(user_id, job_id);
+                CREATE INDEX IF NOT EXISTS idx_pg_apply_ledger_user_fingerprint ON apply_ledger(user_id, job_fingerprint);
                 """)
                 conn.commit()
         finally:
@@ -349,13 +372,14 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                INSERT INTO hitl_events (event_id, user_id, job_id, company, role_title, question_text, input_type, options, ai_suggested_draft, user_answer, status, created_at, resolved_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO hitl_events (event_id, user_id, job_id, company, role_title, question_text, input_type, options, ai_suggested_draft, user_answer, status, screenshot_path, dom_snapshot, field_selector, created_at, resolved_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (event_id) DO UPDATE SET user_answer = EXCLUDED.user_answer, status = EXCLUDED.status, resolved_at = EXCLUDED.resolved_at
                 """, (
                     event.event_id, user_id, event.job_id, event.company, event.role_title, event.question_text,
                     event.input_type, json.dumps(event.options), event.ai_suggested_draft, event.user_answer,
-                    event.status, event.created_at, event.resolved_at
+                    event.status, event.screenshot_path, event.dom_snapshot, event.field_selector,
+                    event.created_at, event.resolved_at
                 ))
                 conn.commit()
                 return True
@@ -366,16 +390,27 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT event_id, user_id, job_id, company, role_title, question_text, input_type, options, ai_suggested_draft, user_answer, status, created_at, resolved_at FROM hitl_events WHERE user_id = %s AND status = 'PENDING'", (user_id,))
+                cursor.execute("SELECT event_id, user_id, job_id, company, role_title, question_text, input_type, options, ai_suggested_draft, user_answer, status, screenshot_path, dom_snapshot, field_selector, created_at, resolved_at FROM hitl_events WHERE user_id = %s AND status = 'PENDING'", (user_id,))
                 rows = cursor.fetchall()
                 events = []
                 for r in rows:
-                    events.append(HITLEvent(
-                        event_id=r[0], user_id=r[1], job_id=r[2], company=r[3], role_title=r[4],
-                        question_text=r[5], input_type=r[6],
-                        options=r[7] if isinstance(r[7], list) else json.loads(r[7] or '[]'),
-                        ai_suggested_draft=r[8], user_answer=r[9], status=r[10], created_at=r[11], resolved_at=r[12]
-                    ))
+                    if len(r) >= 16:
+                        events.append(HITLEvent(
+                            event_id=r[0], user_id=r[1], job_id=r[2], company=r[3], role_title=r[4],
+                            question_text=r[5], input_type=r[6],
+                            options=r[7] if isinstance(r[7], list) else json.loads(r[7] or '[]'),
+                            ai_suggested_draft=r[8], user_answer=r[9], status=r[10],
+                            screenshot_path=r[11], dom_snapshot=r[12], field_selector=r[13],
+                            created_at=r[14], resolved_at=r[15]
+                        ))
+                    else:
+                        events.append(HITLEvent(
+                            event_id=r[0], user_id=r[1], job_id=r[2], company=r[3], role_title=r[4],
+                            question_text=r[5], input_type=r[6],
+                            options=r[7] if isinstance(r[7], list) else json.loads(r[7] or '[]'),
+                            ai_suggested_draft=r[8], user_answer=r[9], status=r[10],
+                            created_at=r[11], resolved_at=r[12] if len(r) > 12 else None
+                        ))
                 return events
         finally:
             self.release_connection(conn)
@@ -482,5 +517,105 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     "recruiter_responses": recruiter_responses,
                     "response_rate_percent": round(response_rate, 2)
                 }
+        finally:
+            self.release_connection(conn)
+
+    # =========================================================================
+    # Apply Ledger Operations (PostgreSQL Multi-Tenant)
+    # =========================================================================
+    def save_apply_ledger_entry(self, entry: ApplyLedgerEntry, user_id: str) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                INSERT INTO apply_ledger (
+                    ledger_id, user_id, job_id, job_fingerprint, status,
+                    attempt_count, max_retries, last_error_category, last_error_message,
+                    confirmation_id, screenshot_path, idempotency_key, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (ledger_id) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    attempt_count = EXCLUDED.attempt_count,
+                    last_error_category = EXCLUDED.last_error_category,
+                    last_error_message = EXCLUDED.last_error_message,
+                    confirmation_id = EXCLUDED.confirmation_id,
+                    screenshot_path = EXCLUDED.screenshot_path,
+                    updated_at = EXCLUDED.updated_at
+                """, (
+                    entry.ledger_id, user_id, entry.job_id, entry.job_fingerprint,
+                    entry.status.value if hasattr(entry.status, "value") else str(entry.status),
+                    entry.attempt_count, entry.max_retries, entry.last_error_category,
+                    entry.last_error_message, entry.confirmation_id, entry.screenshot_path,
+                    entry.idempotency_key, entry.created_at, entry.updated_at
+                ))
+                conn.commit()
+                return True
+        finally:
+            self.release_connection(conn)
+
+    def _row_to_apply_ledger(self, r: Any) -> ApplyLedgerEntry:
+        status_val = ApplyLedgerStatus.INITIATED
+        for st in ApplyLedgerStatus:
+            if st.value == r[4]:
+                status_val = st
+                break
+        return ApplyLedgerEntry(
+            ledger_id=r[0], user_id=r[1], job_id=r[2], job_fingerprint=r[3],
+            status=status_val, attempt_count=r[5], max_retries=r[6],
+            last_error_category=r[7], last_error_message=r[8],
+            confirmation_id=r[9], screenshot_path=r[10], idempotency_key=r[11],
+            created_at=r[12], updated_at=r[13]
+        )
+
+    def get_apply_ledger_entry(self, ledger_id: str, user_id: str) -> Optional[ApplyLedgerEntry]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT ledger_id, user_id, job_id, job_fingerprint, status, attempt_count, max_retries, last_error_category, last_error_message, confirmation_id, screenshot_path, idempotency_key, created_at, updated_at FROM apply_ledger WHERE ledger_id = %s AND user_id = %s", (ledger_id, user_id))
+                row = cursor.fetchone()
+                return self._row_to_apply_ledger(row) if row else None
+        finally:
+            self.release_connection(conn)
+
+    def get_active_ledger_by_fingerprint(self, fingerprint: str, user_id: str) -> Optional[ApplyLedgerEntry]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT ledger_id, user_id, job_id, job_fingerprint, status, attempt_count, max_retries, last_error_category, last_error_message, confirmation_id, screenshot_path, idempotency_key, created_at, updated_at FROM apply_ledger WHERE job_fingerprint = %s AND user_id = %s ORDER BY updated_at DESC LIMIT 1", (fingerprint, user_id))
+                row = cursor.fetchone()
+                return self._row_to_apply_ledger(row) if row else None
+        finally:
+            self.release_connection(conn)
+
+    def get_ledger_for_job(self, job_id: str, user_id: str) -> Optional[ApplyLedgerEntry]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT ledger_id, user_id, job_id, job_fingerprint, status, attempt_count, max_retries, last_error_category, last_error_message, confirmation_id, screenshot_path, idempotency_key, created_at, updated_at FROM apply_ledger WHERE job_id = %s AND user_id = %s ORDER BY updated_at DESC LIMIT 1", (job_id, user_id))
+                row = cursor.fetchone()
+                return self._row_to_apply_ledger(row) if row else None
+        finally:
+            self.release_connection(conn)
+
+    def list_user_apply_ledger(
+        self,
+        user_id: str,
+        limit: int = 50,
+        offset: int = 0,
+        status: Optional[str] = None
+    ) -> List[ApplyLedgerEntry]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                query = "SELECT ledger_id, user_id, job_id, job_fingerprint, status, attempt_count, max_retries, last_error_category, last_error_message, confirmation_id, screenshot_path, idempotency_key, created_at, updated_at FROM apply_ledger WHERE user_id = %s"
+                params: list = [user_id]
+                if status:
+                    query += " AND status = %s"
+                    params.append(status)
+                query += " ORDER BY updated_at DESC LIMIT %s OFFSET %s"
+                params.extend([limit, offset])
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
+                return [self._row_to_apply_ledger(r) for r in rows]
         finally:
             self.release_connection(conn)

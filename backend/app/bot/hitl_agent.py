@@ -27,10 +27,13 @@ class HITLAgent:
         input_type: str = "text",
         options: Optional[List[str]] = None,
         ai_suggested_draft: str = "",
+        screenshot_path: Optional[str] = None,
+        dom_snapshot: Optional[str] = None,
+        field_selector: Optional[str] = None,
         user_id: str = "default",
         ws_broadcast_callback = None
     ) -> HITLEvent:
-        """Creates a pending HITL event in SQLite and broadcasts via WebSocket."""
+        """Creates a pending HITL event with evidence snapshots and broadcasts via WebSocket."""
         event_id = f"hitl_{uuid.uuid4().hex[:8]}"
         event = HITLEvent(
             event_id=event_id,
@@ -43,6 +46,9 @@ class HITLAgent:
             options=options or [],
             ai_suggested_draft=ai_suggested_draft,
             status="PENDING",
+            screenshot_path=screenshot_path,
+            dom_snapshot=dom_snapshot,
+            field_selector=field_selector,
             created_at=datetime.now().isoformat()
         )
         db.save_hitl_event(event, user_id=user_id)

@@ -31,6 +31,15 @@ class ApplicationStatus(str, Enum):
     OFFER = "OFFER"
 
 
+class ApplyLedgerStatus(str, Enum):
+    INITIATED = "INITIATED"
+    IN_PROGRESS = "IN_PROGRESS"
+    SUBMITTED = "SUBMITTED"
+    FAILED = "FAILED"
+    HITL_PAUSED = "HITL_PAUSED"
+    CANCELLED = "CANCELLED"
+
+
 class EmailIntent(str, Enum):
     CONFIRMATION = "CONFIRMATION"
     INTERVIEW_INVITE = "INTERVIEW_INVITE"
@@ -268,8 +277,31 @@ class HITLEvent(BaseModel):
     ai_suggested_draft: str = ""
     user_answer: Optional[str] = None
     status: str = "PENDING"  # PENDING, RESOLVED, SKIPPED, EXPIRED
+    screenshot_path: Optional[str] = None
+    dom_snapshot: Optional[str] = None
+    field_selector: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     resolved_at: Optional[str] = None
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class ApplyLedgerEntry(BaseModel):
+    ledger_id: str
+    user_id: str = "default"
+    job_id: str
+    job_fingerprint: str
+    status: ApplyLedgerStatus = ApplyLedgerStatus.INITIATED
+    attempt_count: int = 1
+    max_retries: int = 3
+    last_error_category: Optional[str] = None
+    last_error_message: Optional[str] = None
+    confirmation_id: Optional[str] = None
+    screenshot_path: Optional[str] = None
+    idempotency_key: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
     def dict(self, *args, **kwargs):
         return self.model_dump(*args, **kwargs)
