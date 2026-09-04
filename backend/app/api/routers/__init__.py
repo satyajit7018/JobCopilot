@@ -15,6 +15,9 @@ from app.api.routers.interview_router import router as interview_router
 from app.api.routers.negotiation_router import router as negotiation_router
 from app.api.routers.billing_router import router as billing_router
 from app.api.routers.backup_router import router as backup_router
+from app.api.routers.admin_router import router as admin_router
+from app.api.routers.org_router import router as org_router
+from app.api.routers.account_router import router as account_router
 
 all_routers = [
     auth_router,
@@ -29,6 +32,9 @@ all_routers = [
     negotiation_router,
     billing_router,
     backup_router,
+    admin_router,
+    org_router,
+    account_router,
 ]
 
 __all__ = [
@@ -44,5 +50,9 @@ __all__ = [
     "negotiation_router",
     "billing_router",
     "backup_router",
+    "admin_router",
+    "org_router",
+    "account_router",
     "all_routers",
 ]
+

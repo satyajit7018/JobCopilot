@@ -36,7 +36,8 @@ from app.core.mailer import mailer
 from app.core.models import (
     User, UserRole, UserRegisterRequest, UserLoginRequest,
     RefreshTokenRequest, TokenResponse, UserResponse,
-    VerifyEmailRequest, RequestPasswordResetRequest, ResetPasswordRequest
+    VerifyEmailRequest, RequestPasswordResetRequest, ResetPasswordRequest,
+    Membership, OrgRole
 )
 from app.core.database import db
 
@@ -258,7 +259,69 @@ async def get_current_user(
     user = db.get_user_by_id(user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account not found or disabled.")
+    
+    # Attach impersonation metadata if token was issued via admin impersonation
+    if payload.get("impersonated_by"):
+        setattr(user, "impersonated_by", payload.get("impersonated_by"))
+
     return user
+
+
+async def require_admin(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Requires the authenticated user to hold the ADMIN role."""
+    role_str = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    if role_str != "ADMIN" and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required for this resource."
+        )
+    return current_user
+
+
+async def get_current_org_membership(
+    org_id: str,
+    current_user: User = Depends(get_current_user)
+) -> Membership:
+    """Verifies that the authenticated user is an active member of the specified organization."""
+    membership = db.get_membership(org_id, current_user.user_id)
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this organization."
+        )
+    return membership
+
+
+async def require_org_admin(
+    org_id: str,
+    current_user: User = Depends(get_current_user)
+) -> Membership:
+    """Requires the authenticated user to be an OWNER or ADMIN of the specified organization."""
+    membership = await get_current_org_membership(org_id, current_user)
+    role_val = membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
+    if role_val not in ["OWNER", "ADMIN"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization administrator privileges required."
+        )
+    return membership
+
+
+async def require_org_owner(
+    org_id: str,
+    current_user: User = Depends(get_current_user)
+) -> Membership:
+    """Requires the authenticated user to be the OWNER of the specified organization."""
+    membership = await get_current_org_membership(org_id, current_user)
+    role_val = membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
+    if role_val != "OWNER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organization owner privileges required."
+        )
+    return membership
 
 
 # =========================================================================

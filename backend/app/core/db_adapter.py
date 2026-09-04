@@ -8,7 +8,8 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Optional, Any
 from app.core.models import (
     User, CandidateProfile, VaultEntry, JobListing,
-    HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint
+    HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint,
+    Organization, Membership, AdminAuditLog
 )
 
 
@@ -99,8 +100,75 @@ class DatabaseAdapter(ABC):
     def list_user_apply_ledger(self, user_id: str, limit: int = 50, offset: int = 0, status: Optional[str] = None) -> List[Any]:
         return []
 
+    # SaaS Organization & Membership Methods (with safe base defaults)
+    def create_organization(self, org: Organization) -> bool:
+        return True
+
+    def get_organization(self, org_id: str) -> Optional[Organization]:
+        return None
+
+    def get_organization_by_slug(self, slug: str) -> Optional[Organization]:
+        return None
+
+    def list_user_organizations(self, user_id: str) -> List[Dict[str, Any]]:
+        return []
+
+    def update_organization(self, org_id: str, name: Optional[str] = None, plan_tier: Optional[str] = None) -> bool:
+        return True
+
+    def add_membership(self, membership: Membership) -> bool:
+        return True
+
+    def get_membership(self, org_id: str, user_id: str) -> Optional[Membership]:
+        return None
+
+    def list_org_members(self, org_id: str) -> List[Dict[str, Any]]:
+        return []
+
+    def remove_membership(self, org_id: str, user_id: str) -> bool:
+        return True
+
+    def update_member_role(self, org_id: str, user_id: str, role: str) -> bool:
+        return True
+
+    # Admin Panel & Audit Logging Methods
+    def log_admin_action(self, log_entry: AdminAuditLog) -> bool:
+        return True
+
+    def list_admin_audit_logs(self, limit: int = 50, offset: int = 0) -> List[AdminAuditLog]:
+        return []
+
+    def list_all_users(self, limit: int = 50, offset: int = 0, search: Optional[str] = None) -> List[Dict[str, Any]]:
+        return []
+
+    def count_all_users(self, search: Optional[str] = None) -> int:
+        return 0
+
+    def list_all_organizations(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        return []
+
+    def count_all_organizations(self) -> int:
+        return 0
+
+    def get_admin_system_metrics(self) -> Dict[str, Any]:
+        return {
+            "total_users": 0,
+            "total_jobs": 0,
+            "total_applications": 0,
+            "active_subscriptions": {"FREE": 0, "PRO": 0, "ELITE": 0, "ADMIN": 0},
+            "total_organizations": 0
+        }
+
+    # GDPR Data Portability & Erasure
+    def export_user_data(self, user_id: str) -> Dict[str, Any]:
+        return {"user_id": user_id}
+
+    def hard_delete_user_account(self, user_id: str) -> bool:
+        return True
+
 
 def get_db_adapter() -> DatabaseAdapter:
     """Factory function returning SQLite or PostgreSQL adapter based on DB_MODE."""
     from app.core.database import db
     return db
+

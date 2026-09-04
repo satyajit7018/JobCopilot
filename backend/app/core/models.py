@@ -139,6 +139,7 @@ class User(BaseModel):
     role: UserRole = UserRole.FREE
     is_active: bool = True
     email_verified: bool = False
+    impersonated_by: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
@@ -354,3 +355,131 @@ class JobCheckpoint(BaseModel):
 
     def dict(self, *args, **kwargs):
         return self.model_dump(*args, **kwargs)
+
+
+class OrgRole(str, Enum):
+    OWNER = "OWNER"
+    ADMIN = "ADMIN"
+    MEMBER = "MEMBER"
+
+
+class Organization(BaseModel):
+    org_id: str
+    name: str
+    slug: str
+    owner_id: str
+    plan_tier: str = "FREE"
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class Membership(BaseModel):
+    membership_id: str
+    org_id: str
+    user_id: str
+    role: OrgRole = OrgRole.MEMBER
+    invited_by: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class AdminAuditLog(BaseModel):
+    log_id: str
+    admin_id: str
+    action: str
+    target_user_id: Optional[str] = None
+    target_org_id: Optional[str] = None
+    ip_address: Optional[str] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class CreateOrgRequest(BaseModel):
+    name: str
+    slug: Optional[str] = None
+
+
+class UpdateOrgRequest(BaseModel):
+    name: Optional[str] = None
+    plan_tier: Optional[str] = None
+
+
+class InviteMemberRequest(BaseModel):
+    email: str
+    role: OrgRole = OrgRole.MEMBER
+
+
+class UpdateMemberRoleRequest(BaseModel):
+    role: OrgRole
+
+
+class OrgResponse(BaseModel):
+    org_id: str
+    name: str
+    slug: str
+    owner_id: str
+    plan_tier: str = "FREE"
+    created_at: str
+    role: Optional[str] = None
+
+
+class MemberResponse(BaseModel):
+    membership_id: str
+    org_id: str
+    user_id: str
+    email: str
+    full_name: str
+    role: str
+    created_at: str
+
+
+class AdminUserListResponse(BaseModel):
+    users: List[Dict[str, Any]]
+    total: int
+    limit: int
+    offset: int
+
+
+class AdminOrgListResponse(BaseModel):
+    orgs: List[Dict[str, Any]]
+    total: int
+    limit: int
+    offset: int
+
+
+class AdminStatsResponse(BaseModel):
+    total_users: int
+    total_jobs: int
+    total_applications: int
+    active_subscriptions: Dict[str, int]
+    total_organizations: int
+
+
+class AdminImpersonateResponse(BaseModel):
+    access_token: str
+    impersonated_user_id: str
+    impersonated_email: str
+    admin_id: str
+    token_type: str = "bearer"
+
+
+class AccountExportResponse(BaseModel):
+    user_id: str
+    email: str
+    exported_at: str
+    data: Dict[str, Any]
+
+
+class DeleteAccountRequest(BaseModel):
+    confirm_email: str
+    password: Optional[str] = None
+

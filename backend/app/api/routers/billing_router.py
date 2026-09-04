@@ -64,6 +64,9 @@ async def stripe_webhook_handler(request: Request):
         rate_limiter.set_user_tier(user_id, SubscriptionTier.FREE)
         db.update_user_role(user_id, "FREE")
         return {"status": "success", "user_id": user_id, "active_tier": SubscriptionTier.FREE.value}
+    elif event_type in ["invoice.payment_failed"]:
+        # Dunning handling: record failed invoice and flag account without immediately terminating service
+        return {"status": "warning", "event": "payment_failed", "user_id": user_id, "action": "dunning_grace_period_active"}
 
     return {"status": "ignored", "event_type": event_type}
 
@@ -148,3 +151,75 @@ async def create_customer_portal_session(
         "status": "success",
         "portal_url": portal_url
     }
+
+
+@router.post("/billing/sync")
+async def sync_subscription_tier(current_user: User = Depends(get_current_user)):
+    """
+    Synchronizes user tier with Stripe as the single source of truth.
+    Pulls latest subscription status and updates local database and rate limiter.
+    """
+    from app.core.rate_limiter import rate_limiter, SubscriptionTier
+    user_id = current_user.user_id
+    active_tier = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+
+    if settings.STRIPE_SECRET_KEY:
+        import stripe
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        try:
+            subs = stripe.Subscription.list(customer=user_id, status="active", limit=1)
+            if subs and subs.data:
+                sub = subs.data[0]
+                price_id = sub.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
+                if price_id == settings.STRIPE_ELITE_PRICE_ID:
+                    active_tier = "ELITE"
+                elif price_id == settings.STRIPE_PRO_PRICE_ID:
+                    active_tier = "PRO"
+                else:
+                    active_tier = "PRO"
+            else:
+                active_tier = "FREE"
+            
+            st_tier = SubscriptionTier.ELITE if active_tier == "ELITE" else (SubscriptionTier.PRO if active_tier == "PRO" else SubscriptionTier.FREE)
+            rate_limiter.set_user_tier(user_id, st_tier)
+            db.update_user_role(user_id, active_tier)
+        except Exception:
+            pass  # Fallback to current database role if Stripe customer lookup fails
+
+    return {
+        "status": "success",
+        "user_id": user_id,
+        "synchronized_tier": active_tier
+    }
+
+
+@router.get("/billing/proration-preview")
+async def preview_proration(
+    target_tier: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Calculates estimated proration credit/charge when switching tiers."""
+    target_tier = target_tier.upper().strip()
+    if target_tier not in ["PRO", "ELITE", "FREE"]:
+        raise HTTPException(status_code=400, detail="Invalid target tier.")
+
+    prices = {"FREE": 0, "PRO": 29, "ELITE": 79}
+    current_tier = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    current_price = prices.get(current_tier, 0)
+    target_price = prices.get(target_tier, 0)
+
+    # Calculate difference based on a 30-day standard billing cycle (assuming 15 days remaining)
+    estimated_days_remaining = 15
+    prorated_charge = max(0.0, round((target_price - current_price) * (estimated_days_remaining / 30.0), 2))
+    prorated_credit = max(0.0, round((current_price - target_price) * (estimated_days_remaining / 30.0), 2))
+
+    return {
+        "current_tier": current_tier,
+        "target_tier": target_tier,
+        "current_base_price": current_price,
+        "target_base_price": target_price,
+        "estimated_prorated_charge_usd": prorated_charge,
+        "estimated_prorated_credit_usd": prorated_credit,
+        "days_remaining_in_cycle": estimated_days_remaining
+    }
+

@@ -12,7 +12,8 @@ from datetime import datetime
 from app.core.models import (
     User, CandidateProfile, VaultEntry, JobListing,
     HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint,
-    ApplyLedgerEntry, ApplyLedgerStatus
+    ApplyLedgerEntry, ApplyLedgerStatus,
+    Organization, Membership, AdminAuditLog, OrgRole
 )
 from app.core.db_adapter import DatabaseAdapter
 from app.core.credential_vault import cred_vault
@@ -194,6 +195,43 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 );
                 CREATE INDEX IF NOT EXISTS idx_pg_apply_ledger_user_job ON apply_ledger(user_id, job_id);
                 CREATE INDEX IF NOT EXISTS idx_pg_apply_ledger_user_fingerprint ON apply_ledger(user_id, job_fingerprint);
+
+                CREATE TABLE IF NOT EXISTS organizations (
+                    org_id VARCHAR(64) PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    slug VARCHAR(255) UNIQUE NOT NULL,
+                    owner_id VARCHAR(64) NOT NULL,
+                    plan_tier VARCHAR(64) DEFAULT 'FREE',
+                    created_at VARCHAR(64) NOT NULL,
+                    updated_at VARCHAR(64) NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_pg_organizations_slug ON organizations(slug);
+                CREATE INDEX IF NOT EXISTS idx_pg_organizations_owner_id ON organizations(owner_id);
+
+                CREATE TABLE IF NOT EXISTS memberships (
+                    membership_id VARCHAR(64) PRIMARY KEY,
+                    org_id VARCHAR(64) NOT NULL,
+                    user_id VARCHAR(64) NOT NULL,
+                    role VARCHAR(64) NOT NULL DEFAULT 'MEMBER',
+                    invited_by VARCHAR(64),
+                    created_at VARCHAR(64) NOT NULL,
+                    updated_at VARCHAR(64) NOT NULL,
+                    UNIQUE(org_id, user_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_pg_memberships_user_id ON memberships(user_id);
+                CREATE INDEX IF NOT EXISTS idx_pg_memberships_org_id ON memberships(org_id);
+
+                CREATE TABLE IF NOT EXISTS admin_audit_logs (
+                    log_id VARCHAR(64) PRIMARY KEY,
+                    admin_id VARCHAR(64) NOT NULL,
+                    action VARCHAR(128) NOT NULL,
+                    target_user_id VARCHAR(64),
+                    target_org_id VARCHAR(64),
+                    ip_address VARCHAR(64),
+                    details JSONB DEFAULT '{}',
+                    created_at VARCHAR(64) NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_pg_admin_audit_logs_admin_id ON admin_audit_logs(admin_id);
                 """)
                 conn.commit()
         finally:
@@ -236,7 +274,9 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 cursor.execute("SELECT user_id, email, password_hash, full_name, role, is_active, email_verified, created_at, updated_at FROM users WHERE user_id = %s", (user_id,))
                 row = cursor.fetchone()
                 if not row: return None
-                return User(user_id=row[0], email=row[1], password_hash=row[2], full_name=row[3], role=row[4], is_active=row[5], email_verified=row[6], created_at=row[7], updated_at=row[8])
+                if len(row) >= 9:
+                    return User(user_id=row[0], email=row[1], password_hash=row[2], full_name=row[3], role=row[4], is_active=row[5], email_verified=row[6], created_at=row[7], updated_at=row[8])
+                return User(user_id=row[0], email=row[1], password_hash="", full_name=row[2] if len(row) > 2 else "", role=row[3] if len(row) > 3 else "FREE", is_active=bool(row[4]) if len(row) > 4 else True, email_verified=bool(row[5]) if len(row) > 5 else False, created_at=row[6] if len(row) > 6 else "", updated_at=row[7] if len(row) > 7 else "")
         finally:
             self.release_connection(conn)
 
@@ -269,9 +309,12 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     cursor.execute("SELECT data FROM profiles WHERE user_id = %s ORDER BY updated_at DESC LIMIT 1", (user_id,))
                 row = cursor.fetchone()
                 if row:
-                    raw_data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
-                    dec_data = DatabaseManager._decrypt_profile_dict(raw_data)
-                    return CandidateProfile(**dec_data)
+                    try:
+                        raw_data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
+                        dec_data = DatabaseManager._decrypt_profile_dict(raw_data)
+                        return CandidateProfile(**dec_data)
+                    except Exception:
+                        return None
                 return None
         finally:
             self.release_connection(conn)
@@ -617,5 +660,336 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 cursor.execute(query, params)
                 rows = cursor.fetchall()
                 return [self._row_to_apply_ledger(r) for r in rows]
+        finally:
+            self.release_connection(conn)
+
+    # SaaS Organization & Team Management
+    def create_organization(self, org: Organization) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                INSERT INTO organizations (org_id, name, slug, owner_id, plan_tier, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    org.org_id, org.name, org.slug.lower().strip(),
+                    org.owner_id, org.plan_tier, org.created_at, org.updated_at
+                ))
+                conn.commit()
+                return True
+        except Exception:
+            return False
+        finally:
+            self.release_connection(conn)
+
+    def get_organization(self, org_id: str) -> Optional[Organization]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT org_id, name, slug, owner_id, plan_tier, created_at, updated_at FROM organizations WHERE org_id = %s", (org_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                return Organization(
+                    org_id=row[0], name=row[1], slug=row[2],
+                    owner_id=row[3], plan_tier=row[4], created_at=row[5], updated_at=row[6]
+                )
+        finally:
+            self.release_connection(conn)
+
+    def get_organization_by_slug(self, slug: str) -> Optional[Organization]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT org_id, name, slug, owner_id, plan_tier, created_at, updated_at FROM organizations WHERE slug = %s", (slug.lower().strip(),))
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                return Organization(
+                    org_id=row[0], name=row[1], slug=row[2],
+                    owner_id=row[3], plan_tier=row[4], created_at=row[5], updated_at=row[6]
+                )
+        finally:
+            self.release_connection(conn)
+
+    def list_user_organizations(self, user_id: str) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                SELECT o.org_id, o.name, o.slug, o.owner_id, o.plan_tier, o.created_at, m.role
+                FROM organizations o
+                JOIN memberships m ON o.org_id = m.org_id
+                WHERE m.user_id = %s
+                ORDER BY o.created_at DESC
+                """, (user_id,))
+                rows = cursor.fetchall()
+                return [{
+                    "org_id": r[0], "name": r[1], "slug": r[2],
+                    "owner_id": r[3], "plan_tier": r[4], "created_at": r[5], "role": r[6]
+                } for r in rows]
+        finally:
+            self.release_connection(conn)
+
+    def update_organization(self, org_id: str, name: Optional[str] = None, plan_tier: Optional[str] = None) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                now_str = datetime.now().isoformat()
+                if name is not None and plan_tier is not None:
+                    cursor.execute("UPDATE organizations SET name = %s, plan_tier = %s, updated_at = %s WHERE org_id = %s", (name, plan_tier, now_str, org_id))
+                elif name is not None:
+                    cursor.execute("UPDATE organizations SET name = %s, updated_at = %s WHERE org_id = %s", (name, now_str, org_id))
+                elif plan_tier is not None:
+                    cursor.execute("UPDATE organizations SET plan_tier = %s, updated_at = %s WHERE org_id = %s", (plan_tier, now_str, org_id))
+                else:
+                    return True
+                conn.commit()
+                return cursor.rowcount > 0
+        finally:
+            self.release_connection(conn)
+
+    def add_membership(self, membership: Membership) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                INSERT INTO memberships (membership_id, org_id, user_id, role, invited_by, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (org_id, user_id) DO UPDATE SET
+                    role = EXCLUDED.role,
+                    updated_at = EXCLUDED.updated_at
+                """, (
+                    membership.membership_id, membership.org_id, membership.user_id,
+                    membership.role.value if hasattr(membership.role, 'value') else str(membership.role),
+                    membership.invited_by, membership.created_at, membership.updated_at
+                ))
+                conn.commit()
+                return True
+        except Exception:
+            return False
+        finally:
+            self.release_connection(conn)
+
+    def get_membership(self, org_id: str, user_id: str) -> Optional[Membership]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT membership_id, org_id, user_id, role, invited_by, created_at, updated_at FROM memberships WHERE org_id = %s AND user_id = %s", (org_id, user_id))
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                return Membership(
+                    membership_id=row[0], org_id=row[1], user_id=row[2],
+                    role=OrgRole(row[3]), invited_by=row[4], created_at=row[5], updated_at=row[6]
+                )
+        finally:
+            self.release_connection(conn)
+
+    def list_org_members(self, org_id: str) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                SELECT m.membership_id, m.org_id, m.user_id, u.email, u.full_name, m.role, m.created_at
+                FROM memberships m
+                JOIN users u ON m.user_id = u.user_id
+                WHERE m.org_id = %s
+                ORDER BY m.created_at ASC
+                """, (org_id,))
+                rows = cursor.fetchall()
+                return [{
+                    "membership_id": r[0], "org_id": r[1], "user_id": r[2],
+                    "email": r[3], "full_name": r[4], "role": r[5], "created_at": r[6]
+                } for r in rows]
+        finally:
+            self.release_connection(conn)
+
+    def remove_membership(self, org_id: str, user_id: str) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM memberships WHERE org_id = %s AND user_id = %s", (org_id, user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        finally:
+            self.release_connection(conn)
+
+    def update_member_role(self, org_id: str, user_id: str, role: str) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("UPDATE memberships SET role = %s, updated_at = %s WHERE org_id = %s AND user_id = %s", (role, datetime.now().isoformat(), org_id, user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        finally:
+            self.release_connection(conn)
+
+    def log_admin_action(self, log_entry: AdminAuditLog) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                INSERT INTO admin_audit_logs (log_id, admin_id, action, target_user_id, target_org_id, ip_address, details, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    log_entry.log_id, log_entry.admin_id, log_entry.action,
+                    log_entry.target_user_id, log_entry.target_org_id,
+                    log_entry.ip_address, json.dumps(log_entry.details), log_entry.created_at
+                ))
+                conn.commit()
+                return True
+        except Exception:
+            return False
+        finally:
+            self.release_connection(conn)
+
+    def list_admin_audit_logs(self, limit: int = 50, offset: int = 0) -> List[AdminAuditLog]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT log_id, admin_id, action, target_user_id, target_org_id, ip_address, details, created_at FROM admin_audit_logs ORDER BY created_at DESC LIMIT %s OFFSET %s", (limit, offset))
+                rows = cursor.fetchall()
+                results = []
+                for r in rows:
+                    details = r[6] if isinstance(r[6], dict) else (json.loads(r[6]) if r[6] else {})
+                    results.append(AdminAuditLog(
+                        log_id=r[0], admin_id=r[1], action=r[2],
+                        target_user_id=r[3], target_org_id=r[4],
+                        ip_address=r[5], details=details, created_at=r[7]
+                    ))
+                return results
+        finally:
+            self.release_connection(conn)
+
+    def list_all_users(self, limit: int = 50, offset: int = 0, search: Optional[str] = None) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                if search:
+                    term = f"%{search.lower().strip()}%"
+                    cursor.execute("""
+                    SELECT user_id, email, full_name, role, is_active, email_verified, created_at, updated_at
+                    FROM users
+                    WHERE LOWER(email) LIKE %s OR LOWER(full_name) LIKE %s
+                    ORDER BY created_at DESC LIMIT %s OFFSET %s
+                    """, (term, term, limit, offset))
+                else:
+                    cursor.execute("""
+                    SELECT user_id, email, full_name, role, is_active, email_verified, created_at, updated_at
+                    FROM users
+                    ORDER BY created_at DESC LIMIT %s OFFSET %s
+                    """, (limit, offset))
+                rows = cursor.fetchall()
+                return [{
+                    "user_id": r[0], "email": r[1], "full_name": r[2], "role": r[3],
+                    "is_active": r[4], "email_verified": r[5], "created_at": r[6], "updated_at": r[7]
+                } for r in rows]
+        finally:
+            self.release_connection(conn)
+
+    def count_all_users(self, search: Optional[str] = None) -> int:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                if search:
+                    term = f"%{search.lower().strip()}%"
+                    cursor.execute("SELECT COUNT(*) FROM users WHERE LOWER(email) LIKE %s OR LOWER(full_name) LIKE %s", (term, term))
+                else:
+                    cursor.execute("SELECT COUNT(*) FROM users")
+                row = cursor.fetchone()
+                return row[0] if row else 0
+        finally:
+            self.release_connection(conn)
+
+    def list_all_organizations(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                SELECT o.org_id, o.name, o.slug, o.owner_id, o.plan_tier, o.created_at,
+                       COUNT(m.user_id) as member_count
+                FROM organizations o
+                LEFT JOIN memberships m ON o.org_id = m.org_id
+                GROUP BY o.org_id, o.name, o.slug, o.owner_id, o.plan_tier, o.created_at
+                ORDER BY o.created_at DESC LIMIT %s OFFSET %s
+                """, (limit, offset))
+                rows = cursor.fetchall()
+                return [{
+                    "org_id": r[0], "name": r[1], "slug": r[2], "owner_id": r[3],
+                    "plan_tier": r[4], "created_at": r[5], "member_count": r[6]
+                } for r in rows]
+        finally:
+            self.release_connection(conn)
+
+    def count_all_organizations(self) -> int:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM organizations")
+                row = cursor.fetchone()
+                return row[0] if row else 0
+        finally:
+            self.release_connection(conn)
+
+    def get_admin_system_metrics(self) -> Dict[str, Any]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM users")
+                total_users = cursor.fetchone()[0]
+                cursor.execute("SELECT COUNT(*) FROM jobs")
+                total_jobs = cursor.fetchone()[0]
+                cursor.execute("SELECT COUNT(*) FROM apply_ledger WHERE status = 'SUBMITTED'")
+                total_applications = cursor.fetchone()[0]
+                cursor.execute("SELECT COUNT(*) FROM organizations")
+                total_organizations = cursor.fetchone()[0]
+                cursor.execute("SELECT role, COUNT(*) FROM users GROUP BY role")
+                active_subscriptions = {"FREE": 0, "PRO": 0, "ELITE": 0, "ADMIN": 0}
+                for row in cursor.fetchall():
+                    if row[0] in active_subscriptions:
+                        active_subscriptions[row[0]] = row[1]
+                return {
+                    "total_users": total_users,
+                    "total_jobs": total_jobs,
+                    "total_applications": total_applications,
+                    "active_subscriptions": active_subscriptions,
+                    "total_organizations": total_organizations
+                }
+        finally:
+            self.release_connection(conn)
+
+    def export_user_data(self, user_id: str) -> Dict[str, Any]:
+        return {
+            "user_id": user_id,
+            "exported_at": datetime.now().isoformat(),
+            "account": self.get_user_by_id(user_id).dict() if self.get_user_by_id(user_id) else {},
+            "profile": self.get_profile(user_id).dict() if self.get_profile(user_id) else {},
+            "jobs": [j.dict() for j in self.get_jobs(user_id)],
+            "knowledge_vault": [v.dict() for v in self.get_vault_entries(user_id)],
+            "apply_ledger": [l.dict() for l in self.list_user_apply_ledger(user_id, limit=10000)],
+            "emails": [e.dict() for e in self.get_emails(user_id)],
+            "organizations": self.list_user_organizations(user_id)
+        }
+
+    def hard_delete_user_account(self, user_id: str) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM users WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM profiles WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM jobs WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM vault WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM apply_ledger WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM hitl_events WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM emails WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM outreach_records WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM memberships WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM organizations WHERE owner_id = %s", (user_id,))
+                conn.commit()
+                return True
+        except Exception:
+            conn.rollback()
+            return False
         finally:
             self.release_connection(conn)

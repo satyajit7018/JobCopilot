@@ -44,7 +44,10 @@ from app.api.routers.negotiation_router import (
 )
 from app.api.routers.billing_router import CheckoutRequest, CustomerPortalRequest
 from app.api.routers.backup_router import RestoreBackupPayload
-from app.core.models import ApplyLedgerEntry, ApplyLedgerStatus
+from app.core.models import (
+    ApplyLedgerEntry, ApplyLedgerStatus,
+    Organization, Membership, AdminAuditLog, OrgRole
+)
 
 # Backwards compatibility routers
 public_router = APIRouter()
@@ -88,6 +91,10 @@ __all__ = [
     "RestoreBackupPayload",
     "ApplyLedgerEntry",
     "ApplyLedgerStatus",
+    "Organization",
+    "Membership",
+    "AdminAuditLog",
+    "OrgRole",
     "auth_router",
     "profile_router",
     "vault_router",
@@ -100,4 +107,8 @@ __all__ = [
     "negotiation_router",
     "billing_router",
     "backup_router",
+    "admin_router",
+    "org_router",
+    "account_router",
 ]
+

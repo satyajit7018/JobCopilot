@@ -16,7 +16,8 @@ from app.core.postgres_adapter import PostgresDatabaseAdapter
 from app.core.models import (
     User, CandidateProfile, VaultEntry, JobListing,
     HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, OutreachChannel, EmailIntent,
-    ApplyLedgerEntry, ApplyLedgerStatus
+    ApplyLedgerEntry, ApplyLedgerStatus,
+    Organization, Membership, AdminAuditLog, OrgRole
 )
 from app.core.interview_studio import InterviewStudioEngine
 from app.core.credential_vault import cred_vault
@@ -202,6 +203,73 @@ def test_postgres_adapter_mocked():
         ]
         ledgers = adapter.list_user_apply_ledger("usr_pg_1", limit=10, offset=0, status="SUBMITTED")
         assert len(ledgers) == 1
+
+        # 10. Organizations & Memberships (PostgreSQL)
+        org = Organization(org_id="org_pg_1", name="Acme PG", slug="acme-pg", owner_id="usr_pg_1", plan_tier="PRO")
+        adapter.create_organization(org)
+        mock_cursor.fetchone.return_value = ("org_pg_1", "Acme PG", "acme-pg", "usr_pg_1", "PRO", "2026-09-01", "2026-09-01")
+        ret_org = adapter.get_organization("org_pg_1")
+        assert ret_org is not None
+        assert ret_org.name == "Acme PG"
+
+        ret_org_slug = adapter.get_organization_by_slug("acme-pg")
+        assert ret_org_slug is not None
+
+        mock_cursor.fetchall.return_value = [("org_pg_1", "Acme PG", "acme-pg", "usr_pg_1", "PRO", "2026-09-01", "OWNER")]
+        user_orgs = adapter.list_user_organizations("usr_pg_1")
+        assert len(user_orgs) == 1
+
+        adapter.update_organization("org_pg_1", name="Acme PG Global", plan_tier="ELITE")
+
+        # Memberships
+        mem = Membership(membership_id="mem_pg_1", org_id="org_pg_1", user_id="usr_pg_1", role=OrgRole.OWNER)
+        adapter.add_membership(mem)
+        mock_cursor.fetchone.return_value = ("mem_pg_1", "org_pg_1", "usr_pg_1", "OWNER", None, "2026-09-01", "2026-09-01")
+        ret_mem = adapter.get_membership("org_pg_1", "usr_pg_1")
+        assert ret_mem is not None
+        assert ret_mem.role == OrgRole.OWNER
+
+        mock_cursor.fetchall.return_value = [("mem_pg_1", "org_pg_1", "usr_pg_1", "pg@test.com", "PG User", "OWNER", "2026-09-01")]
+        members = adapter.list_org_members("org_pg_1")
+        assert len(members) == 1
+
+        adapter.update_member_role("org_pg_1", "usr_pg_1", "ADMIN")
+        adapter.remove_membership("org_pg_1", "usr_pg_1")
+
+        # 11. Admin Audit & Metrics
+        audit = AdminAuditLog(log_id="log_pg_1", admin_id="usr_pg_1", action="TEST_ACTION")
+        adapter.log_admin_action(audit)
+        mock_cursor.fetchall.return_value = [("log_pg_1", "usr_pg_1", "TEST_ACTION", None, None, None, "{}", "2026-09-01")]
+        logs = adapter.list_admin_audit_logs(limit=10, offset=0)
+        assert len(logs) == 1
+
+        mock_cursor.fetchall.return_value = [("usr_pg_1", "pg@test.com", "PG User", "ADMIN", True, True, "2026-09-01", "2026-09-01")]
+        all_users = adapter.list_all_users(limit=10, offset=0, search="pg")
+        assert len(all_users) == 1
+
+        mock_cursor.fetchone.return_value = (5,)
+        assert adapter.count_all_users() == 5
+        assert adapter.count_all_organizations() == 5
+
+        mock_cursor.fetchall.return_value = [("org_pg_1", "Acme PG", "acme-pg", "usr_pg_1", "PRO", "2026-09-01", 1)]
+        all_orgs = adapter.list_all_organizations()
+        assert len(all_orgs) == 1
+
+        mock_cursor.fetchone.side_effect = [(10,), (25,), (15,), (3,)]
+        mock_cursor.fetchall.return_value = [("PRO", 5), ("FREE", 5)]
+        pg_metrics = adapter.get_admin_system_metrics()
+        assert pg_metrics["total_users"] == 10
+
+        # 12. GDPR Export & Delete (PostgreSQL)
+        mock_cursor.fetchone.side_effect = None
+        mock_cursor.fetchone.return_value = ("usr_pg_1", "pg@test.com", "hash_pw", "PG User", "PRO", True, True, "2026-09-01", "2026-09-01")
+        mock_cursor.fetchall.return_value = []
+        export_data = adapter.export_user_data("usr_pg_1")
+        assert export_data["user_id"] == "usr_pg_1"
+
+        del_success = adapter.hard_delete_user_account("usr_pg_1")
+        assert del_success is True
+
 
 
 def test_credential_vault_methods():

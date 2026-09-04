@@ -34,6 +34,10 @@ from app.api.endpoints import (
     CheckoutRequest,
     CustomerPortalRequest,
     RestoreBackupPayload,
+    Organization,
+    Membership,
+    AdminAuditLog,
+    OrgRole,
 )
 from app.api.routers import (
     auth_router,
@@ -48,13 +52,16 @@ from app.api.routers import (
     negotiation_router,
     billing_router,
     backup_router,
+    admin_router,
+    org_router,
+    account_router,
     all_routers,
 )
 
 
 def test_all_domain_routers_exported_and_valid():
-    """Validates that all 12 domain routers are distinct APIRouter instances."""
-    assert len(all_routers) == 12
+    """Validates that all domain routers are distinct APIRouter instances."""
+    assert len(all_routers) == 15
     for r in all_routers:
         assert isinstance(r, APIRouter)
 
@@ -83,6 +90,10 @@ def test_backwards_compatible_model_exports():
     assert CheckoutRequest is not None
     assert CustomerPortalRequest is not None
     assert RestoreBackupPayload is not None
+    assert Organization is not None
+    assert Membership is not None
+    assert AdminAuditLog is not None
+    assert OrgRole is not None
     assert isinstance(ws_manager, MultiTenantWebSocketGateway)
 
 
@@ -157,6 +168,23 @@ def test_route_topology_coverage(client: TestClient):
         "/api/billing/plan",
         "/api/billing/checkout",
         "/api/billing/portal",
+        "/api/billing/sync",
+        "/api/billing/proration-preview",
+        # Admin Router
+        "/api/admin/users",
+        "/api/admin/orgs",
+        "/api/admin/metrics",
+        "/api/admin/impersonate/{user_id}",
+        "/api/admin/audit-logs",
+        "/api/admin/users/{user_id}/role",
+        # Org Router
+        "/api/orgs",
+        "/api/orgs/{org_id}",
+        "/api/orgs/{org_id}/members",
+        "/api/orgs/{org_id}/members/{user_id}",
+        # Account Router
+        "/api/account/export",
+        "/api/account",
         # Backup Router
         "/api/backup/export",
         "/api/backup/restore",

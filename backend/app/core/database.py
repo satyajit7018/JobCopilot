@@ -14,7 +14,8 @@ from app.core.config import DB_PATH
 from app.core.models import (
     User, CandidateProfile, VaultEntry, JobListing, HITLEvent,
     ApplicationStatus, OutreachRecord, OutreachChannel, EmailMessage, JobCheckpoint,
-    ApplyLedgerEntry, ApplyLedgerStatus
+    ApplyLedgerEntry, ApplyLedgerStatus,
+    Organization, Membership, AdminAuditLog, OrgRole
 )
 from app.core.db_adapter import DatabaseAdapter
 from app.core.credential_vault import cred_vault
@@ -475,6 +476,53 @@ class DatabaseManager(DatabaseAdapter):
                 self._ensure_columns(conn, "users", {
                     "email_verified": "INTEGER DEFAULT 0"
                 })
+
+                # 14. Organizations Table (SaaS Multi-Tenancy)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS organizations (
+                    org_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    slug TEXT UNIQUE NOT NULL,
+                    owner_id TEXT NOT NULL,
+                    plan_tier TEXT DEFAULT 'FREE',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_organizations_slug ON organizations(slug);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_organizations_owner_id ON organizations(owner_id);")
+
+                # 15. Memberships Table (Org Roles & RBAC)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS memberships (
+                    membership_id TEXT PRIMARY KEY,
+                    org_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'MEMBER',
+                    invited_by TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(org_id, user_id)
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_memberships_user_id ON memberships(user_id);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_memberships_org_id ON memberships(org_id);")
+
+                # 16. Admin Audit Logs Table (Admin Security & Impersonation Tracking)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS admin_audit_logs (
+                    log_id TEXT PRIMARY KEY,
+                    admin_id TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    target_user_id TEXT,
+                    target_org_id TEXT,
+                    ip_address TEXT,
+                    details JSON NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_admin_id ON admin_audit_logs(admin_id);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_action ON admin_audit_logs(action);")
 
                 conn.commit()
 
@@ -1410,6 +1458,390 @@ class DatabaseManager(DatabaseAdapter):
                 "recruiter_responses": recruiter_responses,
                 "response_rate_percent": round(response_rate, 2)
             }
+
+    # =========================================================================
+    # SaaS Organization & Team Management
+    # =========================================================================
+    def create_organization(self, org: Organization) -> bool:
+        """Creates a new organization."""
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                    INSERT INTO organizations (org_id, name, slug, owner_id, plan_tier, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        org.org_id,
+                        org.name,
+                        org.slug.lower().strip(),
+                        org.owner_id,
+                        org.plan_tier,
+                        org.created_at,
+                        org.updated_at
+                    ))
+                    conn.commit()
+                    return True
+                except Exception:
+                    return False
+
+    def get_organization(self, org_id: str) -> Optional[Organization]:
+        """Retrieves an organization by its unique org_id."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM organizations WHERE org_id = ?", (org_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return Organization(
+                org_id=row["org_id"],
+                name=row["name"],
+                slug=row["slug"],
+                owner_id=row["owner_id"],
+                plan_tier=row["plan_tier"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"]
+            )
+
+    def get_organization_by_slug(self, slug: str) -> Optional[Organization]:
+        """Retrieves an organization by its slug."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM organizations WHERE slug = ?", (slug.lower().strip(),))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return Organization(
+                org_id=row["org_id"],
+                name=row["name"],
+                slug=row["slug"],
+                owner_id=row["owner_id"],
+                plan_tier=row["plan_tier"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"]
+            )
+
+    def list_user_organizations(self, user_id: str) -> List[Dict[str, Any]]:
+        """Lists all organizations a user belongs to, including their membership role."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT o.org_id, o.name, o.slug, o.owner_id, o.plan_tier, o.created_at, m.role
+            FROM organizations o
+            JOIN memberships m ON o.org_id = m.org_id
+            WHERE m.user_id = ?
+            ORDER BY o.created_at DESC
+            """, (user_id,))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def update_organization(self, org_id: str, name: Optional[str] = None, plan_tier: Optional[str] = None) -> bool:
+        """Updates organization name or plan tier."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                now_str = datetime.now().isoformat()
+                if name is not None and plan_tier is not None:
+                    cursor.execute("UPDATE organizations SET name = ?, plan_tier = ?, updated_at = ? WHERE org_id = ?", (name, plan_tier, now_str, org_id))
+                elif name is not None:
+                    cursor.execute("UPDATE organizations SET name = ?, updated_at = ? WHERE org_id = ?", (name, now_str, org_id))
+                elif plan_tier is not None:
+                    cursor.execute("UPDATE organizations SET plan_tier = ?, updated_at = ? WHERE org_id = ?", (plan_tier, now_str, org_id))
+                else:
+                    return True
+                conn.commit()
+                return cursor.rowcount > 0
+
+    # =========================================================================
+    # Organization Memberships & RBAC
+    # =========================================================================
+    def add_membership(self, membership: Membership) -> bool:
+        """Adds or updates a user's membership in an organization."""
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                    INSERT INTO memberships (membership_id, org_id, user_id, role, invited_by, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(org_id, user_id) DO UPDATE SET
+                        role = excluded.role,
+                        updated_at = excluded.updated_at
+                    """, (
+                        membership.membership_id,
+                        membership.org_id,
+                        membership.user_id,
+                        membership.role.value if hasattr(membership.role, 'value') else str(membership.role),
+                        membership.invited_by,
+                        membership.created_at,
+                        membership.updated_at
+                    ))
+                    conn.commit()
+                    return True
+                except Exception:
+                    return False
+
+    def get_membership(self, org_id: str, user_id: str) -> Optional[Membership]:
+        """Gets membership details for a user in an organization."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM memberships WHERE org_id = ? AND user_id = ?", (org_id, user_id))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return Membership(
+                membership_id=row["membership_id"],
+                org_id=row["org_id"],
+                user_id=row["user_id"],
+                role=OrgRole(row["role"]),
+                invited_by=row["invited_by"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"]
+            )
+
+    def list_org_members(self, org_id: str) -> List[Dict[str, Any]]:
+        """Lists all members of an organization with profile and role details."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT m.membership_id, m.org_id, m.user_id, u.email, u.full_name, m.role, m.created_at
+            FROM memberships m
+            JOIN users u ON m.user_id = u.user_id
+            WHERE m.org_id = ?
+            ORDER BY m.created_at ASC
+            """, (org_id,))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def remove_membership(self, org_id: str, user_id: str) -> bool:
+        """Removes a user's membership from an organization."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM memberships WHERE org_id = ? AND user_id = ?", (org_id, user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+
+    def update_member_role(self, org_id: str, user_id: str, role: str) -> bool:
+        """Updates a user's role within an organization."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                UPDATE memberships SET role = ?, updated_at = ?
+                WHERE org_id = ? AND user_id = ?
+                """, (role, datetime.now().isoformat(), org_id, user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+
+    # =========================================================================
+    # Admin Panel, Metrics & Impersonation Audit
+    # =========================================================================
+    def log_admin_action(self, log_entry: AdminAuditLog) -> bool:
+        """Records an admin action or impersonation event to the audit log."""
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                    INSERT INTO admin_audit_logs (log_id, admin_id, action, target_user_id, target_org_id, ip_address, details, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        log_entry.log_id,
+                        log_entry.admin_id,
+                        log_entry.action,
+                        log_entry.target_user_id,
+                        log_entry.target_org_id,
+                        log_entry.ip_address,
+                        json.dumps(log_entry.details),
+                        log_entry.created_at
+                    ))
+                    conn.commit()
+                    return True
+                except Exception:
+                    return False
+
+    def list_admin_audit_logs(self, limit: int = 50, offset: int = 0) -> List[AdminAuditLog]:
+        """Retrieves paginated audit log entries."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT * FROM admin_audit_logs
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """, (limit, offset))
+            results = []
+            for r in cursor.fetchall():
+                results.append(AdminAuditLog(
+                    log_id=r["log_id"],
+                    admin_id=r["admin_id"],
+                    action=r["action"],
+                    target_user_id=r["target_user_id"],
+                    target_org_id=r["target_org_id"],
+                    ip_address=r["ip_address"],
+                    details=json.loads(r["details"]) if r["details"] else {},
+                    created_at=r["created_at"]
+                ))
+            return results
+
+    def list_all_users(self, limit: int = 50, offset: int = 0, search: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Lists users for the admin panel with optional search by email or name."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if search:
+                term = f"%{search.lower().strip()}%"
+                cursor.execute("""
+                SELECT user_id, email, full_name, role, is_active, email_verified, created_at, updated_at
+                FROM users
+                WHERE LOWER(email) LIKE ? OR LOWER(full_name) LIKE ?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """, (term, term, limit, offset))
+            else:
+                cursor.execute("""
+                SELECT user_id, email, full_name, role, is_active, email_verified, created_at, updated_at
+                FROM users
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """, (limit, offset))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def count_all_users(self, search: Optional[str] = None) -> int:
+        """Counts total users matching optional search criteria."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if search:
+                term = f"%{search.lower().strip()}%"
+                cursor.execute("SELECT COUNT(*) as total FROM users WHERE LOWER(email) LIKE ? OR LOWER(full_name) LIKE ?", (term, term))
+            else:
+                cursor.execute("SELECT COUNT(*) as total FROM users")
+            return cursor.fetchone()["total"]
+
+    def list_all_organizations(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """Lists all organizations with member counts."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT o.org_id, o.name, o.slug, o.owner_id, o.plan_tier, o.created_at,
+                   COUNT(m.user_id) as member_count
+            FROM organizations o
+            LEFT JOIN memberships m ON o.org_id = m.org_id
+            GROUP BY o.org_id
+            ORDER BY o.created_at DESC
+            LIMIT ? OFFSET ?
+            """, (limit, offset))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def count_all_organizations(self) -> int:
+        """Counts total organizations."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as total FROM organizations")
+            return cursor.fetchone()["total"]
+
+    def get_admin_system_metrics(self) -> Dict[str, Any]:
+        """Calculates global SaaS platform metrics for admin dashboard."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) as c FROM users")
+            total_users = cursor.fetchone()["c"]
+
+            cursor.execute("SELECT COUNT(*) as c FROM jobs")
+            total_jobs = cursor.fetchone()["c"]
+
+            cursor.execute("SELECT COUNT(*) as c FROM apply_ledger WHERE status = 'SUBMITTED'")
+            total_applications = cursor.fetchone()["c"]
+
+            cursor.execute("SELECT COUNT(*) as c FROM organizations")
+            total_organizations = cursor.fetchone()["c"]
+
+            cursor.execute("SELECT role, COUNT(*) as c FROM users GROUP BY role")
+            active_subscriptions = {"FREE": 0, "PRO": 0, "ELITE": 0, "ADMIN": 0}
+            for row in cursor.fetchall():
+                role_val = row["role"]
+                if role_val in active_subscriptions:
+                    active_subscriptions[role_val] = row["c"]
+
+            return {
+                "total_users": total_users,
+                "total_jobs": total_jobs,
+                "total_applications": total_applications,
+                "active_subscriptions": active_subscriptions,
+                "total_organizations": total_organizations
+            }
+
+    # =========================================================================
+    # GDPR Data Portability & Erasure
+    # =========================================================================
+    def export_user_data(self, user_id: str) -> Dict[str, Any]:
+        """Generates comprehensive GDPR Article 20 data portability export bundle."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id, email, full_name, role, is_active, email_verified, created_at, updated_at FROM users WHERE user_id = ?", (user_id,))
+            user_row = cursor.fetchone()
+            user_info = dict(user_row) if user_row else {}
+
+            profile = self.get_profile(user_id)
+            profile_dict = profile.dict() if profile else {}
+
+            jobs = [j.dict() for j in self.get_jobs(user_id)]
+            vault_entries = [v.dict() for v in self.get_vault_entries(user_id)]
+            ledger_entries = [l.dict() for l in self.list_user_apply_ledger(user_id, limit=10000)]
+
+            cursor.execute("SELECT * FROM hitl_events WHERE user_id = ?", (user_id,))
+            hitl_events = [dict(r) for r in cursor.fetchall()]
+
+            emails = [e.dict() for e in self.get_emails(user_id)]
+
+            cursor.execute("SELECT * FROM outreach_records WHERE user_id = ?", (user_id,))
+            outreach_records = [dict(r) for r in cursor.fetchall()]
+
+            orgs = self.list_user_organizations(user_id)
+
+            return {
+                "user_id": user_id,
+                "exported_at": datetime.now().isoformat(),
+                "account": user_info,
+                "profile": profile_dict,
+                "jobs": jobs,
+                "knowledge_vault": vault_entries,
+                "apply_ledger": ledger_entries,
+                "hitl_events": hitl_events,
+                "emails": emails,
+                "outreach_records": outreach_records,
+                "organizations": orgs
+            }
+
+    def hard_delete_user_account(self, user_id: str) -> bool:
+        """Executes full GDPR Article 17 hard erasure across all tenant-scoped tables and disk storage."""
+        import shutil
+        from app.core.config import settings
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM profiles WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM jobs WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM vault WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM apply_ledger WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM hitl_events WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM emails WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM outreach_records WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM user_daily_usage WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM memberships WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM organizations WHERE owner_id = ?", (user_id,))
+                    conn.commit()
+
+                    try:
+                        user_storage = Path(settings.BASE_DIR) / "storage" / "users" / user_id
+                        if user_storage.exists() and user_storage.is_dir():
+                            shutil.rmtree(user_storage, ignore_errors=True)
+                    except Exception:
+                        pass
+
+                    return True
+                except Exception:
+                    conn.rollback()
+                    return False
 
 
 db = DatabaseManager()
