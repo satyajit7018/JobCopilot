@@ -22,7 +22,7 @@
 
   <!-- Mobile Top Header Bar for Phones -->
   <header class="mobile-top-bar">
-    <div class="mobile-top-left" onclick="window.switchTab('onboarding')">
+    <div class="mobile-top-left" data-action="switchTab" data-tab="onboarding">
       <div class="mobile-logo-icon">⚡</div>
       <div>
         <div class="mobile-brand-title">JobCopilot</div>
@@ -30,10 +30,10 @@
       </div>
     </div>
     <div class="mobile-top-right">
-      <button class="btn-mobile-install" id="btn-mobile-top-install" onclick="window.openInstallModal()">
+      <button class="btn-mobile-install" id="btn-mobile-top-install" data-action="openInstallModal">
         <span>📱 Install App</span>
       </button>
-      <button class="btn-mobile-drawer" id="btn-mobile-menu" onclick="window.toggleMobileDrawer()" aria-label="Open Menu">
+      <button class="btn-mobile-drawer" id="btn-mobile-menu" data-action="toggleMobileDrawer" aria-label="Open Menu">
         <span>☰</span>
       </button>
     </div>
@@ -132,7 +132,7 @@
     <!-- Topbar Header & Live Telemetry HUD Trigger -->
     <header class="cockpit-topbar">
       <div class="topbar-left">
-        <div class="cmd-k-trigger" onclick="window.toggleCmdPalette()">
+        <div class="cmd-k-trigger" data-action="toggleCmdPalette">
           <span>🔍 Quick Search or Action</span>
           <span class="cmd-k-badge">⌘K</span>
         </div>
@@ -140,7 +140,7 @@
 
       <div class="topbar-right">
         <!-- Held Applications Alert Badge (Step 6 & 7) -->
-        <button class="hud-pill" id="held-apps-trigger" onclick="window.openHeldAppsModal()" style="display: none; background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.5); color: #fbbf24; cursor: pointer;">
+        <button class="hud-pill" id="held-apps-trigger" data-action="openHeldAppsModal" style="display: none; background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.5); color: #fbbf24; cursor: pointer;">
           <span class="hud-dot" style="background: #f59e0b;"></span>
           <span id="held-apps-count">⏸️ 0 Held Applications</span>
         </button>
@@ -160,7 +160,7 @@
           <span id="ws-status-text">Sync: Connected</span>
         </div>
 
-        <button class="btn btn-primary btn-sm" onclick="triggerDiscoveryCycle()">
+        <button class="btn btn-primary btn-sm" data-action="triggerDiscoveryCycle">
           <span>▶ Run 0-Day Discovery</span>
         </button>
       </div>
@@ -285,7 +285,7 @@
 
             <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; background: rgba(10, 14, 24, 0.6); padding: 1.25rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
               <div style="display: flex; gap: 1rem; align-items: center;">
-                <button type="button" class="btn btn-secondary" id="btn-google-sso" onclick="window.triggerGoogleSSO()" style="background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); font-weight: 600;">
+                <button type="button" class="btn btn-secondary" id="btn-google-sso" data-action="triggerGoogleSSO" style="background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); font-weight: 600;">
                   <span style="font-size: 16px;">🌐</span>
                   <span>Sign in with Google</span>
                 </button>
@@ -341,7 +341,7 @@
                 <p style="color: var(--text-secondary); font-size: 13px; margin-top: 2px;">Pre-fills standard application form questions. You can complete these now or skip and fill later.</p>
               </div>
               <div style="display: flex; gap: 8px;">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="window.skipQuestionnaire()" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
+                <button type="button" class="btn btn-secondary btn-sm" data-action="skipQuestionnaire" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
                   <span>⏭️ Skip &amp; Fill Later</span>
                 </button>
                 <span class="hud-pill" style="color: var(--accent-emerald); border-color: rgba(16, 185, 129, 0.3);">
@@ -481,7 +481,7 @@
               <div style="display: flex; justify-content: space-between; margin-top: 1.5rem;">
                 <button type="button" class="btn btn-secondary" id="btn-back-step-1">➔ Back to Resume</button>
                 <div style="display: flex; gap: 0.75rem;">
-                  <button type="button" class="btn btn-secondary" onclick="window.skipQuestionnaire()" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
+                  <button type="button" class="btn btn-secondary" data-action="skipQuestionnaire" style="border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
                     <span>⏭️ Skip &amp; Fill Later</span>
                   </button>
                   <button type="submit" class="btn btn-primary" id="btn-save-questionnaire">
@@ -510,14 +510,14 @@
             <div style="margin-bottom: 1.5rem;">
               <label class="form-label" style="margin-bottom: 0.75rem;">Select Target Roles (Choose one or multiple):</label>
               <div class="role-selector-grid" id="role-selector-grid" style="display: flex; flex-wrap: wrap; gap: 8px;">
-                <button type="button" class="role-pill active" data-role="Backend Engineer" onclick="window.toggleTargetRole(this)">⚡ Backend Engineer</button>
-                <button type="button" class="role-pill active" data-role="Full Stack Engineer" onclick="window.toggleTargetRole(this)">🌐 Full Stack Engineer</button>
-                <button type="button" class="role-pill" data-role="AI/ML Engineer" onclick="window.toggleTargetRole(this)">🤖 AI/ML Engineer</button>
-                <button type="button" class="role-pill" data-role="DevOps / Cloud Engineer" onclick="window.toggleTargetRole(this)">☁️ DevOps / Cloud</button>
-                <button type="button" class="role-pill" data-role="Frontend Engineer" onclick="window.toggleTargetRole(this)">🎨 Frontend Engineer</button>
-                <button type="button" class="role-pill" data-role="Data Platform Engineer" onclick="window.toggleTargetRole(this)">📊 Data Platform</button>
-                <button type="button" class="role-pill" data-role="Mobile (iOS/Android)" onclick="window.toggleTargetRole(this)">📱 Mobile Engineer</button>
-                <button type="button" class="role-pill" data-role="Engineering Manager" onclick="window.toggleTargetRole(this)">👑 Engineering Manager</button>
+                <button type="button" class="role-pill active" data-role="Backend Engineer" data-action="toggleTargetRole">⚡ Backend Engineer</button>
+                <button type="button" class="role-pill active" data-role="Full Stack Engineer" data-action="toggleTargetRole">🌐 Full Stack Engineer</button>
+                <button type="button" class="role-pill" data-role="AI/ML Engineer" data-action="toggleTargetRole">🤖 AI/ML Engineer</button>
+                <button type="button" class="role-pill" data-role="DevOps / Cloud Engineer" data-action="toggleTargetRole">☁️ DevOps / Cloud</button>
+                <button type="button" class="role-pill" data-role="Frontend Engineer" data-action="toggleTargetRole">🎨 Frontend Engineer</button>
+                <button type="button" class="role-pill" data-role="Data Platform Engineer" data-action="toggleTargetRole">📊 Data Platform</button>
+                <button type="button" class="role-pill" data-role="Mobile (iOS/Android)" data-action="toggleTargetRole">📱 Mobile Engineer</button>
+                <button type="button" class="role-pill" data-role="Engineering Manager" data-action="toggleTargetRole">👑 Engineering Manager</button>
               </div>
             </div>
 
@@ -527,8 +527,8 @@
             </div>
 
             <div style="display: flex; justify-content: space-between;">
-              <button type="button" class="btn btn-secondary" onclick="window.backToStep2()">➔ Back to Form</button>
-              <button type="button" class="btn btn-primary" onclick="window.proceedToStep4()">
+              <button type="button" class="btn btn-secondary" data-action="backToStep2">➔ Back to Form</button>
+              <button type="button" class="btn btn-primary" data-action="proceedToStep4">
                 <span>Confirm Tailored Resumes &amp; Launch</span> ➔
               </button>
             </div>
@@ -544,8 +544,8 @@
               Your profile is verified, tailored resume variants are compiled, and 0-day feeds are synchronized. Ready to launch autonomous hunting.
             </p>
             <div style="display: flex; gap: 1rem; justify-content: center;">
-              <button class="btn btn-primary" onclick="window.switchTab('pipeline')">🎯 Open 0-Day Pipeline</button>
-              <button class="btn btn-secondary" onclick="window.switchTab('vault')">🧠 Inspect Knowledge Vault</button>
+              <button class="btn btn-primary" data-action="switchTab" data-tab="pipeline">🎯 Open 0-Day Pipeline</button>
+              <button class="btn btn-secondary" data-action="switchTab" data-tab="vault">🧠 Inspect Knowledge Vault</button>
             </div>
           </div>
         </div>
@@ -560,10 +560,10 @@
             <p class="view-subtitle">High-frequency parallel ingestion from Greenhouse, Lever, Ashby, Y Combinator, and HackerNews.</p>
           </div>
           <div style="display: flex; gap: 0.75rem;">
-            <button class="btn btn-secondary" onclick="window.openLogCallModal()">
+            <button class="btn btn-secondary" data-action="openLogCallModal">
               <span>📞 + Log Direct Recruiter Call</span>
             </button>
-            <button class="btn btn-cyan" onclick="triggerDiscoveryCycle()">
+            <button class="btn btn-cyan" data-action="triggerDiscoveryCycle">
               <span>⚡ Fetch 0-Day Openings</span>
             </button>
           </div>
@@ -576,35 +576,35 @@
           </div>
 
           <div class="filter-pills">
-            <button class="filter-pill active" data-filter="ALL" onclick="filterPipeline('ALL', this)">All Roles</button>
-            <button class="filter-pill" data-filter="HIGH_MATCH" onclick="filterPipeline('HIGH_MATCH', this)">🔥 80%+ Match</button>
-            <button class="filter-pill" data-filter="NAUKRI" onclick="filterPipeline('NAUKRI', this)">🇮🇳 Naukri</button>
-            <button class="filter-pill" data-filter="INSTAHYRE" onclick="filterPipeline('INSTAHYRE', this)">⚡ Instahyre</button>
-            <button class="filter-pill" data-filter="CUVETTE" onclick="filterPipeline('CUVETTE', this)">🚀 Cuvette</button>
-            <button class="filter-pill" data-filter="CUTSHORT" onclick="filterPipeline('CUTSHORT', this)">🎯 Cutshort</button>
-            <button class="filter-pill" data-filter="GREENHOUSE" onclick="filterPipeline('GREENHOUSE', this)">Greenhouse</button>
-            <button class="filter-pill" data-filter="LEVER" onclick="filterPipeline('LEVER', this)">Lever</button>
-            <button class="filter-pill" data-filter="ASHBY" onclick="filterPipeline('ASHBY', this)">Ashby</button>
-            <button class="filter-pill" data-filter="YC" onclick="filterPipeline('YC', this)">YC Startups</button>
+            <button class="filter-pill active" data-filter="ALL" data-action="filterPipeline">All Roles</button>
+            <button class="filter-pill" data-filter="HIGH_MATCH" data-action="filterPipeline">🔥 80%+ Match</button>
+            <button class="filter-pill" data-filter="NAUKRI" data-action="filterPipeline">🇮🇳 Naukri</button>
+            <button class="filter-pill" data-filter="INSTAHYRE" data-action="filterPipeline">⚡ Instahyre</button>
+            <button class="filter-pill" data-filter="CUVETTE" data-action="filterPipeline">🚀 Cuvette</button>
+            <button class="filter-pill" data-filter="CUTSHORT" data-action="filterPipeline">🎯 Cutshort</button>
+            <button class="filter-pill" data-filter="GREENHOUSE" data-action="filterPipeline">Greenhouse</button>
+            <button class="filter-pill" data-filter="LEVER" data-action="filterPipeline">Lever</button>
+            <button class="filter-pill" data-filter="ASHBY" data-action="filterPipeline">Ashby</button>
+            <button class="filter-pill" data-filter="YC" data-action="filterPipeline">YC Startups</button>
           </div>
         </div>
 
         <!-- Mobile Pipeline Stage Segment Filter -->
         <div class="mobile-pipeline-segments">
-          <button class="mob-segment active" data-stage="ALL" onclick="window.switchMobileKanbanStage('ALL', this)">All</button>
-          <button class="mob-segment" data-stage="DISCOVERED" onclick="window.switchMobileKanbanStage('DISCOVERED', this)">
+          <button class="mob-segment active" data-stage="ALL" data-action="switchMobileKanbanStage">All</button>
+          <button class="mob-segment" data-stage="DISCOVERED" data-action="switchMobileKanbanStage">
             Discovered <span class="mob-seg-count" id="mob-seg-count-discovered">0</span>
           </button>
-          <button class="mob-segment" data-stage="QUEUED" onclick="window.switchMobileKanbanStage('QUEUED', this)">
+          <button class="mob-segment" data-stage="QUEUED" data-action="switchMobileKanbanStage">
             Queued <span class="mob-seg-count" id="mob-seg-count-queued">0</span>
           </button>
-          <button class="mob-segment" data-stage="SUBMITTED" onclick="window.switchMobileKanbanStage('SUBMITTED', this)">
+          <button class="mob-segment" data-stage="SUBMITTED" data-action="switchMobileKanbanStage">
             Applied <span class="mob-seg-count" id="mob-seg-count-submitted">0</span>
           </button>
-          <button class="mob-segment" data-stage="INTERVIEW" onclick="window.switchMobileKanbanStage('INTERVIEW', this)">
+          <button class="mob-segment" data-stage="INTERVIEW" data-action="switchMobileKanbanStage">
             Interview <span class="mob-seg-count" id="mob-seg-count-interview">0</span>
           </button>
-          <button class="mob-segment" data-stage="OFFER" onclick="window.switchMobileKanbanStage('OFFER', this)">
+          <button class="mob-segment" data-stage="OFFER" data-action="switchMobileKanbanStage">
             Offers <span class="mob-seg-count" id="mob-seg-count-offer">0</span>
           </button>
         </div>
@@ -667,7 +667,7 @@
             <h1>Knowledge Vault &amp; Self-Learning Engine</h1>
             <p class="view-subtitle">Hybrid Reciprocal Rank Fusion (Dense Vector + BM25 Lexical) indexing all screening questions.</p>
           </div>
-          <button class="btn btn-secondary" onclick="window.openNewSlotModal()">
+          <button class="btn btn-secondary" data-action="openNewSlotModal">
             <span>+ Add Custom Q&amp;A Slot</span>
           </button>
         </div>
@@ -695,7 +695,7 @@
               <label class="form-label">Novel Recruiter Prompt</label>
               <textarea id="vault-test-prompt" class="form-textarea" rows="3" placeholder="e.g. Do you have experience building event-driven microservices?"></textarea>
             </div>
-            <button class="btn btn-primary" onclick="simulateVaultMatch()">
+            <button class="btn btn-primary" data-action="simulateVaultMatch">
               <span>⚡ Execute Hybrid Vector Match</span>
             </button>
             <div id="vault-test-result" style="margin-top: 1rem;"></div>
@@ -710,7 +710,7 @@
             <h1>Inbound Email Radar &amp; Calendar</h1>
             <p class="view-subtitle">Real-time IMAP IDLE push listener, 5-way intent classification, and automatic Google Meet extraction.</p>
           </div>
-          <button class="btn btn-cyan" onclick="syncEmailRadar()">
+          <button class="btn btn-cyan" data-action="syncEmailRadar">
             <span>🔄 Sync Inbound Messages</span>
           </button>
         </div>
@@ -735,13 +735,13 @@
 
         <!-- Category & Role Selector Pills -->
         <div class="filter-pills" style="margin-bottom: 1.25rem;">
-          <button class="filter-pill active" data-qcat="all" onclick="filterMockQuestions('all', this)">All Master Drills (12)</button>
-          <button class="filter-pill" data-qcat="Backend & Distributed Systems" onclick="filterMockQuestions('Backend & Distributed Systems', this)">⚙️ Backend &amp; Distributed (5)</button>
-          <button class="filter-pill" data-qcat="Frontend & Full-Stack" onclick="filterMockQuestions('Frontend & Full-Stack', this)">💻 Frontend &amp; Full-Stack (2)</button>
-          <button class="filter-pill" data-qcat="AI / ML & Data" onclick="filterMockQuestions('AI / ML & Data', this)">🤖 AI / ML &amp; Data (2)</button>
-          <button class="filter-pill" data-qcat="DevOps & SRE" onclick="filterMockQuestions('DevOps & SRE', this)">🛠️ DevOps &amp; SRE (1)</button>
-          <button class="filter-pill" data-qcat="Incident Response" onclick="filterMockQuestions('Incident Response', this)">🚨 Outages &amp; Incidents (1)</button>
-          <button class="filter-pill" data-qcat="STAR Leadership" onclick="filterMockQuestions('STAR Leadership', this)">💼 Executive STAR (2)</button>
+          <button class="filter-pill active" data-qcat="all" data-action="filterMockQuestions">All Master Drills (12)</button>
+          <button class="filter-pill" data-qcat="Backend & Distributed Systems" data-action="filterMockQuestions">⚙️ Backend &amp; Distributed (5)</button>
+          <button class="filter-pill" data-qcat="Frontend & Full-Stack" data-action="filterMockQuestions">💻 Frontend &amp; Full-Stack (2)</button>
+          <button class="filter-pill" data-qcat="AI / ML & Data" data-action="filterMockQuestions">🤖 AI / ML &amp; Data (2)</button>
+          <button class="filter-pill" data-qcat="DevOps & SRE" data-action="filterMockQuestions">🛠️ DevOps &amp; SRE (1)</button>
+          <button class="filter-pill" data-qcat="Incident Response" data-action="filterMockQuestions">🚨 Outages &amp; Incidents (1)</button>
+          <button class="filter-pill" data-qcat="STAR Leadership" data-action="filterMockQuestions">💼 Executive STAR (2)</button>
         </div>
 
         <!-- Studio Grid Layout -->
@@ -763,7 +763,7 @@
             <!-- Question Jump Selector -->
             <div class="form-group" style="margin-bottom: 10px;">
               <label class="form-label" style="font-size: 11.5px; color: var(--text-muted);">Jump to Interview Drill:</label>
-              <select id="mock-question-dropdown" class="form-input" onchange="selectMockQuestionById(this.value)" style="font-size: 12.5px; padding: 6px 10px; background: #0f172a;">
+              <select id="mock-question-dropdown" class="form-input" data-change-action="selectMockQuestionById" style="font-size: 12.5px; padding: 6px 10px; background: #0f172a;">
                 <!-- Populated dynamically via app.js -->
               </select>
             </div>
@@ -799,20 +799,20 @@
 
             <!-- Controls & Action Buttons -->
             <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap;">
-              <button class="btn btn-primary" id="btn-toggle-mic" onclick="toggleVoiceRecording()" style="flex: 1; min-width: 170px;">
+              <button class="btn btn-primary" id="btn-toggle-mic" data-action="toggleVoiceRecording" style="flex: 1; min-width: 170px;">
                 <span id="mic-btn-icon">🎙️</span>
                 <span id="mic-btn-label">Start Voice Answer</span>
               </button>
 
-              <button class="btn btn-secondary" onclick="cycleNextMockQuestion()" title="Next Question">
+              <button class="btn btn-secondary" data-action="cycleNextMockQuestion" title="Next Question">
                 <span>Next Drill ➡️</span>
               </button>
 
-              <button class="btn btn-secondary" onclick="loadInterviewSampleAnswer()" title="Load Sample Technical Answer">
+              <button class="btn btn-secondary" data-action="loadInterviewSampleAnswer" title="Load Sample Technical Answer">
                 <span>💡 Sample STAR</span>
               </button>
 
-              <button class="btn btn-secondary" onclick="window.openGlassBoothModal()" title="Launch Distraction-Free Full-Screen Studio" style="border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe;">
+              <button class="btn btn-secondary" data-action="openGlassBoothModal" title="Launch Distraction-Free Full-Screen Studio" style="border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe;">
                 <span>🪟 Glass Booth</span>
               </button>
             </div>
@@ -823,10 +823,10 @@
                 <label class="form-label" style="margin-bottom: 0;">Live Speech-to-Text Transcript (Auto-Streamed)</label>
                 <span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="transcript-word-count">0 words</span>
               </div>
-              <textarea id="mock-candidate-answer" class="form-textarea" rows="4" placeholder="Speak into your microphone or type your response here... As you speak, Web Speech API will continuously transcribe your words." oninput="updateWordCount()"></textarea>
+              <textarea id="mock-candidate-answer" class="form-textarea" rows="4" placeholder="Speak into your microphone or type your response here... As you speak, Web Speech API will continuously transcribe your words." data-input-action="updateWordCount"></textarea>
             </div>
 
-            <button class="btn btn-primary" style="width: 100%; background: linear-gradient(135deg, #10b981, #06b6d4);" onclick="submitAnswerForEvaluation()">
+            <button class="btn btn-primary" style="width: 100%; background: linear-gradient(135deg, #10b981, #06b6d4);" data-action="submitAnswerForEvaluation">
               <span>⚡ Evaluate STAR Response &amp; Key Concepts</span>
             </button>
           </div>
@@ -947,7 +947,7 @@
               <input type="text" id="mock-role-title" class="form-input" value="Senior Backend Engineer" placeholder="e.g. Senior Distributed Systems Engineer">
             </div>
           </div>
-          <button class="btn btn-secondary" onclick="loadInterviewQuestions()">
+          <button class="btn btn-secondary" data-action="loadInterviewQuestions">
             <span>⚡ Generate Architectural Dossier &amp; 4-Round Rubric</span>
           </button>
           <div id="interview-dossier-container" style="margin-top: 1.5rem;"></div>
@@ -960,7 +960,7 @@
               <span style="font-size: 18px;">💡</span>
               <h3 class="glass-card-title">Reverse-Interview Intelligence: Strategic Questions to Ask Hiring Manager</h3>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="fetchReverseInterviewQuestions()">
+            <button class="btn btn-secondary btn-sm" data-action="fetchReverseInterviewQuestions">
               <span>🔄 Generate 3 Strategic Questions</span>
             </button>
           </div>
@@ -990,7 +990,7 @@
               <input type="text" id="sleuth-interviewer-role" class="form-input" value="Principal Systems Architect (ex-Amazon Bar Raiser)" placeholder="e.g. Engineering Manager, Staff Architect">
             </div>
           </div>
-          <button class="btn btn-secondary" onclick="analyzeInterviewerSleuth()">
+          <button class="btn btn-secondary" data-action="analyzeInterviewerSleuth">
             <span>🔍 Analyze Persona &amp; Tech Biases</span>
           </button>
           <div id="sleuth-results-container" style="margin-top: 1rem;"></div>
@@ -1021,7 +1021,7 @@
               <input type="text" id="neg-role-title" class="form-input" value="Senior Software Engineer">
             </div>
           </div>
-          <button class="btn btn-primary" onclick="evaluateOfferCompensation()">
+          <button class="btn btn-primary" data-action="evaluateOfferCompensation">
             <span>Benchmark Compensation Offer</span>
           </button>
           <div id="negotiation-results-container" style="margin-top: 1.5rem;"></div>
@@ -1046,7 +1046,7 @@
               <input type="number" id="esop-valuation-usd" class="form-input" value="50000000">
             </div>
           </div>
-          <button class="btn btn-secondary" onclick="simulateEsopEquity()">
+          <button class="btn btn-secondary" data-action="simulateEsopEquity">
             <span>Calculate Exit Multipliers</span>
           </button>
           <div id="esop-results-container" style="margin-top: 1.25rem;"></div>
@@ -1059,7 +1059,7 @@
               <span style="font-size: 18px;">💰</span>
               <h3 class="glass-card-title">3. Side-by-Side Multi-Offer Comparison Matrix (4-Year TC Growth)</h3>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="runMultiOfferComparison()">
+            <button class="btn btn-primary btn-sm" data-action="runMultiOfferComparison">
               <span>⚡ Compare 4-Year TC</span>
             </button>
           </div>
@@ -1156,7 +1156,7 @@
               <input type="text" id="counter-target-terms" class="form-input" value="52 Base + 20/yr Equity">
             </div>
           </div>
-          <button class="btn btn-secondary" onclick="generateAdvancedCounterScript()">
+          <button class="btn btn-secondary" data-action="generateAdvancedCounterScript">
             <span>📝 Generate Executive Negotiation Package</span>
           </button>
           <div id="advanced-counter-script-results" style="margin-top: 1.25rem;"></div>
@@ -1207,7 +1207,7 @@
             <h1>Security &amp; Disaster Recovery</h1>
             <p class="view-subtitle">Local-first Argon2id key derivation and AES-256-GCM encrypted disaster recovery archives.</p>
           </div>
-          <button class="btn btn-primary" onclick="exportEncryptedBackup()">
+          <button class="btn btn-primary" data-action="exportEncryptedBackup">
             <span>Export Encrypted Archive (.jobcopilot.enc)</span>
           </button>
         </div>
@@ -1234,34 +1234,34 @@
     </main>
 
     <!-- ==================== COMMAND PALETTE (CMD + K) MODAL ==================== -->
-    <div class="cmd-palette-overlay" id="cmd-palette-overlay" onclick="if(event.target===this) window.toggleCmdPalette()">
+    <div class="cmd-palette-overlay" id="cmd-palette-overlay" data-action="closeCmdPaletteOverlay">
       <div class="cmd-palette-box">
         <div class="cmd-palette-input-wrap">
           <span style="font-size: 18px;">🔍</span>
           <input type="text" id="cmd-palette-input" class="cmd-palette-input" placeholder="Type a command or search (e.g. 'pipeline', 'discovery', 'export')...">
         </div>
         <div class="cmd-palette-list" id="cmd-palette-list">
-          <div class="cmd-item" onclick="window.switchTab('pipeline'); window.toggleCmdPalette();">
+          <div class="cmd-item" data-action="switchTab" data-tab="pipeline" data-close-palette="true">
             <span>🎯 Jump to 0-Day Job Pipeline</span>
             <span class="cmd-k-badge">P</span>
           </div>
-          <div class="cmd-item" onclick="triggerDiscoveryCycle(); window.toggleCmdPalette();">
+          <div class="cmd-item" data-action="triggerDiscoveryCycle" data-close-palette="true">
             <span>⚡ Run 0-Day Discovery Cycle</span>
             <span class="cmd-k-badge">D</span>
           </div>
-          <div class="cmd-item" onclick="window.switchTab('vault'); window.toggleCmdPalette();">
+          <div class="cmd-item" data-action="switchTab" data-tab="vault" data-close-palette="true">
             <span>🧠 Inspect Knowledge Vault Studio</span>
             <span class="cmd-k-badge">V</span>
           </div>
-          <div class="cmd-item" onclick="window.switchTab('interview'); window.toggleCmdPalette();">
+          <div class="cmd-item" data-action="switchTab" data-tab="interview" data-close-palette="true">
             <span>🎙️ Open Mock Interview Studio</span>
             <span class="cmd-k-badge">I</span>
           </div>
-          <div class="cmd-item" onclick="window.switchTab('negotiation'); window.toggleCmdPalette();">
+          <div class="cmd-item" data-action="switchTab" data-tab="negotiation" data-close-palette="true">
             <span>💎 Salary &amp; ESOP Modeler</span>
             <span class="cmd-k-badge">S</span>
           </div>
-          <div class="cmd-item" onclick="exportEncryptedBackup(); window.toggleCmdPalette();">
+          <div class="cmd-item" data-action="exportEncryptedBackup" data-close-palette="true">
             <span>🔒 Export Encrypted Backup Archive</span>
             <span class="cmd-k-badge">B</span>
           </div>
@@ -1274,7 +1274,7 @@
       <div class="modal-box" style="max-width: 620px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <h3 style="font-size: 16px; color: var(--accent-amber); font-weight: 700;">⏸️ Held Applications Queue</h3>
-          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('modal-held-applications').classList.remove('active')">✕</button>
+          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="modal-held-applications">✕</button>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 1.25rem;">
           These job applications were paused due to novel screening questions not yet indexed in your Knowledge Vault. Answering resumes submission immediately!
@@ -1290,9 +1290,9 @@
       <div class="modal-box" style="max-width: 540px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <h3 style="font-size: 16px; font-weight: 700;">📞 Log Direct Recruiter Call / Update</h3>
-          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('modal-log-call').classList.remove('active')">✕</button>
+          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="modal-log-call">✕</button>
         </div>
-        <form id="form-log-call" onsubmit="window.submitDirectCall(event)">
+        <form id="form-log-call" data-form-action="submitDirectCall">
           <div class="form-group">
             <label class="form-label">Company Name</label>
             <input type="text" id="call-company" class="form-input" placeholder="e.g. Anthropic" required>
@@ -1358,15 +1358,15 @@
       <div class="modal-box" style="max-width: 680px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <h3 style="font-size: 16px; font-weight: 700;" id="outreach-modal-title">Tailored Assets &amp; Triple-Threat Outreach</h3>
-          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('outreach-modal').classList.remove('active')">✕</button>
+          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="outreach-modal">✕</button>
         </div>
 
         <div style="display: flex; gap: 6px; margin-bottom: 1rem; flex-wrap: wrap;">
-          <button class="btn btn-secondary btn-sm active" id="modal-tab-cover" onclick="switchOutreachTab('cover')">Cover Letter</button>
-          <button class="btn btn-secondary btn-sm" id="modal-tab-li" onclick="switchOutreachTab('li')">LinkedIn (280c)</button>
-          <button class="btn btn-secondary btn-sm" id="modal-tab-email" onclick="switchOutreachTab('email')">Cold Email</button>
-          <button class="btn btn-secondary btn-sm" id="modal-tab-alumni" onclick="switchOutreachTab('alumni')">Alumni Referral (280c)</button>
-          <button class="btn btn-secondary btn-sm" id="modal-tab-nudge" onclick="switchOutreachTab('nudge')">5-Day Recruiter Nudge</button>
+          <button class="btn btn-secondary btn-sm active" id="modal-tab-cover" data-action="switchOutreachTab" data-target="cover">Cover Letter</button>
+          <button class="btn btn-secondary btn-sm" id="modal-tab-li" data-action="switchOutreachTab" data-target="li">LinkedIn (280c)</button>
+          <button class="btn btn-secondary btn-sm" id="modal-tab-email" data-action="switchOutreachTab" data-target="email">Cold Email</button>
+          <button class="btn btn-secondary btn-sm" id="modal-tab-alumni" data-action="switchOutreachTab" data-target="alumni">Alumni Referral (280c)</button>
+          <button class="btn btn-secondary btn-sm" id="modal-tab-nudge" data-action="switchOutreachTab" data-target="nudge">5-Day Recruiter Nudge</button>
         </div>
 
         <div id="modal-content-cover">
@@ -1387,7 +1387,7 @@
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem;">
           <span style="font-size: 12.5px; color: var(--accent-emerald); font-weight: 600;">✓ PDF Resume Compiled</span>
-          <button class="btn btn-primary btn-sm" id="btn-copy-active-outreach" onclick="copyActiveOutreach()">Copy Active Text</button>
+          <button class="btn btn-primary btn-sm" id="btn-copy-active-outreach" data-action="copyActiveOutreach">Copy Active Text</button>
         </div>
       </div>
     </div>
@@ -1403,7 +1403,7 @@
               <span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">INBOUND PIPELINE MATCH</span>
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="window.closeInterviewInviteModal()">✕</button>
+          <button class="btn btn-secondary btn-sm" data-action="closeInterviewInviteModal">✕</button>
         </div>
 
         <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.25rem;">
@@ -1420,7 +1420,7 @@
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 8px;">
-          <button class="btn btn-primary" id="btn-launch-tailored-interview" onclick="window.launchTailoredInterviewFromModal()" style="width: 100%; background: linear-gradient(135deg, #10b981, #06b6d4); font-size: 14px; padding: 10px 16px;">
+          <button class="btn btn-primary" id="btn-launch-tailored-interview" data-action="launchTailoredInterviewFromModal" style="width: 100%; background: linear-gradient(135deg, #10b981, #06b6d4); font-size: 14px; padding: 10px 16px;">
             <span>🎙️ Practice Tailored Mock Interview Now</span>
           </button>
           
@@ -1428,7 +1428,7 @@
             <a href="#" target="_blank" id="invite-modal-meeting-link" class="btn btn-secondary btn-sm" style="display: none; align-items: center; gap: 6px; color: #34d399; text-decoration: none;">
               <span>📹 Open Video Meeting</span>
             </a>
-            <button class="btn btn-secondary btn-sm" onclick="window.closeInterviewInviteModal()" style="margin-left: auto;">
+            <button class="btn btn-secondary btn-sm" data-action="closeInterviewInviteModal" style="margin-left: auto;">
               <span>Dismiss &amp; Practice Later</span>
             </button>
           </div>
@@ -1450,7 +1450,7 @@
         <div style="display: flex; align-items: center; gap: 12px;">
           <span id="booth-cadence-wpm" class="cadence-hud" style="color: var(--accent-cyan);">🟢 0 WPM</span>
           <span id="booth-filler-words" class="cadence-hud" style="color: #fbbf24;">⚠️ 0 Fillers</span>
-          <button class="btn btn-secondary btn-sm" onclick="window.closeGlassBoothModal()" style="font-weight: 700;">✕ Exit Booth (ESC)</button>
+          <button class="btn btn-secondary btn-sm" data-action="closeGlassBoothModal" style="font-weight: 700;">✕ Exit Booth (ESC)</button>
         </div>
       </div>
 
@@ -1478,13 +1478,13 @@
 
           <!-- Voice & Action Controls -->
           <div style="display: flex; gap: 10px;">
-            <button class="btn btn-primary" id="btn-booth-mic" onclick="toggleVoiceRecording()" style="flex: 1; padding: 10px 16px; font-size: 13.5px;">
+            <button class="btn btn-primary" id="btn-booth-mic" data-action="toggleVoiceRecording" style="flex: 1; padding: 10px 16px; font-size: 13.5px;">
               <span id="booth-mic-btn-label">🎙️ Start Voice Answer</span>
             </button>
-            <button class="btn btn-secondary" onclick="cycleNextMockQuestion()">
+            <button class="btn btn-secondary" data-action="cycleNextMockQuestion">
               <span>Next Drill ➡️</span>
             </button>
-            <button class="btn btn-secondary" onclick="loadInterviewSampleAnswer()">
+            <button class="btn btn-secondary" data-action="loadInterviewSampleAnswer">
               <span>💡 Sample STAR</span>
             </button>
           </div>
@@ -1492,10 +1492,10 @@
           <!-- Live Speech-to-Text Textarea -->
           <div class="form-group" style="flex: 1; display: flex; flex-direction: column; margin-bottom: 0;">
             <label class="form-label" style="font-size: 12px; color: var(--text-muted);">Real-Time Voice Transcript (Continuous Stream):</label>
-            <textarea id="booth-candidate-answer" class="form-textarea" style="flex: 1; min-height: 110px; font-size: 13.5px; line-height: 1.5;" placeholder="Your spoken words stream here live as you talk into your microphone..." oninput="window.syncBoothAnswer(this.value)"></textarea>
+            <textarea id="booth-candidate-answer" class="form-textarea" style="flex: 1; min-height: 110px; font-size: 13.5px; line-height: 1.5;" placeholder="Your spoken words stream here live as you talk into your microphone..." data-input-action="syncBoothAnswer"></textarea>
           </div>
 
-          <button class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #06b6d4); padding: 10px;" onclick="submitAnswerForEvaluation()">
+          <button class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #06b6d4); padding: 10px;" data-action="submitAnswerForEvaluation">
             <span>⚡ Evaluate STAR Response &amp; Key Concepts</span>
           </button>
         </div>
@@ -1548,7 +1548,7 @@
               <div style="font-size: 12px; color: var(--accent-cyan);">Fast PWA &amp; Standalone Mobile Experience</div>
             </div>
           </div>
-          <button class="btn-close" onclick="window.closeInstallModal()">✕</button>
+          <button class="btn-close" data-action="closeInstallModal">✕</button>
         </div>
 
         <div class="modal-body" style="padding: 1rem 0;">
@@ -1562,7 +1562,7 @@
                 <div style="font-size: 12px; color: var(--text-secondary);">Full-screen, offline-ready, instant push alerts</div>
               </div>
             </div>
-            <button class="btn btn-primary" id="btn-trigger-pwa-install" onclick="window.triggerNativePWAInstall()" style="margin-top: 1rem; width: 100%; justify-content: center; font-size: 14.5px; padding: 11px;">
+            <button class="btn btn-primary" id="btn-trigger-pwa-install" data-action="triggerNativePWAInstall" style="margin-top: 1rem; width: 100%; justify-content: center; font-size: 14.5px; padding: 11px;">
               <span>⚡ 1-Tap Install on Android</span>
             </button>
           </div>
@@ -1609,56 +1609,56 @@
         </div>
 
         <div class="modal-footer" style="display: flex; justify-content: flex-end;">
-          <button class="btn btn-secondary" onclick="window.closeInstallModal()">Close</button>
+          <button class="btn btn-secondary" data-action="closeInstallModal">Close</button>
         </div>
       </div>
     </div>
 
     <!-- Mobile Slide-Out Drawer Overlay & Panel -->
-    <div class="mobile-drawer-overlay" id="mobile-drawer-overlay" onclick="window.toggleMobileDrawer(false)"></div>
+    <div class="mobile-drawer-overlay" id="mobile-drawer-overlay" data-action="toggleMobileDrawer" data-drawer-state="false"></div>
     <aside class="mobile-drawer" id="mobile-drawer">
       <div class="mobile-drawer-header">
         <div style="display: flex; align-items: center; gap: 8px;">
           <div class="mobile-logo-icon">⚡</div>
           <span style="font-weight: 700; font-family: 'Outfit', sans-serif;">JobCopilot Menu</span>
         </div>
-        <button class="btn-drawer-close" onclick="window.toggleMobileDrawer(false)">✕</button>
+        <button class="btn-drawer-close" data-action="toggleMobileDrawer" data-drawer-state="false">✕</button>
       </div>
       <div class="mobile-drawer-body">
         <div class="mobile-drawer-section">
           <div class="drawer-section-title">Core Subsystems</div>
-          <button class="drawer-nav-item" onclick="window.switchTab('onboarding'); window.toggleMobileDrawer(false)">
+          <button class="drawer-nav-item" data-action="switchTab" data-tab="onboarding" data-close-drawer="true">
             <span>✨ Smart Onboarding</span>
           </button>
-          <button class="drawer-nav-item" onclick="window.switchTab('pipeline'); window.toggleMobileDrawer(false)">
+          <button class="drawer-nav-item" data-action="switchTab" data-tab="pipeline" data-close-drawer="true">
             <span>🎯 0-Day Pipeline</span>
           </button>
-          <button class="drawer-nav-item" onclick="window.switchTab('vault'); window.toggleMobileDrawer(false)">
+          <button class="drawer-nav-item" data-action="switchTab" data-tab="vault" data-close-drawer="true">
             <span>🧠 Knowledge Vault</span>
           </button>
-          <button class="drawer-nav-item" onclick="window.switchTab('email'); window.toggleMobileDrawer(false)">
+          <button class="drawer-nav-item" data-action="switchTab" data-tab="email" data-close-drawer="true">
             <span>📬 Email Radar</span>
           </button>
-          <button class="drawer-nav-item" onclick="window.switchTab('interview'); window.toggleMobileDrawer(false)">
+          <button class="drawer-nav-item" data-action="switchTab" data-tab="interview" data-close-drawer="true">
             <span>🎙️ Interview Studio</span>
           </button>
-          <button class="drawer-nav-item" onclick="window.switchTab('negotiation'); window.toggleMobileDrawer(false)">
+          <button class="drawer-nav-item" data-action="switchTab" data-tab="negotiation" data-close-drawer="true">
             <span>💰 Salary &amp; ESOP Modeler</span>
           </button>
-          <button class="drawer-nav-item" onclick="window.switchTab('bot'); window.toggleMobileDrawer(false)">
+          <button class="drawer-nav-item" data-action="switchTab" data-tab="bot" data-close-drawer="true">
             <span>⚡ Autonomous Bot Deck</span>
           </button>
-          <button class="drawer-nav-item" onclick="window.switchTab('settings'); window.toggleMobileDrawer(false)">
+          <button class="drawer-nav-item" data-action="switchTab" data-tab="settings" data-close-drawer="true">
             <span>🛡️ Security &amp; Disaster Recovery</span>
           </button>
         </div>
         
         <div class="mobile-drawer-section">
           <div class="drawer-section-title">Android App &amp; Settings</div>
-          <button class="drawer-nav-item highlight-btn" onclick="window.openInstallModal(); window.toggleMobileDrawer(false)">
+          <button class="drawer-nav-item highlight-btn" data-action="openInstallModal" data-close-drawer="true">
             <span>📱 Install Android App</span>
           </button>
-          <button class="drawer-nav-item" onclick="window.testMobileNotifications(); window.toggleMobileDrawer(false)">
+          <button class="drawer-nav-item" data-action="testMobileNotifications" data-close-drawer="true">
             <span>🔔 Enable Push Alerts</span>
           </button>
         </div>
@@ -1667,7 +1667,7 @@
           <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 0.5rem;" id="mob-user-email-display">
             Active Session
           </div>
-          <button class="btn btn-secondary btn-sm" style="width: 100%;" onclick="window.logoutUser()">
+          <button class="btn btn-secondary btn-sm" style="width: 100%;" data-action="logoutUser">
             <span>🚪 Sign Out</span>
           </button>
         </div>
@@ -1676,30 +1676,30 @@
 
     <!-- Mobile Floating Bottom Navigation Bar -->
     <nav class="mobile-bottom-nav">
-      <button class="mobile-nav-tab active" data-view="onboarding" onclick="window.switchTab('onboarding')">
+      <button class="mobile-nav-tab active" data-view="onboarding" data-action="switchTab" data-tab="onboarding">
         <span class="mobile-nav-icon">✨</span>
         <span class="mobile-nav-label">Home</span>
       </button>
-      <button class="mobile-nav-tab" data-view="pipeline" onclick="window.switchTab('pipeline')">
+      <button class="mobile-nav-tab" data-view="pipeline" data-action="switchTab" data-tab="pipeline">
         <span class="mobile-nav-icon">🎯</span>
         <span class="mobile-nav-label">Pipeline</span>
         <span class="mobile-nav-badge" id="mob-badge-pipeline" style="display: none;">0</span>
       </button>
-      <button class="mobile-nav-tab" data-view="vault" onclick="window.switchTab('vault')">
+      <button class="mobile-nav-tab" data-view="vault" data-action="switchTab" data-tab="vault">
         <span class="mobile-nav-icon">🧠</span>
         <span class="mobile-nav-label">Vault</span>
         <span class="mobile-nav-badge" id="mob-badge-vault">20+</span>
       </button>
-      <button class="mobile-nav-tab" data-view="email" onclick="window.switchTab('email')">
+      <button class="mobile-nav-tab" data-view="email" data-action="switchTab" data-tab="email">
         <span class="mobile-nav-icon">📬</span>
         <span class="mobile-nav-label">Radar</span>
         <span class="mobile-nav-badge" id="mob-badge-email" style="display: none;">0</span>
       </button>
-      <button class="mobile-nav-tab" data-view="interview" onclick="window.switchTab('interview')">
+      <button class="mobile-nav-tab" data-view="interview" data-action="switchTab" data-tab="interview">
         <span class="mobile-nav-icon">🎙️</span>
         <span class="mobile-nav-label">Studio</span>
       </button>
-      <button class="mobile-nav-tab" id="btn-mob-more" onclick="window.toggleMobileDrawer()">
+      <button class="mobile-nav-tab" id="btn-mob-more" data-action="toggleMobileDrawer">
         <span class="mobile-nav-icon">☰</span>
         <span class="mobile-nav-label">More</span>
       </button>

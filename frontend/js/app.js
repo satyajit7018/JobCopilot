@@ -1135,14 +1135,14 @@ function renderJobCardHTML(job) {
       ` : ''}
 
       ${job.status === 'INTERVIEW' ? `
-        <button class="btn btn-secondary btn-sm" onclick="window.launchTailoredInterviewForJob('${company.replace(/'/g, "\\'")}', '${title.replace(/'/g, "\\'")}')" style="margin-top: 8px; width: 100%; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.25)); border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe; font-size: 11.5px; padding: 6px 10px; justify-content: center;">
+        <button class="btn btn-secondary btn-sm" data-action="launchTailoredInterview" data-company="${company}" data-title="${title}" style="margin-top: 8px; width: 100%; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.25)); border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe; font-size: 11.5px; padding: 6px 10px; justify-content: center;">
           <span>🎙️ Practice Voice Mock Interview</span>
         </button>
       ` : ''}
 
       <div class="job-card-actions">
-        <button class="btn btn-primary btn-sm" onclick="applyToJob('${jobId}')" style="flex: 1.2;">⚡ Apply Now</button>
-        <button class="btn btn-secondary btn-sm" onclick="tailorJobAssets('${jobId}')" style="flex: 1;">🎯 Tailor</button>
+        <button class="btn btn-primary btn-sm" data-action="applyToJob" data-job-id="${jobId}" style="flex: 1.2;">⚡ Apply Now</button>
+        <button class="btn btn-secondary btn-sm" data-action="tailorJobAssets" data-job-id="${jobId}" style="flex: 1;">🎯 Tailor</button>
       </div>
     </div>
   `;
@@ -1276,7 +1276,7 @@ window.openHeldAppsModal = function() {
         <textarea id="held-ans-${escapeHTML(h.event_id || '')}" class="form-textarea" rows="2">${escapeHTML(h.ai_suggested_draft || '')}</textarea>
       </div>
       <div style="display: flex; justify-content: flex-end;">
-        <button class="btn btn-primary btn-sm" onclick="resolveHeldApplication('${escapeHTML(h.event_id || '')}')">
+        <button class="btn btn-primary btn-sm" data-action="resolveHeldApplication" data-event-id="${escapeHTML(h.event_id || '')}">
           ✓ Approve &amp; Submit Application
         </button>
       </div>
@@ -1349,6 +1349,31 @@ function renderVaultEntries(entries) {
     </div>
   `).join('');
 }
+
+window.openNewSlotModal = async function() {
+  const question = prompt('Enter the screening question pattern (e.g. "What is your expected notice period?"):');
+  if (!question || !question.trim()) return;
+  const answer = prompt('Enter your authoritative standard answer:');
+  if (!answer || !answer.trim()) return;
+
+  try {
+    const res = await authFetch(`${API_BASE}/vault/learn`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: question.trim(), answer: answer.trim() })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      showToast('Custom Q&A slot indexed in Knowledge Vault!', 'success');
+      window.playProceduralChime('success');
+      fetchVaultEntries();
+    } else {
+      showToast('Failed to index slot.', 'error');
+    }
+  } catch (err) {
+    showToast(`Error adding vault slot: ${err.message}`, 'error');
+  }
+};
 
 window.simulateVaultMatch = async function() {
   const prompt = els.vaultTestPrompt ? els.vaultTestPrompt.value.trim() : '';
@@ -2214,7 +2239,7 @@ window.generateAdvancedCounterScript = async function() {
       <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(0, 242, 254, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <strong style="color: var(--accent-cyan); font-size: 13.5px;">📧 Executive Counter-Offer Email:</strong>
-          <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('counter-email-box').value); showToast('Email copied to clipboard!', 'success'); window.playProceduralChime('tap');">Copy Email</button>
+          <button class="btn btn-secondary btn-sm" data-action="copyCounterEmail">Copy Email</button>
         </div>
         <textarea id="counter-email-box" class="form-textarea" rows="6" readonly style="font-size: 12.5px; margin-bottom: 12px;">${scripts.negotiation_email || ''}</textarea>
 
@@ -2226,6 +2251,90 @@ window.generateAdvancedCounterScript = async function() {
     window.playProceduralChime('success');
   } catch (e) {
     container.innerHTML = '<div style="color: var(--text-muted);">Failed to generate counter script.</div>';
+  }
+};
+
+window.evaluateOfferCompensation = async function() {
+  const baseSalary = parseFloat(document.getElementById('neg-base-salary')?.value || '35');
+  const company = document.getElementById('neg-company-name')?.value || 'Target Company';
+  const roleTitle = document.getElementById('neg-role-title')?.value || 'Senior Software Engineer';
+  const container = document.getElementById('negotiation-results-container');
+  if (!container) return;
+
+  container.innerHTML = '<div style="color: var(--accent-cyan); font-size: 12.5px;">Benchmarking against Indian & Global compensation datasets...</div>';
+
+  try {
+    const res = await authFetch(`${API_BASE}/negotiation/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        base_salary_lpa: baseSalary,
+        bonus_lpa: 0.0,
+        equity_annual_lpa: 0.0,
+        role_title: roleTitle
+      })
+    });
+    const data = await res.json();
+    const ev = data.evaluation || {};
+    container.innerHTML = `
+      <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="font-size: 14px; color: #34d399;">Offer Percentile: ${escapeHTML(ev.percentile || 'Top 15%')}</strong>
+          <span class="badge badge-success">${escapeHTML(ev.verdict || 'Competitive')}</span>
+        </div>
+        <p style="font-size: 13px; color: #cbd5e1; margin-bottom: 10px;">${escapeHTML(ev.market_summary || ('Salary matches market benchmarks for ' + roleTitle))}</p>
+        <div style="font-size: 12px; color: #94a3b8;">
+          <strong>Target Counter Range:</strong> ₹${escapeHTML(ev.recommended_counter_range || ((baseSalary * 1.15).toFixed(1) + ' - ' + (baseSalary * 1.3).toFixed(1)))} LPA
+        </div>
+      </div>
+    `;
+    showToast('Compensation benchmarking complete!', 'success');
+    window.playProceduralChime('success');
+  } catch (err) {
+    container.innerHTML = `<div style="color: var(--accent-rose); font-size: 12px;">Evaluation failed: ${escapeHTML(err.message)}</div>`;
+  }
+};
+
+window.simulateEsopEquity = async function() {
+  const options = parseInt(document.getElementById('esop-options-count')?.value || '15000', 10);
+  const totalShares = parseInt(document.getElementById('esop-total-shares')?.value || '10000000', 10);
+  const valuation = parseFloat(document.getElementById('esop-valuation-usd')?.value || '50000000');
+  const container = document.getElementById('esop-results-container');
+  if (!container) return;
+
+  container.innerHTML = '<div style="color: var(--accent-cyan); font-size: 12.5px;">Simulating exit multiples & ownership dilution...</div>';
+
+  try {
+    const res = await authFetch(`${API_BASE}/negotiation/equity`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        options_count: options,
+        total_company_shares: totalShares,
+        current_valuation_usd: valuation,
+        strike_price: 0.0
+      })
+    });
+    const data = await res.json();
+    const eq = data.equity_model || {};
+    const pct = ((options / totalShares) * 100).toFixed(4);
+    const currVal = ((options / totalShares) * valuation).toLocaleString();
+
+    container.innerHTML = `
+      <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <strong style="color: #fbbf24; font-size: 14px;">Equity Ownership: ${pct}%</strong>
+          <span style="font-size: 12px; color: #cbd5e1;">Current Value: $${currVal}</span>
+        </div>
+        <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
+          ${eq.scenarios ? Object.entries(eq.scenarios).map(([k, v]) => `<div>• <strong>${escapeHTML(k)}:</strong> $${escapeHTML(String(v))}</div>`).join('') : '<div>• Projected 3x Exit: $' + (((options / totalShares) * valuation * 3)).toLocaleString() + '</div><div>• Projected 5x Exit: $' + (((options / totalShares) * valuation * 5)).toLocaleString() + '</div>'}
+        </div>
+      </div>
+    `;
+    showToast('ESOP equity modeled!', 'success');
+    window.playProceduralChime('success');
+  } catch (err) {
+    container.innerHTML = `<div style="color: var(--accent-rose); font-size: 12px;">ESOP simulation failed: ${escapeHTML(err.message)}</div>`;
   }
 };
 
@@ -2571,6 +2680,184 @@ document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault();
     window.toggleCmdPalette();
+  }
+});
+
+// ==========================================================================
+// User Session & Logout
+// ==========================================================================
+window.logoutUser = function() {
+  localStorage.removeItem('jobcopilot_access_token');
+  localStorage.removeItem('jobcopilot_refresh_token');
+  showToast('Signed out successfully.', 'info');
+  setTimeout(() => window.location.reload(), 300);
+};
+
+// ==========================================================================
+// Strict Content Security Policy (CSP) Delegated Event Listeners
+// Eliminates inline event handlers while guaranteeing full interactivity.
+// ==========================================================================
+document.addEventListener('click', (event) => {
+  const target = event.target.closest('[data-action]');
+  if (!target) return;
+
+  const action = target.getAttribute('data-action');
+  if (!action) return;
+
+  // Drawer / Palette closing side-effects
+  if (target.getAttribute('data-close-drawer') === 'true' && typeof window.toggleMobileDrawer === 'function') {
+    window.toggleMobileDrawer(false);
+  }
+  if (target.getAttribute('data-close-palette') === 'true' && typeof window.toggleCmdPalette === 'function') {
+    window.toggleCmdPalette(false);
+  }
+
+  switch (action) {
+    case 'switchTab': {
+      const tab = target.getAttribute('data-tab');
+      if (tab && typeof window.switchTab === 'function') {
+        window.switchTab(tab);
+      }
+      break;
+    }
+    case 'filterPipeline': {
+      const filter = target.getAttribute('data-filter') || 'ALL';
+      if (typeof window.filterPipeline === 'function') {
+        window.filterPipeline(filter, target);
+      }
+      break;
+    }
+    case 'switchMobileKanbanStage': {
+      const stage = target.getAttribute('data-stage') || 'ALL';
+      if (typeof window.switchMobileKanbanStage === 'function') {
+        window.switchMobileKanbanStage(stage, target);
+      }
+      break;
+    }
+    case 'toggleTargetRole': {
+      if (typeof window.toggleTargetRole === 'function') {
+        window.toggleTargetRole(target);
+      }
+      break;
+    }
+    case 'filterMockQuestions': {
+      const qcat = target.getAttribute('data-qcat') || 'all';
+      if (typeof window.filterMockQuestions === 'function') {
+        window.filterMockQuestions(qcat, target);
+      }
+      break;
+    }
+    case 'switchOutreachTab': {
+      const tab = target.getAttribute('data-target') || 'cover';
+      if (typeof window.switchOutreachTab === 'function') {
+        window.switchOutreachTab(tab);
+      }
+      break;
+    }
+    case 'closeModal': {
+      const modalId = target.getAttribute('data-modal');
+      if (modalId) {
+        const modalEl = document.getElementById(modalId);
+        if (modalEl) modalEl.classList.remove('active');
+      }
+      break;
+    }
+    case 'closeCmdPaletteOverlay': {
+      if (event.target === target && typeof window.toggleCmdPalette === 'function') {
+        window.toggleCmdPalette(false);
+      }
+      break;
+    }
+    case 'toggleMobileDrawer': {
+      const stateAttr = target.getAttribute('data-drawer-state');
+      const state = stateAttr === 'false' ? false : (stateAttr === 'true' ? true : undefined);
+      if (typeof window.toggleMobileDrawer === 'function') {
+        window.toggleMobileDrawer(state);
+      }
+      break;
+    }
+    case 'applyToJob': {
+      const jobId = target.getAttribute('data-job-id');
+      if (jobId && typeof window.applyToJob === 'function') {
+        window.applyToJob(jobId);
+      }
+      break;
+    }
+    case 'tailorJobAssets': {
+      const jobId = target.getAttribute('data-job-id');
+      if (jobId && typeof window.tailorJobAssets === 'function') {
+        window.tailorJobAssets(jobId);
+      }
+      break;
+    }
+    case 'resolveHeldApplication': {
+      const eventId = target.getAttribute('data-event-id');
+      if (eventId && typeof window.resolveHeldApplication === 'function') {
+        window.resolveHeldApplication(eventId);
+      }
+      break;
+    }
+    case 'launchTailoredInterview': {
+      const comp = target.getAttribute('data-company');
+      const ttl = target.getAttribute('data-title');
+      if (typeof window.launchTailoredInterviewForJob === 'function') {
+        window.launchTailoredInterviewForJob(comp, ttl);
+      }
+      break;
+    }
+    case 'copyCounterEmail': {
+      const box = document.getElementById('counter-email-box');
+      if (box) {
+        navigator.clipboard.writeText(box.value);
+        if (typeof showToast === 'function') showToast('Email copied to clipboard!', 'success');
+        if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
+      }
+      break;
+    }
+    default: {
+      if (typeof window[action] === 'function') {
+        window[action](target, event);
+      }
+      break;
+    }
+  }
+});
+
+// Delegated Change Handler
+document.addEventListener('change', (event) => {
+  const target = event.target.closest('[data-change-action]');
+  if (!target) return;
+  const action = target.getAttribute('data-change-action');
+  if (action === 'selectMockQuestionById' && typeof window.selectMockQuestionById === 'function') {
+    window.selectMockQuestionById(target.value);
+  } else if (typeof window[action] === 'function') {
+    window[action](target.value, target, event);
+  }
+});
+
+// Delegated Input Handler
+document.addEventListener('input', (event) => {
+  const target = event.target.closest('[data-input-action]');
+  if (!target) return;
+  const action = target.getAttribute('data-input-action');
+  if (action === 'updateWordCount' && typeof window.updateWordCount === 'function') {
+    window.updateWordCount();
+  } else if (action === 'syncBoothAnswer' && typeof window.syncBoothAnswer === 'function') {
+    window.syncBoothAnswer(target.value);
+  } else if (typeof window[action] === 'function') {
+    window[action](target.value, target, event);
+  }
+});
+
+// Delegated Form Submit Handler
+document.addEventListener('submit', (event) => {
+  const form = event.target.closest('[data-form-action]');
+  if (!form) return;
+  const action = form.getAttribute('data-form-action');
+  if (action === 'submitDirectCall' && typeof window.submitDirectCall === 'function') {
+    window.submitDirectCall(event);
+  } else if (typeof window[action] === 'function') {
+    window[action](event, form);
   }
 });
 

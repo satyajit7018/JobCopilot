@@ -65,4 +65,8 @@ def test_csp_pwa_security_headers(client: TestClient):
     csp = res.headers.get("content-security-policy", "")
     assert "manifest-src 'self'" in csp
     assert "worker-src 'self'" in csp
+    assert "script-src 'self';" in csp
+    # Enforce that script-src has dropped 'unsafe-inline' for structural XSS immunity
+    script_directive = [p.strip() for p in csp.split(";") if p.strip().startswith("script-src")][0]
+    assert "'unsafe-inline'" not in script_directive
     assert "microphone=(self)" in res.headers.get("permissions-policy", "")
