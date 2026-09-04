@@ -34,22 +34,33 @@ class GreenhouseAdapter:
         first_name = name_parts[0] if name_parts else profile.full_name
         last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
 
-        if await page.query_selector("#first_name"):
-            await HumanBehaviorEngine.human_type(page, "#first_name", first_name)
+        first_name_input = await page.query_selector("#first_name, input[name*='first_name' i], input[name='job_application[first_name]'], input[autocomplete='given-name']")
+        if first_name_input:
+            await HumanBehaviorEngine.human_type(page, first_name_input, first_name)
             filled_fields["first_name"] = first_name
 
-        if await page.query_selector("#last_name"):
-            await HumanBehaviorEngine.human_type(page, "#last_name", last_name or first_name)
+        last_name_input = await page.query_selector("#last_name, input[name*='last_name' i], input[name='job_application[last_name]'], input[autocomplete='family-name']")
+        if last_name_input:
+            await HumanBehaviorEngine.human_type(page, last_name_input, last_name or first_name)
             filled_fields["last_name"] = last_name or first_name
 
+        # Single full name fallback if first/last split fields are not present
+        if not first_name_input and not last_name_input:
+            full_name_input = await page.query_selector("#name, input[name*='name' i], input[autocomplete='name']")
+            if full_name_input:
+                await HumanBehaviorEngine.human_type(page, full_name_input, profile.full_name)
+                filled_fields["name"] = profile.full_name
+
         # 2. Email
-        if await page.query_selector("#email"):
-            await HumanBehaviorEngine.human_type(page, "#email", profile.email)
+        email_input = await page.query_selector("#email, input[name*='email' i], input[name='job_application[email]'], input[autocomplete='email']")
+        if email_input:
+            await HumanBehaviorEngine.human_type(page, email_input, profile.email)
             filled_fields["email"] = profile.email
 
         # 3. Phone
-        if await page.query_selector("#phone"):
-            await HumanBehaviorEngine.human_type(page, "#phone", profile.phone)
+        phone_input = await page.query_selector("#phone, input[name*='phone' i], input[name='job_application[phone]'], input[autocomplete='tel']")
+        if phone_input:
+            await HumanBehaviorEngine.human_type(page, phone_input, profile.phone)
             filled_fields["phone"] = profile.phone
 
         # 4. Resume File Upload

@@ -115,10 +115,10 @@ class AutonomousJobRunner:
         await log("Initializing stealth headless Chromium session...")
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
-            context = await StealthEngine.create_stealth_context(browser)
-            page = await context.new_page()
-
             try:
+                context = await StealthEngine.create_stealth_context(browser)
+                page = await context.new_page()
+
                 await log(f"Navigating to ATS portal: {job.url}...")
                 await page.goto(job.url, wait_until="domcontentloaded", timeout=25000)
                 await asyncio.sleep(1.0)
@@ -174,7 +174,6 @@ class AutonomousJobRunner:
                     db.save_job(job, user_id=user_id or job.user_id)
                     CheckpointManager.clear(job.job_id)
 
-                await browser.close()
                 return {
                     "status": "success",
                     "job_id": job.job_id,
@@ -192,8 +191,12 @@ class AutonomousJobRunner:
 
             except Exception as e:
                 await log(f"❌ Application encountered error: {str(e)}")
-                await browser.close()
                 return {"status": "error", "message": str(e)}
+            finally:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
 
 
 bot_runner = AutonomousJobRunner()

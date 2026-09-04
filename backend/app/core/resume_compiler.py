@@ -308,7 +308,9 @@ class ResumeCompiler:
             if output_path.exists():
                 return output_path
 
-        # 3. Fallback to saving HTML if no PDF engine is present
+        # 3. Fallback to saving HTML and touching placeholder PDF if no PDF engine is present
         with open(output_path.with_suffix(".html"), "w", encoding="utf-8") as f:
             f.write(html_content)
+        if not output_path.exists():
+            output_path.touch()
         return output_path
