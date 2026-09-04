@@ -80,6 +80,58 @@ class ResumeTailor:
         return tailored, matched_skills
 
     @classmethod
+    async def tailor_profile_for_job_async(
+        cls,
+        profile: CandidateProfile,
+        job_title: str,
+        job_description: str,
+        company_name: str = "Target Company"
+    ) -> Tuple[CandidateProfile, List[str]]:
+        """
+        AI-powered profile tailoring: uses LLM to optimize work experience bullets
+        against target job description, with automatic deterministic fallback.
+        """
+        from app.core.llm_client import llm_client
+        from app.core.prompts.tailoring_prompts import TailoringPrompts
+
+        # 1. Base deterministic reordering
+        tailored, matched_skills = cls.tailor_profile_for_job(profile, job_title, job_description)
+
+        if not tailored.experience or not matched_skills:
+            return tailored, matched_skills
+
+        # 2. LLM-optimized bullet refinement
+        async def _llm_refine():
+            for exp in tailored.experience[:2]:
+                if not exp.highlights:
+                    continue
+                prompt = TailoringPrompts.build_bullet_optimization_prompt(
+                    candidate_bullets=exp.highlights[:4],
+                    job_title=job_title,
+                    company_name=company_name,
+                    target_skills=matched_skills[:5],
+                    job_description=job_description
+                )
+                raw = await llm_client.generate_completion(
+                    prompt=prompt,
+                    system_prompt=TailoringPrompts.SYSTEM_PROMPT,
+                    fallback_fn=lambda: "\n".join(f"- {h}" for h in exp.highlights[:4])
+                )
+                lines = [
+                    line.strip().lstrip("-* ").strip()
+                    for line in raw.split("\n")
+                    if line.strip() and len(line.strip()) > 15
+                ]
+                if lines and len(lines) == len(exp.highlights[:4]):
+                    exp.highlights = lines + exp.highlights[4:]
+            return tailored
+
+        try:
+            return await _llm_refine(), matched_skills
+        except Exception:
+            return tailored, matched_skills
+
+    @classmethod
     async def compile_tailored_resume_for_job(
         cls,
         profile: CandidateProfile,
@@ -92,7 +144,12 @@ class ResumeTailor:
         Generates and compiles a bespoke, tailored PDF resume for a specific job application.
         Returns (pdf_path, content_hash, tailored_profile).
         """
-        tailored_profile, matched_skills = cls.tailor_profile_for_job(profile, job_title, job_description)
+        tailored_profile, matched_skills = await cls.tailor_profile_for_job_async(
+            profile=profile,
+            job_title=job_title,
+            job_description=job_description,
+            company_name=company_name
+        )
         html_content = ResumeCompiler.generate_resume_html(tailored_profile, tailored_skills=matched_skills[:6])
 
         # Generate unique content hash

@@ -276,6 +276,32 @@ class InterviewStudioEngine:
         }
 
     @classmethod
+    async def generate_company_dossier_async(
+        cls,
+        company_name: str,
+        role_title: str
+    ) -> Dict[str, Any]:
+        """Generates tailored company briefing via LLM with deterministic fallback."""
+        from app.core.llm_client import llm_client
+        from app.core.prompts.interview_prompts import InterviewPrompts
+
+        fallback = lambda: cls.generate_company_dossier(company_name, role_title)
+        prompt = InterviewPrompts.build_company_dossier_prompt(company_name, role_title)
+
+        try:
+            raw = await llm_client.generate_completion(
+                prompt=prompt,
+                system_prompt=InterviewPrompts.DOSSIER_SYSTEM_PROMPT,
+                fallback_fn=fallback
+            )
+            base = fallback()
+            if raw and len(raw) > 50 and raw != "Deterministic local synthesis complete.":
+                base["ai_intel_summary"] = raw
+            return base
+        except Exception:
+            return fallback()
+
+    @classmethod
     def generate_mock_questions(
         cls,
         role_title: str = "Senior Software Engineer",
@@ -431,6 +457,61 @@ class InterviewStudioEngine:
             candidate_answer=candidate_answer,
             key_concepts=key_concepts
         )
+
+    @classmethod
+    async def evaluate_candidate_response_async(
+        cls,
+        question: str,
+        candidate_answer: str,
+        role_title: str = "Senior Software Engineer",
+        company_name: str = "Target Company",
+        key_concepts: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Evaluates verbal or written response with LLM STAR scoring and deterministic fallback."""
+        import json
+        from app.core.llm_client import llm_client
+        from app.core.prompts.interview_prompts import InterviewPrompts
+
+        fallback = lambda: cls.evaluate_interview_response(
+            question=question,
+            candidate_answer=candidate_answer,
+            key_concepts=key_concepts
+        )
+
+        if len(candidate_answer.strip()) < 20:
+            return fallback()
+
+        prompt = InterviewPrompts.build_star_evaluation_prompt(
+            question=question,
+            candidate_answer=candidate_answer,
+            role_title=role_title,
+            company_name=company_name
+        )
+
+        try:
+            raw = await llm_client.generate_completion(
+                prompt=prompt,
+                system_prompt=InterviewPrompts.STAR_SYSTEM_PROMPT,
+                fallback_fn=fallback
+            )
+            base_eval = fallback()
+            if raw and "{" in raw and "}" in raw:
+                try:
+                    start = raw.index("{")
+                    end = raw.rindex("}") + 1
+                    llm_data = json.loads(raw[start:end])
+                    if "overall_score" in llm_data:
+                        base_eval["overall_score"] = int(llm_data["overall_score"])
+                        base_eval["score"] = int(llm_data["overall_score"])
+                    if "verdict" in llm_data:
+                        base_eval["hire_verdict"] = str(llm_data["verdict"])
+                    if "feedback" in llm_data:
+                        base_eval["feedback"] = str(llm_data["feedback"])
+                except Exception:
+                    pass
+            return base_eval
+        except Exception:
+            return fallback()
 
     @classmethod
     def generate_reverse_interview_questions(

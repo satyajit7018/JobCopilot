@@ -254,3 +254,62 @@ class SalaryNegotiationEngine:
             "negotiation_email": CoverLetterGenerator.sanitize_anti_ai(email_body),
             "phone_talking_points": phone_talking_points
         }
+
+    @classmethod
+    async def generate_advanced_counter_script_async(
+        cls,
+        candidate_name: str,
+        target_company: str,
+        role_title: str,
+        current_base: str,
+        current_equity: str,
+        target_base: str,
+        target_equity: str,
+        competing_company: Optional[str] = None,
+        competing_tc: Optional[str] = None
+    ) -> Dict[str, str]:
+        """Generates tailored executive counter-offer package via LLM with deterministic fallback."""
+        from app.core.llm_client import llm_client
+        from app.core.prompts.negotiation_prompts import NegotiationPrompts
+
+        fallback = lambda: cls.generate_advanced_counter_script(
+            candidate_name=candidate_name,
+            target_company=target_company,
+            role_title=role_title,
+            current_base=current_base,
+            current_equity=current_equity,
+            target_base=target_base,
+            target_equity=target_equity,
+            competing_company=competing_company,
+            competing_tc=competing_tc
+        )
+
+        try:
+            from app.core.compensation import CompensationConverter
+            c_base = CompensationConverter.parse_to_base_inr(current_base) / 100000.0
+            t_base = CompensationConverter.parse_to_base_inr(target_base) / 100000.0
+            c_eq = CompensationConverter.parse_to_base_inr(current_equity) / 100000.0
+            t_eq = CompensationConverter.parse_to_base_inr(target_equity) / 100000.0
+            leverage_summary = f"{competing_company} offering {competing_tc}" if competing_company and competing_tc else None
+
+            prompt = NegotiationPrompts.build_counter_script_prompt(
+                company_name=target_company,
+                role_title=role_title,
+                offered_base=c_base,
+                target_base=t_base,
+                offered_equity=c_eq,
+                target_equity=t_eq,
+                competing_offers_summary=leverage_summary
+            )
+
+            raw = await llm_client.generate_completion(
+                prompt=prompt,
+                system_prompt=NegotiationPrompts.SYSTEM_PROMPT,
+                fallback_fn=fallback
+            )
+            base_script = fallback()
+            if raw and len(raw) > 80 and raw != "Deterministic local synthesis complete.":
+                base_script["ai_negotiation_strategy"] = raw
+            return base_script
+        except Exception:
+            return fallback()
