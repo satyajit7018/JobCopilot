@@ -104,8 +104,11 @@ class ResumeParser:
         email_match = re.search(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', text)
         email = email_match.group(0) if email_match else "candidate@example.com"
 
-        # Phone (International & local formats)
-        phone_match = re.search(r'(?:\+?\d{1,3}[-.\s]?)?\(?\d{3,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}', text)
+        # Phone (International, local, and Indian 5-5 grouped formats)
+        phone_match = re.search(
+            r'(?:\+?\d{1,3}[-.\s]?)?(?:(?:\(?\d{3,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4})|(?:\d{5}[-.\s]?\d{5}))',
+            text
+        )
         phone = phone_match.group(0) if phone_match else "+91 0000000000"
 
         # LinkedIn URL

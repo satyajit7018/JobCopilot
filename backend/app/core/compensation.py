@@ -62,19 +62,36 @@ class CompensationConverter:
         else:
             val = nums[0]
 
-        # Handle Indian LPA
-        if currency == "INR":
-            if "lpa" in text or "lakh" in text or "lac" in text or val < 100.0:
-                return max(0.0, val * 100000.0)
-            return max(0.0, val)
+        # Check periodicity: Monthly or Hourly
+        is_monthly = bool(re.search(r'(?:/|\bper\s*)\s*(?:month|mo\b)|monthly|\bp\.m\b', text))
+        is_hourly = bool(re.search(r'(?:/|\bper\s*)\s*(?:hour|hr\b)|hourly', text))
 
-        # Handle 'k' multiplier (e.g. 120k)
+        # Handle 'k' multiplier (e.g. 120k, 80k)
         if "k" in text and val < 1000.0:
             val = val * 1000.0
 
-        # Convert foreign currency to INR
+        # Handle Indian LPA vs plain INR
+        if currency == "INR":
+            if "lpa" in text or "lakh" in text or "lac" in text or (val < 100.0 and not is_monthly and not is_hourly):
+                annual_val = val * 100000.0
+            else:
+                annual_val = val
+
+            if is_monthly:
+                annual_val = annual_val * 12.0
+            elif is_hourly:
+                annual_val = annual_val * 2080.0
+            return max(0.0, annual_val)
+
+        # Foreign currency conversion to INR
+        annual_foreign = val
+        if is_monthly:
+            annual_foreign = annual_foreign * 12.0
+        elif is_hourly:
+            annual_foreign = annual_foreign * 2080.0
+
         rate = cls.FX_RATES_TO_INR.get(currency, 83.5)
-        return max(0.0, val * rate)
+        return max(0.0, annual_foreign * rate)
 
     @classmethod
     def parse_ctc(cls, ctc_string: str) -> float:
