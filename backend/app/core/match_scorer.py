@@ -146,3 +146,45 @@ class MatchScorer:
         final_clamped = min(max(round(total_score, 2), 0.05), 0.99)
 
         return final_clamped, match_reasons, missing_skills[:6]
+
+    @classmethod
+    def compute_match_score_semantic(
+        cls,
+        profile: CandidateProfile,
+        job_title: str,
+        job_description: str,
+        job_location: str = "Remote"
+    ) -> Tuple[float, List[str], List[str]]:
+        """
+        Computes multi-factor match score enhanced with dense semantic vector similarity:
+        - 40% Semantic Vector Alignment (deep conceptual match between profile narrative and job requirements)
+        - 60% Rule-Based Multidimensional Factors (skills, title, experience, location)
+        """
+        from app.core.llm_client import llm_client
+
+        base_score, match_reasons, missing_skills = cls.compute_match_score(
+            profile, job_title, job_description, job_location
+        )
+
+        profile_text = (
+            f"{profile.summary} "
+            f"Skills: {', '.join(profile.skills[:15])}. "
+            f"Experience: {' '.join(h for exp in profile.experience for h in exp.highlights[:2])}"
+        ).strip()
+        job_text = f"{job_title}. Description: {job_description[:2000]}".strip()
+
+        try:
+            p_vec = llm_client.embed_text_sync(profile_text)
+            j_vec = llm_client.embed_text_sync(job_text)
+            semantic_sim = llm_client.cosine_similarity(p_vec, j_vec)
+            normalized_sim = max(0.0, min(1.0, (semantic_sim + 1.0) / 2.0 if semantic_sim < 0 else semantic_sim))
+        except Exception:
+            normalized_sim = base_score
+
+        blended_score = (normalized_sim * 0.40) + (base_score * 0.60)
+        final_score = min(max(round(blended_score, 2), 0.05), 0.99)
+
+        if normalized_sim >= 0.65:
+            match_reasons.insert(0, f"High semantic vector alignment ({int(normalized_sim * 100)}% conceptual fit)")
+
+        return final_score, match_reasons, missing_skills

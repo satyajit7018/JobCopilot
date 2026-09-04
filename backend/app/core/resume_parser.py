@@ -126,7 +126,8 @@ class ResumeParser:
         # Location heuristic
         location = "Remote / Global"
         loc_patterns = [
-            r'\b([A-Z][a-zA-Z\s]+,\s*(?:India|USA|United States|UK|Canada|Germany|California|Bangalore|Bengaluru|Hyderabad|Seattle|New York|San Francisco))\b'
+            r'\b([A-Z][a-zA-Z\s]+,\s*(?:[A-Z]{2}|India|USA|United States|UK|Canada|Germany|California|Texas|Washington|Bangalore|Bengaluru|Hyderabad|Delhi|Mumbai|Pune|Gurgaon|Noida))\b',
+            r'\bbased in\s+([A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+)\b'
         ]
         for pat in loc_patterns:
             m = re.search(pat, text)
@@ -142,6 +143,12 @@ class ResumeParser:
             if 2 <= len(line.split()) <= 4 and not re.search(r'[@:/|0-9]', line) and len(line) < 40:
                 full_name = line.strip()
                 break
+
+        # Fallback for unstructured inline names
+        if full_name == "Candidate Name":
+            name_inline = re.search(r'(?:^|[.\n])\s*(?:name:?|i am)?\s*([A-Z][a-z]+\s+[A-Z][a-z]+)\s+based in', text, re.IGNORECASE)
+            if name_inline:
+                full_name = name_inline.group(1).strip()
 
         return {
             "email": email,
@@ -399,3 +406,169 @@ class ResumeParser:
             preferences=prefs,
             raw_resume_text=text
         )
+
+    @classmethod
+    async def parse_to_profile_async(
+        cls,
+        source_path_or_text: str,
+        profile_id: str = "default_user",
+        user_id: str = "default_user"
+    ) -> CandidateProfile:
+        """
+        Asynchronously parses any PDF, DOCX, or text resume using LLM structured extraction,
+        with seamless deterministic heuristic fallback to parse_to_profile().
+        """
+        text = cls.extract_raw_text(source_path_or_text)
+        fallback_profile = cls.parse_to_profile(text, profile_id=profile_id)
+
+        try:
+            from app.core.llm_client import llm_client
+
+            prompt = f"""
+Extract structured candidate profile details from the following resume text:
+
+--- RESUME TEXT ---
+{text[:4000]}
+--- END RESUME TEXT ---
+
+Return a strictly valid JSON object with the following schema:
+{{
+    "full_name": "Candidate Full Name",
+    "email": "candidate@example.com",
+    "phone": "+1-000-000-0000",
+    "location": "City, State / Country",
+    "linkedin_url": "https://linkedin.com/in/... or null",
+    "github_url": "https://github.com/... or null",
+    "portfolio_url": "https://... or null",
+    "summary": "Brief 2-3 sentence professional summary",
+    "skills": ["Skill1", "Skill2"],
+    "education": [
+        {{"degree": "Degree name", "institution": "University/College", "graduation_year": "2024", "gpa": "3.8"}}
+    ],
+    "experience": [
+        {{
+            "company": "Company Name",
+            "title": "Role Title",
+            "start_date": "YYYY or Month YYYY",
+            "end_date": "Present or Month YYYY",
+            "location": "Remote / City",
+            "highlights": ["Key achievement 1", "Key achievement 2"],
+            "tech_stack": ["Tech1", "Tech2"]
+        }}
+    ],
+    "projects": [
+        {{
+            "name": "Project Name",
+            "description": "Project summary",
+            "technologies": ["Tech1", "Tech2"],
+            "metrics": "Impact metrics"
+        }}
+    ],
+    "certifications": ["Cert 1", "Cert 2"],
+    "years_of_experience": 3.5
+}}
+"""
+            system_prompt = (
+                "You are an expert ATS resume extraction engine. Extract high-fidelity structured profile details "
+                "from resume text. Output strictly valid JSON."
+            )
+
+            res = await llm_client.chat_completion_json(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                fallback_fn=lambda: fallback_profile.dict(),
+                user_id=user_id
+            )
+
+            if isinstance(res, dict) and (res.get("full_name") or res.get("email") or res.get("skills")):
+                full_name = res.get("full_name") or fallback_profile.full_name
+                email = res.get("email") or fallback_profile.email
+                phone = res.get("phone") or fallback_profile.phone
+                location = res.get("location") or fallback_profile.location
+                linkedin = res.get("linkedin_url") or fallback_profile.linkedin_url
+                github = res.get("github_url") or fallback_profile.github_url
+                portfolio = res.get("portfolio_url") or fallback_profile.portfolio_url
+                summary = res.get("summary") or fallback_profile.summary
+
+                # Skills
+                skills = res.get("skills") if isinstance(res.get("skills"), list) and res.get("skills") else fallback_profile.skills
+                _, categorized_skills = cls.categorize_skills(" ".join(skills) + " " + text)
+
+                # Education
+                education_objs = []
+                if isinstance(res.get("education"), list) and res.get("education"):
+                    for ed in res["education"]:
+                        if isinstance(ed, dict):
+                            education_objs.append(Education(
+                                degree=ed.get("degree", "Degree"),
+                                institution=ed.get("institution", "University"),
+                                graduation_year=str(ed.get("graduation_year", "2024")),
+                                gpa=str(ed.get("gpa", "")) if ed.get("gpa") else None
+                            ))
+                if not education_objs:
+                    education_objs = fallback_profile.education
+
+                # Experience
+                experience_objs = []
+                if isinstance(res.get("experience"), list) and res.get("experience"):
+                    for exp in res["experience"]:
+                        if isinstance(exp, dict):
+                            experience_objs.append(WorkExperience(
+                                company=exp.get("company", "Technology Solutions"),
+                                title=exp.get("title", "Software Engineer"),
+                                start_date=str(exp.get("start_date", "2023")),
+                                end_date=str(exp.get("end_date", "Present")),
+                                location=exp.get("location", "Remote"),
+                                highlights=exp.get("highlights", ["Engineered backend services."]),
+                                tech_stack=exp.get("tech_stack", skills[:5])
+                            ))
+                if not experience_objs:
+                    experience_objs = fallback_profile.experience
+
+                # Projects
+                project_objs = []
+                if isinstance(res.get("projects"), list) and res.get("projects"):
+                    for pr in res["projects"]:
+                        if isinstance(pr, dict):
+                            project_objs.append(Project(
+                                name=pr.get("name", "Software Project"),
+                                description=pr.get("description", "High-scale engineering project."),
+                                technologies=pr.get("technologies", skills[:3]),
+                                metrics=pr.get("metrics", "Sub-50ms latency")
+                            ))
+                if not project_objs:
+                    project_objs = fallback_profile.projects
+
+                certifications = res.get("certifications") if isinstance(res.get("certifications"), list) else fallback_profile.certifications
+                try:
+                    yoe = float(res.get("years_of_experience", fallback_profile.preferences.years_of_experience))
+                except Exception:
+                    yoe = fallback_profile.preferences.years_of_experience
+
+                prefs = fallback_profile.preferences
+                prefs.years_of_experience = yoe
+
+                return CandidateProfile(
+                    id=profile_id,
+                    user_id=user_id,
+                    full_name=full_name,
+                    email=email,
+                    phone=phone,
+                    location=location,
+                    linkedin_url=linkedin,
+                    github_url=github,
+                    portfolio_url=portfolio,
+                    summary=summary,
+                    education=education_objs,
+                    experience=experience_objs,
+                    projects=project_objs,
+                    skills=skills,
+                    categorized_skills=categorized_skills,
+                    certifications=certifications,
+                    preferences=prefs,
+                    raw_resume_text=text
+                )
+        except Exception:
+            pass
+
+        return fallback_profile

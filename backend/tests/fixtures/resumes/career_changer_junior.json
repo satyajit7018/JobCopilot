@@ -1,0 +1,11 @@
+{
+    "full_name": "Elena Rostova",
+    "email": "elena.codes@gmail.com",
+    "phone": "+1 206-555-7890",
+    "location": "Seattle, WA",
+    "github_url": "https://github.com/elenacodes",
+    "portfolio_url": "https://elenarostova.dev",
+    "expected_skills": ["JavaScript", "TypeScript", "Python", "React", "Next.js", "Node.js", "Flask", "Docker", "MongoDB", "PostgreSQL"],
+    "expected_company": "TechForward Solutions",
+    "expected_title": "Software Engineering Intern"
+}

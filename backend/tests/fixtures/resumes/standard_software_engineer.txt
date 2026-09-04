@@ -1,0 +1,32 @@
+Marcus Vance
+marcus.vance@alum.mit.edu | +1 (415) 555-0192 | https://linkedin.com/in/marcusvance | https://github.com/marcusvance
+San Francisco, CA
+
+SUMMARY
+Senior Distributed Systems Engineer with 5+ years of production experience designing event-driven microservices, high-throughput streaming pipelines, and resilient cloud architectures.
+
+SKILLS
+Languages: Python, Go, TypeScript, SQL, Bash
+Frameworks & Libraries: FastAPI, Django, PyTorch, React
+Cloud & DevOps: Docker, Kubernetes, AWS, Terraform, CI/CD, Linux
+Databases & Queues: PostgreSQL, Redis, Apache Kafka, Elasticsearch
+
+EXPERIENCE
+CloudScale Systems Inc | San Francisco, CA
+Senior Backend Engineer | 2021 - Present
+- Architected and deployed distributed event pipeline processing over 250,000 messages/sec using Kafka and Go microservices.
+- Optimized PostgreSQL database cluster indexing and partitioned multi-terabyte tables, slashing p99 query latency by 45%.
+- Implemented automated canary deployment workflows on Kubernetes using Helm and GitHub Actions.
+
+Datadot Technologies | San Jose, CA
+Backend Engineer | 2019 - 2021
+- Developed RESTful API microservices in Python with FastAPI handling 40,000 active daily requests.
+- Integrated Redis caching layer for session tokens and high-frequency read queries.
+
+EDUCATION
+Massachusetts Institute of Technology (MIT) | Cambridge, MA
+Bachelor of Science in Computer Science | 2019
+GPA: 3.85
+
+PROJECTS
+HyperFlow: Open-source distributed task orchestrator built with Python, Redis, and WebSockets.

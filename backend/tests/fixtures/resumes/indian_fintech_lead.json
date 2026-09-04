@@ -1,0 +1,12 @@
+{
+    "full_name": "Priya Sundaram",
+    "email": "priya.sundaram@finpay.in",
+    "phone": "+91 98451 23456",
+    "location": "Bengaluru, Karnataka, India",
+    "linkedin_url": "https://linkedin.com/in/priyasundaram",
+    "expected_skills": ["Java", "Python", "Spring Boot", "FastAPI", "Apache Kafka", "PostgreSQL", "Redis", "Docker", "Kubernetes", "AWS"],
+    "expected_company": "Razorpay Technologies",
+    "expected_title": "Lead Engineering Architect",
+    "expected_degree": "Bachelor of Technology in Computer Science and Engineering",
+    "expected_institution": "Indian Institute of Technology Madras (IIT Madras)"
+}

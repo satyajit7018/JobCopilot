@@ -230,7 +230,48 @@ class KnowledgeVault:
             resolved = self._resolve_template(best_entry.answer_template, profile, company, role, domain)
             return resolved, best_score, best_entry
 
+        # 3. Dense Semantic Vector Retrieval Fallback
+        semantic_matches = self.search_semantic(question, user_id=target_user, top_k=1)
+        if semantic_matches:
+            top_sem_entry, top_sem_score = semantic_matches[0]
+            if top_sem_score >= similarity_threshold:
+                db.increment_vault_usage(top_sem_entry.qa_id)
+                resolved = self._resolve_template(top_sem_entry.answer_template, profile, company, role, domain)
+                return resolved, top_sem_score, top_sem_entry
+
         return None, best_score, None
+
+    def search_semantic(
+        self,
+        query: str,
+        user_id: str = "default",
+        top_k: int = 5
+    ) -> List[Tuple[VaultEntry, float]]:
+        """
+        Ranks knowledge vault entries strictly by dense semantic vector similarity.
+        Returns top_k (VaultEntry, similarity_score) pairs.
+        """
+        from app.core.llm_client import llm_client
+
+        user_entries = self._get_entries(user_id=user_id) if user_id != "system_baseline" else []
+        baseline_entries = self._get_entries(user_id="system_baseline")
+        user_keys = {e.slot_key for e in user_entries if e.slot_key}
+        entries = list(user_entries) + [b for b in baseline_entries if b.slot_key not in user_keys]
+
+        if not entries:
+            return []
+
+        query_vec = llm_client.embed_text_sync(query)
+        scored = []
+        for entry in entries:
+            doc_vec = entry.embedding
+            if not doc_vec or len(doc_vec) != len(query_vec):
+                doc_vec = llm_client.embed_text_sync(entry.question_pattern)
+            sim = llm_client.cosine_similarity(query_vec, doc_vec)
+            scored.append((entry, sim))
+
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return scored[:top_k]
 
     def get_answer_for_question(
         self,

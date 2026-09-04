@@ -1,0 +1,13 @@
+{
+    "full_name": "Marcus Vance",
+    "email": "marcus.vance@alum.mit.edu",
+    "phone": "+1 (415) 555-0192",
+    "location": "San Francisco, CA",
+    "linkedin_url": "https://linkedin.com/in/marcusvance",
+    "github_url": "https://github.com/marcusvance",
+    "expected_skills": ["Python", "Go", "TypeScript", "FastAPI", "Docker", "Kubernetes", "AWS", "PostgreSQL", "Redis", "Apache Kafka"],
+    "expected_company": "CloudScale Systems Inc",
+    "expected_title": "Senior Backend Engineer",
+    "expected_degree": "Bachelor of Science in Computer Science",
+    "expected_institution": "Massachusetts Institute of Technology (MIT)"
+}

@@ -29,7 +29,7 @@ from app.api.routers import (
 # Re-export request models for backwards compatibility
 from app.api.routers.auth_router import GoogleSSORequest
 from app.api.routers.profile_router import QuestionnaireSubmitRequest
-from app.api.routers.vault_router import VaultLearnRequest, VaultTestMatchRequest
+from app.api.routers.vault_router import VaultLearnRequest, VaultTestMatchRequest, VaultSemanticSearchRequest
 from app.api.routers.jobs_router import (
     AlumniReferralRequest, RecruiterNudgeRequest, MultiRoleTailorRequest, LogDirectCallRequest
 )
@@ -66,6 +66,7 @@ __all__ = [
     "QuestionnaireSubmitRequest",
     "VaultLearnRequest",
     "VaultTestMatchRequest",
+    "VaultSemanticSearchRequest",
     "AlumniReferralRequest",
     "RecruiterNudgeRequest",
     "MultiRoleTailorRequest",

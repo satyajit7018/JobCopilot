@@ -1,0 +1,32 @@
+Elena Rostova
+elena.codes@gmail.com | +1 206-555-7890 | https://github.com/elenacodes | https://elenarostova.dev
+Seattle, WA
+
+OBJECTIVE
+Passionate Full Stack Software Engineer specializing in modern JavaScript/TypeScript, React, Python, and cloud deployment. Seeking junior engineering roles.
+
+TECHNICAL SKILLS
+Languages: JavaScript, TypeScript, Python, HTML, CSS, SQL
+Libraries & Frameworks: React, Next.js, Node.js, Express.js, Flask, TailwindCSS
+Tools & Platforms: Git, GitHub, Docker, MongoDB, PostgreSQL, Postman
+
+EXPERIENCE
+TechForward Solutions | Seattle, WA
+Software Engineering Intern | 2023 - 2024
+- Contributed to customer-facing dashboard using React and TailwindCSS.
+- Authored backend REST endpoints in Python Flask and PostgreSQL with unit test coverage.
+- Configured automated GitHub Actions workflows for continuous integration.
+
+PROJECTS
+Automated Job Tracker & Application Pipeline
+- Built responsive web application in TypeScript, React, and FastAPI.
+- Handled automated webhook updates and database persistence with SQLite.
+
+Full-Stack E-Commerce Platform
+- Built store platform utilizing Node.js, Express, MongoDB, and Stripe checkout APIs.
+
+EDUCATION
+Flatiron School | Remote
+Certificate in Software Engineering | 2023
+University of Washington | Seattle, WA
+Bachelor of Arts in Economics | 2020

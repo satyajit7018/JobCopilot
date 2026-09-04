@@ -1,0 +1,6 @@
+{
+    "full_name": "Rahul Verma",
+    "email": "dev.rahul@protonmail.com",
+    "phone": "91234 56789",
+    "expected_skills": ["Python", "FastAPI", "Redis", "Docker", "Kubernetes", "Postgres", "Kafka"]
+}

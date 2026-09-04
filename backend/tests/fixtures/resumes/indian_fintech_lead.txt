@@ -1,0 +1,28 @@
+Priya Sundaram
+priya.sundaram@finpay.in | +91 98451 23456 | https://linkedin.com/in/priyasundaram
+Bengaluru, Karnataka, India
+
+PROFESSIONAL SUMMARY
+Lead Engineering Architect with 6+ years driving real-time core banking systems, UPI payment rails, and distributed ledger reconciliations in Indian FinTech ecosystems. Current CTC: 38 LPA | Expected: 50 LPA | Notice Period: 30 days.
+
+TECHNICAL SKILLS
+Languages: Java, Python, Go, SQL, Bash
+Frameworks: Spring Boot, FastAPI, Django
+Data & Messaging: Apache Kafka, RabbitMQ, PostgreSQL, Redis, Elasticsearch
+Infrastructure: Docker, Kubernetes, AWS, Terraform, CI/CD
+
+PROFESSIONAL EXPERIENCE
+Razorpay Technologies | Bengaluru, India
+Lead Engineering Architect | 2020 - Present
+- Spearheaded merchant payout engine servicing 1.2M transactions daily with 99.999% system availability.
+- Designed idempotency consensus layer over Redis and PostgreSQL preventing duplicate debits.
+- Spearheaded migration to Kubernetes containerized clusters on AWS EKS.
+
+Flipkart Internet Pvt Ltd | Bengaluru, India
+Senior Software Development Engineer | 2018 - 2020
+- Built order dispatch microservices in Java Spring Boot and Kafka message brokers.
+- Reduced checkout transaction completion latency by 35ms across peak Big Billion Days traffic.
+
+EDUCATION
+Indian Institute of Technology Madras (IIT Madras)
+Bachelor of Technology in Computer Science and Engineering | 2018

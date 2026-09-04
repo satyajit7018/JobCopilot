@@ -81,3 +81,37 @@ async def test_vault_match(
         "matched_pattern": entry.question_pattern if entry else "N/A",
         "is_matched": answer is not None
     }
+
+
+class VaultSemanticSearchRequest(BaseModel):
+    query: str
+    top_k: int = 5
+
+
+@router.post("/vault/semantic-search")
+async def semantic_search_vault(
+    payload: VaultSemanticSearchRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Ranks and returns vault entries by dense semantic vector similarity."""
+    results = vault.search_semantic(
+        query=payload.query,
+        user_id=current_user.user_id,
+        top_k=payload.top_k
+    )
+    formatted = []
+    for entry, score in results:
+        formatted.append({
+            "qa_id": entry.qa_id,
+            "question_pattern": entry.question_pattern,
+            "answer_template": entry.answer_template,
+            "slot_key": entry.slot_key,
+            "slot_type": entry.slot_type.value if hasattr(entry.slot_type, "value") else str(entry.slot_type),
+            "similarity_score": round(score, 4)
+        })
+    return {
+        "status": "success",
+        "query": payload.query,
+        "count": len(formatted),
+        "results": formatted
+    }

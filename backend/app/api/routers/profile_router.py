@@ -44,9 +44,9 @@ async def upload_resume(
         file_path = RESUMES_DIR / f"{user_id}_{safe_filename}"
         with open(file_path, "wb") as buffer:
             buffer.write(contents)
-        profile = ResumeParser.parse_to_profile(str(file_path), profile_id=target_profile_id)
+        profile = await ResumeParser.parse_to_profile_async(str(file_path), profile_id=target_profile_id, user_id=user_id)
     elif raw_text:
-        profile = ResumeParser.parse_to_profile(raw_text, profile_id=target_profile_id)
+        profile = await ResumeParser.parse_to_profile_async(raw_text, profile_id=target_profile_id, user_id=user_id)
     else:
         raise HTTPException(status_code=400, detail="No resume file or raw text provided.")
 

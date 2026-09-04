@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: Optional[str] = None
     DEFAULT_LLM_PROVIDER: str = "local"  # "openai", "anthropic", "local"
     DEFAULT_LLM_MODEL: str = "gpt-4o-mini"
+    LLM_CACHE_ENABLED: bool = True
+    LLM_CACHE_TTL_SECONDS: int = 86400  # 24 hours
+    LLM_DAILY_TOKEN_LIMIT_FREE: int = 50_000
+    LLM_DAILY_TOKEN_LIMIT_PRO: int = 500_000
+    LLM_DAILY_TOKEN_LIMIT_ELITE: int = 2_000_000
 
     # Stealth Bot & Proxy
     PROXY_PASSWORD: str = "secret"
