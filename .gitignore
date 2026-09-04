@@ -37,3 +37,8 @@ tmp/
 .env
 .env.local
 .env.production
+
+# Test & Coverage
+.coverage
+.coverage.*
+*.db
