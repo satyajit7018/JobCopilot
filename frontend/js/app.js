@@ -539,20 +539,24 @@ window.testMobileNotifications = async function() {
 // Multi-Step Onboarding Navigation & Responsive Synchronizer
 // ==========================================================================
 window.switchTab = function(viewId) {
-  if (viewId === 'studio') viewId = 'interview-studio';
-  if (viewId === 'interview') viewId = 'interview-studio';
+  if (viewId === 'studio' || viewId === 'interview-studio') viewId = 'interview';
+  if (viewId === 'backups') viewId = 'settings';
+  if (viewId === 'accelerator') viewId = 'interview';
+  if (viewId === 'billing') viewId = 'settings';
 
   els.navTabs.forEach(t => {
-    t.classList.toggle('active', t.getAttribute('data-view') === viewId);
+    const v = t.getAttribute('data-view');
+    t.classList.toggle('active', v === viewId || (viewId === 'interview' && (v === 'interview' || v === 'interview-studio')));
   });
   document.querySelectorAll('.mobile-nav-tab').forEach(t => {
-    t.classList.toggle('active', t.getAttribute('data-view') === viewId);
+    const v = t.getAttribute('data-view');
+    t.classList.toggle('active', v === viewId || (viewId === 'interview' && (v === 'interview' || v === 'interview-studio')));
   });
   els.viewPanels.forEach(p => {
     p.classList.toggle('active', p.id === `view-${viewId}`);
   });
   window.location.hash = viewId;
-  if (viewId === 'interview-studio' || viewId === 'interview') {
+  if (viewId === 'interview') {
     setTimeout(initVisualizerCanvas, 50);
   }
 };

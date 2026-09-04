@@ -40,7 +40,7 @@ async def test_indian_job_platform_scrapers_and_queries():
     assert len(insta_leads) >= 4
     for lead in insta_leads:
         assert lead["platform"] == "Instahyre"
-        assert lead["company"] in ["Razorpay", "Cred", "BrowserStack", "Groww"]
+        assert lead["company"] in ["Razorpay", "Cred", "BrowserStack", "Groww", "Classplus"]
         assert "LPA" in lead["salary_range"]
 
     # 4. Cuvette Feed
