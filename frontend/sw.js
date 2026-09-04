@@ -3,7 +3,7 @@
  * Manages caching, offline reliability, background sync hooks, and native push notifications.
  */
 
-const CACHE_NAME = 'jobcopilot-pwa-v1.0';
+const CACHE_NAME = 'jobcopilot-pwa-v1.1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -146,3 +146,17 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
+// Background Sync Handler for Offline Actions
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-offline-actions') {
+    event.waitUntil(
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: 'FLUSH_OFFLINE_QUEUE' });
+        });
+      })
+    );
+  }
+});
+

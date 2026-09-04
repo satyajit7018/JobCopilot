@@ -20,6 +20,25 @@
 </head>
 <body>
 
+  <!-- Screen-Reader Only Accessible Live Announcement Region -->
+  <div id="sr-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- High-Visibility Persistent Impersonation Alert Banner -->
+  <div id="impersonation-banner" class="impersonation-alert-banner" role="alert" aria-live="assertive">
+    <div class="impersonation-banner-left">
+      <span class="impersonation-pulse-dot" aria-hidden="true"></span>
+      <span>⚠️ <strong>Active Impersonation Session</strong>: Viewing as <span id="impersonation-target-label" style="text-decoration: underline; font-weight: 700;">User</span>. All tenant actions are recorded in immutable audit logs.</span>
+    </div>
+    <button class="btn-impersonation-exit" data-action="exitImpersonation" aria-label="Stop impersonation session">
+      🛑 Stop Impersonating
+    </button>
+  </div>
+
+  <!-- Offline Status Connection Banner -->
+  <div id="offline-banner" class="offline-alert-banner" role="status" aria-live="polite">
+    ⚡ <strong>Offline Mode</strong>: Network connection lost. Changes and notes will queue locally and sync automatically upon reconnection.
+  </div>
+
   <!-- Mobile Top Header Bar for Phones -->
   <header class="mobile-top-bar">
     <div class="mobile-top-left" data-action="switchTab" data-tab="onboarding">
@@ -49,6 +68,33 @@
           <div>
             <div class="brand-title">JobCopilot</div>
             <div style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">CAREER OS v2.0</div>
+          </div>
+        </div>
+
+        <!-- Multi-Tenant Workspace Selector -->
+        <div class="workspace-section" style="padding: 0 1.25rem 0.85rem 1.25rem;">
+          <div class="workspace-switcher-wrap" id="workspace-switcher-container">
+            <button class="workspace-pill" id="btn-workspace-switcher" data-action="toggleWorkspaceDropdown" aria-haspopup="true" aria-expanded="false" aria-label="Switch organization workspace">
+              <span id="current-workspace-name">Personal Workspace</span>
+              <span id="current-workspace-role" class="role-badge-owner">OWNER</span>
+              <span style="font-size: 10px; color: var(--text-muted);">▼</span>
+            </button>
+            <div class="workspace-dropdown" id="workspace-dropdown" role="menu">
+              <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; padding: 4px 8px;">Workspaces</div>
+              <div id="workspace-list">
+                <div class="workspace-item active" data-action="selectWorkspace" data-org-id="" role="menuitem">
+                  <span>Personal Workspace</span>
+                  <span class="role-badge-owner">Default</span>
+                </div>
+              </div>
+              <div class="workspace-dropdown-divider"></div>
+              <button class="workspace-action-btn" data-action="openCreateOrgModal" role="menuitem">
+                <span>➕ Create Organization</span>
+              </button>
+              <button class="workspace-action-btn" id="btn-manage-workspace" data-action="openManageOrgModal" role="menuitem" style="display: none;">
+                <span>⚙️ Manage Workspace Team</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -114,6 +160,14 @@
               <span class="nav-icon">🔒</span>
               <span>Security &amp; Vault</span>
             </div>
+          </button>
+
+          <button class="nav-item" id="nav-item-admin" data-view="admin" style="display: none;">
+            <div class="nav-item-left">
+              <span class="nav-icon">🛡️</span>
+              <span>Admin Portal</span>
+            </div>
+            <span class="nav-badge" style="color: #fbbf24; border-color: rgba(245, 158, 11, 0.4);">SaaS</span>
           </button>
         </nav>
       </div>
@@ -1229,6 +1283,181 @@
             <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Hardware-backed secure enclave integration.</div>
           </div>
         </div>
+
+        <!-- Billing Lifecycle & Stripe Tier Management Card -->
+        <div class="glass-card" style="margin-top: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div>
+              <div style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Subscription &amp; Stripe Billing</div>
+              <div style="font-size: 12.5px; color: var(--text-secondary); margin-top: 3px;">
+                Active Tier: <span class="badge badge-success" id="settings-billing-tier" style="font-size: 11.5px; margin-left: 4px;">FREE</span>
+                <span id="settings-billing-status" style="margin-left: 8px; font-size: 11.5px; color: var(--accent-emerald);">● Active</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <button class="btn btn-secondary btn-sm" data-action="syncBillingStatus">
+                <span>🔄 Sync Stripe Truth</span>
+              </button>
+              <button class="btn btn-primary btn-sm" data-action="openProrationPreviewModal">
+                <span>📊 Proration Calculator &amp; Upgrade</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- GDPR Self-Service & Privacy Rights (Articles 17 & 20) -->
+        <div class="glass-card" style="margin-top: 1.5rem;">
+          <div style="font-size: 16px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>🛡️ Data Privacy &amp; GDPR Self-Service</span>
+            <span class="hud-pill" style="font-size: 10px; padding: 2px 8px;">Compliance Ready</span>
+          </div>
+          <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 6px; line-height: 1.5;">
+            Under GDPR Article 20 (Right to Data Portability) and Article 17 (Right to Erasure), you maintain 100% ownership of your data. You can instantly export your complete machine-readable dossier or permanently erase your account.
+          </p>
+
+          <div style="display: flex; gap: 12px; margin-top: 1.25rem; flex-wrap: wrap;">
+            <button class="btn btn-secondary" data-action="exportPersonalData">
+              <span>📥 Export Personal Data Archive (.json)</span>
+            </button>
+            <button class="btn btn-secondary" style="border-color: rgba(244, 63, 94, 0.4); color: #fda4af;" data-action="openDeleteAccountModal">
+              <span>🗑️ Request Account Erasure (Article 17)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- PWA Offline & Notifications Settings -->
+        <div class="glass-card" style="margin-top: 1.5rem;">
+          <div style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Offline Queue &amp; Native Alerts</div>
+          <div style="font-size: 12.5px; color: var(--text-secondary); margin-top: 4px;">
+            Offline status: <span id="offline-queue-count" style="font-weight: 700; color: var(--accent-cyan);">0 items queued</span>
+          </div>
+          <div style="display: flex; gap: 10px; margin-top: 1rem; flex-wrap: wrap;">
+            <button class="btn btn-secondary btn-sm" data-action="requestPushNotifications">
+              <span>🔔 Request Push Permissions</span>
+            </button>
+            <button class="btn btn-secondary btn-sm" data-action="openInstallModal">
+              <span>📱 Install App Prompt</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== ADMIN PORTAL (SAAS ENTERPRISE TELEMETRY) ==================== -->
+      <section id="view-admin" class="view-panel" style="display: none;">
+        <div class="view-header">
+          <div class="view-title-group">
+            <h1>Enterprise Admin Portal</h1>
+            <p class="view-subtitle">Platform telemetry, multi-tenant directory, user impersonation, and immutable audit logs.</p>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" data-action="refreshAdminData">
+              <span>🔄 Refresh Telemetry</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Telemetry Cards -->
+        <div class="admin-kpi-grid">
+          <div class="admin-kpi-card">
+            <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Total Platform Users</div>
+            <div class="admin-kpi-val" id="kpi-total-users">--</div>
+            <div style="font-size: 11.5px; color: var(--accent-indigo); margin-top: 4px;">Registered accounts</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Active Job Pipeline</div>
+            <div class="admin-kpi-val" id="kpi-total-jobs">--</div>
+            <div style="font-size: 11.5px; color: var(--accent-cyan); margin-top: 4px;">Tracked openings</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Bot Applications</div>
+            <div class="admin-kpi-val" id="kpi-total-applications">--</div>
+            <div style="font-size: 11.5px; color: var(--accent-emerald); margin-top: 4px;">Submissions executed</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Paid Subscriptions</div>
+            <div class="admin-kpi-val" id="kpi-active-subs">--</div>
+            <div style="font-size: 11.5px; color: var(--accent-amber); margin-top: 4px;">PRO / ELITE active</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Tenant Workspaces</div>
+            <div class="admin-kpi-val" id="kpi-total-orgs">--</div>
+            <div style="font-size: 11.5px; color: var(--accent-violet); margin-top: 4px;">Organizations active</div>
+          </div>
+        </div>
+
+        <!-- Sub-Tabs: Users Directory, Organizations, Audit Logs -->
+        <div class="hud-tab-bar" style="margin-bottom: 1rem;">
+          <button class="hud-tab-btn active" id="tab-admin-users" data-action="switchAdminSubTab" data-subtab="users">👥 User Directory</button>
+          <button class="hud-tab-btn" id="tab-admin-orgs" data-action="switchAdminSubTab" data-subtab="orgs">🏢 Organization Directory</button>
+          <button class="hud-tab-btn" id="tab-admin-logs" data-action="switchAdminSubTab" data-subtab="logs">📜 Security Audit Logs</button>
+        </div>
+
+        <!-- Admin Users Table Panel -->
+        <div id="admin-subpanel-users">
+          <div class="admin-search-bar">
+            <input type="text" id="admin-user-search" class="input-field" placeholder="Search by email, name, or user ID..." style="max-width: 380px;">
+            <button class="btn btn-secondary btn-sm" data-action="searchAdminUsers">Search</button>
+          </div>
+          <div class="admin-table-container">
+            <table class="admin-table" aria-label="Platform Users Table">
+              <thead>
+                <tr>
+                  <th>User ID</th>
+                  <th>Full Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-tbody">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Loading user records...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Admin Orgs Table Panel -->
+        <div id="admin-subpanel-orgs" style="display: none;">
+          <div class="admin-table-container">
+            <table class="admin-table" aria-label="Organizations Table">
+              <thead>
+                <tr>
+                  <th>Org ID</th>
+                  <th>Name</th>
+                  <th>Slug</th>
+                  <th>Owner ID</th>
+                  <th>Tier</th>
+                  <th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="admin-orgs-tbody">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Loading organizations...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Admin Audit Logs Panel -->
+        <div id="admin-subpanel-logs" style="display: none;">
+          <div class="admin-table-container">
+            <table class="admin-table" aria-label="Admin Audit Logs Table">
+              <thead>
+                <tr>
+                  <th>Log ID</th>
+                  <th>Admin ID</th>
+                  <th>Action</th>
+                  <th>Target User / Org</th>
+                  <th>IP Address</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody id="admin-logs-tbody">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Loading audit logs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
     </main>
@@ -1270,11 +1499,11 @@
     </div>
 
     <!-- ==================== HELD APPLICATIONS QUEUE MODAL (Step 6 & 7) ==================== -->
-    <div class="modal-overlay" id="modal-held-applications">
+    <div class="modal-overlay" id="modal-held-applications" role="dialog" aria-modal="true" aria-labelledby="title-held-apps">
       <div class="modal-box" style="max-width: 620px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <h3 style="font-size: 16px; color: var(--accent-amber); font-weight: 700;">⏸️ Held Applications Queue</h3>
-          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="modal-held-applications">✕</button>
+          <h3 id="title-held-apps" style="font-size: 16px; color: var(--accent-amber); font-weight: 700;">⏸️ Held Applications Queue</h3>
+          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="modal-held-applications" aria-label="Close held applications modal">✕</button>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 1.25rem;">
           These job applications were paused due to novel screening questions not yet indexed in your Knowledge Vault. Answering resumes submission immediately!
@@ -1286,11 +1515,11 @@
     </div>
 
     <!-- ==================== MANUAL DIRECT CALL LOGGER MODAL (Step 8) ==================== -->
-    <div class="modal-overlay" id="modal-log-call">
+    <div class="modal-overlay" id="modal-log-call" role="dialog" aria-modal="true" aria-labelledby="title-log-call">
       <div class="modal-box" style="max-width: 540px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-          <h3 style="font-size: 16px; font-weight: 700;">📞 Log Direct Recruiter Call / Update</h3>
-          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="modal-log-call">✕</button>
+          <h3 id="title-log-call" style="font-size: 16px; font-weight: 700;">📞 Log Direct Recruiter Call / Update</h3>
+          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="modal-log-call" aria-label="Close direct call modal">✕</button>
         </div>
         <form id="form-log-call" data-form-action="submitDirectCall">
           <div class="form-group">
@@ -1330,10 +1559,10 @@
     </div>
 
     <!-- ==================== HITL RESOLUTION MODAL ==================== -->
-    <div class="modal-overlay" id="hitl-modal">
+    <div class="modal-overlay" id="hitl-modal" role="dialog" aria-modal="true" aria-labelledby="title-hitl-modal">
       <div class="modal-box">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-          <h3 style="font-size: 16px; color: var(--accent-amber);">⚠️ Human-in-the-Loop Input Required</h3>
+          <h3 id="title-hitl-modal" style="font-size: 16px; color: var(--accent-amber);">⚠️ Human-in-the-Loop Input Required</h3>
           <span class="hud-pill" id="hitl-company-tag">Company</span>
         </div>
         <p id="hitl-question-text" style="font-weight: 600; font-size: 14px; margin-bottom: 1rem; color: #f1f5f9;"></p>
@@ -1354,11 +1583,11 @@
     </div>
 
     <!-- ==================== TRIPLE-THREAT OUTREACH & RESUME MODAL ==================== -->
-    <div class="modal-overlay" id="outreach-modal">
+    <div class="modal-overlay" id="outreach-modal" role="dialog" aria-modal="true" aria-labelledby="outreach-modal-title">
       <div class="modal-box" style="max-width: 680px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <h3 style="font-size: 16px; font-weight: 700;" id="outreach-modal-title">Tailored Assets &amp; Triple-Threat Outreach</h3>
-          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="outreach-modal">✕</button>
+          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="outreach-modal" aria-label="Close outreach modal">✕</button>
         </div>
 
         <div style="display: flex; gap: 6px; margin-bottom: 1rem; flex-wrap: wrap;">
@@ -1393,17 +1622,17 @@
     </div>
 
     <!-- ==================== INTERVIEW INVITATION CELEBRATION & MOCK PROMPT MODAL ==================== -->
-    <div class="modal-overlay" id="interview-invite-modal">
+    <div class="modal-overlay" id="interview-invite-modal" role="dialog" aria-modal="true" aria-labelledby="title-invite-modal">
       <div class="modal-box" style="max-width: 640px; border-color: rgba(16, 185, 129, 0.6); box-shadow: 0 0 35px rgba(16, 185, 129, 0.25);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-size: 24px;">🎉</span>
             <div>
-              <h3 style="font-size: 17px; font-weight: 800; color: #34d399;">Interview Invitation Confirmed!</h3>
+              <h3 id="title-invite-modal" style="font-size: 17px; font-weight: 800; color: #34d399;">Interview Invitation Confirmed!</h3>
               <span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">INBOUND PIPELINE MATCH</span>
             </div>
           </div>
-          <button class="btn btn-secondary btn-sm" data-action="closeInterviewInviteModal">✕</button>
+          <button class="btn btn-secondary btn-sm" data-action="closeInterviewInviteModal" aria-label="Close interview invite modal">✕</button>
         </div>
 
         <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.25rem;">
@@ -1437,12 +1666,12 @@
     </div>
 
     <!-- ==================== GLASS BOOTH DISTRACTION-FREE FULL-SCREEN STUDIO ==================== -->
-    <div class="glass-booth-overlay" id="glass-booth-modal">
+    <div class="glass-booth-overlay" id="glass-booth-modal" role="dialog" aria-modal="true" aria-labelledby="title-glass-booth">
       <div class="glass-booth-header">
         <div style="display: flex; align-items: center; gap: 12px;">
           <span style="font-size: 24px;">🪟</span>
           <div>
-            <h2 style="font-size: 18px; font-weight: 800; color: #f1f5f9; margin: 0;">Glass Booth • Distraction-Free Interview Studio</h2>
+            <h2 id="title-glass-booth" style="font-size: 18px; font-weight: 800; color: #f1f5f9; margin: 0;">Glass Booth • Distraction-Free Interview Studio</h2>
             <span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">LIVE AUDIO FREQUENCY VISUALIZER &amp; SPEECH-TO-TEXT RADAR</span>
           </div>
         </div>
@@ -1538,17 +1767,17 @@
     </div>
 
     <!-- Modal: Install Android App & Download APK -->
-    <div class="modal-overlay" id="modal-install-app" style="display: none;">
+    <div class="modal-overlay" id="modal-install-app" role="dialog" aria-modal="true" aria-labelledby="title-install-app" style="display: none;">
       <div class="modal-dialog glass-card" style="max-width: 520px; border-color: rgba(99, 102, 241, 0.4);">
         <div class="modal-header">
           <div style="display: flex; align-items: center; gap: 10px;">
             <div style="font-size: 28px;">📱</div>
             <div>
-              <h3 class="modal-title" style="font-size: 18px;">Install JobCopilot on Android</h3>
+              <h3 class="modal-title" id="title-install-app" style="font-size: 18px;">Install JobCopilot on Android</h3>
               <div style="font-size: 12px; color: var(--accent-cyan);">Fast PWA &amp; Standalone Mobile Experience</div>
             </div>
           </div>
-          <button class="btn-close" data-action="closeInstallModal">✕</button>
+          <button class="btn-close" data-action="closeInstallModal" aria-label="Close dialog">✕</button>
         </div>
 
         <div class="modal-body" style="padding: 1rem 0;">
@@ -1614,6 +1843,177 @@
       </div>
     </div>
 
+    <!-- Modal: Create Organization Workspace -->
+    <div class="modal-overlay" id="modal-create-org" role="dialog" aria-modal="true" aria-labelledby="title-create-org" style="display: none;">
+      <div class="modal-dialog glass-card" style="max-width: 480px; border-color: rgba(99, 102, 241, 0.4);">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 24px;">🏢</div>
+            <div>
+              <h3 class="modal-title" id="title-create-org" style="font-size: 18px;">Create Organization</h3>
+              <div style="font-size: 12px; color: var(--accent-indigo);">Team Workspaces &amp; Collaborative Hunting</div>
+            </div>
+          </div>
+          <button class="btn-close" data-action="closeCreateOrgModal" aria-label="Close dialog">✕</button>
+        </div>
+        <div class="modal-body" style="padding: 1rem 0;">
+          <div style="margin-bottom: 1rem;">
+            <label for="new-org-name" style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary);">Organization Name</label>
+            <input type="text" id="new-org-name" class="input-field" placeholder="e.g. Acme Talent Ventures" data-input-action="updateOrgSlugPreview" style="width: 100%;">
+          </div>
+          <div style="margin-bottom: 1rem;">
+            <label style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary);">Organization URL Slug Preview</label>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent-cyan); background: rgba(0, 0, 0, 0.4); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-subtle);">
+              jobcopilot.local/org/<span id="new-org-slug-preview">acme-talent-ventures</span>
+            </div>
+          </div>
+          <div style="margin-bottom: 1rem;">
+            <label for="new-org-tier" style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary);">Initial Workspace Tier</label>
+            <select id="new-org-tier" class="input-field" style="width: 100%;">
+              <option value="FREE">FREE (Up to 3 members)</option>
+              <option value="PRO">PRO (Up to 10 members + pooled bot concurrency)</option>
+              <option value="ENTERPRISE">ENTERPRISE (Unlimited members + dedicated proxies)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="btn btn-secondary" data-action="closeCreateOrgModal">Cancel</button>
+          <button class="btn btn-primary" data-action="submitCreateOrg">Create Workspace</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Manage Organization Workspace & Members -->
+    <div class="modal-overlay" id="modal-manage-org" role="dialog" aria-modal="true" aria-labelledby="title-manage-org" style="display: none;">
+      <div class="modal-dialog glass-card" style="max-width: 640px; border-color: rgba(99, 102, 241, 0.4);">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 24px;">👥</div>
+            <div>
+              <h3 class="modal-title" id="title-manage-org" style="font-size: 18px;">Workspace Settings &amp; Members</h3>
+              <div style="font-size: 12px; color: var(--accent-emerald);" id="manage-org-subtitle">Organization Team Roster</div>
+            </div>
+          </div>
+          <button class="btn-close" data-action="closeManageOrgModal" aria-label="Close dialog">✕</button>
+        </div>
+        <div class="modal-body" style="padding: 1rem 0;">
+          <!-- Invite Member Form -->
+          <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 12px; margin-bottom: 1.25rem;">
+            <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">Invite Team Member</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <input type="email" id="invite-member-email" class="input-field" placeholder="colleague@company.com" style="flex: 2; min-width: 180px;">
+              <select id="invite-member-role" class="input-field" style="flex: 1; min-width: 110px;">
+                <option value="MEMBER">MEMBER</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+              <button class="btn btn-primary btn-sm" data-action="submitInviteMember">Send Invite</button>
+            </div>
+          </div>
+
+          <!-- Members Table -->
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">Current Members</div>
+          <div class="admin-table-container" style="max-height: 280px; overflow-y: auto;">
+            <table class="admin-table" aria-label="Workspace Members Table">
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th>Role</th>
+                  <th>Joined</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="org-members-tbody">
+                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Loading members...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end;">
+          <button class="btn btn-secondary" data-action="closeManageOrgModal">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Billing Proration Preview & Tier Upgrade -->
+    <div class="modal-overlay" id="modal-proration-preview" role="dialog" aria-modal="true" aria-labelledby="title-proration" style="display: none;">
+      <div class="modal-dialog glass-card" style="max-width: 520px; border-color: rgba(99, 102, 241, 0.4);">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 24px;">💎</div>
+            <div>
+              <h3 class="modal-title" id="title-proration" style="font-size: 18px;">Subscription Tier &amp; Proration</h3>
+              <div style="font-size: 12px; color: var(--accent-cyan);">Live Stripe billing preview</div>
+            </div>
+          </div>
+          <button class="btn-close" data-action="closeProrationPreviewModal" aria-label="Close dialog">✕</button>
+        </div>
+        <div class="modal-body" style="padding: 1rem 0;">
+          <div style="margin-bottom: 1rem;">
+            <label for="proration-target-tier" style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary);">Select Target Subscription Tier</label>
+            <select id="proration-target-tier" class="input-field" data-change-action="onProrationTierChanged" style="width: 100%;">
+              <option value="PRO">PRO ($29 / month) — Unlimited tailoring + 5 concurrent bot workers</option>
+              <option value="ELITE">ELITE ($79 / month) — Dedicated proxies + VIP ATS fast-track</option>
+              <option value="FREE">FREE ($0 / month) — Basic manual tracking</option>
+            </select>
+          </div>
+
+          <div class="proration-preview-card" id="proration-details-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 12.5px; color: var(--text-secondary);">Prorated Adjustment Due Today:</span>
+              <span class="proration-amount-highlight" id="proration-amount-display">$0.00</span>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;" id="proration-explanation-text">
+              Selecting a plan queries Stripe proration tables. Upgrades grant instant access to advanced features.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="btn btn-secondary" data-action="closeProrationPreviewModal">Cancel</button>
+          <button class="btn btn-primary" data-action="confirmTierUpgrade">Upgrade Now</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: GDPR Article 17 Permanent Account Erasure -->
+    <div class="modal-overlay" id="modal-gdpr-delete" role="dialog" aria-modal="true" aria-labelledby="title-gdpr-delete" style="display: none;">
+      <div class="modal-dialog glass-card" style="max-width: 500px; border-color: rgba(244, 63, 94, 0.5);">
+        <div class="modal-header">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 24px;">⚠️</div>
+            <div>
+              <h3 class="modal-title" id="title-gdpr-delete" style="font-size: 18px; color: var(--accent-rose);">Permanent Account Erasure</h3>
+              <div style="font-size: 12px; color: #fda4af;">GDPR Article 17 — Right to be Forgotten</div>
+            </div>
+          </div>
+          <button class="btn-close" data-action="closeDeleteAccountModal" aria-label="Close dialog">✕</button>
+        </div>
+        <div class="modal-body" style="padding: 1rem 0;">
+          <div style="background: rgba(244, 63, 94, 0.08); border: 1px solid rgba(244, 63, 94, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 1rem; color: #fecdd3; font-size: 12.5px; line-height: 1.5;">
+            <strong>Warning: This action is permanent and irreversible.</strong><br>
+            All candidate profiles, uploaded résumés, tracked applications, knowledge vault Q&amp;A vectors, apply ledger records, and physical disk storage files will be permanently erased.
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label for="delete-account-password" style="display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary);">Confirm Your Account Password</label>
+            <input type="password" id="delete-account-password" class="input-field" placeholder="Enter password to authenticate erasure" style="width: 100%;">
+          </div>
+
+          <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 0.5rem;">
+            <input type="checkbox" id="delete-account-consent" style="margin-top: 3px;">
+            <label for="delete-account-consent" style="font-size: 12px; color: var(--text-secondary);">
+              I explicitly request cryptographic hard deletion of all my tenant records and stored files under GDPR Article 17.
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button class="btn btn-secondary" data-action="closeDeleteAccountModal">Cancel</button>
+          <button class="btn btn-primary" style="background: linear-gradient(135deg, #e11d48, #be123c); border-color: #f43f5e;" data-action="executeAccountDeletion">
+            Permanently Erase Account
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Mobile Slide-Out Drawer Overlay & Panel -->
     <div class="mobile-drawer-overlay" id="mobile-drawer-overlay" data-action="toggleMobileDrawer" data-drawer-state="false"></div>
     <aside class="mobile-drawer" id="mobile-drawer">
@@ -1650,6 +2050,9 @@
           </button>
           <button class="drawer-nav-item" data-action="switchTab" data-tab="settings" data-close-drawer="true">
             <span>🛡️ Security &amp; Disaster Recovery</span>
+          </button>
+          <button class="drawer-nav-item" id="drawer-nav-item-admin" data-action="switchTab" data-tab="admin" data-close-drawer="true" style="display: none;">
+            <span>🛡️ Admin Portal</span>
           </button>
         </div>
         
