@@ -543,6 +543,54 @@ class DatabaseManager(DatabaseAdapter):
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_idempotency_keys_expires ON idempotency_keys(expires_at);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_idempotency_keys_user ON idempotency_keys(user_id, idempotency_key);")
 
+                # 16. MFA Credentials Table (Epic F)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS mfa_credentials (
+                    user_id TEXT PRIMARY KEY,
+                    secret TEXT NOT NULL,
+                    backup_codes JSON NOT NULL,
+                    is_enabled BOOLEAN NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_mfa_credentials_user ON mfa_credentials(user_id);")
+
+                # 17. User Sessions Table (Epic F)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    session_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    token_jti TEXT NOT NULL,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    device_name TEXT,
+                    created_at TEXT NOT NULL,
+                    last_active TEXT NOT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT 1
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id, is_active);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_jti ON user_sessions(token_jti);")
+
+                # 18. Security Audit Logs Table - Append-Only (Epic F)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS security_audit_logs (
+                    log_id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    event_type TEXT NOT NULL,
+                    severity TEXT NOT NULL DEFAULT 'INFO',
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    details JSON NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_sec_audit_user ON security_audit_logs(user_id);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_sec_audit_event ON security_audit_logs(event_type);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_sec_audit_severity ON security_audit_logs(severity);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_sec_audit_created ON security_audit_logs(created_at DESC);")
+
                 # High-traffic compound indexes for query tuning
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_emails_user_received ON emails(user_id, received_at DESC);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_hitl_user_status ON hitl_events(user_id, status);")
@@ -1996,6 +2044,283 @@ class DatabaseManager(DatabaseAdapter):
                 except Exception:
                     conn.rollback()
                     return 0
+
+    # =========================================================================
+    # Epic F: MFA / TOTP Storage
+    # =========================================================================
+    def get_mfa_credentials(self, user_id: str) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT user_id, secret, backup_codes, is_enabled, created_at, updated_at FROM mfa_credentials WHERE user_id = ?",
+                (user_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            backup_codes = []
+            if row[2]:
+                try:
+                    backup_codes = json.loads(row[2])
+                except Exception:
+                    backup_codes = []
+            return {
+                "user_id": row[0],
+                "secret": row[1],
+                "backup_codes": backup_codes,
+                "is_enabled": bool(row[3]),
+                "created_at": row[4],
+                "updated_at": row[5]
+            }
+
+    def save_mfa_credentials(self, user_id: str, secret: str, backup_codes: List[Dict[str, Any]], is_enabled: bool) -> bool:
+        now_str = datetime.now().isoformat()
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                    INSERT INTO mfa_credentials (user_id, secret, backup_codes, is_enabled, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(user_id) DO UPDATE SET
+                        secret = excluded.secret,
+                        backup_codes = excluded.backup_codes,
+                        is_enabled = excluded.is_enabled,
+                        updated_at = excluded.updated_at
+                    """, (user_id, secret, json.dumps(backup_codes), 1 if is_enabled else 0, now_str, now_str))
+                    conn.commit()
+                    return True
+                except Exception:
+                    conn.rollback()
+                    return False
+
+    def delete_mfa_credentials(self, user_id: str) -> bool:
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("DELETE FROM mfa_credentials WHERE user_id = ?", (user_id,))
+                    conn.commit()
+                    return cursor.rowcount > 0
+                except Exception:
+                    conn.rollback()
+                    return False
+
+    # =========================================================================
+    # Epic F: Session & Device Management
+    # =========================================================================
+    def create_session(self, session: Dict[str, Any]) -> bool:
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                    INSERT INTO user_sessions (session_id, user_id, token_jti, ip_address, user_agent, device_name, created_at, last_active, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        session["session_id"],
+                        session["user_id"],
+                        session["token_jti"],
+                        session.get("ip_address"),
+                        session.get("user_agent"),
+                        session.get("device_name", "Unknown Device"),
+                        session.get("created_at", datetime.now().isoformat()),
+                        session.get("last_active", datetime.now().isoformat()),
+                        1 if session.get("is_active", True) else 0
+                    ))
+                    conn.commit()
+                    return True
+                except Exception:
+                    conn.rollback()
+                    return False
+
+    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT session_id, user_id, token_jti, ip_address, user_agent, device_name, created_at, last_active, is_active FROM user_sessions WHERE session_id = ?",
+                (session_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "session_id": row[0],
+                "user_id": row[1],
+                "token_jti": row[2],
+                "ip_address": row[3],
+                "user_agent": row[4],
+                "device_name": row[5],
+                "created_at": row[6],
+                "last_active": row[7],
+                "is_active": bool(row[8])
+            }
+
+    def list_user_sessions(self, user_id: str, active_only: bool = True) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            if active_only:
+                cursor.execute(
+                    "SELECT session_id, user_id, token_jti, ip_address, user_agent, device_name, created_at, last_active, is_active FROM user_sessions WHERE user_id = ? AND is_active = 1 ORDER BY last_active DESC",
+                    (user_id,)
+                )
+            else:
+                cursor.execute(
+                    "SELECT session_id, user_id, token_jti, ip_address, user_agent, device_name, created_at, last_active, is_active FROM user_sessions WHERE user_id = ? ORDER BY last_active DESC",
+                    (user_id,)
+                )
+            rows = cursor.fetchall()
+            return [
+                {
+                    "session_id": r[0],
+                    "user_id": r[1],
+                    "token_jti": r[2],
+                    "ip_address": r[3],
+                    "user_agent": r[4],
+                    "device_name": r[5],
+                    "created_at": r[6],
+                    "last_active": r[7],
+                    "is_active": bool(r[8])
+                }
+                for r in rows
+            ]
+
+    def revoke_session(self, session_id: str, user_id: str) -> bool:
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE user_sessions SET is_active = 0 WHERE session_id = ? AND user_id = ?",
+                        (session_id, user_id)
+                    )
+                    conn.commit()
+                    return cursor.rowcount > 0
+                except Exception:
+                    conn.rollback()
+                    return False
+
+    def revoke_all_user_sessions(self, user_id: str, except_jti: Optional[str] = None) -> int:
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    if except_jti:
+                        cursor.execute(
+                            "UPDATE user_sessions SET is_active = 0 WHERE user_id = ? AND token_jti != ? AND is_active = 1",
+                            (user_id, except_jti)
+                        )
+                    else:
+                        cursor.execute(
+                            "UPDATE user_sessions SET is_active = 0 WHERE user_id = ? AND is_active = 1",
+                            (user_id,)
+                        )
+                    conn.commit()
+                    return cursor.rowcount
+                except Exception:
+                    conn.rollback()
+                    return 0
+
+    def update_session_activity(self, token_jti: str) -> bool:
+        now_str = datetime.now().isoformat()
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE user_sessions SET last_active = ? WHERE token_jti = ? AND is_active = 1",
+                        (now_str, token_jti)
+                    )
+                    conn.commit()
+                    return cursor.rowcount > 0
+                except Exception:
+                    conn.rollback()
+                    return False
+
+    # =========================================================================
+    # Epic F: Security Audit Logs (Append-Only)
+    # =========================================================================
+    def insert_security_audit_log(self, log_entry: Dict[str, Any]) -> bool:
+        with self._lock:
+            with self.get_connection() as conn:
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                    INSERT INTO security_audit_logs (log_id, user_id, event_type, severity, ip_address, user_agent, details, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        log_entry["log_id"],
+                        log_entry.get("user_id"),
+                        log_entry["event_type"],
+                        log_entry.get("severity", "INFO"),
+                        log_entry.get("ip_address"),
+                        log_entry.get("user_agent"),
+                        json.dumps(log_entry.get("details", {})),
+                        log_entry.get("created_at", datetime.now().isoformat())
+                    ))
+                    conn.commit()
+                    return True
+                except Exception:
+                    conn.rollback()
+                    return False
+
+    def list_security_audit_logs(
+        self,
+        user_id: Optional[str] = None,
+        event_type: Optional[str] = None,
+        severity: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = (
+                "SELECT log_id, user_id, event_type, severity, ip_address, user_agent, details, created_at "
+                "FROM security_audit_logs "
+                "WHERE (? IS NULL OR user_id = ?) "
+                "AND (? IS NULL OR event_type = ?) "
+                "AND (? IS NULL OR severity = ?) "
+                "ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            )
+            cursor.execute(query, (user_id, user_id, event_type, event_type, severity, severity, limit, offset))
+            rows = cursor.fetchall()
+            results = []
+            for r in rows:
+                details = {}
+                if r[6]:
+                    try:
+                        details = json.loads(r[6])
+                    except Exception:
+                        details = {}
+                results.append({
+                    "log_id": r[0],
+                    "user_id": r[1],
+                    "event_type": r[2],
+                    "severity": r[3],
+                    "ip_address": r[4],
+                    "user_agent": r[5],
+                    "details": details,
+                    "created_at": r[7]
+                })
+            return results
+
+    def count_security_audit_logs(
+        self,
+        user_id: Optional[str] = None,
+        event_type: Optional[str] = None,
+        severity: Optional[str] = None
+    ) -> int:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = (
+                "SELECT COUNT(*) FROM security_audit_logs "
+                "WHERE (? IS NULL OR user_id = ?) "
+                "AND (? IS NULL OR event_type = ?) "
+                "AND (? IS NULL OR severity = ?)"
+            )
+            cursor.execute(query, (user_id, user_id, event_type, event_type, severity, severity))
+            row = cursor.fetchone()
+            return row[0] if row else 0
 
 
 

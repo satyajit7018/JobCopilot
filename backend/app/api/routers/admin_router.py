@@ -131,6 +131,26 @@ async def get_admin_audit_logs(
     }
 
 
+@router.get("/security-audit-logs")
+async def get_system_security_audit_logs(
+    user_id: Optional[str] = None,
+    event_type: Optional[str] = None,
+    severity: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    admin_user: User = Depends(require_admin)
+):
+    """Retrieves system-wide security audit logs and anomaly alerts (Admin only)."""
+    from app.core.security_logger import security_logger
+    return security_logger.get_logs(
+        user_id=user_id,
+        event_type=event_type,
+        severity=severity,
+        limit=limit,
+        offset=offset
+    )
+
+
 @router.patch("/users/{user_id}/role")
 async def update_user_role(
     user_id: str,

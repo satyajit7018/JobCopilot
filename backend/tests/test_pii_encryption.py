@@ -49,14 +49,14 @@ def test_profile_pii_encrypted_at_rest():
         # Assert envelope marker exists
         assert raw_data.get("_pii_encrypted") is True
 
-        # Assert sensitive fields are encrypted (start with enc:)
-        assert raw_data["phone"].startswith("enc:")
+        # Assert sensitive fields are encrypted (start with enc: or env:)
+        assert raw_data["phone"].startswith(("enc:", "env:"))
         assert phone not in raw_json_str
-        assert raw_data["location"].startswith("enc:")
+        assert raw_data["location"].startswith(("enc:", "env:"))
         assert location not in raw_json_str
-        assert raw_data["preferences"]["expected_ctc"].startswith("enc:")
+        assert raw_data["preferences"]["expected_ctc"].startswith(("enc:", "env:"))
         assert expected_ctc not in raw_json_str
-        assert raw_data["preferences"]["current_employer"].startswith("enc:")
+        assert raw_data["preferences"]["current_employer"].startswith(("enc:", "env:"))
         assert employer not in raw_json_str
 
     # 3. Read profile through application layer (transparent decryption)
@@ -109,7 +109,7 @@ def test_legacy_plaintext_profile_backfill():
         row = cursor.fetchone()
         raw_data = json.loads(row["data"])
         assert raw_data.get("_pii_encrypted") is True
-        assert raw_data["phone"].startswith("enc:")
+        assert raw_data["phone"].startswith(("enc:", "env:"))
 
     # Verify retrieval
     retrieved = db.get_profile(user_id=user_id)

@@ -37,9 +37,15 @@ from app.core.models import (
     User, UserRole, UserRegisterRequest, UserLoginRequest,
     RefreshTokenRequest, TokenResponse, UserResponse,
     VerifyEmailRequest, RequestPasswordResetRequest, ResetPasswordRequest,
-    Membership, OrgRole
+    Membership, OrgRole,
+    MFASetupResponse, MFAVerifyRequest, MFALoginChallengeRequest, MFADisableRequest,
+    SessionResponse, SessionListResponse, SecurityLogListResponse
 )
 from app.core.database import db
+from app.core.credential_vault import cred_vault
+from app.core.mfa import mfa_engine
+from app.core.session_manager import session_manager
+from app.core.security_logger import security_logger
 
 # =========================================================================
 # Fail-Closed JWT Configuration (F-05)
@@ -58,7 +64,23 @@ JWT_ALGORITHM = settings.JWT_ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS
 
-limiter = Limiter(key_func=get_remote_address)
+
+def get_user_or_ip(request: Request) -> str:
+    """Per-user rate limiting key function for authenticated requests, falling back to IP."""
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+        try:
+            payload = decode_jwt_token(token)
+            sub = payload.get("sub")
+            if sub:
+                return f"usr:{sub}"
+        except Exception:
+            pass
+    return f"ip:{get_remote_address(request)}"
+
+
+limiter = Limiter(key_func=get_user_or_ip)
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security = HTTPBearer(auto_error=False)
 
@@ -392,12 +414,20 @@ async def register_user(request: Request, req: UserRegisterRequest):
 @router.post("/login", response_model=TokenResponse)
 @limiter.limit("15/minute")
 async def login_user(request: Request, req: UserLoginRequest):
-    """Authenticates user credentials, enforces brute-force lockout, and issues JWT tokens."""
+    """Authenticates user credentials, enforces brute-force lockout, MFA gate, and issues JWT tokens."""
     clean_email = req.email.lower().strip()
     client_ip = request.client.host if request.client else "127.0.0.1"
+    user_agent = request.headers.get("User-Agent")
 
     # Check brute-force lockout
     if db.check_login_lockout(clean_email, client_ip):
+        security_logger.log_event(
+            "auth.lockout",
+            user_id=clean_email,
+            severity="WARNING",
+            ip_address=client_ip,
+            user_agent=user_agent
+        )
         raise HTTPException(
             status_code=401,
             detail="Account temporarily locked due to multiple failed login attempts. Please try again in 15 minutes."
@@ -406,11 +436,25 @@ async def login_user(request: Request, req: UserLoginRequest):
     user = db.get_user_by_email(clean_email)
     if not user:
         db.record_login_attempt(clean_email, client_ip, success=False)
+        security_logger.log_event(
+            "auth.login.failed",
+            user_id=clean_email,
+            severity="WARNING",
+            ip_address=client_ip,
+            user_agent=user_agent
+        )
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     
     is_valid, needs_rehash = verify_password(req.password, user.password_hash)
     if not is_valid:
         db.record_login_attempt(clean_email, client_ip, success=False)
+        security_logger.log_event(
+            "auth.login.failed",
+            user_id=user.user_id,
+            severity="WARNING",
+            ip_address=client_ip,
+            user_agent=user_agent
+        )
         raise HTTPException(status_code=401, detail="Invalid email or password.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="User account is deactivated.")
@@ -427,6 +471,31 @@ async def login_user(request: Request, req: UserLoginRequest):
             pass
 
     role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
+
+    # --- Epic F: MFA Enforcement Gate ---
+    mfa_cred = db.get_mfa_credentials(user.user_id)
+    if mfa_cred and mfa_cred.get("is_enabled"):
+        mfa_token = create_jwt_token(
+            {"sub": user.user_id, "email": user.email, "role": role_str, "type": "mfa_challenge"},
+            timedelta(minutes=5)
+        )
+        security_logger.log_event(
+            "auth.mfa.challenge_issued",
+            user_id=user.user_id,
+            ip_address=client_ip,
+            user_agent=user_agent
+        )
+        return TokenResponse(
+            access_token="",
+            refresh_token="",
+            user_id=user.user_id,
+            email=user.email,
+            role=role_str,
+            mfa_required=True,
+            mfa_token=mfa_token
+        )
+
+    # Direct login when MFA is disabled
     access_token = create_jwt_token(
         {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access"},
         timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -434,6 +503,22 @@ async def login_user(request: Request, req: UserLoginRequest):
     refresh_token = create_jwt_token(
         {"sub": user.user_id, "type": "refresh"},
         timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+
+    # Register active session
+    token_payload = decode_jwt_token(access_token)
+    session_manager.create_session(
+        user_id=user.user_id,
+        token_jti=token_payload.get("jti", ""),
+        ip_address=client_ip,
+        user_agent=user_agent
+    )
+
+    security_logger.log_event(
+        "auth.login.success",
+        user_id=user.user_id,
+        ip_address=client_ip,
+        user_agent=user_agent
     )
 
     return TokenResponse(
@@ -563,10 +648,11 @@ async def reset_password(request: Request, req: ResetPasswordRequest):
 
 @router.post("/logout")
 async def logout_user(
+    request: Request,
     current_user: User = Depends(get_current_user),
     auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ):
-    """Revokes the current access token in the database blacklist."""
+    """Revokes the current access token in the database blacklist and deactivates active session."""
     if auth and auth.credentials:
         try:
             payload = decode_jwt_token(auth.credentials)
@@ -574,8 +660,20 @@ async def logout_user(
             if jti:
                 exp_str = str(payload.get("exp", ""))
                 db.revoke_token(jti, current_user.user_id, exp_str)
+                # Find and revoke corresponding user session
+                sessions = db.list_user_sessions(current_user.user_id, active_only=True)
+                for s in sessions:
+                    if s.get("token_jti") == jti:
+                        db.revoke_session(s["session_id"], current_user.user_id)
         except Exception:
             pass
+
+    security_logger.log_event(
+        "auth.logout",
+        user_id=current_user.user_id,
+        ip_address=request.client.host if request.client else "127.0.0.1",
+        user_agent=request.headers.get("User-Agent")
+    )
     return {"status": "success", "message": "Successfully logged out and token revoked."}
 
 
@@ -591,3 +689,272 @@ async def get_my_profile(current_user: User = Depends(get_current_user)):
         email_verified=current_user.email_verified,
         created_at=current_user.created_at
     )
+
+
+# =========================================================================
+# MFA / TOTP API Endpoints (Epic F)
+# =========================================================================
+@router.post("/mfa/setup", response_model=MFASetupResponse)
+async def setup_mfa(request: Request, current_user: User = Depends(get_current_user)):
+    """Initiates TOTP enrollment, generates secret, QR provisioning URI, and backup recovery codes."""
+    secret = mfa_engine.generate_secret()
+    provisioning_uri = mfa_engine.generate_provisioning_uri(secret, current_user.email)
+    plain_backup_codes, hashed_storage = mfa_engine.generate_backup_codes(8)
+
+    # Store encrypted secret and recovery codes in pending state (is_enabled=False)
+    enc_secret = cred_vault.encrypt_field(secret)
+    db.save_mfa_credentials(
+        user_id=current_user.user_id,
+        secret=enc_secret,
+        backup_codes=hashed_storage,
+        is_enabled=False
+    )
+
+    security_logger.log_event(
+        "auth.mfa.setup",
+        user_id=current_user.user_id,
+        ip_address=request.client.host if request.client else "127.0.0.1",
+        user_agent=request.headers.get("User-Agent")
+    )
+
+    return MFASetupResponse(
+        secret=secret,
+        provisioning_uri=provisioning_uri,
+        backup_codes=plain_backup_codes,
+        message="MFA setup initiated. Enter current 6-digit TOTP code to finalize activation."
+    )
+
+
+@router.post("/mfa/verify")
+async def verify_and_enable_mfa(request: Request, req: MFAVerifyRequest, current_user: User = Depends(get_current_user)):
+    """Verifies TOTP code against pending secret and finalizes MFA activation."""
+    mfa_cred = db.get_mfa_credentials(current_user.user_id)
+    if not mfa_cred or not mfa_cred.get("secret"):
+        raise HTTPException(status_code=400, detail="MFA setup has not been initiated. Call /auth/mfa/setup first.")
+
+    plain_secret = cred_vault.decrypt_field(mfa_cred["secret"])
+    if not mfa_engine.verify_totp(plain_secret, req.code):
+        raise HTTPException(status_code=400, detail="Invalid verification code. Please check your authenticator app.")
+
+    # Enable MFA
+    db.save_mfa_credentials(
+        user_id=current_user.user_id,
+        secret=mfa_cred["secret"],
+        backup_codes=mfa_cred.get("backup_codes", []),
+        is_enabled=True
+    )
+
+    security_logger.log_event(
+        "auth.mfa.enabled",
+        user_id=current_user.user_id,
+        ip_address=request.client.host if request.client else "127.0.0.1",
+        user_agent=request.headers.get("User-Agent")
+    )
+
+    return {"status": "success", "message": "Two-factor authentication successfully enabled."}
+
+
+@router.post("/mfa/login-challenge", response_model=TokenResponse)
+async def complete_mfa_login(request: Request, req: MFALoginChallengeRequest):
+    """Verifies MFA challenge token with TOTP code or backup recovery code, issuing full JWT."""
+    token_payload = decode_jwt_token(req.mfa_token)
+    if token_payload.get("type") != "mfa_challenge":
+        raise HTTPException(status_code=400, detail="Invalid MFA challenge token type.")
+
+    user_id = token_payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid challenge token subject.")
+
+    user = db.get_user_by_id(user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="User account not found or disabled.")
+
+    mfa_cred = db.get_mfa_credentials(user.user_id)
+    if not mfa_cred or not mfa_cred.get("is_enabled"):
+        raise HTTPException(status_code=400, detail="MFA is not enabled for this account.")
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user_agent = request.headers.get("User-Agent")
+
+    # 1. Try TOTP code
+    plain_secret = cred_vault.decrypt_field(mfa_cred["secret"])
+    is_valid_totp = mfa_engine.verify_totp(plain_secret, req.code)
+
+    # 2. If TOTP code fails, try recovery code
+    used_recovery = False
+    if not is_valid_totp:
+        backup_codes = mfa_cred.get("backup_codes", [])
+        consumed, updated_backup_codes = mfa_engine.verify_and_consume_backup_code(backup_codes, req.code)
+        if consumed:
+            used_recovery = True
+            db.save_mfa_credentials(
+                user_id=user.user_id,
+                secret=mfa_cred["secret"],
+                backup_codes=updated_backup_codes,
+                is_enabled=True
+            )
+            security_logger.log_event(
+                "auth.mfa.recovery_used",
+                user_id=user.user_id,
+                ip_address=client_ip,
+                user_agent=user_agent
+            )
+        else:
+            security_logger.log_event(
+                "auth.mfa.challenge_failed",
+                user_id=user.user_id,
+                severity="WARNING",
+                ip_address=client_ip,
+                user_agent=user_agent
+            )
+            raise HTTPException(status_code=401, detail="Invalid TOTP code or backup recovery code.")
+
+    role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
+    access_token = create_jwt_token(
+        {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access"},
+        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    refresh_token = create_jwt_token(
+        {"sub": user.user_id, "type": "refresh"},
+        timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+
+    # Register active session
+    access_jti = decode_jwt_token(access_token).get("jti", "")
+    session_manager.create_session(
+        user_id=user.user_id,
+        token_jti=access_jti,
+        ip_address=client_ip,
+        user_agent=user_agent
+    )
+
+    security_logger.log_event(
+        "auth.login.success",
+        user_id=user.user_id,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        details={"mfa_verified": True, "recovery_code": used_recovery}
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user_id=user.user_id,
+        email=user.email,
+        role=role_str
+    )
+
+
+@router.post("/mfa/disable")
+async def disable_mfa(
+    request: Request,
+    req: MFADisableRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Disables MFA after verifying the user's password or current TOTP code."""
+    verified = False
+    if req.password:
+        is_valid, _ = verify_password(req.password, current_user.password_hash)
+        if is_valid:
+            verified = True
+    elif req.code:
+        mfa_cred = db.get_mfa_credentials(current_user.user_id)
+        if mfa_cred and mfa_cred.get("secret"):
+            plain_secret = cred_vault.decrypt_field(mfa_cred["secret"])
+            if mfa_engine.verify_totp(plain_secret, req.code):
+                verified = True
+
+    if not verified:
+        raise HTTPException(status_code=400, detail="Invalid password or verification code to disable MFA.")
+
+    db.delete_mfa_credentials(current_user.user_id)
+    security_logger.log_event(
+        "auth.mfa.disabled",
+        user_id=current_user.user_id,
+        severity="WARNING",
+        ip_address=request.client.host if request.client else "127.0.0.1",
+        user_agent=request.headers.get("User-Agent")
+    )
+    return {"status": "success", "message": "Two-factor authentication has been disabled."}
+
+
+# =========================================================================
+# Session & Device Management API Endpoints (Epic F)
+# =========================================================================
+@router.get("/sessions", response_model=SessionListResponse)
+async def list_active_sessions(
+    current_user: User = Depends(get_current_user),
+    auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
+):
+    """Lists all active device sessions for the authenticated candidate."""
+    current_jti = None
+    if auth and auth.credentials:
+        try:
+            payload = decode_jwt_token(auth.credentials)
+            current_jti = payload.get("jti")
+        except Exception:
+            pass
+
+    sessions = session_manager.list_active_sessions(current_user.user_id, current_jti=current_jti)
+    return SessionListResponse(sessions=sessions, total=len(sessions))
+
+
+@router.delete("/sessions/{session_id}")
+async def revoke_user_session(
+    session_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """Revokes a specific device session and blacklists its token."""
+    success = session_manager.revoke_session(session_id, current_user.user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found or already revoked.")
+
+    security_logger.log_event(
+        "auth.session.revoked",
+        user_id=current_user.user_id,
+        ip_address=request.client.host if request.client else "127.0.0.1",
+        user_agent=request.headers.get("User-Agent"),
+        details={"revoked_session_id": session_id}
+    )
+    return {"status": "success", "message": "Session revoked successfully."}
+
+
+@router.delete("/sessions")
+async def revoke_all_other_sessions(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
+):
+    """Revokes all active sessions for the user except the current one."""
+    current_jti = None
+    if auth and auth.credentials:
+        try:
+            payload = decode_jwt_token(auth.credentials)
+            current_jti = payload.get("jti")
+        except Exception:
+            pass
+
+    revoked_count = session_manager.revoke_all_sessions(current_user.user_id, except_jti=current_jti)
+    security_logger.log_event(
+        "auth.session.revoked_all",
+        user_id=current_user.user_id,
+        ip_address=request.client.host if request.client else "127.0.0.1",
+        user_agent=request.headers.get("User-Agent"),
+        details={"revoked_count": revoked_count}
+    )
+    return {"status": "success", "message": f"Successfully revoked {revoked_count} other active session(s)."}
+
+
+# =========================================================================
+# Security Audit Logs API Endpoints (Epic F)
+# =========================================================================
+@router.get("/security-logs", response_model=SecurityLogListResponse)
+async def get_user_security_logs(
+    limit: int = 50,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user)
+):
+    """Returns security audit log events pertaining to the authenticated user."""
+    logs_data = security_logger.get_logs(user_id=current_user.user_id, limit=limit, offset=offset)
+    return SecurityLogListResponse(**logs_data)

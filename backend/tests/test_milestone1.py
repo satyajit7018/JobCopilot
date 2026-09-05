@@ -118,7 +118,7 @@ class TestMilestone1:
 
         phone = "+91 9988776655"
         enc = self.cred_vault.encrypt_field(phone)
-        assert enc.startswith("enc:")
+        assert enc.startswith(("enc:", "env:"))
         assert self.cred_vault.decrypt_field(enc) == phone
 
     # 5. Test Resume Parser

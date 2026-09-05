@@ -270,6 +270,50 @@ def test_postgres_adapter_mocked():
         del_success = adapter.hard_delete_user_account("usr_pg_1")
         assert del_success is True
 
+        # 13. Epic F: MFA / TOTP (PostgreSQL)
+        mock_cursor.fetchone.return_value = ("usr_pg_1", "enc_sec", '[{"hash": "abc", "used": false}]', True, "2026-09-01", "2026-09-01")
+        mfa_data = adapter.get_mfa_credentials("usr_pg_1")
+        assert mfa_data["user_id"] == "usr_pg_1"
+        assert mfa_data["is_enabled"] is True
+
+        assert adapter.save_mfa_credentials("usr_pg_1", "enc_sec", [], True) is True
+        assert adapter.delete_mfa_credentials("usr_pg_1") is True
+
+        # 14. Epic F: Sessions & Device (PostgreSQL)
+        assert adapter.create_session({
+            "session_id": "sess_pg_1",
+            "user_id": "usr_pg_1",
+            "token_jti": "jti_pg_1"
+        }) is True
+
+        mock_cursor.fetchone.return_value = ("sess_pg_1", "usr_pg_1", "jti_pg_1", "127.0.0.1", "Agent", "Device", "2026-09-01", "2026-09-01", True)
+        sess_rec = adapter.get_session("sess_pg_1")
+        assert sess_rec["session_id"] == "sess_pg_1"
+
+        mock_cursor.fetchall.return_value = [("sess_pg_1", "usr_pg_1", "jti_pg_1", "127.0.0.1", "Agent", "Device", "2026-09-01", "2026-09-01", True)]
+        sessions = adapter.list_user_sessions("usr_pg_1", active_only=True)
+        assert len(sessions) == 1
+        sessions_all = adapter.list_user_sessions("usr_pg_1", active_only=False)
+        assert len(sessions_all) == 1
+
+        assert adapter.revoke_session("sess_pg_1", "usr_pg_1") is True
+        assert adapter.revoke_all_user_sessions("usr_pg_1", except_jti="jti_pg_1") == 1
+        assert adapter.revoke_all_user_sessions("usr_pg_1") == 1
+        assert adapter.update_session_activity("jti_pg_1") is True
+
+        # 15. Epic F: Security Audit Logs (PostgreSQL)
+        assert adapter.insert_security_audit_log({
+            "log_id": "sec_pg_1",
+            "user_id": "usr_pg_1",
+            "event_type": "auth.login.success"
+        }) is True
+
+        mock_cursor.fetchall.return_value = [("sec_pg_1", "usr_pg_1", "auth.login.success", "INFO", "127.0.0.1", "Agent", '{"ip":"127.0.0.1"}', "2026-09-01")]
+        sec_logs = adapter.list_security_audit_logs(user_id="usr_pg_1", limit=10, offset=0)
+        assert len(sec_logs) == 1
+
+        mock_cursor.fetchone.return_value = (1,)
+        assert adapter.count_security_audit_logs(user_id="usr_pg_1") == 1
 
 
 def test_credential_vault_methods():
@@ -277,6 +321,14 @@ def test_credential_vault_methods():
     decrypted = cred_vault.decrypt(encrypted)
     assert decrypted == "super_secret_api_key"
     assert cred_vault.decrypt("") == ""
+
+    # Re-encrypt to current version
+    reencrypted = cred_vault.reencrypt_field_to_current_version(encrypted)
+    assert cred_vault.decrypt(reencrypted) == "super_secret_api_key"
+    assert cred_vault.reencrypt_field_to_current_version("") == ""
+
+    # KMS listing
+    assert len(cred_vault.kms.list_versions()) >= 1
 
 
 def test_interview_studio_additional_methods():

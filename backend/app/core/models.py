@@ -169,6 +169,8 @@ class TokenResponse(BaseModel):
     user_id: str
     email: str
     role: str
+    mfa_required: bool = False
+    mfa_token: Optional[str] = None
 
 
 class UserResponse(BaseModel):
@@ -482,4 +484,91 @@ class AccountExportResponse(BaseModel):
 class DeleteAccountRequest(BaseModel):
     confirm_email: str
     password: Optional[str] = None
+
+
+# --- Epic F: MFA & TOTP Models ---
+class MFACredentials(BaseModel):
+    user_id: str
+    secret: str
+    backup_codes: List[Dict[str, Any]] = Field(default_factory=list)
+    is_enabled: bool = False
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class MFASetupResponse(BaseModel):
+    secret: str
+    provisioning_uri: str
+    backup_codes: List[str]
+    message: str = "MFA setup initiated. Enter TOTP code to finalize activation."
+
+
+class MFAVerifyRequest(BaseModel):
+    code: str
+    mfa_token: Optional[str] = None
+
+
+class MFALoginChallengeRequest(BaseModel):
+    mfa_token: str
+    code: str
+
+
+class MFADisableRequest(BaseModel):
+    code: Optional[str] = None
+    password: Optional[str] = None
+
+
+# --- Epic F: Session & Device Management Models ---
+class UserSession(BaseModel):
+    session_id: str
+    user_id: str
+    token_jti: str
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    device_name: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    last_active: str = Field(default_factory=lambda: datetime.now().isoformat())
+    is_active: bool = True
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class SessionResponse(BaseModel):
+    session_id: str
+    device_name: str
+    ip_address: Optional[str] = None
+    created_at: str
+    last_active: str
+    is_current: bool = False
+
+
+class SessionListResponse(BaseModel):
+    sessions: List[SessionResponse]
+    total: int
+
+
+# --- Epic F: Security Audit Log Models ---
+class SecurityAuditLog(BaseModel):
+    log_id: str
+    user_id: Optional[str] = None
+    event_type: str
+    severity: str = "INFO"  # INFO, WARNING, CRITICAL
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    details: Dict[str, Any] = Field(default_factory=dict)
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class SecurityLogListResponse(BaseModel):
+    logs: List[Dict[str, Any]]
+    total: int
+    limit: int
+    offset: int
 

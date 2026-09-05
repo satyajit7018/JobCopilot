@@ -12,9 +12,11 @@ from pydantic import BaseModel
 
 from app.core.models import User, UserRole, TokenResponse, CandidateProfile
 from app.core.database import db
+from app.core.session_manager import session_manager
+from app.core.security_logger import security_logger
 from app.api.auth import (
     router as core_auth_router,
-    get_current_user, hash_password, create_jwt_token,
+    get_current_user, hash_password, create_jwt_token, decode_jwt_token,
     ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 )
 
@@ -102,6 +104,19 @@ async def google_sso_auth(payload: GoogleSSORequest):
     refresh_token = create_jwt_token(
         {"sub": user.user_id, "type": "refresh"},
         timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+
+    access_jti = decode_jwt_token(access_token).get("jti", "")
+    session_manager.create_session(
+        user_id=user.user_id,
+        token_jti=access_jti,
+        ip_address="127.0.0.1",
+        user_agent="Google SSO Client"
+    )
+    security_logger.log_event(
+        "auth.login.google_sso",
+        user_id=user.user_id,
+        details={"provider": "google"}
     )
 
     return TokenResponse(

@@ -182,6 +182,45 @@ class DatabaseAdapter(ABC):
     def cleanup_expired_idempotency_keys(self) -> int:
         return 0
 
+    # --- Epic F: MFA / TOTP Storage ---
+    def get_mfa_credentials(self, user_id: str) -> Optional[Dict[str, Any]]:
+        return None
+
+    def save_mfa_credentials(self, user_id: str, secret: str, backup_codes: List[Dict[str, Any]], is_enabled: bool) -> bool:
+        return True
+
+    def delete_mfa_credentials(self, user_id: str) -> bool:
+        return True
+
+    # --- Epic F: Session & Device Management ---
+    def create_session(self, session: Dict[str, Any]) -> bool:
+        return True
+
+    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        return None
+
+    def list_user_sessions(self, user_id: str, active_only: bool = True) -> List[Dict[str, Any]]:
+        return []
+
+    def revoke_session(self, session_id: str, user_id: str) -> bool:
+        return True
+
+    def revoke_all_user_sessions(self, user_id: str, except_jti: Optional[str] = None) -> int:
+        return 0
+
+    def update_session_activity(self, token_jti: str) -> bool:
+        return True
+
+    # --- Epic F: Security Audit Logs ---
+    def insert_security_audit_log(self, log_entry: Dict[str, Any]) -> bool:
+        return True
+
+    def list_security_audit_logs(self, user_id: Optional[str] = None, event_type: Optional[str] = None, severity: Optional[str] = None, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        return []
+
+    def count_security_audit_logs(self, user_id: Optional[str] = None, event_type: Optional[str] = None, severity: Optional[str] = None) -> int:
+        return 0
+
 
 def get_db_adapter() -> DatabaseAdapter:
     """Factory function returning SQLite or PostgreSQL adapter based on DB_MODE."""
