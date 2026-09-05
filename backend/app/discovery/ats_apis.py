@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Optional
 import httpx
 
 from app.core.models import JobListing, ApplicationStatus
+from app.core.circuit_breaker import ats_api_breaker, CircuitOpenError
 
 logger = logging.getLogger(__name__)
 
@@ -54,37 +55,45 @@ class ATSApiFeeders:
         jobs = []
 
         async def _fetch(c: httpx.AsyncClient):
-            try:
-                res = await c.get(url, headers=cls.HEADERS, timeout=8.0)
-                if res.status_code == 200:
-                    data = res.json()
-                    raw_jobs = data.get("jobs", [])
-                    for rj in raw_jobs:
-                        title = rj.get("title", "").strip()
-                        location = rj.get("location", {}).get("name", "Remote")
-                        job_url = rj.get("absolute_url", "")
-                        job_id = str(rj.get("id", ""))
-                        description = cls._clean_html(rj.get("content", ""))
-                        updated_at = rj.get("updated_at")
+            res = await c.get(url, headers=cls.HEADERS, timeout=8.0)
+            if res.status_code >= 500:
+                raise httpx.HTTPStatusError(f"Greenhouse server error {res.status_code}", request=res.request, response=res)
+            if res.status_code == 200:
+                data = res.json()
+                raw_jobs = data.get("jobs", [])
+                for rj in raw_jobs:
+                    title = rj.get("title", "").strip()
+                    location = rj.get("location", {}).get("name", "Remote")
+                    job_url = rj.get("absolute_url", "")
+                    job_id = str(rj.get("id", ""))
+                    description = cls._clean_html(rj.get("content", ""))
+                    updated_at = rj.get("updated_at")
 
-                        jobs.append({
-                            "external_id": job_id,
-                            "platform": "Greenhouse",
-                            "company": company_slug.capitalize(),
-                            "title": title,
-                            "location": location,
-                            "url": job_url,
-                            "description": description,
-                            "posted_date": updated_at
-                        })
-            except Exception as e:
-                logger.debug(f"Greenhouse fetch error for {company_slug}: {e}")
+                    jobs.append({
+                        "external_id": job_id,
+                        "platform": "Greenhouse",
+                        "company": company_slug.capitalize(),
+                        "title": title,
+                        "location": location,
+                        "url": job_url,
+                        "description": description,
+                        "posted_date": updated_at
+                    })
 
-        if client:
-            await _fetch(client)
-        else:
-            async with httpx.AsyncClient(http2=HAS_H2) as c:
-                await _fetch(c)
+        async def _op():
+            if client:
+                await _fetch(client)
+            else:
+                async with httpx.AsyncClient(http2=HAS_H2) as c:
+                    await _fetch(c)
+
+        try:
+            await ats_api_breaker.call(_op)
+        except CircuitOpenError as e:
+            logger.warning(f"Circuit ats_api is OPEN: {e}. Fast-failing Greenhouse fetch for {company_slug}.")
+            return []
+        except Exception as e:
+            logger.debug(f"Greenhouse fetch error for {company_slug}: {e}")
 
         return jobs
 
@@ -98,38 +107,46 @@ class ATSApiFeeders:
         jobs = []
 
         async def _fetch(c: httpx.AsyncClient):
-            try:
-                res = await c.get(url, headers=cls.HEADERS, timeout=8.0)
-                if res.status_code == 200:
-                    data = res.json()
-                    if isinstance(data, list):
-                        for rj in data:
-                            title = rj.get("text", "").strip()
-                            categories = rj.get("categories", {})
-                            location = categories.get("location", "Remote")
-                            job_url = rj.get("hostedUrl", "")
-                            job_id = str(rj.get("id", ""))
-                            description = rj.get("descriptionPlain") or cls._clean_html(rj.get("description", ""))
-                            created_at = rj.get("createdAt")
+            res = await c.get(url, headers=cls.HEADERS, timeout=8.0)
+            if res.status_code >= 500:
+                raise httpx.HTTPStatusError(f"Lever server error {res.status_code}", request=res.request, response=res)
+            if res.status_code == 200:
+                data = res.json()
+                if isinstance(data, list):
+                    for rj in data:
+                        title = rj.get("text", "").strip()
+                        categories = rj.get("categories", {})
+                        location = categories.get("location", "Remote")
+                        job_url = rj.get("hostedUrl", "")
+                        job_id = str(rj.get("id", ""))
+                        description = rj.get("descriptionPlain") or cls._clean_html(rj.get("description", ""))
+                        created_at = rj.get("createdAt")
 
-                            jobs.append({
-                                "external_id": job_id,
-                                "platform": "Lever",
-                                "company": company_slug.capitalize(),
-                                "title": title,
-                                "location": location,
-                                "url": job_url,
-                                "description": description,
-                                "posted_date": str(created_at) if created_at else None
-                            })
-            except Exception as e:
-                logger.debug(f"Lever fetch error for {company_slug}: {e}")
+                        jobs.append({
+                            "external_id": job_id,
+                            "platform": "Lever",
+                            "company": company_slug.capitalize(),
+                            "title": title,
+                            "location": location,
+                            "url": job_url,
+                            "description": description,
+                            "posted_date": str(created_at) if created_at else None
+                        })
 
-        if client:
-            await _fetch(client)
-        else:
-            async with httpx.AsyncClient(http2=HAS_H2) as c:
-                await _fetch(c)
+        async def _op():
+            if client:
+                await _fetch(client)
+            else:
+                async with httpx.AsyncClient(http2=HAS_H2) as c:
+                    await _fetch(c)
+
+        try:
+            await ats_api_breaker.call(_op)
+        except CircuitOpenError as e:
+            logger.warning(f"Circuit ats_api is OPEN: {e}. Fast-failing Lever fetch for {company_slug}.")
+            return []
+        except Exception as e:
+            logger.debug(f"Lever fetch error for {company_slug}: {e}")
 
         return jobs
 
@@ -143,37 +160,45 @@ class ATSApiFeeders:
         jobs = []
 
         async def _fetch(c: httpx.AsyncClient):
-            try:
-                res = await c.get(url, headers=cls.HEADERS, timeout=8.0)
-                if res.status_code == 200:
-                    data = res.json()
-                    job_postings = data.get("jobs", []) or data.get("jobPostings", [])
-                    for rj in job_postings:
-                        title = rj.get("title", "").strip()
-                        location = rj.get("locationName") or rj.get("location", "Remote")
-                        job_url = rj.get("jobUrl") or rj.get("applyUrl", "")
-                        job_id = str(rj.get("id", ""))
-                        description = rj.get("descriptionPlain") or cls._clean_html(rj.get("descriptionHtml", ""))
-                        published_at = rj.get("publishedAt")
+            res = await c.get(url, headers=cls.HEADERS, timeout=8.0)
+            if res.status_code >= 500:
+                raise httpx.HTTPStatusError(f"Ashby server error {res.status_code}", request=res.request, response=res)
+            if res.status_code == 200:
+                data = res.json()
+                job_postings = data.get("jobs", []) or data.get("jobPostings", [])
+                for rj in job_postings:
+                    title = rj.get("title", "").strip()
+                    location = rj.get("locationName") or rj.get("location", "Remote")
+                    job_url = rj.get("jobUrl") or rj.get("applyUrl", "")
+                    job_id = str(rj.get("id", ""))
+                    description = rj.get("descriptionPlain") or cls._clean_html(rj.get("descriptionHtml", ""))
+                    published_at = rj.get("publishedAt")
 
-                        jobs.append({
-                            "external_id": job_id,
-                            "platform": "Ashby",
-                            "company": company_slug.capitalize(),
-                            "title": title,
-                            "location": location,
-                            "url": job_url,
-                            "description": description,
-                            "posted_date": str(published_at) if published_at else None
-                        })
-            except Exception as e:
-                logger.debug(f"Ashby fetch error for {company_slug}: {e}")
+                    jobs.append({
+                        "external_id": job_id,
+                        "platform": "Ashby",
+                        "company": company_slug.capitalize(),
+                        "title": title,
+                        "location": location,
+                        "url": job_url,
+                        "description": description,
+                        "posted_date": str(published_at) if published_at else None
+                    })
 
-        if client:
-            await _fetch(client)
-        else:
-            async with httpx.AsyncClient(http2=HAS_H2) as c:
-                await _fetch(c)
+        async def _op():
+            if client:
+                await _fetch(client)
+            else:
+                async with httpx.AsyncClient(http2=HAS_H2) as c:
+                    await _fetch(c)
+
+        try:
+            await ats_api_breaker.call(_op)
+        except CircuitOpenError as e:
+            logger.warning(f"Circuit ats_api is OPEN: {e}. Fast-failing Ashby fetch for {company_slug}.")
+            return []
+        except Exception as e:
+            logger.debug(f"Ashby fetch error for {company_slug}: {e}")
 
         return jobs
 

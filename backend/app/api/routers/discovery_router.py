@@ -35,15 +35,25 @@ async def run_discovery(
         "matched_and_saved": result.get("matched_and_saved", 0)
     }, user_id=current_user.user_id)
 
+    from app.core.cache import cache_manager
+    await cache_manager.invalidate_namespace(current_user.user_id, "discovery")
+
     return result
 
 
 @router.get("/discovery/status")
 async def get_discovery_status(current_user: User = Depends(get_current_user)):
-    """Returns current discovery metrics."""
-    return {
+    """Returns current discovery metrics with caching."""
+    from app.core.cache import cache_manager
+    cached = await cache_manager.get(current_user.user_id, "discovery", "status")
+    if cached is not None:
+        return cached
+
+    status_data = {
         "is_running": discovery_orchestrator.is_running,
         "last_run_at": discovery_orchestrator.last_run_at,
         "total_discovered": discovery_orchestrator.total_discovered,
         "total_matched": discovery_orchestrator.total_matched
     }
+    await cache_manager.set(current_user.user_id, "discovery", "status", status_data, ttl_seconds=15)
+    return status_data

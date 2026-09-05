@@ -232,6 +232,28 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     created_at VARCHAR(64) NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_pg_admin_audit_logs_admin_id ON admin_audit_logs(admin_id);
+
+                CREATE TABLE IF NOT EXISTS idempotency_keys (
+                    idempotency_key VARCHAR(128) PRIMARY KEY,
+                    user_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                    method VARCHAR(16) NOT NULL,
+                    path VARCHAR(512) NOT NULL,
+                    request_hash VARCHAR(64) NOT NULL,
+                    status_code INTEGER,
+                    response_headers JSONB,
+                    response_body TEXT,
+                    status VARCHAR(32) NOT NULL,
+                    created_at VARCHAR(64) NOT NULL,
+                    expires_at VARCHAR(64) NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_pg_idempotency_keys_expires ON idempotency_keys(expires_at);
+                CREATE INDEX IF NOT EXISTS idx_pg_idempotency_keys_user ON idempotency_keys(user_id, idempotency_key);
+
+                -- High-traffic compound indexes for query tuning
+                CREATE INDEX IF NOT EXISTS idx_pg_emails_user_received ON emails(user_id, received_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_pg_hitl_user_status ON hitl_events(user_id, status);
+                CREATE INDEX IF NOT EXISTS idx_pg_outreach_user_job ON outreach_records(user_id, job_id);
+                CREATE INDEX IF NOT EXISTS idx_pg_jobs_user_applied ON jobs(user_id, applied_at DESC);
                 """)
                 conn.commit()
         finally:
@@ -993,3 +1015,123 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
             return False
         finally:
             self.release_connection(conn)
+
+    # Idempotency Engine Operations
+    def save_idempotency_record(self, record: Dict[str, Any]) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                INSERT INTO idempotency_keys (
+                    idempotency_key, user_id, method, path, request_hash,
+                    status_code, response_headers, response_body, status, created_at, expires_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (idempotency_key) DO UPDATE SET
+                    status_code = EXCLUDED.status_code,
+                    response_headers = EXCLUDED.response_headers,
+                    response_body = EXCLUDED.response_body,
+                    status = EXCLUDED.status,
+                    expires_at = EXCLUDED.expires_at
+                """, (
+                    record["idempotency_key"],
+                    record.get("user_id", "default"),
+                    record["method"],
+                    record["path"],
+                    record["request_hash"],
+                    record.get("status_code"),
+                    json.dumps(record.get("response_headers", {})),
+                    record.get("response_body"),
+                    record.get("status", "PENDING"),
+                    record.get("created_at", datetime.now().isoformat()),
+                    record.get("expires_at", "")
+                ))
+                conn.commit()
+                return True
+        except Exception:
+            conn.rollback()
+            return False
+        finally:
+            self.release_connection(conn)
+
+    def get_idempotency_record(self, idempotency_key: str, user_id: str = "default") -> Optional[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                SELECT idempotency_key, user_id, method, path, request_hash,
+                       status_code, response_headers, response_body, status, created_at, expires_at
+                FROM idempotency_keys
+                WHERE idempotency_key = %s AND (user_id = %s OR user_id = 'default')
+                """, (idempotency_key, user_id))
+                row = cursor.fetchone()
+                if not row:
+                    return None
+
+                headers = row[6] if isinstance(row[6], dict) else (json.loads(row[6]) if row[6] else {})
+                return {
+                    "idempotency_key": row[0],
+                    "user_id": row[1],
+                    "method": row[2],
+                    "path": row[3],
+                    "request_hash": row[4],
+                    "status_code": row[5],
+                    "response_headers": headers,
+                    "response_body": row[7],
+                    "status": row[8],
+                    "created_at": row[9],
+                    "expires_at": row[10]
+                }
+        finally:
+            self.release_connection(conn)
+
+    def update_idempotency_record(
+        self,
+        idempotency_key: str,
+        status: str,
+        status_code: int,
+        response_headers: Dict[str, Any],
+        response_body: str
+    ) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                UPDATE idempotency_keys
+                SET status = %s, status_code = %s, response_headers = %s, response_body = %s
+                WHERE idempotency_key = %s
+                """, (status, status_code, json.dumps(response_headers), response_body, idempotency_key))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception:
+            conn.rollback()
+            return False
+        finally:
+            self.release_connection(conn)
+
+    def delete_idempotency_record(self, idempotency_key: str) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM idempotency_keys WHERE idempotency_key = %s", (idempotency_key,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except Exception:
+            conn.rollback()
+            return False
+        finally:
+            self.release_connection(conn)
+
+    def cleanup_expired_idempotency_keys(self) -> int:
+        now_iso = datetime.now().isoformat()
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM idempotency_keys WHERE expires_at != '' AND expires_at < %s", (now_iso,))
+                conn.commit()
+                return cursor.rowcount
+        except Exception:
+            conn.rollback()
+            return 0
+        finally:
+            self.release_connection(conn)
+

@@ -76,3 +76,122 @@ class RequestTracingMiddleware(BaseHTTPMiddleware):
             )
 
         return response
+
+
+class IdempotencyMiddleware(BaseHTTPMiddleware):
+    """
+    Enforces at-most-once execution for mutating requests with an Idempotency-Key header.
+    Replays completed cached responses, detects concurrent in-flight executions (409),
+    and rejects payload signature divergences (422).
+    """
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+            return await call_next(request)
+
+        idempotency_key = request.headers.get("Idempotency-Key")
+        if not idempotency_key:
+            return await call_next(request)
+
+        idempotency_key = idempotency_key.strip()
+        if not idempotency_key:
+            return await call_next(request)
+
+        # Extract user_id from token or request state for tenant isolation
+        user_id = getattr(request.state, "user_id", None)
+        if not user_id:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header.split(" ", 1)[1]
+                try:
+                    import jwt
+                    unverified = jwt.decode(token, options={"verify_signature": False})
+                    user_id = unverified.get("sub")
+                except Exception:
+                    user_id = None
+        if not user_id:
+            client_ip = request.client.host if request.client else "127.0.0.1"
+            user_id = f"ip_{client_ip}"
+
+        from app.core.idempotency import idempotency_engine, IdempotencyResult
+        import json
+
+        body = await request.body()
+        result, record = idempotency_engine.acquire(
+            key=idempotency_key,
+            user_id=user_id,
+            method=request.method,
+            path=request.url.path,
+            body=body
+        )
+
+        if result == IdempotencyResult.IN_PROGRESS:
+            return Response(
+                content=json.dumps({
+                    "detail": "Request with this Idempotency-Key is currently in progress. Please retry shortly."
+                }),
+                status_code=409,
+                media_type="application/json",
+                headers={"Idempotency-Key": idempotency_key, "Retry-After": "1"}
+            )
+
+        if result == IdempotencyResult.MISMATCH:
+            return Response(
+                content=json.dumps({
+                    "detail": "Idempotency key payload mismatch: same key used with different request parameters."
+                }),
+                status_code=422,
+                media_type="application/json",
+                headers={"Idempotency-Key": idempotency_key}
+            )
+
+        if result == IdempotencyResult.REPLAY and record:
+            replay_headers = dict(record.get("response_headers", {}))
+            replay_headers["Idempotency-Key"] = idempotency_key
+            replay_headers["Idempotency-Replayed"] = "true"
+            replay_headers["X-Cache-Lookup"] = "HIT"
+            return Response(
+                content=record.get("response_body", ""),
+                status_code=record.get("status_code", 200),
+                headers=replay_headers,
+                media_type=replay_headers.get("content-type", "application/json")
+            )
+
+        # ACQUIRED: execute request and capture response
+        try:
+            response = await call_next(request)
+
+            # Read streaming response body
+            response_chunks = []
+            async for chunk in response.body_iterator:
+                response_chunks.append(chunk)
+
+            full_body_bytes = b"".join(response_chunks)
+            full_body_str = full_body_bytes.decode("utf-8", errors="replace")
+
+            # Re-wrap body iterator for client delivery
+            async def _stream_gen():
+                yield full_body_bytes
+
+            response.body_iterator = _stream_gen()
+            response.headers["Idempotency-Key"] = idempotency_key
+
+            # Only cache non-5xx responses (allow transient server errors to be retried)
+            if response.status_code < 500:
+                response_headers = dict(response.headers)
+                idempotency_engine.complete(
+                    key=idempotency_key,
+                    user_id=user_id,
+                    status_code=response.status_code,
+                    response_headers=response_headers,
+                    response_body=full_body_str
+                )
+            else:
+                idempotency_engine.release(idempotency_key, user_id)
+
+            return response
+
+        except Exception:
+            idempotency_engine.release(idempotency_key, user_id)
+            raise
+

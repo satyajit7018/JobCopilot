@@ -12,9 +12,18 @@ router = APIRouter(tags=["analytics"])
 
 @router.get("/analytics/funnel")
 async def get_funnel_analytics(current_user: User = Depends(get_current_user)):
-    """Returns aggregated pipeline funnel metrics for authenticated tenant."""
+    """Returns aggregated pipeline funnel metrics for authenticated tenant with multi-tier caching."""
     from app.core.analytics import AnalyticsEngine
-    return {
+    from app.core.cache import cache_manager
+
+    cached = await cache_manager.get(current_user.user_id, "analytics", "funnel")
+    if cached is not None:
+        return cached
+
+    result = {
         "status": "success",
         "metrics": AnalyticsEngine.get_funnel_metrics(user_id=current_user.user_id)
     }
+    await cache_manager.set(current_user.user_id, "analytics", "funnel", result, ttl_seconds=60)
+    return result
+

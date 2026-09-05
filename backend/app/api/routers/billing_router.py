@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.database import db
 from app.core.models import User
 from app.api.auth import get_current_user
+from app.core.circuit_breaker import stripe_api_breaker, CircuitOpenError
 
 router = APIRouter(tags=["billing"])
 
@@ -99,18 +100,23 @@ async def create_checkout_session(
         cancel_url = payload.cancel_url or f"http://localhost:{settings.FRONTEND_PORT}/#billing"
 
         try:
-            session = stripe.checkout.Session.create(
-                mode="subscription",
-                payment_method_types=["card"],
-                line_items=[{"price": price_id, "quantity": 1}],
-                success_url=success_url,
-                cancel_url=cancel_url,
-                client_reference_id=current_user.user_id,
-                customer_email=current_user.email,
-                metadata={"user_id": current_user.user_id, "tier": requested_tier}
-            )
+            def _create_session():
+                return stripe.checkout.Session.create(
+                    mode="subscription",
+                    payment_method_types=["card"],
+                    line_items=[{"price": price_id, "quantity": 1}],
+                    success_url=success_url,
+                    cancel_url=cancel_url,
+                    client_reference_id=current_user.user_id,
+                    customer_email=current_user.email,
+                    metadata={"user_id": current_user.user_id, "tier": requested_tier}
+                )
+
+            session = await stripe_api_breaker.call(_create_session)
             checkout_url = session.url or f"https://checkout.stripe.com/pay/{session.id}"
             session_id = session.id
+        except CircuitOpenError as ce:
+            raise HTTPException(status_code=503, detail=f"Billing service unavailable (circuit open): {str(ce)}")
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"Stripe API error: {str(e)}")
     else:
@@ -137,11 +143,16 @@ async def create_customer_portal_session(
         import stripe
         stripe.api_key = settings.STRIPE_SECRET_KEY
         try:
-            portal_session = stripe.billing_portal.Session.create(
-                customer=current_user.user_id,
-                return_url=return_url
-            )
+            def _create_portal():
+                return stripe.billing_portal.Session.create(
+                    customer=current_user.user_id,
+                    return_url=return_url
+                )
+
+            portal_session = await stripe_api_breaker.call(_create_portal)
             portal_url = portal_session.url
+        except CircuitOpenError as ce:
+            raise HTTPException(status_code=503, detail=f"Customer portal unavailable (circuit open): {str(ce)}")
         except Exception as e:
             raise HTTPException(status_code=502, detail=f"Stripe Customer Portal error: {str(e)}")
     else:
@@ -167,7 +178,10 @@ async def sync_subscription_tier(current_user: User = Depends(get_current_user))
         import stripe
         stripe.api_key = settings.STRIPE_SECRET_KEY
         try:
-            subs = stripe.Subscription.list(customer=user_id, status="active", limit=1)
+            def _get_subs():
+                return stripe.Subscription.list(customer=user_id, status="active", limit=1)
+
+            subs = await stripe_api_breaker.call(_get_subs)
             if subs and subs.data:
                 sub = subs.data[0]
                 price_id = sub.get("items", {}).get("data", [{}])[0].get("price", {}).get("id")
@@ -184,7 +198,7 @@ async def sync_subscription_tier(current_user: User = Depends(get_current_user))
             rate_limiter.set_user_tier(user_id, st_tier)
             db.update_user_role(user_id, active_tier)
         except Exception:
-            pass  # Fallback to current database role if Stripe customer lookup fails
+            pass  # Fallback to current database role if Stripe customer lookup fails or circuit is open
 
     return {
         "status": "success",

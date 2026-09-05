@@ -166,6 +166,22 @@ class DatabaseAdapter(ABC):
     def hard_delete_user_account(self, user_id: str) -> bool:
         return True
 
+    # Idempotency Engine Operations
+    def save_idempotency_record(self, record: Dict[str, Any]) -> bool:
+        return True
+
+    def get_idempotency_record(self, idempotency_key: str, user_id: str = "default") -> Optional[Dict[str, Any]]:
+        return None
+
+    def update_idempotency_record(self, idempotency_key: str, status: str, status_code: int, response_headers: Dict[str, Any], response_body: str) -> bool:
+        return True
+
+    def delete_idempotency_record(self, idempotency_key: str) -> bool:
+        return True
+
+    def cleanup_expired_idempotency_keys(self) -> int:
+        return 0
+
 
 def get_db_adapter() -> DatabaseAdapter:
     """Factory function returning SQLite or PostgreSQL adapter based on DB_MODE."""

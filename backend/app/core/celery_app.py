@@ -26,15 +26,24 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     task_time_limit=300,
-    worker_concurrency=4
+    worker_concurrency=4,
+    task_routes={
+        "jobcopilot.apply_to_job": {"queue": "priority.normal"},
+        "jobcopilot.dlq.*": {"queue": "dead_letter"},
+    },
+    task_default_retry_delay=5,
+    task_max_retries=3,
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
 )
 
 # In-Memory fallback store for task status when running without Redis cluster
 _IN_MEMORY_TASKS: Dict[str, Dict[str, Any]] = {}
+_IN_MEMORY_DLQ: Dict[str, Dict[str, Any]] = {}
 
 
 class TaskManager:
-    """Manages asynchronous job applications, candidate discovery, and task polling."""
+    """Manages asynchronous job applications, candidate discovery, and task polling with DLQ resilience."""
 
     @classmethod
     def dispatch_apply_task(cls, job_id: str, user_id: str, submission_mode: str = "DRY_RUN") -> str:
@@ -83,6 +92,24 @@ class TaskManager:
             return task_info
 
         return None
+
+    @classmethod
+    def get_dlq_tasks(cls, user_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
+        """Lists dead-lettered application tasks with tenant isolation."""
+        if not user_id or user_id == "admin":
+            return dict(_IN_MEMORY_DLQ)
+        return {tid: t for tid, t in _IN_MEMORY_DLQ.items() if t.get("user_id") == user_id}
+
+    @classmethod
+    def retry_dlq_task(cls, task_id: str) -> bool:
+        """Removes task from DLQ and re-queues it for execution."""
+        if task_id not in _IN_MEMORY_DLQ:
+            return False
+        task = _IN_MEMORY_DLQ.pop(task_id)
+        task["status"] = "QUEUED"
+        task["progress_percent"] = 10
+        _IN_MEMORY_TASKS[task_id] = task
+        return True
 
 
 @celery_app.task(name="jobcopilot.apply_to_job")

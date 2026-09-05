@@ -17,7 +17,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
 from app.core.settings import settings
-from app.api.middleware import SecurityHeadersMiddleware, RequestTracingMiddleware
+from app.api.middleware import SecurityHeadersMiddleware, RequestTracingMiddleware, IdempotencyMiddleware
 from app.api.auth import limiter
 from app.api.endpoints import router as api_router, ws_manager
 from app.core.database import get_db
@@ -51,7 +51,10 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # 1. Tracing & Latency Logger
 app.add_middleware(RequestTracingMiddleware)
 
-# 2. Strict Security Headers (CSP, HSTS, X-Frame-Options)
+# 2. Idempotency Key Engine for Mutating Operations
+app.add_middleware(IdempotencyMiddleware)
+
+# 3. Strict Security Headers (CSP, HSTS, X-Frame-Options)
 app.add_middleware(SecurityHeadersMiddleware)
 
 # 3. CORS Policy
@@ -83,6 +86,8 @@ async def health_check():
 
     is_overall_healthy = db_status == "healthy"
     status_code = 200 if is_overall_healthy else 503
+    from app.core.circuit_breaker import get_all_circuit_statuses
+    circuits = get_all_circuit_statuses()
 
     return Response(
         content=json.dumps({
@@ -94,6 +99,7 @@ async def health_check():
                 "status": db_status,
                 "engine": db_mode
             },
+            "circuit_breakers": circuits,
             "sentry_enabled": bool(settings.SENTRY_DSN)
         }),
         status_code=status_code,
