@@ -20,7 +20,19 @@ Items fixed in the accompanying change are marked ✅; open items are marked ⬜
 
 - ✅ **Unpinned dependencies.** `backend/requirements.txt` used lower bounds (`>=`) only,
   giving non-reproducible builds and drifting `pip-audit` results.
-  **Fix:** all 31 direct dependencies pinned to the currently tested versions (`==`).
+  **Fix:** direct dependencies pinned to tested versions (`==`). Pinning surfaced known CVEs,
+  which were then patched: `python-multipart` → 0.0.31, `requests` → 2.33.0. Test-only tools
+  (`pytest`, `pytest-asyncio`) were removed from the runtime requirements (CI installs them
+  separately). These patched releases require Python ≥3.10, so `requires-python` was raised
+  accordingly (3.9 is end-of-life).
+
+### Accepted risk (no fix available)
+
+- ⬜ **`starlette` advisories PYSEC-2026-161/248/249/2280/2281 have no installable fix.**
+  Every patched release is `starlette` 1.x, but `fastapi` (≤0.128.8) pins `starlette<1.0.0`,
+  so the dependency tree cannot resolve to a patched version. These IDs are explicitly
+  ignored in the `pip-audit` CI step (documented inline). **Revisit when a `fastapi` release
+  supports `starlette` 1.x** — then drop the `--ignore-vuln` entries and bump.
 - ⬜ **JWTs stored in `localStorage`** (`frontend/js/app.js`) are readable by any XSS.
   Escaping is currently disciplined, but a refresh token should live in an httpOnly,
   `SameSite` cookie rather than `localStorage`.
