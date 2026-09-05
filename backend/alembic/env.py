@@ -18,7 +18,10 @@ target_metadata = None
 
 
 def get_url():
-    if settings.DATABASE_URL.startswith("postgres"):
+    cfg_url = config.get_main_option("sqlalchemy.url")
+    if cfg_url:
+        return cfg_url
+    if settings.DATABASE_URL and settings.DATABASE_URL.startswith("postgres"):
         return settings.DATABASE_URL
     return f"sqlite:///{settings.DATA_DIR}/jobcopilot.db"
 

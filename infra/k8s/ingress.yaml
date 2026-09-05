@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jobcopilot-ingress
+  namespace: production
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "jobcopilot-api-service"
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+spec:
+  tls:
+    - hosts:
+        - api.jobcopilot.com
+        - app.jobcopilot.com
+      secretName: jobcopilot-tls-cert
+  rules:
+    - host: api.jobcopilot.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: jobcopilot-api-service
+                port:
+                  number: 8000

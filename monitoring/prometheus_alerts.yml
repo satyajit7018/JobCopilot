@@ -1,0 +1,64 @@
+# Prometheus Alerting Rules for JobCopilot Production
+# SLO Thresholds: Availability >= 99.9%, Latency p95 <= 2000ms, Error Budget Consumption
+
+groups:
+  - name: jobcopilot_slo_alerts
+    rules:
+      - alert: JobCopilotHighHttp5xxRate
+        expr: (sum(rate(jobcopilot_http_requests_total{status=~"5.."}[5m])) / sum(rate(jobcopilot_http_requests_total[5m]))) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+          tier: api
+          slo: availability
+        annotations:
+          summary: "JobCopilot HTTP 5xx error rate exceeds 1% SLO threshold"
+          description: "Current HTTP 5xx error rate is {{ $value | humanizePercentage }} over 5m window. SLO error budget is burning rapidly."
+          runbook_url: "https://docs.jobcopilot.local/runbooks/high_5xx_rate"
+
+      - alert: JobCopilotHighP95Latency
+        expr: histogram_quantile(0.95, sum(rate(jobcopilot_http_request_duration_seconds_bucket[5m])) by (le)) > 2.0
+        for: 3m
+        labels:
+          severity: warning
+          tier: api
+          slo: latency
+        annotations:
+          summary: "JobCopilot p95 HTTP latency exceeds 2.0s SLO threshold"
+          description: "p95 latency is currently {{ $value | humanizeDuration }} over 5m window. Degraded user experience detected."
+          runbook_url: "https://docs.jobcopilot.local/runbooks/high_latency"
+
+      - alert: JobCopilotDlqBuildup
+        expr: jobcopilot_dlq_tasks_count > 10
+        for: 1m
+        labels:
+          severity: critical
+          tier: worker
+          slo: reliability
+        annotations:
+          summary: "Dead-Letter Queue buildup detected (> 10 exhausted tasks)"
+          description: "Celery Dead-Letter Queue contains {{ $value }} failed tasks that have exhausted maximum retry attempts."
+          runbook_url: "https://docs.jobcopilot.local/runbooks/dlq_drain"
+
+      - alert: JobCopilotDatabaseUnhealthy
+        expr: probe_success{instance=~".*/health"} == 0
+        for: 1m
+        labels:
+          severity: page
+          tier: storage
+          slo: availability
+        annotations:
+          summary: "JobCopilot primary database health probe failed"
+          description: "Deep health probe at /health reported database read/write degraded or unreachable for > 1 minute."
+          runbook_url: "https://docs.jobcopilot.local/runbooks/db_failover"
+
+      - alert: JobCopilotCircuitBreakerOpen
+        expr: jobcopilot_circuit_breaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: warning
+          tier: upstream
+        annotations:
+          summary: "Circuit breaker {{ $labels.circuit_name }} is OPEN"
+          description: "Upstream circuit breaker has tripped open to prevent cascading failures. Fast-fallback active."
+          runbook_url: "https://docs.jobcopilot.local/runbooks/circuit_tripped"

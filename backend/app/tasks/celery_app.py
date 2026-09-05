@@ -82,6 +82,7 @@ class LocalTaskRunner:
             "task_id": task_id,
             "task_name": task_name,
             "user_id": user_id or kwargs.get("user_id", "default"),
+            "trace_parent": kwargs.get("trace_parent"),
             "status": "QUEUED",
             "retry_count": 0,
             "max_retries": retries_allowed,

@@ -1,0 +1,216 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "SLO & Service Health Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PROMETHEUS_DS" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "max": 100,
+          "min": 90,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 99.0 },
+              { "color": "green", "value": 99.9 }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "id": 2,
+      "options": {
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "expr": "100 * (1 - (sum(rate(jobcopilot_http_requests_total{status=~\"5..\"}[30m])) / sum(rate(jobcopilot_http_requests_total[30m]))))",
+          "legendFormat": "30m Availability SLO",
+          "refId": "A"
+        }
+      ],
+      "title": "Availability SLO (Target: 99.9%)",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PROMETHEUS_DS" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "axisColorMode": "text", "drawStyle": "line", "lineInterpolation": "smooth" },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 5, "w": 10, "x": 6, "y": 1 },
+      "id": 3,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum(rate(jobcopilot_http_requests_total[1m])) by (method, status)",
+          "legendFormat": "{{method}} {{status}}",
+          "refId": "A"
+        }
+      ],
+      "title": "HTTP Throughput (Req/sec)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PROMETHEUS_DS" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "expr": "jobcopilot_dlq_tasks_count",
+          "legendFormat": "DLQ Depth",
+          "refId": "A"
+        }
+      ],
+      "title": "Dead-Letter Queue (DLQ)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PROMETHEUS_DS" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            { "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "HEALTHY" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 },
+      "id": 5,
+      "options": { "colorMode": "background", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [
+        {
+          "expr": "probe_success{instance=~\".*/health\"}",
+          "legendFormat": "Database Probe",
+          "refId": "A"
+        }
+      ],
+      "title": "System Health Probe",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 6,
+      "title": "Latency & Error Budgets",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PROMETHEUS_DS" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "drawStyle": "line", "lineInterpolation": "smooth" },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 },
+      "id": 7,
+      "options": { "legend": { "displayMode": "table", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(jobcopilot_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50 Median Latency",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(jobcopilot_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95 Tail Latency",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(jobcopilot_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p99 Worst Latency",
+          "refId": "C"
+        }
+      ],
+      "title": "Latency Distribution (p50 / p95 / p99)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PROMETHEUS_DS" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "axisCenteredZero": false, "drawStyle": "bars" },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 },
+      "id": 8,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" } },
+      "targets": [
+        {
+          "expr": "sum(rate(jobcopilot_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(jobcopilot_http_requests_total[5m]))",
+          "legendFormat": "5xx Server Error Rate",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(jobcopilot_http_requests_total{status=~\"4..\"}[5m])) / sum(rate(jobcopilot_http_requests_total[5m]))",
+          "legendFormat": "4xx Client Error Rate",
+          "refId": "B"
+        }
+      ],
+      "title": "Error Rates (4xx & 5xx Ratio)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["jobcopilot", "observability", "slo"],
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": { "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"] },
+  "timezone": "browser",
+  "title": "JobCopilot Production Service Overview",
+  "uid": "jobcopilot-prod-overview",
+  "version": 1
+}

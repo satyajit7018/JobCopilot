@@ -12,6 +12,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.core.settings import settings
+from app.core.telemetry import telemetry
 
 logger = logging.getLogger("jobcopilot.access")
 
@@ -54,23 +55,56 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class RequestTracingMiddleware(BaseHTTPMiddleware):
-    """Tracks unique correlation X-Request-ID and logs request latencies."""
+    """Tracks unique correlation X-Request-ID, W3C traceparent, OpenTelemetry root spans, and logs request latencies."""
 
     async def dispatch(self, request: Request, call_next) -> Response:
         request_id = request.headers.get("X-Request-ID") or f"req_{uuid.uuid4().hex[:12]}"
         request.state.request_id = request_id
 
+        # Extract parent span context if incoming (traceparent / X-Trace-ID)
+        header_dict = {k.lower(): v for k, v in request.headers.items()}
+        parent_context = telemetry.extract_context_from_headers(header_dict)
+
+        span = telemetry.start_span(
+            name="http.request",
+            parent_context=parent_context,
+            attributes={
+                "http.method": request.method,
+                "http.url": str(request.url),
+                "http.target": request.url.path,
+                "http.user_agent": request.headers.get("user-agent", ""),
+                "http.request_id": request_id
+            }
+        )
+
+        request.state.trace_id = span.context.trace_id
+        request.state.span_id = span.context.span_id
+        request.state.traceparent = span.context.to_traceparent()
+
         start_time = time.time()
-        response = await call_next(request)
+        try:
+            with span:
+                response = await call_next(request)
+                span.set_attribute("http.status_code", response.status_code)
+                if response.status_code >= 500:
+                    span.status_code = "ERROR"
+        except Exception as exc:
+            span.record_exception(exc)
+            raise exc
+
         duration_ms = round((time.time() - start_time) * 1000, 2)
 
         response.headers["X-Request-ID"] = request_id
+        response.headers["traceparent"] = span.context.to_traceparent()
+        response.headers["X-Trace-ID"] = span.context.trace_id
+        response.headers["X-Span-ID"] = span.context.span_id
         
-        # Log structured request details
+        # Log structured request details with trace correlation
         if not request.url.path.startswith("/metrics") and not request.url.path.startswith("/health"):
             user_id = getattr(request.state, "user_id", "anonymous")
             logger.info(
-                f'{{"request_id": "{request_id}", "method": "{request.method}", '
+                f'{{"request_id": "{request_id}", "trace_id": "{span.context.trace_id}", '
+                f'"span_id": "{span.context.span_id}", "method": "{request.method}", '
                 f'"path": "{request.url.path}", "status": {response.status_code}, '
                 f'"duration_ms": {duration_ms}, "user_id": "{user_id}"}}'
             )

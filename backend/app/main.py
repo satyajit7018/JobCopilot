@@ -63,7 +63,16 @@ app.add_middleware(
     allow_origins=settings.ALLOWED_ORIGINS if isinstance(settings.ALLOWED_ORIGINS, list) else [settings.ALLOWED_ORIGINS],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Accept"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Request-ID",
+        "Accept",
+        "Idempotency-Key",
+        "traceparent",
+        "X-Trace-ID",
+        "X-Span-ID"
+    ],
 )
 
 # Observability Endpoints

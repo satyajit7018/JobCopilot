@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jobcopilot-worker
+  namespace: production
+  labels:
+    app: jobcopilot
+    component: worker
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: jobcopilot
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: jobcopilot
+        component: worker
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      containers:
+        - name: celery-worker
+          image: jobcopilot/api:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - app.tasks.celery_app.celery_app
+            - worker
+            - -Q
+            - priority.high,priority.normal,priority.low
+            - -c
+            - "4"
+            - -l
+            - INFO
+          envFrom:
+            - secretRef:
+                name: jobcopilot-secrets
+            - configMapRef:
+                name: jobcopilot-config
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "1024Mi"
+            limits:
+              cpu: "4000m"
+              memory: "4096Mi"
+          securityContext:
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
