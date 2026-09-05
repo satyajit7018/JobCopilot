@@ -12,6 +12,8 @@ import hashlib
 import base64
 import json
 import uuid
+import secrets
+import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, Tuple
 
@@ -52,14 +54,34 @@ from app.core.security_logger import security_logger
 # =========================================================================
 RAW_JWT_SECRET = settings.JWT_SECRET
 ENV = settings.ENV.lower()
+_KNOWN_BAD_JWT_SECRET = "jobcopilot-super-secret-saas-jwt-signing-key-32b"
 
-if ENV == "production":
-    if not RAW_JWT_SECRET or RAW_JWT_SECRET == "jobcopilot-super-secret-saas-jwt-signing-key-32b" or len(RAW_JWT_SECRET) < 32:
+
+def _resolve_jwt_secret() -> str:
+    """Resolves the JWT signing secret with a fail-closed posture.
+
+    Production: a strong, externally supplied secret is mandatory.
+    Non-production: if none is supplied we generate a cryptographically
+    random ephemeral secret for this process rather than falling back to a
+    known, source-committed key (which would let anyone forge tokens).
+    """
+    if RAW_JWT_SECRET and RAW_JWT_SECRET != _KNOWN_BAD_JWT_SECRET and len(RAW_JWT_SECRET) >= 32:
+        return RAW_JWT_SECRET
+
+    if ENV == "production":
         raise RuntimeError(
             "FATAL: In production, JWT_SECRET must be set to a cryptographically secure string of at least 32 characters."
         )
 
-JWT_SECRET: str = RAW_JWT_SECRET or "jobcopilot-super-secret-saas-jwt-signing-key-32b"
+    ephemeral = secrets.token_urlsafe(48)
+    logging.getLogger("jobcopilot.auth").warning(
+        "JWT_SECRET is unset or insecure; using an EPHEMERAL per-process secret. "
+        "Tokens will not survive a restart. Set JWT_SECRET for stable auth."
+    )
+    return ephemeral
+
+
+JWT_SECRET: str = _resolve_jwt_secret()
 JWT_ALGORITHM = settings.JWT_ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 REFRESH_TOKEN_EXPIRE_DAYS = settings.REFRESH_TOKEN_EXPIRE_DAYS

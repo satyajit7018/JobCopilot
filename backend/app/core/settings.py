@@ -40,7 +40,9 @@ class Settings(BaseSettings):
     JOBCOPILOT_MASTER_KEY: Optional[str] = None
 
     # Authentication & JWT
-    JWT_SECRET: str = "jobcopilot-super-secret-saas-jwt-signing-key-32b"
+    # No hardcoded default: a real secret must come from the environment. When unset,
+    # auth derives an ephemeral per-process secret (non-prod) or fails closed (prod).
+    JWT_SECRET: Optional[str] = None
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -112,8 +114,9 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_fail_closed(self) -> "Settings":
         """Enforces critical secrets in production (fail-closed architecture)."""
+        _KNOWN_BAD_JWT_SECRET = "jobcopilot-super-secret-saas-jwt-signing-key-32b"
         if self.ENV.lower() == "production":
-            if not self.JWT_SECRET or self.JWT_SECRET == "jobcopilot-super-secret-saas-jwt-signing-key-32b" or len(self.JWT_SECRET) < 32:
+            if not self.JWT_SECRET or self.JWT_SECRET == _KNOWN_BAD_JWT_SECRET or len(self.JWT_SECRET) < 32:
                 raise ValueError(
                     "FATAL: In production, JWT_SECRET must be set to a cryptographically secure string of at least 32 characters."
                 )
