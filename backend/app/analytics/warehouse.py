@@ -4,14 +4,13 @@ Streams full-lifecycle candidate funnel telemetry, aggregates retention and conv
 and computes platform efficiency benchmarks with multi-tenant isolation.
 """
 
-import time
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
 from collections import defaultdict
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from app.core.models import AnalyticsEvent, ApplicationStatus
 from app.core.database import get_db
+from app.core.models import AnalyticsEvent, ApplicationStatus
 
 logger = logging.getLogger("jobcopilot.analytics.warehouse")
 

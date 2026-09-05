@@ -1,0 +1,6294 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "JobCopilot API v1",
+    "version": "1.0.0",
+    "description": "Version 1 of the JobCopilot Autonomous Career Operating System REST API."
+  },
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Register User",
+        "description": "Registers a new multi-tenant candidate account with Argon2id password hashing.",
+        "operationId": "register_user_api_v1_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Login User",
+        "description": "Authenticates user credentials, enforces brute-force lockout, MFA gate, and issues JWT tokens.",
+        "operationId": "login_user_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Refresh Token",
+        "description": "Rotates refresh token, revokes old token, and issues a new access token.",
+        "operationId": "refresh_token_api_v1_auth_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify-email": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Verify Email",
+        "description": "Verifies user email from a signed verification token.",
+        "operationId": "verify_email_api_v1_auth_verify_email_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/request-reset": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Request Password Reset",
+        "description": "Initiates a secure password reset workflow without user enumeration.",
+        "operationId": "request_password_reset_api_v1_auth_request_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Reset Password",
+        "description": "Completes password reset using a single-use signed token.",
+        "operationId": "reset_password_api_v1_auth_reset_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Logout User",
+        "description": "Revokes the current access token in the database blacklist and deactivates active session.",
+        "operationId": "logout_user_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Get My Profile",
+        "description": "Returns the authenticated candidate's identity and subscription tier.",
+        "operationId": "get_my_profile_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/setup": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Setup Mfa",
+        "description": "Initiates TOTP enrollment, generates secret, QR provisioning URI, and backup recovery codes.",
+        "operationId": "setup_mfa_api_v1_auth_mfa_setup_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MFASetupResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/verify": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Verify And Enable Mfa",
+        "description": "Verifies TOTP code against pending secret and finalizes MFA activation.",
+        "operationId": "verify_and_enable_mfa_api_v1_auth_mfa_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MFAVerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/mfa/login-challenge": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Complete Mfa Login",
+        "description": "Verifies MFA challenge token with TOTP code or backup recovery code, issuing full JWT.",
+        "operationId": "complete_mfa_login_api_v1_auth_mfa_login_challenge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MFALoginChallengeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/mfa/disable": {
+      "post": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Disable Mfa",
+        "description": "Disables MFA after verifying the user's password or current TOTP code.",
+        "operationId": "disable_mfa_api_v1_auth_mfa_disable_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MFADisableRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "List Active Sessions",
+        "description": "Lists all active device sessions for the authenticated candidate.",
+        "operationId": "list_active_sessions_api_v1_auth_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Revoke All Other Sessions",
+        "description": "Revokes all active sessions for the user except the current one.",
+        "operationId": "revoke_all_other_sessions_api_v1_auth_sessions_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/sessions/{session_id}": {
+      "delete": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Revoke User Session",
+        "description": "Revokes a specific device session and blacklists its token.",
+        "operationId": "revoke_user_session_api_v1_auth_sessions__session_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/security-logs": {
+      "get": {
+        "tags": [
+          "auth",
+          "Authentication"
+        ],
+        "summary": "Get User Security Logs",
+        "description": "Returns security audit log events pertaining to the authenticated user.",
+        "operationId": "get_user_security_logs_api_v1_auth_security_logs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityLogListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Health Check",
+        "description": "Public healthcheck endpoint.",
+        "operationId": "health_check_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/google-sso": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Google Sso Auth",
+        "description": "Authenticates candidate with Google ID token and issues signed JWT.",
+        "operationId": "google_sso_auth_api_v1_auth_google_sso_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleSSORequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/status": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Auth Status",
+        "description": "Returns local vault encryption status and user authentication state.",
+        "operationId": "auth_status_api_v1_auth_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/upload-resume": {
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Upload Resume",
+        "description": "Uploads and parses a resume (PDF, DOCX, or text) and auto-prefills questionnaire.",
+        "operationId": "upload_resume_api_v1_upload_resume_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_resume_api_v1_upload_resume_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/profile": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Get Profile",
+        "description": "Retrieves current candidate profile for authenticated tenant.",
+        "operationId": "get_profile_api_v1_profile_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/questionnaire": {
+      "get": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Get Questionnaire",
+        "description": "Retrieves the recruiter questions schema and prefilled answers.",
+        "operationId": "get_questionnaire_api_v1_questionnaire_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "profile"
+        ],
+        "summary": "Submit Questionnaire",
+        "description": "Applies user-confirmed answers to profile and Knowledge Vault.",
+        "operationId": "submit_questionnaire_api_v1_questionnaire_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuestionnaireSubmitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/vault": {
+      "get": {
+        "tags": [
+          "vault"
+        ],
+        "summary": "Get Vault Entries",
+        "description": "Returns all indexed Q&A slots for the authenticated tenant.",
+        "operationId": "get_vault_entries_api_v1_vault_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/vault/learn": {
+      "post": {
+        "tags": [
+          "vault"
+        ],
+        "summary": "Learn Vault Entry",
+        "description": "Manually teaches or updates a Q&A slot.",
+        "operationId": "learn_vault_entry_api_v1_vault_learn_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultLearnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/vault/test-match": {
+      "post": {
+        "tags": [
+          "vault"
+        ],
+        "summary": "Test Vault Match",
+        "description": "Tests real-time question resolution against the Knowledge Vault.",
+        "operationId": "test_vault_match_api_v1_vault_test_match_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultTestMatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/vault/semantic-search": {
+      "post": {
+        "tags": [
+          "vault"
+        ],
+        "summary": "Semantic Search Vault",
+        "description": "Ranks and returns vault entries by dense semantic vector similarity.",
+        "operationId": "semantic_search_vault_api_v1_vault_semantic_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultSemanticSearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/discovery/run": {
+      "post": {
+        "tags": [
+          "discovery"
+        ],
+        "summary": "Run Discovery",
+        "description": "Triggers an async 0-day job discovery cycle across ATS APIs and VC boards.",
+        "operationId": "run_discovery_api_v1_discovery_run_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "profile_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/discovery/status": {
+      "get": {
+        "tags": [
+          "discovery"
+        ],
+        "summary": "Get Discovery Status",
+        "description": "Returns current discovery metrics with caching.",
+        "operationId": "get_discovery_status_api_v1_discovery_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Jobs",
+        "description": "Returns all tracked job applications for the authenticated tenant.",
+        "operationId": "get_jobs_api_v1_jobs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{job_id}/tailor": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Generate Tailored Assets",
+        "description": "Compiles a tailored PDF resume, cover letter, and outreach package for a job.",
+        "operationId": "generate_tailored_assets_api_v1_jobs__job_id__tailor_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "profile_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resumes/tailor-multi": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Tailor Resumes For Multiple Roles",
+        "description": "Compiles ATS-tailored resume summaries for multiple target roles.",
+        "operationId": "tailor_resumes_for_multiple_roles_api_v1_resumes_tailor_multi_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MultiRoleTailorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/log-call": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Log Direct Recruiter Call",
+        "description": "Manually records an offline recruiter call or phone screen.",
+        "operationId": "log_direct_recruiter_call_api_v1_jobs_log_call_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogDirectCallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/held": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Held Applications",
+        "description": "Retrieves all applications currently paused on novel questions for authenticated tenant.",
+        "operationId": "get_held_applications_api_v1_jobs_held_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/outreach/alumni-referral": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Generate Alumni Referral",
+        "description": "Generates 280-char LinkedIn connection note and email for alumni referral outreach.",
+        "operationId": "generate_alumni_referral_api_v1_outreach_alumni_referral_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlumniReferralRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/outreach/recruiter-nudge": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Generate Recruiter Nudge Endpoint",
+        "description": "Generates polite, high-converting recruiter follow-up message.",
+        "operationId": "generate_recruiter_nudge_endpoint_api_v1_outreach_recruiter_nudge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecruiterNudgeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/hitl/pending": {
+      "get": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Get Pending Hitl",
+        "description": "Returns all pending HITL questions for authenticated tenant.",
+        "operationId": "get_pending_hitl_api_v1_hitl_pending_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/hitl/resolve": {
+      "post": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Resolve Hitl",
+        "description": "Atomically resolves a pending HITL question strictly for the authenticated tenant.",
+        "operationId": "resolve_hitl_api_v1_hitl_resolve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HITLResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/hitl/resolve-held": {
+      "post": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Resolve Held Application",
+        "description": "Atomically resolves held application, saves Q&A to vault, and resumes submission.",
+        "operationId": "resolve_held_application_api_v1_hitl_resolve_held_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveHeldApplicationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/bot/apply/{job_id}": {
+      "post": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Apply To Job",
+        "description": "Executes full autonomous stealth application workflow with persistent rate limiting and idempotency.",
+        "operationId": "apply_to_job_api_v1_bot_apply__job_id__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "profile_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile Id"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mode"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bot/apply-async/{job_id}": {
+      "post": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Apply To Job Async",
+        "description": "Dispatches asynchronous application task to Celery/Redis background worker queue with idempotency checks.\nReturns HTTP 202 Accepted with a unique task_id for progress polling.",
+        "operationId": "apply_to_job_async_api_v1_bot_apply_async__job_id__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mode"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/apply-async/{job_id}": {
+      "post": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Apply To Job Async",
+        "description": "Dispatches asynchronous application task to Celery/Redis background worker queue with idempotency checks.\nReturns HTTP 202 Accepted with a unique task_id for progress polling.",
+        "operationId": "apply_to_job_async_api_v1_jobs_apply_async__job_id__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mode"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{task_id}": {
+      "get": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Get Task Status Endpoint",
+        "description": "Polls progress and completion status for an asynchronous background task.",
+        "operationId": "get_task_status_endpoint_api_v1_tasks__task_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bot/ledger": {
+      "get": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Get Apply Ledger",
+        "description": "Returns paginated application audit ledger history for authenticated tenant.",
+        "operationId": "get_apply_ledger_api_v1_bot_ledger_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bot/ledger/{job_id}": {
+      "get": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Get Job Ledger",
+        "description": "Retrieves apply ledger entry for a specific job.",
+        "operationId": "get_job_ledger_api_v1_bot_ledger__job_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hitl/{event_id}/evidence": {
+      "get": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Get Hitl Evidence",
+        "description": "Returns visual evidence (screenshot path, DOM snapshot, field selector) for a HITL challenge.",
+        "operationId": "get_hitl_evidence_api_v1_hitl__event_id__evidence_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/email/inbound-webhook": {
+      "post": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Receive Inbound Email Webhook",
+        "description": "Public webhook receiver for external email providers (Postmark, SendGrid, Mailgun).\nVerifies HMAC-SHA256 signature and attributes incoming email to tenant via subaddress.",
+        "operationId": "receive_inbound_email_webhook_api_v1_email_inbound_webhook_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/email/inbound": {
+      "post": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Receive Inbound Email",
+        "description": "Processes incoming recruiter email and syncs pipeline for authenticated tenant.",
+        "operationId": "receive_inbound_email_api_v1_email_inbound_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InboundEmailPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/email/messages": {
+      "get": {
+        "tags": [
+          "email"
+        ],
+        "summary": "List Email Messages",
+        "description": "Returns all parsed recruiter communications for authenticated tenant.",
+        "operationId": "list_email_messages_api_v1_email_messages_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/email/followup/{job_id}": {
+      "post": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Generate Job Followup",
+        "description": "Generates and saves a follow-up draft for a submitted application.",
+        "operationId": "generate_job_followup_api_v1_email_followup__job_id__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "stage_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 7,
+              "title": "Stage Days"
+            }
+          },
+          {
+            "name": "profile_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/funnel": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Funnel Analytics",
+        "description": "Returns aggregated pipeline funnel metrics for authenticated tenant with multi-tier caching.",
+        "operationId": "get_funnel_analytics_api_v1_analytics_funnel_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/events": {
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Record Telemetry Event",
+        "description": "Ingests a telemetry event into the Analytics Warehouse.",
+        "operationId": "record_telemetry_event_api_v1_analytics_events_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List Telemetry Events",
+        "description": "Retrieves recent analytics events for the authenticated tenant.",
+        "operationId": "list_telemetry_events_api_v1_analytics_events_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/cohorts": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Cohort Analytics",
+        "description": "Returns application cohort progression and conversion velocity over time.",
+        "operationId": "get_cohort_analytics_api_v1_analytics_cohorts_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(weekly|monthly)$",
+              "default": "weekly",
+              "title": "Interval"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analytics/conversions": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Get Conversion Insights",
+        "description": "Returns top-converting skills, platform breakdown, and velocity turnaround times.",
+        "operationId": "get_conversion_insights_api_v1_analytics_conversions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/calibrate": {
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Calibrate Conversion Weights",
+        "description": "Triggers feedback loop calibration to update MatchScorer dynamic empirical weights.",
+        "operationId": "calibrate_conversion_weights_api_v1_analytics_calibrate_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/experiments": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "List Ab Experiments",
+        "description": "Lists all active and historical A/B experimentation campaigns.",
+        "operationId": "list_ab_experiments_api_v1_analytics_experiments_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Create Ab Experiment",
+        "description": "Initializes a new A/B testing experiment.",
+        "operationId": "create_ab_experiment_api_v1_analytics_experiments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/experiments/{experiment_id}/evaluate": {
+      "post": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Evaluate Ab Experiment",
+        "description": "Evaluates sample proportions, two-sample pooled Z-score, p-value, and statistical significance.",
+        "operationId": "evaluate_ab_experiment_api_v1_analytics_experiments__experiment_id__evaluate_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "experiment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Experiment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/dossier": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Company Dossier",
+        "description": "Generates technical architecture dossier and interview rounds for target company.",
+        "operationId": "get_company_dossier_api_v1_interview_dossier_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "company",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Company"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "Senior Software Engineer",
+              "title": "Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/questions": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Mock Questions",
+        "description": "Generates role-specific mock technical, system design, and STAR leadership questions.",
+        "operationId": "get_mock_questions_api_v1_interview_questions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "Senior Software Engineer",
+              "title": "Role"
+            }
+          },
+          {
+            "name": "profile_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Profile Id"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/evaluate": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Evaluate Interview Answer",
+        "description": "Evaluates candidate response with multi-dimensional STAR scoring.",
+        "operationId": "evaluate_interview_answer_api_v1_interview_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewEvalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/interview/notify-invitation": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Trigger Interview Invitation Notification",
+        "description": "Triggers an interview invitation alert and provides role-customized mock interview questions.",
+        "operationId": "trigger_interview_invitation_notification_api_v1_interview_notify_invitation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewInvitationTriggerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/interview/reverse-questions": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Reverse Interview Questions",
+        "description": "Generates strategic questions to ask the hiring manager.",
+        "operationId": "get_reverse_interview_questions_api_v1_interview_reverse_questions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "Senior Software Engineer",
+              "title": "Role"
+            }
+          },
+          {
+            "name": "company",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "Target Company",
+              "title": "Company"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interview/interviewer-recon": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Analyze Interviewer Recon",
+        "description": "Infers interviewer persona, technical biases, and strategic preparation advice.",
+        "operationId": "analyze_interviewer_recon_api_v1_interview_interviewer_recon_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewerReconRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/interview/engineering-intel": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Company Engineering Intel Endpoint",
+        "description": "Fetches company public engineering blog initiatives.",
+        "operationId": "get_company_engineering_intel_endpoint_api_v1_interview_engineering_intel_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "company",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Company"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/calendar/availability": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Get Calendar Availability",
+        "description": "Calculates non-conflicting interview scheduling windows.",
+        "operationId": "get_calendar_availability_api_v1_calendar_availability_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "timezone",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "IST",
+              "title": "Timezone"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 4,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/negotiation/evaluate": {
+      "post": {
+        "tags": [
+          "negotiation"
+        ],
+        "summary": "Evaluate Offer Compensation",
+        "description": "Benchmarks job offer against market percentiles.",
+        "operationId": "evaluate_offer_compensation_api_v1_negotiation_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferEvalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/negotiation/equity": {
+      "post": {
+        "tags": [
+          "negotiation"
+        ],
+        "summary": "Model Equity",
+        "description": "Models startup ESOP ownership and future exit returns.",
+        "operationId": "model_equity_api_v1_negotiation_equity_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EquityModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/negotiation/compare-offers": {
+      "post": {
+        "tags": [
+          "negotiation"
+        ],
+        "summary": "Compare Offers Endpoint",
+        "description": "Compares multiple offers with 4-year TC progression and liquidation analysis.",
+        "operationId": "compare_offers_endpoint_api_v1_negotiation_compare_offers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MultiOfferCompareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/salary/compare-offers": {
+      "post": {
+        "tags": [
+          "negotiation"
+        ],
+        "summary": "Compare Offers Endpoint",
+        "description": "Compares multiple offers with 4-year TC progression and liquidation analysis.",
+        "operationId": "compare_offers_endpoint_api_v1_salary_compare_offers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MultiOfferCompareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/negotiation/advanced-counter": {
+      "post": {
+        "tags": [
+          "negotiation"
+        ],
+        "summary": "Generate Advanced Counter Script Endpoint",
+        "description": "Generates tailored executive negotiation email and phone talking points.",
+        "operationId": "generate_advanced_counter_script_endpoint_api_v1_negotiation_advanced_counter_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvancedCounterOfferRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/salary/counter-script": {
+      "post": {
+        "tags": [
+          "negotiation"
+        ],
+        "summary": "Generate Advanced Counter Script Endpoint",
+        "description": "Generates tailored executive negotiation email and phone talking points.",
+        "operationId": "generate_advanced_counter_script_endpoint_api_v1_salary_counter_script_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvancedCounterOfferRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/negotiation/counter-offer": {
+      "post": {
+        "tags": [
+          "negotiation"
+        ],
+        "summary": "Generate Counter Offer",
+        "description": "Generates an Anti-AI counter-offer negotiation email.",
+        "operationId": "generate_counter_offer_api_v1_negotiation_counter_offer_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CounterOfferRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/billing/webhook": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Stripe Webhook Handler",
+        "description": "Receives Stripe subscription updates and adjusts tenant tier accordingly (Fail-Closed).",
+        "operationId": "stripe_webhook_handler_api_v1_billing_webhook_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/billing/plan": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Get Billing Plan",
+        "description": "Returns the current user's subscription tier, limits, and daily apply balance.",
+        "operationId": "get_billing_plan_api_v1_billing_plan_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/billing/checkout": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Create Checkout Session",
+        "description": "Generates a real Stripe Checkout Session for subscription tier upgrade.",
+        "operationId": "create_checkout_session_api_v1_billing_checkout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/billing/portal": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Create Customer Portal Session",
+        "description": "Creates a Stripe Billing Customer Portal session for user subscription management.",
+        "operationId": "create_customer_portal_session_api_v1_billing_portal_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerPortalRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/billing/sync": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Sync Subscription Tier",
+        "description": "Synchronizes user tier with Stripe as the single source of truth.\nPulls latest subscription status and updates local database and rate limiter.",
+        "operationId": "sync_subscription_tier_api_v1_billing_sync_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/billing/proration-preview": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Preview Proration",
+        "description": "Calculates estimated proration credit/charge when switching tiers.",
+        "operationId": "preview_proration_api_v1_billing_proration_preview_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "target_tier",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Target Tier"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backup/export": {
+      "post": {
+        "tags": [
+          "backup"
+        ],
+        "summary": "Export Backup",
+        "description": "Exports encrypted archive (.jobcopilot.enc) scoped to authenticated tenant.",
+        "operationId": "export_backup_api_v1_backup_export_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/backup/restore": {
+      "post": {
+        "tags": [
+          "backup"
+        ],
+        "summary": "Restore Backup",
+        "description": "Restores database state strictly for the caller's tenant from uploaded backup buffer.",
+        "operationId": "restore_backup_api_v1_backup_restore_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_restore_backup_api_v1_backup_restore_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/storage/download": {
+      "get": {
+        "tags": [
+          "backup"
+        ],
+        "summary": "Download Storage File",
+        "description": "Securely streams object storage files with tenant verification, expiry checks, and path traversal defense.",
+        "operationId": "download_storage_file_api_v1_storage_download_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "file",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "exp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Exp"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Admin Users",
+        "description": "Lists all registered users with optional search filter.",
+        "operationId": "list_admin_users_api_v1_admin_users_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/orgs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Admin Organizations",
+        "description": "Lists all organizations with member counts and plan tiers.",
+        "operationId": "list_admin_organizations_api_v1_admin_orgs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOrgListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/metrics": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Admin Metrics",
+        "description": "Returns platform-wide metrics: user count, job count, application count, tier breakdown.",
+        "operationId": "get_admin_metrics_api_v1_admin_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStatsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/impersonate/{user_id}": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Impersonate User",
+        "description": "Issues an audit-logged, short-lived JWT access token allowing an admin to impersonate a tenant.\nAll actions performed under this token contain an explicit 'impersonated_by' audit claim.",
+        "operationId": "impersonate_user_api_v1_admin_impersonate__user_id__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminImpersonateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/audit-logs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Admin Audit Logs",
+        "description": "Retrieves paginated admin audit trail.",
+        "operationId": "get_admin_audit_logs_api_v1_admin_audit_logs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/security-audit-logs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get System Security Audit Logs",
+        "description": "Retrieves system-wide security audit logs and anomaly alerts (Admin only).",
+        "operationId": "get_system_security_audit_logs_api_v1_admin_security_audit_logs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "event_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/users/{user_id}/role": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update User Role",
+        "description": "Updates a user's subscription or system role.",
+        "operationId": "update_user_role_api_v1_admin_users__user_id__role_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Role"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orgs": {
+      "get": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "List User Organizations",
+        "description": "Lists all organizations the authenticated user belongs to.",
+        "operationId": "list_user_organizations_api_v1_orgs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrgResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List User Organizations Api V1 Orgs Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Create Organization",
+        "description": "Creates a new team organization.\nThe creator is automatically granted the OWNER role.",
+        "operationId": "create_organization_api_v1_orgs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrgRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/orgs/{org_id}": {
+      "get": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Get Organization Details",
+        "description": "Gets details of an organization if the user is a member.",
+        "operationId": "get_organization_details_api_v1_orgs__org_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Org Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Update Organization Settings",
+        "description": "Updates organization name or plan tier (requires OWNER or ADMIN).",
+        "operationId": "update_organization_settings_api_v1_orgs__org_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Org Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrgRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orgs/{org_id}/members": {
+      "get": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "List Organization Members",
+        "description": "Lists all members of an organization (requires membership).",
+        "operationId": "list_organization_members_api_v1_orgs__org_id__members_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Org Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberResponse"
+                  },
+                  "title": "Response List Organization Members Api V1 Orgs  Org Id  Members Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Invite Organization Member",
+        "description": "Invites a user to the organization by email (requires OWNER or ADMIN).",
+        "operationId": "invite_organization_member_api_v1_orgs__org_id__members_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Org Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteMemberRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/orgs/{org_id}/members/{user_id}": {
+      "patch": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Update Organization Member Role",
+        "description": "Updates a member's role (requires OWNER).",
+        "operationId": "update_organization_member_role_api_v1_orgs__org_id__members__user_id__patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemberRoleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Remove Organization Member",
+        "description": "Removes a member from the organization or allows a member to leave.",
+        "operationId": "remove_organization_member_api_v1_orgs__org_id__members__user_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/account/export": {
+      "post": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Export User Account Data",
+        "description": "GDPR Article 20 (Right to Data Portability).\nGenerates and returns an exhaustive, machine-readable JSON archive of all\ncandidate data across all tables, decrypting stored PII.",
+        "operationId": "export_user_account_data_api_v1_account_export_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountExportResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/account": {
+      "delete": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Delete User Account",
+        "description": "GDPR Article 17 (Right to Erasure / Hard Delete).\nPermanently erases all database records tied to the candidate, cancels active\nStripe subscriptions, purges file uploads, and revokes credentials.",
+        "operationId": "delete_user_account_api_v1_account_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountExportResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "exported_at": {
+            "type": "string",
+            "title": "Exported At"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "exported_at",
+          "data"
+        ],
+        "title": "AccountExportResponse"
+      },
+      "AdminImpersonateResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "impersonated_user_id": {
+            "type": "string",
+            "title": "Impersonated User Id"
+          },
+          "impersonated_email": {
+            "type": "string",
+            "title": "Impersonated Email"
+          },
+          "admin_id": {
+            "type": "string",
+            "title": "Admin Id"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "impersonated_user_id",
+          "impersonated_email",
+          "admin_id"
+        ],
+        "title": "AdminImpersonateResponse"
+      },
+      "AdminOrgListResponse": {
+        "properties": {
+          "orgs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Orgs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "orgs",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "AdminOrgListResponse"
+      },
+      "AdminStatsResponse": {
+        "properties": {
+          "total_users": {
+            "type": "integer",
+            "title": "Total Users"
+          },
+          "total_jobs": {
+            "type": "integer",
+            "title": "Total Jobs"
+          },
+          "total_applications": {
+            "type": "integer",
+            "title": "Total Applications"
+          },
+          "active_subscriptions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Active Subscriptions"
+          },
+          "total_organizations": {
+            "type": "integer",
+            "title": "Total Organizations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_users",
+          "total_jobs",
+          "total_applications",
+          "active_subscriptions",
+          "total_organizations"
+        ],
+        "title": "AdminStatsResponse"
+      },
+      "AdminUserListResponse": {
+        "properties": {
+          "users": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Users"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "users",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "AdminUserListResponse"
+      },
+      "AdvancedCounterOfferRequest": {
+        "properties": {
+          "candidate_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Name"
+          },
+          "target_company": {
+            "type": "string",
+            "title": "Target Company"
+          },
+          "role_title": {
+            "type": "string",
+            "title": "Role Title"
+          },
+          "current_base": {
+            "type": "string",
+            "title": "Current Base"
+          },
+          "current_equity": {
+            "type": "string",
+            "title": "Current Equity"
+          },
+          "target_base": {
+            "type": "string",
+            "title": "Target Base"
+          },
+          "target_equity": {
+            "type": "string",
+            "title": "Target Equity"
+          },
+          "competing_company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competing Company"
+          },
+          "competing_tc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Competing Tc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "target_company",
+          "role_title",
+          "current_base",
+          "current_equity",
+          "target_base",
+          "target_equity"
+        ],
+        "title": "AdvancedCounterOfferRequest"
+      },
+      "AlumniReferralRequest": {
+        "properties": {
+          "candidate_name": {
+            "type": "string",
+            "title": "Candidate Name",
+            "default": "Candidate"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "role_title": {
+            "type": "string",
+            "title": "Role Title"
+          },
+          "contact_name": {
+            "type": "string",
+            "title": "Contact Name",
+            "default": "Fellow Alumni"
+          },
+          "common_ground": {
+            "type": "string",
+            "title": "Common Ground",
+            "default": "our shared background"
+          }
+        },
+        "type": "object",
+        "required": [
+          "company_name",
+          "role_title"
+        ],
+        "title": "AlumniReferralRequest"
+      },
+      "Body_restore_backup_api_backup_restore_post": {
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestoreBackupPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "Body_restore_backup_api_backup_restore_post"
+      },
+      "Body_restore_backup_api_v1_backup_restore_post": {
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestoreBackupPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "Body_restore_backup_api_v1_backup_restore_post"
+      },
+      "Body_upload_resume_api_upload_resume_post": {
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "raw_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Text"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          }
+        },
+        "type": "object",
+        "title": "Body_upload_resume_api_upload_resume_post"
+      },
+      "Body_upload_resume_api_v1_upload_resume_post": {
+        "properties": {
+          "file": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "File"
+          },
+          "raw_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Text"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          }
+        },
+        "type": "object",
+        "title": "Body_upload_resume_api_v1_upload_resume_post"
+      },
+      "CheckoutRequest": {
+        "properties": {
+          "tier": {
+            "type": "string",
+            "title": "Tier",
+            "default": "PRO"
+          },
+          "success_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success Url"
+          },
+          "cancel_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Url"
+          }
+        },
+        "type": "object",
+        "title": "CheckoutRequest"
+      },
+      "CounterOfferRequest": {
+        "properties": {
+          "candidate_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Name"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "role_title": {
+            "type": "string",
+            "title": "Role Title"
+          },
+          "offered_tc": {
+            "type": "string",
+            "title": "Offered Tc"
+          },
+          "desired_tc": {
+            "type": "string",
+            "title": "Desired Tc"
+          },
+          "leverage_points": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leverage Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "company_name",
+          "role_title",
+          "offered_tc",
+          "desired_tc"
+        ],
+        "title": "CounterOfferRequest"
+      },
+      "CreateOrgRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "CreateOrgRequest"
+      },
+      "CustomerPortalRequest": {
+        "properties": {
+          "return_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Url"
+          }
+        },
+        "type": "object",
+        "title": "CustomerPortalRequest"
+      },
+      "DeleteAccountRequest": {
+        "properties": {
+          "confirm_email": {
+            "type": "string",
+            "title": "Confirm Email"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "confirm_email"
+        ],
+        "title": "DeleteAccountRequest"
+      },
+      "EquityModelRequest": {
+        "properties": {
+          "options_count": {
+            "type": "integer",
+            "title": "Options Count"
+          },
+          "total_company_shares": {
+            "type": "integer",
+            "title": "Total Company Shares"
+          },
+          "current_valuation_usd": {
+            "type": "number",
+            "title": "Current Valuation Usd"
+          },
+          "strike_price": {
+            "type": "number",
+            "title": "Strike Price",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "options_count",
+          "total_company_shares",
+          "current_valuation_usd"
+        ],
+        "title": "EquityModelRequest"
+      },
+      "GoogleSSORequest": {
+        "properties": {
+          "id_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id Token"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "google_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Google Id"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "auto_login_permissions": {
+            "type": "boolean",
+            "title": "Auto Login Permissions",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "GoogleSSORequest"
+      },
+      "HITLResolveRequest": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "user_answer": {
+            "type": "string",
+            "title": "User Answer"
+          },
+          "save_to_vault": {
+            "type": "boolean",
+            "title": "Save To Vault",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "user_answer"
+        ],
+        "title": "HITLResolveRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InboundEmailPayload": {
+        "properties": {
+          "sender": {
+            "type": "string",
+            "title": "Sender"
+          },
+          "recipient": {
+            "type": "string",
+            "title": "Recipient",
+            "default": "candidate@jobcopilot.local"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "body_html": {
+            "type": "string",
+            "title": "Body Html"
+          },
+          "body_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sender",
+          "subject",
+          "body_html"
+        ],
+        "title": "InboundEmailPayload"
+      },
+      "InterviewEvalRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "candidate_answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Answer"
+          },
+          "key_concepts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Concepts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "InterviewEvalRequest"
+      },
+      "InterviewInvitationTriggerRequest": {
+        "properties": {
+          "company": {
+            "type": "string",
+            "title": "Company"
+          },
+          "role_title": {
+            "type": "string",
+            "title": "Role Title"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "meeting_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meeting Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "company",
+          "role_title"
+        ],
+        "title": "InterviewInvitationTriggerRequest"
+      },
+      "InterviewerReconRequest": {
+        "properties": {
+          "interviewer_name": {
+            "type": "string",
+            "title": "Interviewer Name"
+          },
+          "interviewer_role": {
+            "type": "string",
+            "title": "Interviewer Role",
+            "default": "Engineering Manager"
+          },
+          "background_text": {
+            "type": "string",
+            "title": "Background Text",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "interviewer_name"
+        ],
+        "title": "InterviewerReconRequest"
+      },
+      "InviteMemberRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "role": {
+            "$ref": "#/components/schemas/OrgRole",
+            "default": "MEMBER"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "InviteMemberRequest"
+      },
+      "LogDirectCallRequest": {
+        "properties": {
+          "company": {
+            "type": "string",
+            "title": "Company"
+          },
+          "role_title": {
+            "type": "string",
+            "title": "Role Title"
+          },
+          "recruiter_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recruiter Name",
+            "default": "Recruiter"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "INTERVIEW"
+          },
+          "call_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Notes"
+          },
+          "scheduled_interview_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scheduled Interview Time"
+          },
+          "meeting_link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meeting Link"
+          }
+        },
+        "type": "object",
+        "required": [
+          "company",
+          "role_title"
+        ],
+        "title": "LogDirectCallRequest"
+      },
+      "MFADisableRequest": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "title": "MFADisableRequest"
+      },
+      "MFALoginChallengeRequest": {
+        "properties": {
+          "mfa_token": {
+            "type": "string",
+            "title": "Mfa Token"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mfa_token",
+          "code"
+        ],
+        "title": "MFALoginChallengeRequest"
+      },
+      "MFASetupResponse": {
+        "properties": {
+          "secret": {
+            "type": "string",
+            "title": "Secret"
+          },
+          "provisioning_uri": {
+            "type": "string",
+            "title": "Provisioning Uri"
+          },
+          "backup_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Backup Codes"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "MFA setup initiated. Enter TOTP code to finalize activation."
+          }
+        },
+        "type": "object",
+        "required": [
+          "secret",
+          "provisioning_uri",
+          "backup_codes"
+        ],
+        "title": "MFASetupResponse"
+      },
+      "MFAVerifyRequest": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "mfa_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mfa Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code"
+        ],
+        "title": "MFAVerifyRequest"
+      },
+      "MemberResponse": {
+        "properties": {
+          "membership_id": {
+            "type": "string",
+            "title": "Membership Id"
+          },
+          "org_id": {
+            "type": "string",
+            "title": "Org Id"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "membership_id",
+          "org_id",
+          "user_id",
+          "email",
+          "full_name",
+          "role",
+          "created_at"
+        ],
+        "title": "MemberResponse"
+      },
+      "MultiOfferCompareRequest": {
+        "properties": {
+          "offers": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Offers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "offers"
+        ],
+        "title": "MultiOfferCompareRequest"
+      },
+      "MultiRoleTailorRequest": {
+        "properties": {
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "roles"
+        ],
+        "title": "MultiRoleTailorRequest"
+      },
+      "OfferEvalRequest": {
+        "properties": {
+          "base_salary_lpa": {
+            "type": "number",
+            "title": "Base Salary Lpa"
+          },
+          "bonus_lpa": {
+            "type": "number",
+            "title": "Bonus Lpa",
+            "default": 0.0
+          },
+          "equity_annual_lpa": {
+            "type": "number",
+            "title": "Equity Annual Lpa",
+            "default": 0.0
+          },
+          "role_title": {
+            "type": "string",
+            "title": "Role Title",
+            "default": "Senior Software Engineer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "base_salary_lpa"
+        ],
+        "title": "OfferEvalRequest"
+      },
+      "OrgResponse": {
+        "properties": {
+          "org_id": {
+            "type": "string",
+            "title": "Org Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "owner_id": {
+            "type": "string",
+            "title": "Owner Id"
+          },
+          "plan_tier": {
+            "type": "string",
+            "title": "Plan Tier",
+            "default": "FREE"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "org_id",
+          "name",
+          "slug",
+          "owner_id",
+          "created_at"
+        ],
+        "title": "OrgResponse"
+      },
+      "OrgRole": {
+        "type": "string",
+        "enum": [
+          "OWNER",
+          "ADMIN",
+          "MEMBER"
+        ],
+        "title": "OrgRole"
+      },
+      "QuestionnaireSubmitRequest": {
+        "properties": {
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          },
+          "answers": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Answers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answers"
+        ],
+        "title": "QuestionnaireSubmitRequest"
+      },
+      "RecruiterNudgeRequest": {
+        "properties": {
+          "candidate_name": {
+            "type": "string",
+            "title": "Candidate Name",
+            "default": "Candidate"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "role_title": {
+            "type": "string",
+            "title": "Role Title"
+          },
+          "recruiter_name": {
+            "type": "string",
+            "title": "Recruiter Name",
+            "default": "Recruiter"
+          },
+          "days_elapsed": {
+            "type": "integer",
+            "title": "Days Elapsed",
+            "default": 5
+          },
+          "recent_highlight": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recent Highlight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "company_name",
+          "role_title"
+        ],
+        "title": "RecruiterNudgeRequest"
+      },
+      "RefreshTokenRequest": {
+        "properties": {
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "title": "RefreshTokenRequest"
+      },
+      "RequestPasswordResetRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "RequestPasswordResetRequest"
+      },
+      "ResetPasswordRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "new_password": {
+            "type": "string",
+            "title": "New Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "title": "ResetPasswordRequest"
+      },
+      "ResolveHeldApplicationRequest": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "user_answer": {
+            "type": "string",
+            "title": "User Answer"
+          },
+          "save_to_vault": {
+            "type": "boolean",
+            "title": "Save To Vault",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "user_answer"
+        ],
+        "title": "ResolveHeldApplicationRequest"
+      },
+      "RestoreBackupPayload": {
+        "properties": {
+          "encrypted_data_b64": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Encrypted Data B64"
+          }
+        },
+        "type": "object",
+        "title": "RestoreBackupPayload"
+      },
+      "SecurityLogListResponse": {
+        "properties": {
+          "logs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Logs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "logs",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "SecurityLogListResponse"
+      },
+      "SessionListResponse": {
+        "properties": {
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/SessionResponse"
+            },
+            "type": "array",
+            "title": "Sessions"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sessions",
+          "total"
+        ],
+        "title": "SessionListResponse"
+      },
+      "SessionResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "ip_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip Address"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "last_active": {
+            "type": "string",
+            "title": "Last Active"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "device_name",
+          "created_at",
+          "last_active"
+        ],
+        "title": "SessionResponse"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "title": "Refresh Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "mfa_required": {
+            "type": "boolean",
+            "title": "Mfa Required",
+            "default": false
+          },
+          "mfa_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mfa Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "user_id",
+          "email",
+          "role"
+        ],
+        "title": "TokenResponse"
+      },
+      "UpdateMemberRoleRequest": {
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/OrgRole"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "UpdateMemberRoleRequest"
+      },
+      "UpdateOrgRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "plan_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Tier"
+          }
+        },
+        "type": "object",
+        "title": "UpdateOrgRequest"
+      },
+      "UserLoginRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "UserLoginRequest"
+      },
+      "UserRegisterRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "UserRegisterRequest"
+      },
+      "UserResponse": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "email_verified": {
+            "type": "boolean",
+            "title": "Email Verified",
+            "default": false
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "full_name",
+          "role",
+          "created_at"
+        ],
+        "title": "UserResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VaultLearnRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "answer": {
+            "type": "string",
+            "title": "Answer"
+          },
+          "slot_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot Type"
+          },
+          "slot_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "answer"
+        ],
+        "title": "VaultLearnRequest"
+      },
+      "VaultSemanticSearchRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "top_k": {
+            "type": "integer",
+            "title": "Top K",
+            "default": 5
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "VaultSemanticSearchRequest"
+      },
+      "VaultTestMatchRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "company": {
+            "type": "string",
+            "title": "Company",
+            "default": "Stripe"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role",
+            "default": "Senior Software Engineer"
+          },
+          "profile_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "VaultTestMatchRequest"
+      },
+      "VerifyEmailRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "VerifyEmailRequest"
+      }
+    },
+    "securitySchemes": {
+      "HTTPBearer": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}

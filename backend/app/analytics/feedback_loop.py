@@ -4,14 +4,13 @@ Correlates tailored resume variations, keywords, and outreach strategies with re
 recruiter responses (interviews & offers), producing empirical weight adjustments for MatchScorer.
 """
 
-import math
 import logging
-from datetime import datetime
 from collections import defaultdict
-from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime
+from typing import Any, Dict, List, Tuple
 
-from app.core.models import ApplicationStatus, ConversionSignal
 from app.core.database import get_db
+from app.core.models import ApplicationStatus, ConversionSignal
 
 logger = logging.getLogger("jobcopilot.analytics.feedback")
 

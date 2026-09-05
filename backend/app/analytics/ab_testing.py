@@ -4,14 +4,13 @@ Provides deterministic variant routing, conversion tracking, two-sample Z-tests,
 p-value statistical significance evaluation, and 95% confidence intervals.
 """
 
-import math
 import hashlib
 import logging
-from datetime import datetime
-from typing import Dict, Any, List, Optional, Tuple
+import math
+from typing import Any, Dict, List, Optional
 
-from app.core.models import ABExperiment, ABVariant, ABAssignment
 from app.core.database import get_db
+from app.core.models import ABExperiment, ABVariant
 
 logger = logging.getLogger("jobcopilot.analytics.ab_testing")
 
@@ -62,7 +61,7 @@ class ABTestingEngine:
             return "control_a"
 
         # Deterministic hash to integer 0..999
-        hash_digest = hashlib.sha256(f"{user_id}:{entity_id}:{experiment_id}".encode("utf-8")).hexdigest()
+        hash_digest = hashlib.sha256(f"{user_id}:{entity_id}:{experiment_id}".encode()).hexdigest()
         bucket = int(hash_digest[:8], 16) % 1000  # 0 to 999
 
         # Normalize weights to cumulative integer buckets

@@ -17,7 +17,9 @@ from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 
 from app.core.settings import settings
-from app.api.middleware import SecurityHeadersMiddleware, RequestTracingMiddleware, IdempotencyMiddleware
+from app.api.middleware import (
+    SecurityHeadersMiddleware, RequestTracingMiddleware, IdempotencyMiddleware, ApiDeprecationMiddleware
+)
 from app.api.auth import limiter
 from app.api.endpoints import router as api_router, ws_manager
 from app.core.database import get_db
@@ -51,10 +53,13 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # 1. Tracing & Latency Logger
 app.add_middleware(RequestTracingMiddleware)
 
-# 2. Idempotency Key Engine for Mutating Operations
+# 2. RFC 8594 Sunset & Deprecation Warning for Legacy /api/ Routes
+app.add_middleware(ApiDeprecationMiddleware)
+
+# 3. Idempotency Key Engine for Mutating Operations
 app.add_middleware(IdempotencyMiddleware)
 
-# 3. Strict Security Headers (CSP, HSTS, X-Frame-Options)
+# 4. Strict Security Headers (CSP, HSTS, X-Frame-Options)
 app.add_middleware(SecurityHeadersMiddleware)
 
 # 3. CORS Policy

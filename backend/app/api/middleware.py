@@ -229,3 +229,27 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             idempotency_engine.release(idempotency_key, user_id)
             raise
 
+
+class ApiDeprecationMiddleware(BaseHTTPMiddleware):
+    """
+    RFC 8594 Sunset & Deprecation Header Injection.
+    Emits deprecation warnings on unversioned legacy `/api/*` endpoints,
+    directing consumers to canonical `/api/v1/*` routes.
+    """
+
+    SUNSET_DATE = "Sun, 06 Sep 2026 00:00:00 GMT"  # Graceful deprecation policy window
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        path = request.url.path
+
+        # Inject RFC 8594 deprecation headers if accessing legacy /api/ route (and not /api/v1/)
+        if path.startswith("/api/") and not path.startswith("/api/v1/"):
+            response.headers["Deprecation"] = "true"
+            response.headers["Sunset"] = self.SUNSET_DATE
+            successor_path = path.replace("/api/", "/api/v1/", 1)
+            response.headers["Link"] = f'<{successor_path}>; rel="successor-version"'
+
+        return response
+
+

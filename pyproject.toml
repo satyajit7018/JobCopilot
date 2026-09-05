@@ -1,0 +1,120 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jobcopilot"
+version = "1.0.0"
+description = "Universal Autonomous Job Hunting, Self-Learning Application & Career Operating System"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "SQLAlchemy>=2.0.0",
+    "alembic>=1.11.0",
+    "psycopg2-binary>=2.9.0",
+    "cryptography>=41.0.0",
+    "PyYAML>=6.0",
+    "slowapi>=0.1.8",
+]
+
+[tool.black]
+line-length = 120
+target-version = ["py39"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | venv
+  | \.pytest_cache
+  | __pycache__
+  | dist
+  | build
+  | backend/alembic/versions
+)/
+'''
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+exclude = [
+    ".git",
+    ".pytest_cache",
+    "__pycache__",
+    "backend/venv",
+    "backend/alembic/versions",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # Line too long (handled by Black / line-length)
+    "B008",  # Do not perform function calls in argument defaults (FastAPI Depends)
+    "B904",  # Within an except clause, raise exceptions with raise ... from
+    "UP006", # Use dict/list instead of Dict/List (keep typing.Dict for Python 3.9 compatibility)
+    "UP007", # Use X | Y for type annotations (keep Optional/Union for Python 3.9 compatibility)
+    "UP035", # typing.Dict is deprecated (keep typing.Dict for Python 3.9 compatibility)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = false
+warn_unused_configs = true
+ignore_missing_imports = true
+follow_imports = "silent"
+check_untyped_defs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+no_implicit_optional = false
+
+[[tool.mypy.overrides]]
+module = "backend.app.core.models"
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["backend/tests"]
+pythonpath = ["backend", "."]
+asyncio_mode = "strict"
+addopts = "-ra -q --strict-markers"
+filterwarnings = [
+    "ignore::DeprecationWarning:alembic.*",
+    "ignore::DeprecationWarning:pkg_resources.*",
+    "ignore::UserWarning:pydantic.*",
+]
+
+[tool.coverage.run]
+source = ["backend/app"]
+branch = false
+omit = [
+    "backend/app/main.py",
+    "backend/tests/*",
+    "backend/venv/*",
+    "backend/alembic/*",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+precision = 2
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
