@@ -10,7 +10,7 @@ from app.core.models import (
     User, CandidateProfile, VaultEntry, JobListing,
     HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint,
     Organization, Membership, AdminAuditLog,
-    AnalyticsEvent, ABExperiment, ABAssignment, ConversionSignal
+    AnalyticsEvent, ABExperiment, ABAssignment, ConversionSignal, UserConsent
 )
 
 
@@ -254,6 +254,18 @@ class DatabaseAdapter(ABC):
         pass
 
     def get_conversion_signals(self, user_id: str, feature_type: Optional[str] = None) -> List[ConversionSignal]:
+        return []
+
+    # =========================================================================
+    # Compliance & Consent Management (Epic J)
+    # =========================================================================
+    def record_user_consent(self, consent: UserConsent) -> bool:
+        return True
+
+    def get_user_consents(self, user_id: str) -> Dict[str, UserConsent]:
+        return {}
+
+    def get_user_consent_history(self, user_id: str, consent_type: Optional[str] = None) -> List[UserConsent]:
         return []
 
 

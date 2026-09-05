@@ -18,6 +18,7 @@ from app.api.routers.backup_router import router as backup_router
 from app.api.routers.admin_router import router as admin_router
 from app.api.routers.org_router import router as org_router
 from app.api.routers.account_router import router as account_router
+from app.api.routers.compliance_router import router as compliance_router
 
 all_routers = [
     auth_router,
@@ -35,6 +36,7 @@ all_routers = [
     admin_router,
     org_router,
     account_router,
+    compliance_router,
 ]
 
 __all__ = [
@@ -53,6 +55,7 @@ __all__ = [
     "admin_router",
     "org_router",
     "account_router",
+    "compliance_router",
     "all_routers",
 ]
 

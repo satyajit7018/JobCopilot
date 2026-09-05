@@ -55,13 +55,14 @@ from app.api.routers import (
     admin_router,
     org_router,
     account_router,
+    compliance_router,
     all_routers,
 )
 
 
 def test_all_domain_routers_exported_and_valid():
     """Validates that all domain routers are distinct APIRouter instances."""
-    assert len(all_routers) == 15
+    assert len(all_routers) == 16
     for r in all_routers:
         assert isinstance(r, APIRouter)
 
@@ -189,6 +190,11 @@ def test_route_topology_coverage(client: TestClient):
         "/api/backup/export",
         "/api/backup/restore",
         "/api/storage/download",
+        # Compliance Router
+        "/api/compliance/consent",
+        "/api/compliance/consent/history",
+        "/api/compliance/legal/tos",
+        "/api/compliance/legal/dpa",
     ]
 
     for path in expected_paths:

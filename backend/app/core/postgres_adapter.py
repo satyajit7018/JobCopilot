@@ -14,7 +14,8 @@ from app.core.models import (
     HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint,
     ApplyLedgerEntry, ApplyLedgerStatus,
     Organization, Membership, AdminAuditLog, OrgRole,
-    AnalyticsEvent, ABExperiment, ABVariant, ABAssignment, ConversionSignal
+    AnalyticsEvent, ABExperiment, ABVariant, ABAssignment, ConversionSignal,
+    UserConsent, ConsentType
 )
 from app.core.db_adapter import DatabaseAdapter
 from app.core.credential_vault import cred_vault
@@ -343,6 +344,20 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     updated_at VARCHAR(64) NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_pg_conv_signals_user_feat ON conversion_signals(user_id, feature_type, feature_key);
+
+                -- Epic J: User Consents Audit Table
+                CREATE TABLE IF NOT EXISTS user_consents (
+                    consent_id VARCHAR(64) PRIMARY KEY,
+                    user_id VARCHAR(64) NOT NULL,
+                    consent_type VARCHAR(64) NOT NULL,
+                    version VARCHAR(32) NOT NULL DEFAULT '1.0',
+                    consented BOOLEAN NOT NULL DEFAULT TRUE,
+                    ip_address VARCHAR(64),
+                    user_agent TEXT,
+                    created_at VARCHAR(64) NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_pg_user_consents_user_type ON user_consents(user_id, consent_type);
+                CREATE INDEX IF NOT EXISTS idx_pg_user_consents_user_created ON user_consents(user_id, created_at);
 
                 -- High-traffic compound indexes for query tuning
                 CREATE INDEX IF NOT EXISTS idx_pg_emails_user_received ON emails(user_id, received_at DESC);
@@ -1879,4 +1894,92 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 return signals
         finally:
             self.release_connection(conn)
+
+    # =========================================================================
+    # Compliance & Consent Management (Epic J)
+    # =========================================================================
+    def record_user_consent(self, consent: UserConsent) -> bool:
+        """Records an append-only user consent decision with audit metadata in PostgreSQL."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                type_val = consent.consent_type.value if hasattr(consent.consent_type, "value") else str(consent.consent_type)
+                cursor.execute(
+                    "INSERT INTO user_consents (consent_id, user_id, consent_type, version, consented, ip_address, user_agent, created_at) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        consent.consent_id,
+                        consent.user_id,
+                        type_val,
+                        consent.version,
+                        consent.consented,
+                        consent.ip_address,
+                        consent.user_agent,
+                        consent.created_at
+                    )
+                )
+                conn.commit()
+                return True
+        finally:
+            self.release_connection(conn)
+
+    def get_user_consents(self, user_id: str) -> Dict[str, UserConsent]:
+        """Returns the active (most recent) consent state for each consent type in PostgreSQL."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "SELECT consent_id, user_id, consent_type, version, consented, ip_address, user_agent, created_at "
+                    "FROM user_consents WHERE user_id = %s ORDER BY created_at ASC",
+                    (user_id,)
+                )
+                rows = cursor.fetchall()
+                consents = {}
+                for r in rows:
+                    c = UserConsent(
+                        consent_id=r[0],
+                        user_id=r[1],
+                        consent_type=ConsentType(r[2]),
+                        version=r[3],
+                        consented=bool(r[4]),
+                        ip_address=r[5],
+                        user_agent=r[6],
+                        created_at=r[7]
+                    )
+                    key = c.consent_type.value if hasattr(c.consent_type, "value") else str(c.consent_type)
+                    consents[key] = c
+                return consents
+        finally:
+            self.release_connection(conn)
+
+    def get_user_consent_history(self, user_id: str, consent_type: Optional[str] = None) -> List[UserConsent]:
+        """Returns immutable audit trail of consent events for user, optionally filtered by type in PostgreSQL."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                type_val = consent_type.value if hasattr(consent_type, "value") else consent_type
+                query = (
+                    "SELECT consent_id, user_id, consent_type, version, consented, ip_address, user_agent, created_at "
+                    "FROM user_consents WHERE user_id = %s "
+                    "AND (%s IS NULL OR consent_type = %s) "
+                    "ORDER BY created_at DESC"
+                )
+                cursor.execute(query, (user_id, type_val, type_val))
+                rows = cursor.fetchall()
+                history = []
+                for r in rows:
+                    history.append(UserConsent(
+                        consent_id=r[0],
+                        user_id=r[1],
+                        consent_type=ConsentType(r[2]),
+                        version=r[3],
+                        consented=bool(r[4]),
+                        ip_address=r[5],
+                        user_agent=r[6],
+                        created_at=r[7]
+                    ))
+                return history
+        finally:
+            self.release_connection(conn)
+
 

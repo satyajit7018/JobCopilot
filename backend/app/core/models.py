@@ -656,3 +656,45 @@ class ConversionSignal(BaseModel):
         return self.model_dump(*args, **kwargs)
 
 
+# =========================================================================
+# Compliance, Legal & Consent Management Models (Epic J)
+# =========================================================================
+
+class ConsentType(str, Enum):
+    TERMS_OF_SERVICE = "terms_of_service"
+    DATA_PROCESSING = "data_processing"
+    AI_DATA_USAGE = "ai_data_usage"
+    TELEMETRY_ANALYTICS = "telemetry_analytics"
+    MARKETING = "marketing"
+
+
+class UserConsent(BaseModel):
+    consent_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    consent_type: ConsentType
+    version: str = "1.0"
+    consented: bool = True
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class ConsentGrantRequest(BaseModel):
+    consent_type: ConsentType
+    version: str = "1.0"
+    consented: bool = True
+
+
+class ConsentStatusResponse(BaseModel):
+    user_id: str
+    consents: Dict[str, UserConsent] = Field(default_factory=dict)
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+

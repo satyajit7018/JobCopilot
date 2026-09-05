@@ -23,6 +23,7 @@ from app.api.routers import (
     negotiation_router,
     billing_router,
     backup_router,
+    compliance_router,
     all_routers,
 )
 
@@ -46,7 +47,8 @@ from app.api.routers.billing_router import CheckoutRequest, CustomerPortalReques
 from app.api.routers.backup_router import RestoreBackupPayload
 from app.core.models import (
     ApplyLedgerEntry, ApplyLedgerStatus,
-    Organization, Membership, AdminAuditLog, OrgRole
+    Organization, Membership, AdminAuditLog, OrgRole,
+    ConsentType, UserConsent, ConsentGrantRequest, ConsentStatusResponse
 )
 
 # Backwards compatibility routers
@@ -135,5 +137,10 @@ __all__ = [
     "admin_router",
     "org_router",
     "account_router",
+    "compliance_router",
+    "ConsentType",
+    "UserConsent",
+    "ConsentGrantRequest",
+    "ConsentStatusResponse",
 ]
 
