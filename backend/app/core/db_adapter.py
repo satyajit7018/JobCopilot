@@ -9,7 +9,8 @@ from typing import List, Dict, Optional, Any
 from app.core.models import (
     User, CandidateProfile, VaultEntry, JobListing,
     HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint,
-    Organization, Membership, AdminAuditLog
+    Organization, Membership, AdminAuditLog,
+    AnalyticsEvent, ABExperiment, ABAssignment, ConversionSignal
 )
 
 
@@ -220,6 +221,40 @@ class DatabaseAdapter(ABC):
 
     def count_security_audit_logs(self, user_id: Optional[str] = None, event_type: Optional[str] = None, severity: Optional[str] = None) -> int:
         return 0
+
+    # --- Epic H: Data & ML Flywheel ---
+    def record_analytics_event(self, event: AnalyticsEvent) -> str:
+        return event.event_id
+
+    def query_analytics_events(self, user_id: str, event_type: Optional[str] = None, limit: int = 100) -> List[AnalyticsEvent]:
+        return []
+
+    def create_ab_experiment(self, experiment: ABExperiment) -> str:
+        return experiment.experiment_id
+
+    def get_ab_experiment(self, experiment_id: str, user_id: str) -> Optional[ABExperiment]:
+        return None
+
+    def list_ab_experiments(self, user_id: str) -> List[ABExperiment]:
+        return []
+
+    def assign_ab_variant(self, experiment_id: str, user_id: str, entity_id: str, variant: str) -> ABAssignment:
+        return ABAssignment(experiment_id=experiment_id, user_id=user_id, entity_id=entity_id, variant=variant)
+
+    def get_ab_assignment(self, experiment_id: str, user_id: str, entity_id: str) -> Optional[ABAssignment]:
+        return None
+
+    def record_ab_conversion(self, experiment_id: str, user_id: str, entity_id: str) -> bool:
+        return False
+
+    def get_ab_experiment_stats(self, experiment_id: str, user_id: str) -> Dict[str, Any]:
+        return {}
+
+    def upsert_conversion_signal(self, signal: ConversionSignal) -> None:
+        pass
+
+    def get_conversion_signals(self, user_id: str, feature_type: Optional[str] = None) -> List[ConversionSignal]:
+        return []
 
 
 def get_db_adapter() -> DatabaseAdapter:

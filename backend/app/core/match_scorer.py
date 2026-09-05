@@ -80,14 +80,27 @@ class MatchScorer:
             else:
                 missing_skills.append(js)
 
+        # Apply Conversion Feedback Loop multipliers if present
+        avg_multiplier = 1.0
+        try:
+            from app.analytics.feedback_loop import ConversionFeedbackLoop
+            user_id = getattr(profile, "user_id", "default") or "default"
+            if matched_skills:
+                m_sum = sum(ConversionFeedbackLoop.get_feature_multiplier(user_id, "skill", ms) for ms in matched_skills)
+                avg_multiplier = m_sum / len(matched_skills)
+        except Exception:
+            avg_multiplier = 1.0
+
         if job_skills:
             skill_ratio = len(matched_skills) / len(job_skills)
-            skill_score = min(skill_ratio, 1.0) * 0.40
+            skill_score = min(skill_ratio * avg_multiplier, 1.0) * 0.40
+            if matched_skills:
+                reasons_text = f"Matches {len(matched_skills)} required skill(s): {', '.join(matched_skills[:4])}"
+                if avg_multiplier > 1.05:
+                    reasons_text += f" (+{int((avg_multiplier - 1.0) * 100)}% empirical callback lift)"
+                match_reasons.append(reasons_text)
         else:
             skill_score = 0.0
-
-        if matched_skills:
-            match_reasons.append(f"Strong skill match: {', '.join(matched_skills[:4])}")
 
         # 2. Title Alignment (30% weight)
         title_clean = job_title.lower()

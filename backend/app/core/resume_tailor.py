@@ -20,9 +20,15 @@ class ResumeTailor:
     """Dynamically aligns candidate profile emphasis with target Job Descriptions."""
 
     @classmethod
-    def tailor_for_job(cls, profile: CandidateProfile, job_title: str, job_description: str) -> Dict[str, Any]:
+    def tailor_for_job(
+        cls,
+        profile: CandidateProfile,
+        job_title: str,
+        job_description: str,
+        strategy: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Convenience method returning tailored skills and project names."""
-        tailored, matched = cls.tailor_profile_for_job(profile, job_title, job_description)
+        tailored, matched = cls.tailor_profile_for_job(profile, job_title, job_description, strategy=strategy)
         return {
             "tailored_skills": tailored.skills,
             "reordered_projects": [p.name for p in tailored.projects],
@@ -34,7 +40,8 @@ class ResumeTailor:
         cls,
         profile: CandidateProfile,
         job_title: str,
-        job_description: str
+        job_description: str,
+        strategy: Optional[str] = None
     ) -> Tuple[CandidateProfile, List[str]]:
         """
         Creates a tailored deep-copy of CandidateProfile with reordered skills,
@@ -71,10 +78,14 @@ class ResumeTailor:
 
         tailored.projects.sort(key=project_relevance, reverse=True)
 
-        # 4. Reorder Work Experience Highlights
+        # 4. Reorder Work Experience Highlights (incorporating A/B testing strategy)
         for exp in tailored.experience:
             def highlight_relevance(h: str) -> int:
-                return sum(1 for s in jd_skills_lower if s in h.lower())
+                relevance = sum(1 for s in jd_skills_lower if s in h.lower())
+                if strategy in ("treatment_star", "variant_b"):
+                    has_metric = 1 if any(w in h.lower() for w in ["%", "$", "reduced", "scaled", "improved", "optimized", "increased", "latency"]) else 0
+                    relevance += has_metric * 2
+                return relevance
             exp.highlights.sort(key=highlight_relevance, reverse=True)
 
         return tailored, matched_skills

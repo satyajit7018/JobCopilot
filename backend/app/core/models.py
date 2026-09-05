@@ -4,6 +4,7 @@ Covers Candidate Profile, Knowledge Vault, Job Records, HITL Events,
 Multi-Resume Variants, Email Tracking, and Outreach Records.
 """
 
+import uuid
 from typing import List, Dict, Optional, Any
 from enum import Enum
 from datetime import datetime
@@ -260,6 +261,8 @@ class JobListing(BaseModel):
     status: ApplicationStatus = ApplicationStatus.DISCOVERED
     submission_mode: Optional[str] = None  # DRY_RUN or LIVE
     applied_at: Optional[str] = None
+    created_at: Optional[str] = None
+    interview_date: Optional[str] = None
     application_id: Optional[str] = None  # Internal ATS Reference ID scraped from confirmation
     confirmation_screenshot_path: Optional[str] = None
     notes: Optional[str] = None
@@ -571,4 +574,85 @@ class SecurityLogListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+# --- Epic H: Data & ML Flywheel Models ---
+class AnalyticsEvent(BaseModel):
+    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    event_type: str
+    entity_type: str
+    entity_id: str
+    properties: Dict[str, Any] = Field(default_factory=dict)
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class EventBatch(BaseModel):
+    events: List[AnalyticsEvent]
+
+
+class CohortBucket(BaseModel):
+    cohort_id: str
+    start_date: str
+    end_date: str
+    total_candidates: int = 0
+    applied_count: int = 0
+    interview_count: int = 0
+    offer_count: int = 0
+    rejected_count: int = 0
+    conversion_rate: float = 0.0
+
+
+class ABVariant(BaseModel):
+    variant_id: str
+    name: str
+    weight: float = 0.5
+    description: Optional[str] = None
+
+
+class ABExperiment(BaseModel):
+    experiment_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    name: str
+    description: Optional[str] = None
+    variants: List[ABVariant]
+    status: str = "ACTIVE"  # ACTIVE, PAUSED, COMPLETED
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    ended_at: Optional[str] = None
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class ABAssignment(BaseModel):
+    assignment_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    experiment_id: str
+    user_id: str
+    entity_id: str
+    variant: str
+    converted: bool = False
+    converted_at: Optional[str] = None
+    assigned_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
+
+class ConversionSignal(BaseModel):
+    signal_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    feature_type: str  # skill, seniority, platform, strategy
+    feature_key: str
+    sample_count: int = 0
+    callback_count: int = 0
+    conversion_rate: float = 0.0
+    weight_multiplier: float = 1.0  # Bounded between 0.70x and 1.30x
+    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    def dict(self, *args, **kwargs):
+        return self.model_dump(*args, **kwargs)
+
 

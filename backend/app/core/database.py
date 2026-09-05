@@ -15,7 +15,8 @@ from app.core.models import (
     User, CandidateProfile, VaultEntry, JobListing, HITLEvent,
     ApplicationStatus, OutreachRecord, OutreachChannel, EmailMessage, JobCheckpoint,
     ApplyLedgerEntry, ApplyLedgerStatus,
-    Organization, Membership, AdminAuditLog, OrgRole
+    Organization, Membership, AdminAuditLog, OrgRole,
+    AnalyticsEvent, ABExperiment, ABVariant, ABAssignment, ConversionSignal
 )
 from app.core.db_adapter import DatabaseAdapter
 from app.core.credential_vault import cred_vault
@@ -591,6 +592,66 @@ class DatabaseManager(DatabaseAdapter):
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_sec_audit_severity ON security_audit_logs(severity);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_sec_audit_created ON security_audit_logs(created_at DESC);")
 
+                # 19. Analytics Events Warehouse Table (Epic H)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS analytics_events (
+                    event_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    event_type TEXT NOT NULL,
+                    entity_type TEXT NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    properties JSON NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_analytics_events_user_type_date ON analytics_events(user_id, event_type, created_at);")
+
+                # 20. A/B Testing Experiments Table (Epic H)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ab_experiments (
+                    experiment_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    variants JSON NOT NULL,
+                    status TEXT DEFAULT 'ACTIVE',
+                    created_at TEXT NOT NULL,
+                    ended_at TEXT
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_ab_experiments_user ON ab_experiments(user_id, status);")
+
+                # 21. A/B Testing Assignments Table (Epic H)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ab_assignments (
+                    assignment_id TEXT PRIMARY KEY,
+                    experiment_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    entity_id TEXT NOT NULL,
+                    variant TEXT NOT NULL,
+                    converted INTEGER DEFAULT 0,
+                    converted_at TEXT,
+                    assigned_at TEXT NOT NULL
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_ab_assignments_exp_user_entity ON ab_assignments(experiment_id, user_id, entity_id);")
+
+                # 22. Conversion Signals & Dynamic Weights Table (Epic H)
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS conversion_signals (
+                    signal_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    feature_type TEXT NOT NULL,
+                    feature_key TEXT NOT NULL,
+                    sample_count INTEGER DEFAULT 0,
+                    callback_count INTEGER DEFAULT 0,
+                    conversion_rate REAL DEFAULT 0.0,
+                    weight_multiplier REAL DEFAULT 1.0,
+                    updated_at TEXT NOT NULL
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_conv_signals_user_feat ON conversion_signals(user_id, feature_type, feature_key);")
+
                 # High-traffic compound indexes for query tuning
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_emails_user_received ON emails(user_id, received_at DESC);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_hitl_user_status ON hitl_events(user_id, status);")
@@ -995,6 +1056,20 @@ class DatabaseManager(DatabaseAdapter):
                 job.job_id = target_job_id
                 job.user_id = user_id
 
+                notes_to_save = job.notes or ""
+                meta_payload = {}
+                if getattr(job, "interview_date", None):
+                    meta_payload["interview_date"] = job.interview_date
+                if getattr(job, "created_at", None):
+                    meta_payload["created_at"] = job.created_at
+
+                if meta_payload:
+                    meta_str = json.dumps(meta_payload)
+                    if notes_to_save:
+                        notes_to_save = f"{notes_to_save}\n__meta__:{meta_str}"
+                    else:
+                        notes_to_save = f"__meta__:{meta_str}"
+
                 cursor.execute("""
                 INSERT INTO jobs (
                     job_id, user_id, fingerprint, platform, company, title, location, url,
@@ -1046,7 +1121,7 @@ class DatabaseManager(DatabaseAdapter):
                     job.applied_at,
                     job.application_id,
                     job.confirmation_screenshot_path,
-                    job.notes
+                    notes_to_save
                 ))
                 conn.commit()
                 return True
@@ -1112,6 +1187,23 @@ class DatabaseManager(DatabaseAdapter):
 
     def _row_to_job(self, r: sqlite3.Row) -> JobListing:
         keys = r.keys()
+        raw_notes = r["notes"] or ""
+        extracted_interview_date = None
+        extracted_created_at = None
+        clean_notes = raw_notes
+
+        if raw_notes and "__meta__:" in raw_notes:
+            parts = raw_notes.split("\n__meta__:" if "\n__meta__:" in raw_notes else "__meta__:")
+            clean_notes = parts[0].strip() if parts[0].strip() else None
+            try:
+                meta_dict = json.loads(parts[1])
+                extracted_interview_date = meta_dict.get("interview_date")
+                extracted_created_at = meta_dict.get("created_at")
+            except Exception:
+                clean_notes = raw_notes
+        elif not raw_notes:
+            clean_notes = None
+
         return JobListing(
             job_id=r["job_id"],
             user_id=r["user_id"] if "user_id" in keys else "",
@@ -1132,9 +1224,11 @@ class DatabaseManager(DatabaseAdapter):
             status=r["status"],
             submission_mode=r["submission_mode"] if "submission_mode" in keys else None,
             applied_at=r["applied_at"],
+            created_at=extracted_created_at,
+            interview_date=extracted_interview_date,
             application_id=r["application_id"] if "application_id" in keys else None,
             confirmation_screenshot_path=r["confirmation_screenshot_path"] if "confirmation_screenshot_path" in keys else None,
-            notes=r["notes"]
+            notes=clean_notes
         )
 
     # =========================================================================
@@ -2321,6 +2415,289 @@ class DatabaseManager(DatabaseAdapter):
             cursor.execute(query, (user_id, user_id, event_type, event_type, severity, severity))
             row = cursor.fetchone()
             return row[0] if row else 0
+
+    # =========================================================================
+    # Epic H: Analytics Warehouse & Event Streaming
+    # =========================================================================
+    def record_analytics_event(self, event: AnalyticsEvent) -> str:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO analytics_events (event_id, user_id, event_type, entity_type, entity_id, properties, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    event.event_id,
+                    event.user_id,
+                    event.event_type,
+                    event.entity_type,
+                    event.entity_id,
+                    json.dumps(event.properties),
+                    event.created_at
+                )
+            )
+            conn.commit()
+            return event.event_id
+
+    def query_analytics_events(
+        self,
+        user_id: str,
+        event_type: Optional[str] = None,
+        limit: int = 100
+    ) -> List[AnalyticsEvent]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = (
+                "SELECT event_id, user_id, event_type, entity_type, entity_id, properties, created_at "
+                "FROM analytics_events "
+                "WHERE (user_id = ? OR ? = 'admin') "
+                "AND (? IS NULL OR event_type = ?) "
+                "ORDER BY created_at DESC LIMIT ?"
+            )
+            cursor.execute(query, (user_id, user_id, event_type, event_type, limit))
+            rows = cursor.fetchall()
+            events = []
+            for r in rows:
+                props = json.loads(r[5]) if isinstance(r[5], str) else (r[5] or {})
+                events.append(AnalyticsEvent(
+                    event_id=r[0],
+                    user_id=r[1],
+                    event_type=r[2],
+                    entity_type=r[3],
+                    entity_id=r[4],
+                    properties=props,
+                    created_at=r[6]
+                ))
+            return events
+
+    # =========================================================================
+    # Epic H: A/B Testing Framework
+    # =========================================================================
+    def create_ab_experiment(self, experiment: ABExperiment) -> str:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT OR REPLACE INTO ab_experiments (experiment_id, user_id, name, description, variants, status, created_at, ended_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    experiment.experiment_id,
+                    experiment.user_id,
+                    experiment.name,
+                    experiment.description,
+                    json.dumps([v.model_dump() if hasattr(v, "model_dump") else v.dict() for v in experiment.variants]),
+                    experiment.status,
+                    experiment.created_at,
+                    experiment.ended_at
+                )
+            )
+            conn.commit()
+            return experiment.experiment_id
+
+    def get_ab_experiment(self, experiment_id: str, user_id: str) -> Optional[ABExperiment]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT experiment_id, user_id, name, description, variants, status, created_at, ended_at "
+                "FROM ab_experiments "
+                "WHERE experiment_id = ? AND (user_id = ? OR ? = 'admin')",
+                (experiment_id, user_id, user_id)
+            )
+            r = cursor.fetchone()
+            if not r:
+                return None
+            raw_variants = json.loads(r[4]) if isinstance(r[4], str) else (r[4] or [])
+            variants = [ABVariant(**v) for v in raw_variants]
+            return ABExperiment(
+                experiment_id=r[0],
+                user_id=r[1],
+                name=r[2],
+                description=r[3],
+                variants=variants,
+                status=r[5],
+                created_at=r[6],
+                ended_at=r[7]
+            )
+
+    def list_ab_experiments(self, user_id: str) -> List[ABExperiment]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT experiment_id, user_id, name, description, variants, status, created_at, ended_at "
+                "FROM ab_experiments "
+                "WHERE user_id = ? OR ? = 'admin' "
+                "ORDER BY created_at DESC",
+                (user_id, user_id)
+            )
+            rows = cursor.fetchall()
+            experiments = []
+            for r in rows:
+                raw_variants = json.loads(r[4]) if isinstance(r[4], str) else (r[4] or [])
+                variants = [ABVariant(**v) for v in raw_variants]
+                experiments.append(ABExperiment(
+                    experiment_id=r[0],
+                    user_id=r[1],
+                    name=r[2],
+                    description=r[3],
+                    variants=variants,
+                    status=r[5],
+                    created_at=r[6],
+                    ended_at=r[7]
+                ))
+            return experiments
+
+    def assign_ab_variant(self, experiment_id: str, user_id: str, entity_id: str, variant: str) -> ABAssignment:
+        existing = self.get_ab_assignment(experiment_id, user_id, entity_id)
+        if existing:
+            return existing
+
+        assignment = ABAssignment(
+            experiment_id=experiment_id,
+            user_id=user_id,
+            entity_id=entity_id,
+            variant=variant,
+            converted=False
+        )
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO ab_assignments (assignment_id, experiment_id, user_id, entity_id, variant, converted, converted_at, assigned_at) "
+                "VALUES (?, ?, ?, ?, ?, 0, NULL, ?)",
+                (
+                    assignment.assignment_id,
+                    assignment.experiment_id,
+                    assignment.user_id,
+                    assignment.entity_id,
+                    assignment.variant,
+                    assignment.assigned_at
+                )
+            )
+            conn.commit()
+            return assignment
+
+    def get_ab_assignment(self, experiment_id: str, user_id: str, entity_id: str) -> Optional[ABAssignment]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT assignment_id, experiment_id, user_id, entity_id, variant, converted, converted_at, assigned_at "
+                "FROM ab_assignments "
+                "WHERE experiment_id = ? AND user_id = ? AND entity_id = ?",
+                (experiment_id, user_id, entity_id)
+            )
+            r = cursor.fetchone()
+            if not r:
+                return None
+            return ABAssignment(
+                assignment_id=r[0],
+                experiment_id=r[1],
+                user_id=r[2],
+                entity_id=r[3],
+                variant=r[4],
+                converted=bool(r[5]),
+                converted_at=r[6],
+                assigned_at=r[7]
+            )
+
+    def record_ab_conversion(self, experiment_id: str, user_id: str, entity_id: str) -> bool:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            now_iso = datetime.now().isoformat()
+            cursor.execute(
+                "UPDATE ab_assignments "
+                "SET converted = 1, converted_at = ? "
+                "WHERE experiment_id = ? AND user_id = ? AND entity_id = ? AND converted = 0",
+                (now_iso, experiment_id, user_id, entity_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_ab_experiment_stats(self, experiment_id: str, user_id: str) -> Dict[str, Any]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT variant, COUNT(*), SUM(CASE WHEN converted = 1 THEN 1 ELSE 0 END) "
+                "FROM ab_assignments "
+                "WHERE experiment_id = ? AND (user_id = ? OR ? = 'admin') "
+                "GROUP BY variant",
+                (experiment_id, user_id, user_id)
+            )
+            rows = cursor.fetchall()
+            variants_stats = {}
+            total_samples = 0
+            total_conversions = 0
+            for r in rows:
+                var_name = r[0]
+                samples = r[1] or 0
+                conversions = r[2] or 0
+                rate = round((conversions / samples * 100), 2) if samples > 0 else 0.0
+                variants_stats[var_name] = {
+                    "samples": samples,
+                    "conversions": conversions,
+                    "conversion_rate_percent": rate
+                }
+                total_samples += samples
+                total_conversions += conversions
+
+            return {
+                "experiment_id": experiment_id,
+                "total_samples": total_samples,
+                "total_conversions": total_conversions,
+                "variants": variants_stats
+            }
+
+    # =========================================================================
+    # Epic H: Conversion Signals & Feedback Loop Weights
+    # =========================================================================
+    def upsert_conversion_signal(self, signal: ConversionSignal) -> None:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO conversion_signals (signal_id, user_id, feature_type, feature_key, sample_count, callback_count, conversion_rate, weight_multiplier, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(signal_id) DO UPDATE SET "
+                "sample_count = excluded.sample_count, "
+                "callback_count = excluded.callback_count, "
+                "conversion_rate = excluded.conversion_rate, "
+                "weight_multiplier = excluded.weight_multiplier, "
+                "updated_at = excluded.updated_at",
+                (
+                    signal.signal_id,
+                    signal.user_id,
+                    signal.feature_type,
+                    signal.feature_key,
+                    signal.sample_count,
+                    signal.callback_count,
+                    signal.conversion_rate,
+                    signal.weight_multiplier,
+                    signal.updated_at
+                )
+            )
+            conn.commit()
+
+    def get_conversion_signals(self, user_id: str, feature_type: Optional[str] = None) -> List[ConversionSignal]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = (
+                "SELECT signal_id, user_id, feature_type, feature_key, sample_count, callback_count, conversion_rate, weight_multiplier, updated_at "
+                "FROM conversion_signals "
+                "WHERE (user_id = ? OR ? = 'admin') "
+                "AND (? IS NULL OR feature_type = ?) "
+                "ORDER BY updated_at DESC"
+            )
+            cursor.execute(query, (user_id, user_id, feature_type, feature_type))
+            rows = cursor.fetchall()
+            signals = []
+            for r in rows:
+                signals.append(ConversionSignal(
+                    signal_id=r[0],
+                    user_id=r[1],
+                    feature_type=r[2],
+                    feature_key=r[3],
+                    sample_count=r[4],
+                    callback_count=r[5],
+                    conversion_rate=r[6],
+                    weight_multiplier=r[7],
+                    updated_at=r[8]
+                ))
+            return signals
 
 
 
