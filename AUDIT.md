@@ -26,13 +26,13 @@ Items fixed in the accompanying change are marked ✅; open items are marked ⬜
   separately). These patched releases require Python ≥3.10, so `requires-python` was raised
   accordingly (3.9 is end-of-life).
 
-### Accepted risk (no fix available)
-
-- ⬜ **`starlette` advisories PYSEC-2026-161/248/249/2280/2281 have no installable fix.**
-  Every patched release is `starlette` 1.x, but `fastapi` (≤0.128.8) pins `starlette<1.0.0`,
-  so the dependency tree cannot resolve to a patched version. These IDs are explicitly
-  ignored in the `pip-audit` CI step (documented inline). **Revisit when a `fastapi` release
-  supports `starlette` 1.x** — then drop the `--ignore-vuln` entries and bump.
+- ✅ **`starlette` advisories PYSEC-2026-161/248/249/2280/2281 fixed by upgrade.**
+  All fixes are in `starlette` 1.x. `fastapi` 0.128.8 capped `starlette<1.0.0`, but
+  `fastapi` >=0.135.0 relaxed it to `starlette>=0.46.0`. Upgraded `fastapi` -> 0.141.1
+  and pinned `starlette` -> 1.3.1, which clears all five advisories with **no `pip-audit`
+  suppressions**. The upgrade crosses the `starlette` 1.0 major boundary; the codebase only
+  touches stable surface (`BaseHTTPMiddleware`, `Request`/`Response`, `TestClient`,
+  `WebSocketDisconnect`), and the full suite runs in CI on Python 3.11.
 - ⬜ **JWTs stored in `localStorage`** (`frontend/js/app.js`) are readable by any XSS.
   Escaping is currently disciplined, but a refresh token should live in an httpOnly,
   `SameSite` cookie rather than `localStorage`.
