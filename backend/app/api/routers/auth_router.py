@@ -7,18 +7,23 @@ import os
 import uuid
 from datetime import timedelta
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.core.models import User, UserRole, TokenResponse, CandidateProfile
-from app.core.database import db
-from app.core.session_manager import session_manager
-from app.core.security_logger import security_logger
 from app.api.auth import (
-    router as core_auth_router,
-    get_current_user, hash_password, create_jwt_token, decode_jwt_token,
-    ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+    create_jwt_token,
+    decode_jwt_token,
+    get_current_user,
+    hash_password,
 )
+from app.api.auth import router as core_auth_router
+from app.core.database import db
+from app.core.models import CandidateProfile, TokenResponse, User, UserRole
+from app.core.security_logger import security_logger
+from app.core.session_manager import session_manager
 
 router = APIRouter(tags=["auth"])
 router.include_router(core_auth_router)
@@ -42,8 +47,8 @@ async def health_check():
 @router.post("/auth/google-sso", response_model=TokenResponse)
 async def google_sso_auth(payload: GoogleSSORequest):
     """Authenticates candidate with Google ID token and issues signed JWT."""
-    from google.oauth2 import id_token
     from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token
 
     google_client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
     email = payload.email

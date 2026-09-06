@@ -6,7 +6,7 @@ provides remote session revocation linked to JWT blacklist, and session heartbea
 
 import uuid
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from app.core.database import db
 

@@ -5,7 +5,7 @@ strict Anti-AI cliché filtering and direct, active technical voice.
 """
 
 import re
-from typing import List, Dict, Optional
+
 from app.core.models import CandidateProfile
 
 
@@ -78,7 +78,7 @@ class CoverLetterGenerator:
         if proj_highlight:
             p2 = f"{proj_highlight} I focus on writing clean, tested, and maintainable code with sub-50ms latency SLAs and solid automated test coverage."
         else:
-            p2 = f"In my work, I focus on architecting robust backend APIs and high-throughput pipelines, prioritizing system reliability and performance."
+            p2 = "In my work, I focus on architecting robust backend APIs and high-throughput pipelines, prioritizing system reliability and performance."
 
         # Paragraph 3: Direct Call-to-Action
         links = []

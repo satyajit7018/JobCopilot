@@ -5,7 +5,7 @@ for diverse ATS salary input fields (Annual, Monthly, Hourly, LPA).
 """
 
 import re
-from typing import Dict, Any, Tuple
+from typing import Dict
 
 
 class CompensationConverter:

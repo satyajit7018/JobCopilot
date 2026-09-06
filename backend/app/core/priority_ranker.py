@@ -5,7 +5,8 @@ Freshness Decay (20 pts), and Compensation Alignment (15 pts).
 """
 
 import re
-from typing import Dict, Any, Optional
+from typing import Optional
+
 from app.core.compensation import CompensationConverter
 
 

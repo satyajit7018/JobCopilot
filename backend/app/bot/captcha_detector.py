@@ -4,7 +4,7 @@ Inspects Playwright pages and DOM snapshots to detect anti-bot challenges
 (reCAPTCHA, hCaptcha, Turnstile, Arkose Labs) before forms fail silently.
 """
 
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 # Common anti-bot challenge selector signatures
 CAPTCHA_SIGNATURES = [

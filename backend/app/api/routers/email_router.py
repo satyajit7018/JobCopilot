@@ -5,13 +5,14 @@ and automated follow-up drafts.
 """
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Request, Depends
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app.core.models import User
-from app.core.database import db
 from app.api.auth import get_current_user
 from app.api.ws_gateway import ws_manager
+from app.core.database import db
+from app.core.models import User
 
 router = APIRouter(tags=["email"])
 

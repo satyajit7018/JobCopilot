@@ -4,7 +4,8 @@ Patches Playwright browser contexts with hardware fingerprint spoofing,
 WebGL noise, Canvas jitter, AudioContext perturbation, and Webdriver evasion.
 """
 
-from typing import Dict, Any, Optional
+from typing import Any, Optional
+
 try:
     from playwright.async_api import Browser, BrowserContext
 except ImportError:

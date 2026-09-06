@@ -4,10 +4,11 @@ Parses high-signal 0-day startup jobs from Y Combinator (Work at a Startup),
 HackerNews 'Who is Hiring?' threads, and top tier VC portfolio boards.
 """
 
-import re
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional
+import re
+from typing import Any, Dict, List, Optional
+
 import httpx
 
 logger = logging.getLogger(__name__)

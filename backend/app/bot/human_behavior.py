@@ -4,12 +4,13 @@ Simulates authentic human interaction dynamics: Cubic Bézier mouse trajectories
 Gaussian keystroke rhythm with digraph variance, and organic page exploration.
 """
 
+import asyncio
 import math
 import random
-import asyncio
-from typing import List, Tuple, Any
+from typing import Any, List, Tuple
+
 try:
-    from playwright.async_api import Page, ElementHandle
+    from playwright.async_api import ElementHandle, Page
 except ImportError:
     Page = Any  # type: ignore
     ElementHandle = Any  # type: ignore
@@ -68,8 +69,8 @@ class HumanBehaviorEngine:
             await page.mouse.move(x, y)
             await asyncio.sleep(random.uniform(0.003, 0.010))
 
-        setattr(page, "_mouse_x", target_x)
-        setattr(page, "_mouse_y", target_y)
+        page._mouse_x = target_x
+        page._mouse_y = target_y
 
     @classmethod
     async def human_type(cls, page: Page, selector_or_element, text: str):
@@ -84,7 +85,7 @@ class HumanBehaviorEngine:
         for i, char in enumerate(text):
             # Base typing delay (Gaussian mean=85ms, std=22ms)
             delay = random.gauss(0.085, 0.022)
-            
+
             # Check fast digraphs
             if i > 0 and text[i-1:i+1].lower() in fast_digraphs:
                 delay *= 0.65  # 35% faster for muscle memory digraphs

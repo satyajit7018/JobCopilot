@@ -5,7 +5,8 @@ REJECTION, CONFIRMATION, or OTHER, and extracts scheduling links.
 """
 
 import re
-from typing import List, Dict, Any, Tuple
+from typing import List, Tuple
+
 from app.core.models import EmailIntent
 
 

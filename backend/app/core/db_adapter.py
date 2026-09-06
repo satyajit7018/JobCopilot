@@ -5,12 +5,25 @@ with strict user/tenant isolation.
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from app.core.models import (
-    User, CandidateProfile, VaultEntry, JobListing,
-    HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint,
-    Organization, Membership, AdminAuditLog,
-    AnalyticsEvent, ABExperiment, ABAssignment, ConversionSignal, UserConsent
+    ABAssignment,
+    ABExperiment,
+    AdminAuditLog,
+    AnalyticsEvent,
+    ApplicationStatus,
+    CandidateProfile,
+    ConversionSignal,
+    EmailMessage,
+    HITLEvent,
+    JobListing,
+    Membership,
+    Organization,
+    OutreachRecord,
+    User,
+    UserConsent,
+    VaultEntry,
 )
 
 

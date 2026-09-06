@@ -4,14 +4,14 @@ Tracks submitted applications and generates concise, polite 7-day and 14-day
 follow-up drafts with Anti-AI cliché filtering and value-add project updates.
 """
 
-import uuid
 import logging
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from app.core.models import CandidateProfile, JobListing, ApplicationStatus, OutreachRecord, OutreachChannel
-from app.core.database import db
 from app.core.cover_letter import CoverLetterGenerator
+from app.core.database import db
+from app.core.models import ApplicationStatus, CandidateProfile, JobListing, OutreachChannel, OutreachRecord
 
 logger = logging.getLogger(__name__)
 
@@ -39,15 +39,15 @@ class FollowUpEngine:
             # Stage 1: 7-Day Gentle Check-in
             s1 = f"Hi {first_name}, I hope your week is going well."
             s2 = f"I am checking in regarding my application submitted last week for the {job.title} position at {job.company}."
-            s3 = f"I remain very interested in contributing to your team's engineering roadmap and would welcome the chance to answer any preliminary questions."
+            s3 = "I remain very interested in contributing to your team's engineering roadmap and would welcome the chance to answer any preliminary questions."
         else:
             # Stage 2: 14-Day Value-Add Follow-up
             s1 = f"Hi {first_name}, following up on my application for the {job.title} role at {job.company}."
             if top_project:
                 s2 = f"Since applying, I released an update to {top_project.name} ({top_project.metrics or 'performance optimizations'}), which aligns closely with your tech stack."
             else:
-                s2 = f"I wanted to reiterate my strong interest in joining your backend engineering team."
-            s3 = f"Please let me know if there are any updates or additional details I can provide."
+                s2 = "I wanted to reiterate my strong interest in joining your backend engineering team."
+            s3 = "Please let me know if there are any updates or additional details I can provide."
 
         body = f"{s1}\n\n{s2} {s3}\n\nBest regards,\n{profile.full_name}\n{profile.email} | {profile.phone}"
 

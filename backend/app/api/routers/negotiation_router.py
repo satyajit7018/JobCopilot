@@ -4,12 +4,13 @@ Handles market compensation benchmarking, ESOP equity modeling, multi-offer comp
 and tailored counter-offer negotiation scripts.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.core.models import User
 from app.api.auth import get_current_user
+from app.core.models import User
 
 router = APIRouter(tags=["negotiation"])
 

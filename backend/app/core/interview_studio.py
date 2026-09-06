@@ -5,7 +5,7 @@ Stripe, Meta, Netflix, and Uber interview loops, across Backend, Frontend, AI/ML
 """
 
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 
 class InterviewStudioEngine:
@@ -469,6 +469,7 @@ class InterviewStudioEngine:
     ) -> Dict[str, Any]:
         """Evaluates verbal or written response with LLM STAR scoring and deterministic fallback."""
         import json
+
         from app.core.llm_client import llm_client
         from app.core.prompts.interview_prompts import InterviewPrompts
 
@@ -702,7 +703,7 @@ class InterviewStudioEngine:
             "company": company_name,
             "found_intel": False,
             "recent_initiatives": [
-                f"Modernizing service architecture towards cloud-native containerized microservices and automated CI/CD.",
+                "Modernizing service architecture towards cloud-native containerized microservices and automated CI/CD.",
                 "Adopting async event-driven message streaming (Kafka / RabbitMQ) to decouple core processing pipelines.",
                 "Investing in developer tooling, observability (Prometheus/Grafana/OpenTelemetry), and P99 latency reductions."
             ],

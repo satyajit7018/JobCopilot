@@ -7,48 +7,66 @@ Decomposed into modular domain routers under `app.api.routers` while maintaining
 from fastapi import APIRouter, Depends, Request
 
 from app.api.auth import get_current_user
-from app.api.ws_gateway import ws_manager, MultiTenantWebSocketGateway
 
 # Import all domain routers
 from app.api.routers import (
+    account_router,
+    admin_router,
+    all_routers,
+    analytics_router,
     auth_router,
+    backup_router,
+    billing_router,
+    bot_router,
+    compliance_router,
+    discovery_router,
+    email_router,
+    interview_router,
+    jobs_router,
+    negotiation_router,
+    org_router,
     profile_router,
     vault_router,
-    discovery_router,
-    jobs_router,
-    bot_router,
-    email_router,
-    analytics_router,
-    interview_router,
-    negotiation_router,
-    billing_router,
-    backup_router,
-    compliance_router,
-    all_routers,
 )
 
 # Re-export request models for backwards compatibility
 from app.api.routers.auth_router import GoogleSSORequest
-from app.api.routers.profile_router import QuestionnaireSubmitRequest
-from app.api.routers.vault_router import VaultLearnRequest, VaultTestMatchRequest, VaultSemanticSearchRequest
-from app.api.routers.jobs_router import (
-    AlumniReferralRequest, RecruiterNudgeRequest, MultiRoleTailorRequest, LogDirectCallRequest
-)
+from app.api.routers.backup_router import RestoreBackupPayload
+from app.api.routers.billing_router import CheckoutRequest, CustomerPortalRequest
 from app.api.routers.bot_router import HITLResolveRequest, ResolveHeldApplicationRequest
 from app.api.routers.email_router import InboundEmailPayload
 from app.api.routers.interview_router import (
-    InterviewEvalRequest, InterviewInvitationTriggerRequest, InterviewerReconRequest
+    InterviewerReconRequest,
+    InterviewEvalRequest,
+    InterviewInvitationTriggerRequest,
+)
+from app.api.routers.jobs_router import (
+    AlumniReferralRequest,
+    LogDirectCallRequest,
+    MultiRoleTailorRequest,
+    RecruiterNudgeRequest,
 )
 from app.api.routers.negotiation_router import (
-    OfferEvalRequest, EquityModelRequest, MultiOfferCompareRequest,
-    AdvancedCounterOfferRequest, CounterOfferRequest
+    AdvancedCounterOfferRequest,
+    CounterOfferRequest,
+    EquityModelRequest,
+    MultiOfferCompareRequest,
+    OfferEvalRequest,
 )
-from app.api.routers.billing_router import CheckoutRequest, CustomerPortalRequest
-from app.api.routers.backup_router import RestoreBackupPayload
+from app.api.routers.profile_router import QuestionnaireSubmitRequest
+from app.api.routers.vault_router import VaultLearnRequest, VaultSemanticSearchRequest, VaultTestMatchRequest
+from app.api.ws_gateway import MultiTenantWebSocketGateway, ws_manager
 from app.core.models import (
-    ApplyLedgerEntry, ApplyLedgerStatus,
-    Organization, Membership, AdminAuditLog, OrgRole,
-    ConsentType, UserConsent, ConsentGrantRequest, ConsentStatusResponse
+    AdminAuditLog,
+    ApplyLedgerEntry,
+    ApplyLedgerStatus,
+    ConsentGrantRequest,
+    ConsentStatusResponse,
+    ConsentType,
+    Membership,
+    Organization,
+    OrgRole,
+    UserConsent,
 )
 
 # Backwards compatibility routers

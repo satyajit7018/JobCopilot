@@ -6,16 +6,17 @@ and human-in-the-loop (HITL) novel question resolution.
 
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.core.config import DEFAULT_SUBMISSION_MODE
-from app.core.models import User, ApplicationStatus, ApplyLedgerStatus, ApplyLedgerEntry
-from app.core.database import db
-from app.core.vector_vault import vault
-from app.bot.apply_ledger import apply_ledger
 from app.api.auth import get_current_user
 from app.api.ws_gateway import ws_manager
+from app.bot.apply_ledger import apply_ledger
+from app.core.config import DEFAULT_SUBMISSION_MODE
+from app.core.database import db
+from app.core.models import ApplicationStatus, ApplyLedgerStatus, User
+from app.core.vector_vault import vault
 
 router = APIRouter(tags=["bot"])
 
@@ -165,8 +166,8 @@ async def apply_to_job_async(
         if existing_ledger.status == ApplyLedgerStatus.IN_PROGRESS:
             raise HTTPException(status_code=409, detail="Application is currently actively executing.")
 
-    from app.core.rate_limiter import rate_limiter
     from app.core.celery_app import TaskManager
+    from app.core.rate_limiter import rate_limiter
 
     if not rate_limiter.can_apply(current_user.user_id):
         raise HTTPException(

@@ -5,11 +5,10 @@ Tracks SHA-256 payload signatures, manages in-flight execution locks, and replay
 """
 
 import hashlib
-import json
 import logging
 import threading
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from app.core.database import get_db
 

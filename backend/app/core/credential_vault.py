@@ -4,15 +4,17 @@ Envelope Encryption (DEK/KEK) with KMS Abstraction, Master Key Rotation,
 and OS Keychain / Headless Fallback Integration.
 """
 
-import os
-import json
 import base64
-from typing import Dict, Optional, Any, List, Tuple
+import json
+import os
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+from cryptography.hazmat.primitives import hashes  # type: ignore
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # type: ignore
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC  # type: ignore
-from cryptography.hazmat.primitives import hashes  # type: ignore
-from app.core.config import VAULT_ENC_PATH, APP_DIR
+
+from app.core.config import APP_DIR, VAULT_ENC_PATH
 
 try:
     import keyring  # type: ignore
@@ -21,7 +23,7 @@ except ImportError:
     HAS_KEYRING = False
 
 try:
-    from argon2.low_level import hash_secret_raw, Type  # type: ignore
+    from argon2.low_level import Type, hash_secret_raw  # type: ignore
     HAS_ARGON2 = True
 except ImportError:
     HAS_ARGON2 = False
@@ -65,7 +67,7 @@ class LocalKMSProvider(KMSProvider):
         # 1. Check keystore file
         if self.KEYSTORE_FILE.exists():
             try:
-                with open(self.KEYSTORE_FILE, "r") as f:
+                with open(self.KEYSTORE_FILE) as f:
                     data = json.load(f)
                     self._keys = data.get("keys", {})
                     self._current_version = data.get("current_version", "v1")
@@ -396,7 +398,7 @@ class CredentialVault:
         if not self.vault_path.exists():
             return {}
         try:
-            with open(self.vault_path, "r") as f:
+            with open(self.vault_path) as f:
                 payload = json.load(f)
             return self.decrypt_data(payload, master_password)
         except Exception:

@@ -4,16 +4,17 @@ Handles tenant-scoped encrypted backups (.jobcopilot.enc export and restore)
 and secure object storage file downloads.
 """
 
-import os
 import base64
+import os
 import time
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from app.core.models import User, UserRole
 from app.api.auth import get_current_user
+from app.core.models import User, UserRole
 
 router = APIRouter(tags=["backup"])
 

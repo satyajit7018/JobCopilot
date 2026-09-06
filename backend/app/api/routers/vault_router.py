@@ -4,13 +4,14 @@ Handles semantic vector Q&A indexing, manual learning, and real-time screening q
 """
 
 from typing import Optional
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.core.models import User
-from app.core.database import db
-from app.core.vector_vault import vault
 from app.api.auth import get_current_user
+from app.core.database import db
+from app.core.models import User
+from app.core.vector_vault import vault
 
 router = APIRouter(tags=["vault"])
 

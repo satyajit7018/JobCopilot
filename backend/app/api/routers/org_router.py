@@ -6,16 +6,24 @@ and organization lifecycle management.
 
 import re
 import uuid
-from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends, status
+from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException, status
+
+from app.api.auth import get_current_org_membership, get_current_user, require_org_admin, require_org_owner
 from app.core.database import db
 from app.core.models import (
-    User, Organization, Membership, OrgRole,
-    CreateOrgRequest, UpdateOrgRequest, InviteMemberRequest, UpdateMemberRoleRequest,
-    OrgResponse, MemberResponse
+    CreateOrgRequest,
+    InviteMemberRequest,
+    MemberResponse,
+    Membership,
+    Organization,
+    OrgResponse,
+    OrgRole,
+    UpdateMemberRoleRequest,
+    UpdateOrgRequest,
+    User,
 )
-from app.api.auth import get_current_user, get_current_org_membership, require_org_admin, require_org_owner
 
 router = APIRouter(prefix="/orgs", tags=["organizations"])
 
@@ -177,7 +185,7 @@ async def invite_organization_member(
 ):
     """Invites a user to the organization by email (requires OWNER or ADMIN)."""
     _ = await require_org_admin(org_id, current_user)
-    
+
     clean_email = payload.email.lower().strip()
     target_user = db.get_user_by_email(clean_email)
     if not target_user:
@@ -218,7 +226,7 @@ async def update_organization_member_role(
 ):
     """Updates a member's role (requires OWNER)."""
     _ = await require_org_owner(org_id, current_user)
-    
+
     target_membership = db.get_membership(org_id, user_id)
     if not target_membership:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found in organization.")

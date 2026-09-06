@@ -3,7 +3,7 @@ JobCopilot - Core Configuration & Local Path Setup
 Backward-compatible re-exports backed by the centralized typed Settings engine.
 """
 
-from pathlib import Path
+
 from app.core.settings import settings
 
 # Paths re-exported from settings

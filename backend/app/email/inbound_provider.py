@@ -4,11 +4,12 @@ Normalizes incoming webhook payloads from Postmark, SendGrid, Mailgun, and custo
 Resolves tenant isolation keys via subaddress routing (e.g. inbound+usr_123@jobcopilot.app).
 """
 
-import re
-import hmac
 import hashlib
+import hmac
 import logging
-from typing import Dict, Any, Optional, Tuple
+import re
+from typing import Any, Dict, Optional
+
 from app.core.settings import settings
 
 logger = logging.getLogger("jobcopilot.email.inbound")

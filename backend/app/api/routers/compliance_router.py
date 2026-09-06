@@ -4,18 +4,13 @@ Provides versioned candidate consent tracking (GDPR/CCPA/SOC 2), audit log expor
 and legal agreements (Terms of Service, Data Processing Agreement).
 """
 
-from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
+from typing import List, Optional
 
-from app.core.database import db
-from app.core.models import (
-    User,
-    ConsentType,
-    UserConsent,
-    ConsentGrantRequest,
-    ConsentStatusResponse
-)
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+
 from app.api.auth import get_current_user
+from app.core.database import db
+from app.core.models import ConsentGrantRequest, ConsentStatusResponse, ConsentType, User, UserConsent
 
 router = APIRouter(prefix="/compliance", tags=["compliance"])
 

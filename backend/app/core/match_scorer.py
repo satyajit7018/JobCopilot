@@ -5,7 +5,8 @@ Experience Years (15%), and Location/Remote Compatibility (15%).
 """
 
 import re
-from typing import List, Dict, Tuple, Optional
+from typing import List, Tuple
+
 from app.core.models import CandidateProfile
 
 

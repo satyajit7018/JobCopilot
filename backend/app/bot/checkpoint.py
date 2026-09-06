@@ -5,9 +5,10 @@ fault-tolerant auto-recovery without re-filling forms.
 """
 
 from datetime import datetime
-from typing import Dict, Any, Optional
-from app.core.models import JobCheckpoint
+from typing import Any, Dict, Optional
+
 from app.core.database import db
+from app.core.models import JobCheckpoint
 
 
 class CheckpointManager:

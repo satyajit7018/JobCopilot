@@ -5,6 +5,7 @@ Executes atomic, versioned schema migrations across local SQLite and cloud Postg
 
 import logging
 from typing import List, Tuple
+
 from app.core.database import db
 
 logger = logging.getLogger("jobcopilot.migrations")

@@ -4,15 +4,15 @@ Analyzes target Job Descriptions and dynamically aligns skill emphasis,
 reorders project highlights, and compiles bespoke ATS-compliant PDF resumes.
 """
 
-import re
 import copy
 import hashlib
+import re
 from pathlib import Path
-from typing import Optional, List, Dict, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.config import RESUMES_DIR
-from app.core.models import CandidateProfile, ResumeVariant, CategorizedSkills, Project, WorkExperience
 from app.core.match_scorer import MatchScorer
+from app.core.models import CandidateProfile, Project
 from app.core.resume_compiler import ResumeCompiler
 
 
@@ -126,7 +126,7 @@ class ResumeTailor:
                 raw = await llm_client.generate_completion(
                     prompt=prompt,
                     system_prompt=TailoringPrompts.SYSTEM_PROMPT,
-                    fallback_fn=lambda: "\n".join(f"- {h}" for h in exp.highlights[:4])
+                    fallback_fn=lambda exp=exp: "\n".join(f"- {h}" for h in exp.highlights[:4])
                 )
                 lines = [
                     line.strip().lstrip("-* ").strip()
@@ -165,7 +165,7 @@ class ResumeTailor:
 
         # Generate unique content hash
         content_hash = hashlib.sha256(html_content.encode('utf-8')).hexdigest()
-        
+
         # Save to RESUMES_DIR
         clean_comp = re.sub(r'\W+', '_', company_name.lower())
         clean_title = re.sub(r'\W+', '_', job_title.lower())

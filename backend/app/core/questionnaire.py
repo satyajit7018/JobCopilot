@@ -4,9 +4,10 @@ Generates the 8 core recruiter questions schema, auto-pre-fills 70%+ from parsed
 and applies user confirmed responses back to the candidate profile and Knowledge Vault.
 """
 
-from typing import Dict, Any, List, Optional
-from app.core.models import CandidateProfile, RecruiterPreferences, DemographicPreferences
+from typing import Any, Dict, List
+
 from app.core.compensation import CompensationConverter
+from app.core.models import CandidateProfile
 
 
 class QuestionnaireEngine:

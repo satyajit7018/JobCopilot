@@ -4,13 +4,14 @@ Handles autonomous multi-source job discovery triggers and live status querying.
 """
 
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
 
-from app.core.models import User
-from app.core.database import db
-from app.discovery.orchestrator import discovery_orchestrator
+from fastapi import APIRouter, Depends, HTTPException
+
 from app.api.auth import get_current_user
 from app.api.ws_gateway import ws_manager
+from app.core.database import db
+from app.core.models import User
+from app.discovery.orchestrator import discovery_orchestrator
 
 router = APIRouter(tags=["discovery"])
 

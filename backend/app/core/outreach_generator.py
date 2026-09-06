@@ -5,11 +5,11 @@ Generates multi-channel outreach packages: ATS application package,
 """
 
 import uuid
-from datetime import datetime
-from typing import Dict, Any, Optional
-from app.core.models import CandidateProfile, OutreachRecord, OutreachChannel
-from app.core.database import db
+from typing import Any, Dict, Optional
+
 from app.core.cover_letter import CoverLetterGenerator
+from app.core.database import db
+from app.core.models import CandidateProfile, OutreachChannel, OutreachRecord
 
 
 class OutreachGenerator:
@@ -65,10 +65,10 @@ class OutreachGenerator:
             link = f" (code: {profile.github_url})" if profile.github_url else ""
             s2 = f"Given your technical focus, you might find my work building {top_project.name} in {tech}{metric}{link} directly relevant."
         else:
-            s2 = f"I specialize in building scalable Python backend microservices and reliable data pipelines with high test coverage."
+            s2 = "I specialize in building scalable Python backend microservices and reliable data pipelines with high test coverage."
 
         # Sentence 3: Frictionless call to action
-        s3 = f"If my background aligns with what your team needs, I would be glad to share my code walkthrough."
+        s3 = "If my background aligns with what your team needs, I would be glad to share my code walkthrough."
 
         body = f"{s1} {s2} {s3}\n\nBest,\n{profile.full_name}\n{profile.email} | {profile.phone}\n{profile.linkedin_url or ''}"
 

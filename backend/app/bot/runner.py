@@ -4,11 +4,10 @@ Executes end-to-end autonomous form filling, stealth navigation,
 checkpoint recovery, and HITL resolution for target job postings.
 """
 
-import os
 import asyncio
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, Optional
+
 try:
     from playwright.async_api import async_playwright  # type: ignore
     HAS_PLAYWRIGHT = True
@@ -16,22 +15,19 @@ except ImportError:
     async_playwright = None
     HAS_PLAYWRIGHT = False
 
-from app.core.config import DATA_DIR, DEFAULT_SUBMISSION_MODE
-from app.core.models import JobListing, ApplicationStatus, CandidateProfile
-from app.core.database import db
-from app.core.resume_tailor import ResumeTailor
-from app.core.cover_letter import CoverLetterGenerator
-from app.core.outreach_generator import OutreachGenerator
-from app.bot.stealth import StealthEngine
-from app.bot.human_behavior import HumanBehaviorEngine
-from app.bot.checkpoint import CheckpointManager
-from app.bot.hitl_agent import HITLAgent
 from app.bot.adapters.universal import UniversalATSAdapter
 from app.bot.apply_ledger import apply_ledger
-from app.bot.errors import (
-    classify_bot_error, is_transient, calculate_backoff_delay, BotErrorCategory
-)
 from app.bot.captcha_detector import detect_captcha
+from app.bot.checkpoint import CheckpointManager
+from app.bot.errors import BotErrorCategory, calculate_backoff_delay, classify_bot_error, is_transient
+from app.bot.hitl_agent import HITLAgent
+from app.bot.stealth import StealthEngine
+from app.core.config import DATA_DIR, DEFAULT_SUBMISSION_MODE
+from app.core.cover_letter import CoverLetterGenerator
+from app.core.database import db
+from app.core.models import ApplicationStatus
+from app.core.outreach_generator import OutreachGenerator
+from app.core.resume_tailor import ResumeTailor
 
 
 class AutonomousJobRunner:

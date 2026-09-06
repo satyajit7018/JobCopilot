@@ -6,10 +6,10 @@ for autonomous job application pipelines.
 
 import uuid
 from datetime import datetime
-from typing import Optional, Tuple, List
+from typing import List, Optional, Tuple
 
-from app.core.models import ApplyLedgerEntry, ApplyLedgerStatus
 from app.core.database import db
+from app.core.models import ApplyLedgerEntry, ApplyLedgerStatus
 
 
 class ApplyLedgerManager:
@@ -47,7 +47,7 @@ class ApplyLedgerManager:
             if existing.status == ApplyLedgerStatus.FAILED:
                 if existing.attempt_count >= existing.max_retries:
                     return False, existing, f"Application exceeded max retries ({existing.max_retries}). Last error: {existing.last_error_category}."
-                
+
                 # Re-acquire lock for next attempt
                 existing.attempt_count += 1
                 existing.status = ApplyLedgerStatus.INITIATED

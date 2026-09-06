@@ -5,16 +5,21 @@ system-wide usage metrics, role elevation, and audit-logged impersonation.
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Request, status
 
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+
+from app.api.auth import create_jwt_token, require_admin
 from app.core.database import db
 from app.core.models import (
-    User, UserRole, AdminAuditLog,
-    AdminUserListResponse, AdminOrgListResponse, AdminStatsResponse, AdminImpersonateResponse
+    AdminAuditLog,
+    AdminImpersonateResponse,
+    AdminOrgListResponse,
+    AdminStatsResponse,
+    AdminUserListResponse,
+    User,
 )
-from app.api.auth import require_admin, create_jwt_token, ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 

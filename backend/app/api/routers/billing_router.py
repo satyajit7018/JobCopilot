@@ -6,14 +6,15 @@ plan limits, and webhook-driven subscription provisioning.
 
 import os
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Request, Depends
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from app.api.auth import get_current_user
+from app.core.circuit_breaker import CircuitOpenError, stripe_api_breaker
 from app.core.config import settings
 from app.core.database import db
 from app.core.models import User
-from app.api.auth import get_current_user
-from app.core.circuit_breaker import stripe_api_breaker, CircuitOpenError
 
 router = APIRouter(tags=["billing"])
 
@@ -32,7 +33,8 @@ class CustomerPortalRequest(BaseModel):
 async def stripe_webhook_handler(request: Request):
     """Receives Stripe subscription updates and adjusts tenant tier accordingly (Fail-Closed)."""
     import stripe
-    from app.core.rate_limiter import rate_limiter, SubscriptionTier
+
+    from app.core.rate_limiter import SubscriptionTier, rate_limiter
 
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
     if not webhook_secret:
@@ -170,7 +172,7 @@ async def sync_subscription_tier(current_user: User = Depends(get_current_user))
     Synchronizes user tier with Stripe as the single source of truth.
     Pulls latest subscription status and updates local database and rate limiter.
     """
-    from app.core.rate_limiter import rate_limiter, SubscriptionTier
+    from app.core.rate_limiter import SubscriptionTier, rate_limiter
     user_id = current_user.user_id
     active_tier = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
 
@@ -193,7 +195,7 @@ async def sync_subscription_tier(current_user: User = Depends(get_current_user))
                     active_tier = "PRO"
             else:
                 active_tier = "FREE"
-            
+
             st_tier = SubscriptionTier.ELITE if active_tier == "ELITE" else (SubscriptionTier.PRO if active_tier == "PRO" else SubscriptionTier.FREE)
             rate_limiter.set_user_tier(user_id, st_tier)
             db.update_user_role(user_id, active_tier)

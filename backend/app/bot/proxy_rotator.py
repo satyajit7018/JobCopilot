@@ -6,7 +6,7 @@ supporting Direct Connection, Bright Data, Oxylabs, and custom SOCKS5/HTTP pools
 
 import os
 import random
-from typing import Optional, Dict, Any, List
+from typing import Dict, List, Optional
 
 from app.core.settings import settings
 

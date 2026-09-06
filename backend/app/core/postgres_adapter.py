@@ -6,19 +6,33 @@ multi-tenant query execution with fail-safe schema bootstrapping and PII encrypt
 
 import json
 import logging
-from typing import List, Dict, Optional, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from app.core.models import (
-    User, CandidateProfile, VaultEntry, JobListing,
-    HITLEvent, ApplicationStatus, OutreachRecord, EmailMessage, JobCheckpoint,
-    ApplyLedgerEntry, ApplyLedgerStatus,
-    Organization, Membership, AdminAuditLog, OrgRole,
-    AnalyticsEvent, ABExperiment, ABVariant, ABAssignment, ConversionSignal,
-    UserConsent, ConsentType
-)
 from app.core.db_adapter import DatabaseAdapter
-from app.core.credential_vault import cred_vault
+from app.core.models import (
+    ABAssignment,
+    ABExperiment,
+    ABVariant,
+    AdminAuditLog,
+    AnalyticsEvent,
+    ApplicationStatus,
+    ApplyLedgerEntry,
+    ApplyLedgerStatus,
+    CandidateProfile,
+    ConsentType,
+    ConversionSignal,
+    EmailMessage,
+    HITLEvent,
+    JobListing,
+    Membership,
+    Organization,
+    OrgRole,
+    OutreachRecord,
+    User,
+    UserConsent,
+    VaultEntry,
+)
 
 logger = logging.getLogger("jobcopilot.postgres")
 
@@ -33,7 +47,6 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
 
     def _init_pool(self):
         try:
-            import psycopg2
             from psycopg2.pool import ThreadedConnectionPool
             self._pool = ThreadedConnectionPool(minconn=2, maxconn=20, dsn=self.database_url)
             self._init_tables()

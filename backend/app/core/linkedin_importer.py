@@ -3,8 +3,8 @@ JobCopilot - LinkedIn Profile Importer & Builder
 Converts a public LinkedIn profile URL or raw data into a structured CandidateProfile.
 """
 
-from typing import Dict, Any, Optional
-from app.core.models import CandidateProfile, RecruiterPreferences, Education
+
+from app.core.models import CandidateProfile, RecruiterPreferences
 
 
 class LinkedInImporter:

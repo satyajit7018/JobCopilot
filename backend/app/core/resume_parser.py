@@ -6,7 +6,8 @@ with section segmentation, date parsing, and categorized skill taxonomy.
 
 import re
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Dict, List, Optional, Tuple
+
 try:
     from pypdf import PdfReader  # type: ignore
     HAS_PYPDF = True
@@ -21,8 +22,12 @@ except ImportError:
     HAS_DOCX = False
 
 from app.core.models import (
-    CandidateProfile, Education, WorkExperience, Project,
-    RecruiterPreferences, CategorizedSkills
+    CandidateProfile,
+    CategorizedSkills,
+    Education,
+    Project,
+    RecruiterPreferences,
+    WorkExperience,
 )
 
 
@@ -58,7 +63,7 @@ class ResumeParser:
         """Extracts plain text from all pages of a PDF."""
         if not HAS_PYPDF or PdfReader is None:
             try:
-                with open(pdf_path, "r", encoding="utf-8", errors="ignore") as f:
+                with open(pdf_path, encoding="utf-8", errors="ignore") as f:
                     return f.read()
             except Exception:
                 return ""
@@ -91,7 +96,7 @@ class ResumeParser:
                     elif ext in [".docx", ".doc"]:
                         return cls.extract_text_from_docx(str(path))
                     else:
-                        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                        with open(path, encoding="utf-8", errors="ignore") as f:
                             return f.read()
             except Exception:
                 pass

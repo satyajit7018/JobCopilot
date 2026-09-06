@@ -4,9 +4,10 @@ Applies Defense-in-Depth HTTP security headers (CSP, HSTS, X-Frame-Options),
 request-id correlation tracking, and structured latency logging.
 """
 
+import logging
 import time
 import uuid
-import logging
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -98,7 +99,7 @@ class RequestTracingMiddleware(BaseHTTPMiddleware):
         response.headers["traceparent"] = span.context.to_traceparent()
         response.headers["X-Trace-ID"] = span.context.trace_id
         response.headers["X-Span-ID"] = span.context.span_id
-        
+
         # Log structured request details with trace correlation
         if not request.url.path.startswith("/metrics") and not request.url.path.startswith("/health"):
             user_id = getattr(request.state, "user_id", "anonymous")
@@ -147,8 +148,9 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
             client_ip = request.client.host if request.client else "127.0.0.1"
             user_id = f"ip_{client_ip}"
 
-        from app.core.idempotency import idempotency_engine, IdempotencyResult
         import json
+
+        from app.core.idempotency import IdempotencyResult, idempotency_engine
 
         body = await request.body()
         result, record = idempotency_engine.acquire(

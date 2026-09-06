@@ -4,15 +4,15 @@ Correlates incoming recruiter communications with tracked job applications,
 updates pipeline status automatically, and persists sanitized records to SQLite.
 """
 
-import uuid
 import logging
+import uuid
 from datetime import datetime
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Any, Dict, Optional
 
-from app.core.models import EmailMessage, EmailIntent, ApplicationStatus, JobListing
 from app.core.database import db
-from app.email.parser import EmailParser
+from app.core.models import ApplicationStatus, EmailIntent, EmailMessage, JobListing
 from app.email.classifier import EmailClassifier
+from app.email.parser import EmailParser
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class EmailSyncEngine:
             elif intent == EmailIntent.CONFIRMATION:
                 associated_job.status = ApplicationStatus.SUBMITTED
                 updated_status = "SUBMITTED"
-            
+
             db.save_job(associated_job, user_id=user_id or associated_job.user_id)
 
         # 5. Persist Email Record to SQLite

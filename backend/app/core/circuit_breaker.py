@@ -4,12 +4,12 @@ Protects system stability against cascading failures and outbound latency spikes
 Fails fast when external dependencies (ATS boards, LLMs, Stripe, Email) suffer outages.
 """
 
-import time
 import asyncio
 import logging
+import time
 from enum import Enum
-from typing import Dict, Any, Optional, Callable
 from functools import wraps
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger("jobcopilot.circuit_breaker")
 

@@ -5,7 +5,7 @@ busy calendar periods, and formats human-ready availability schedules.
 """
 
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 # Timezone UTC offsets for common interview timezones (no external dependency)
 _TZ_UTC_OFFSETS: Dict[str, int] = {

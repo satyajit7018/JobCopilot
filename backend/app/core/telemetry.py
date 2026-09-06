@@ -5,14 +5,12 @@ hierarchical spans across HTTP requests, Celery tasks, and external calls (LLM /
 with in-memory span recording and OTLP collector forwarding hook.
 """
 
+import contextvars
 import os
 import time
 import uuid
-import contextvars
-from datetime import datetime
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass, field
-
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 # Context variable tracking the current active span in the async execution context
 _current_span_var: contextvars.ContextVar[Optional["Span"]] = contextvars.ContextVar("_current_span", default=None)

@@ -4,11 +4,13 @@ Provides real-time pipeline funnel analytics, cohort retention matrices, convers
 and statistical A/B testing evaluation with tenant isolation.
 """
 
-from typing import Optional, Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from app.core.models import User
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+
 from app.api.auth import get_current_user
 from app.core.database import get_db
+from app.core.models import User
 
 router = APIRouter(tags=["analytics"])
 

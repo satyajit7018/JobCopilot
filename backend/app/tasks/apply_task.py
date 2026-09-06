@@ -5,11 +5,11 @@ with distributed trace propagation across worker tasks.
 """
 
 import asyncio
-from typing import Dict, Any, Optional
-from app.tasks.celery_app import celery_app, local_task_runner, USE_CELERY
+from typing import Any, Dict, Optional
+
 from app.bot.runner import AutonomousJobRunner
-from app.core.database import db
-from app.core.telemetry import telemetry, SpanContext
+from app.core.telemetry import SpanContext, telemetry
+from app.tasks.celery_app import USE_CELERY, celery_app, local_task_runner
 
 
 def run_apply_job_sync(

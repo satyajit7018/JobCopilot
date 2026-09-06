@@ -4,10 +4,8 @@ Targeted query generators and scrapers prioritizing India's leading tech portals
 Naukri.com, Instahyre, Cuvette, Cutshort, Hirist, and Wellfound.
 """
 
-import re
-import asyncio
-from typing import List, Dict, Any, Optional
-import httpx
+from typing import Any, Dict, List
+
 
 
 class PlatformScrapers:
