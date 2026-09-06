@@ -35,6 +35,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
           pip install pytest pytest-asyncio anyio httpx bandit pip-audit pytest-cov pytest-xdist semgrep ruff black mypy
+          # Browser binaries are required by the Playwright-driven bot/integration tests.
+          python -m playwright install --with-deps chromium
 
       - name: Byte-Compilation Syntax Audit
         run: |

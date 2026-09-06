@@ -7,7 +7,7 @@ name = "jobcopilot"
 version = "1.0.0"
 description = "Universal Autonomous Job Hunting, Self-Learning Application & Career Operating System"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
