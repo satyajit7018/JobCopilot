@@ -842,6 +842,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             return False
         finally:
             self.release_connection(conn)
@@ -931,6 +932,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             return False
         finally:
             self.release_connection(conn)
@@ -1004,6 +1006,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             return False
         finally:
             self.release_connection(conn)
@@ -1153,6 +1156,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1190,6 +1194,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1245,6 +1250,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1258,6 +1264,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1272,6 +1279,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return 0
         finally:
@@ -1325,6 +1333,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1338,6 +1347,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1367,6 +1377,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1440,6 +1451,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1462,6 +1474,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return 0
         finally:
@@ -1479,6 +1492,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1507,6 +1521,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:

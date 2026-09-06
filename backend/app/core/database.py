@@ -7,6 +7,7 @@ Atomic Transactions, Dynamic Multi-Tenant Migration, and User Isolation.
 import sqlite3
 import json
 import threading
+import logging
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 from datetime import datetime
@@ -2798,6 +2799,8 @@ class DatabaseManager(DatabaseAdapter):
 
 db = DatabaseManager()
 
+logger = logging.getLogger("jobcopilot.database")
+
 
 def get_db() -> DatabaseAdapter:
     """Returns active database adapter (PostgreSQL if configured, else SQLite WAL engine)."""
@@ -2807,6 +2810,7 @@ def get_db() -> DatabaseAdapter:
             from app.core.postgres_adapter import PostgresDatabaseAdapter
             return PostgresDatabaseAdapter(settings.DATABASE_URL)
         except Exception:
+            logger.critical("Postgres adapter init failed; falling back to local SQLite", exc_info=True)
             return db
     return db
 
