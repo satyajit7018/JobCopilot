@@ -49,7 +49,7 @@ class ResumeTailor:
         """
         tailored = copy.deepcopy(profile)
         jd_skills = MatchScorer.extract_job_required_skills(job_title + " " + job_description)
-        jd_skills_lower = [s.lower() for s in jd_skills]
+        jd_skills_lower = {s.lower() for s in jd_skills}
 
         # 1. Identify Core Matched Competencies
         matched_skills = []

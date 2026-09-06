@@ -266,7 +266,9 @@ class ResumeParser:
                     p_name = parts[0].strip()
                     p_desc = parts[1].strip()
                     if 3 < len(p_name) < 70 and len(p_desc) > 5:
-                        proj_techs = [s for s in all_skills if s.lower() in p_desc.lower() or s.lower() in p_name.lower()]
+                        p_desc_lower = p_desc.lower()
+                        p_name_lower = p_name.lower()
+                        proj_techs = [s for s in all_skills if s.lower() in p_desc_lower or s.lower() in p_name_lower]
                         projects.append(Project(
                             name=p_name,
                             description=p_desc[:200],
