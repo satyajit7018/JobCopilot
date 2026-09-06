@@ -98,9 +98,28 @@ def test_backwards_compatible_model_exports():
     assert isinstance(ws_manager, MultiTenantWebSocketGateway)
 
 
+def _collect_route_paths(routes, prefix: str = "") -> set:
+    """Recursively collect full route paths from the app routing table.
+
+    Robust to both the older flattened route list and the nested
+    ``_IncludedRouter`` topology introduced in Starlette 1.x, where
+    ``app.routes`` holds container nodes without a ``path`` attribute.
+    """
+    paths: set = set()
+    for route in routes:
+        segment = getattr(route, "path", "") or ""
+        children = getattr(route, "routes", None)
+        if children:
+            paths |= _collect_route_paths(children, prefix + segment)
+        elif segment:
+            paths.add(prefix + segment)
+            paths.add(segment)  # older Starlette bakes the full path into leaves
+    return paths
+
+
 def test_route_topology_coverage(client: TestClient):
     """Verifies that all required domain route paths exist in the application routing table."""
-    routes = [r.path for r in client.app.routes]
+    routes = _collect_route_paths(client.app.routes)
     
     expected_paths = [
         # Health & System
