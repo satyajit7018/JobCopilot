@@ -26,6 +26,27 @@ def _slugify(name: str) -> str:
     return re.sub(r'[-\s]+', '-', s)
 
 
+def _get_org_or_404(org_id: str) -> Organization:
+    """Fetches an organization by id or raises a 404 HTTPException."""
+    org = db.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+    return org
+
+
+def _org_to_response(org: Organization, role) -> OrgResponse:
+    """Builds an OrgResponse from an Organization model and a role (enum or plain value)."""
+    return OrgResponse(
+        org_id=org.org_id,
+        name=org.name,
+        slug=org.slug,
+        owner_id=org.owner_id,
+        plan_tier=org.plan_tier,
+        created_at=org.created_at,
+        role=enum_value(role)
+    )
+
+
 @router.post("", response_model=OrgResponse, status_code=status.HTTP_201_CREATED)
 async def create_organization(
     payload: CreateOrgRequest,
@@ -70,15 +91,7 @@ async def create_organization(
     )
     db.add_membership(membership)
 
-    return OrgResponse(
-        org_id=new_org.org_id,
-        name=new_org.name,
-        slug=new_org.slug,
-        owner_id=new_org.owner_id,
-        plan_tier=new_org.plan_tier,
-        created_at=new_org.created_at,
-        role=OrgRole.OWNER.value
-    )
+    return _org_to_response(new_org, OrgRole.OWNER)
 
 
 @router.get("", response_model=List[OrgResponse])
@@ -105,19 +118,9 @@ async def get_organization_details(
 ):
     """Gets details of an organization if the user is a member."""
     membership = await get_current_org_membership(org_id, current_user)
-    org = db.get_organization(org_id)
-    if not org:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+    org = _get_org_or_404(org_id)
 
-    return OrgResponse(
-        org_id=org.org_id,
-        name=org.name,
-        slug=org.slug,
-        owner_id=org.owner_id,
-        plan_tier=org.plan_tier,
-        created_at=org.created_at,
-        role=enum_value(membership.role)
-    )
+    return _org_to_response(org, membership.role)
 
 
 @router.patch("/{org_id}", response_model=OrgResponse)
@@ -128,24 +131,14 @@ async def update_organization_settings(
 ):
     """Updates organization name or plan tier (requires OWNER or ADMIN)."""
     membership = await require_org_admin(org_id, current_user)
-    org = db.get_organization(org_id)
-    if not org:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+    _get_org_or_404(org_id)
 
     success = db.update_organization(org_id, name=payload.name, plan_tier=payload.plan_tier)
     if not success:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update organization.")
 
     updated_org = db.get_organization(org_id)
-    return OrgResponse(
-        org_id=updated_org.org_id,
-        name=updated_org.name,
-        slug=updated_org.slug,
-        owner_id=updated_org.owner_id,
-        plan_tier=updated_org.plan_tier,
-        created_at=updated_org.created_at,
-        role=enum_value(membership.role)
-    )
+    return _org_to_response(updated_org, membership.role)
 
 
 @router.get("/{org_id}/members", response_model=List[MemberResponse])

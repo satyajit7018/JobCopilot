@@ -23,6 +23,8 @@ from app.core.models import (
 from app.core.db_adapter import DatabaseAdapter
 from app.core.credential_vault import cred_vault
 
+logger = logging.getLogger("jobcopilot.database")
+
 SAMPLE_PREVIEW_JOBS_CATALOG: Dict[str, Dict[str, Any]] = {
     "sample_swiggy_01": {
         "company": "Swiggy",
@@ -1668,6 +1670,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("create_organization failed")
                     return False
 
     def get_organization(self, org_id: str) -> Optional[Organization]:
@@ -1763,6 +1766,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("add_membership failed")
                     return False
 
     def get_membership(self, org_id: str, user_id: str) -> Optional[Membership]:
@@ -1842,6 +1846,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("log_admin_action failed")
                     return False
 
     def list_admin_audit_logs(self, limit: int = 50, offset: int = 0) -> List[AdminAuditLog]:
@@ -2025,6 +2030,7 @@ class DatabaseManager(DatabaseAdapter):
 
                     return True
                 except Exception:
+                    logger.exception("hard_delete_user_account failed")
                     conn.rollback()
                     return False
 
@@ -2064,6 +2070,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("save_idempotency_record failed")
                     conn.rollback()
                     return False
 
@@ -2127,6 +2134,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount > 0
                 except Exception:
+                    logger.exception("update_idempotency_record failed")
                     conn.rollback()
                     return False
 
@@ -2140,6 +2148,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount > 0
                 except Exception:
+                    logger.exception("delete_idempotency_record failed")
                     conn.rollback()
                     return False
 
@@ -2154,6 +2163,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount
                 except Exception:
+                    logger.exception("cleanup_expired_idempotency_keys failed")
                     conn.rollback()
                     return 0
 
@@ -2203,6 +2213,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("save_mfa_credentials failed")
                     conn.rollback()
                     return False
 
@@ -2215,6 +2226,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount > 0
                 except Exception:
+                    logger.exception("delete_mfa_credentials failed")
                     conn.rollback()
                     return False
 
@@ -2243,6 +2255,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("create_session failed")
                     conn.rollback()
                     return False
 
@@ -2309,6 +2322,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount > 0
                 except Exception:
+                    logger.exception("revoke_session failed")
                     conn.rollback()
                     return False
 
@@ -2330,6 +2344,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount
                 except Exception:
+                    logger.exception("revoke_all_user_sessions failed")
                     conn.rollback()
                     return 0
 
@@ -2346,6 +2361,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount > 0
                 except Exception:
+                    logger.exception("update_session_activity failed")
                     conn.rollback()
                     return False
 
@@ -2373,6 +2389,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("insert_security_audit_log failed")
                     conn.rollback()
                     return False
 
@@ -2798,8 +2815,6 @@ class DatabaseManager(DatabaseAdapter):
 
 
 db = DatabaseManager()
-
-logger = logging.getLogger("jobcopilot.database")
 
 
 def get_db() -> DatabaseAdapter:
