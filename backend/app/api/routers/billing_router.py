@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.core.database import db
 from app.core.models import User
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, enum_value
 from app.core.circuit_breaker import stripe_api_breaker, CircuitOpenError
 
 router = APIRouter(tags=["billing"])
@@ -172,7 +172,7 @@ async def sync_subscription_tier(current_user: User = Depends(get_current_user))
     """
     from app.core.rate_limiter import rate_limiter, SubscriptionTier
     user_id = current_user.user_id
-    active_tier = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    active_tier = enum_value(current_user.role)
 
     if settings.STRIPE_SECRET_KEY:
         import stripe
@@ -218,7 +218,7 @@ async def preview_proration(
         raise HTTPException(status_code=400, detail="Invalid target tier.")
 
     prices = {"FREE": 0, "PRO": 29, "ELITE": 79}
-    current_tier = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    current_tier = enum_value(current_user.role)
     current_price = prices.get(current_tier, 0)
     target_price = prices.get(target_tier, 0)
 

@@ -15,7 +15,7 @@ from app.core.models import (
     CreateOrgRequest, UpdateOrgRequest, InviteMemberRequest, UpdateMemberRoleRequest,
     OrgResponse, MemberResponse
 )
-from app.api.auth import get_current_user, get_current_org_membership, require_org_admin, require_org_owner
+from app.api.auth import get_current_user, get_current_org_membership, require_org_admin, require_org_owner, enum_value
 
 router = APIRouter(prefix="/orgs", tags=["organizations"])
 
@@ -116,7 +116,7 @@ async def get_organization_details(
         owner_id=org.owner_id,
         plan_tier=org.plan_tier,
         created_at=org.created_at,
-        role=membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
+        role=enum_value(membership.role)
     )
 
 
@@ -144,7 +144,7 @@ async def update_organization_settings(
         owner_id=updated_org.owner_id,
         plan_tier=updated_org.plan_tier,
         created_at=updated_org.created_at,
-        role=membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
+        role=enum_value(membership.role)
     )
 
 
@@ -204,7 +204,7 @@ async def invite_organization_member(
         user_id=target_user.user_id,
         email=target_user.email,
         full_name=target_user.full_name,
-        role=new_mem.role.value if hasattr(new_mem.role, 'value') else str(new_mem.role),
+        role=enum_value(new_mem.role),
         created_at=new_mem.created_at
     )
 
@@ -226,7 +226,7 @@ async def update_organization_member_role(
     if user_id == current_user.user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change your own role as owner.")
 
-    role_val = payload.role.value if hasattr(payload.role, 'value') else str(payload.role)
+    role_val = enum_value(payload.role)
     success = db.update_member_role(org_id, user_id, role_val)
     if not success:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update member role.")
@@ -247,7 +247,7 @@ async def remove_organization_member(
 ):
     """Removes a member from the organization or allows a member to leave."""
     membership = await get_current_org_membership(org_id, current_user)
-    current_role = membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
+    current_role = enum_value(membership.role)
 
     # If leaving own membership
     if user_id == current_user.user_id:
@@ -269,7 +269,7 @@ async def remove_organization_member(
     if not target_membership:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found in organization.")
 
-    target_role = target_membership.role.value if hasattr(target_membership.role, 'value') else str(target_membership.role)
+    target_role = enum_value(target_membership.role)
     if target_role == "OWNER":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot remove the organization owner.")
     if current_role == "ADMIN" and target_role == "ADMIN":

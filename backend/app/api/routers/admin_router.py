@@ -14,7 +14,7 @@ from app.core.models import (
     User, UserRole, AdminAuditLog,
     AdminUserListResponse, AdminOrgListResponse, AdminStatsResponse, AdminImpersonateResponse
 )
-from app.api.auth import require_admin, create_jwt_token, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.api.auth import require_admin, create_jwt_token, ACCESS_TOKEN_EXPIRE_MINUTES, enum_value
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -76,7 +76,7 @@ async def impersonate_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target user not found.")
 
     client_ip = request.client.host if request.client else "unknown"
-    role_str = target_user.role.value if hasattr(target_user.role, 'value') else str(target_user.role)
+    role_str = enum_value(target_user.role)
 
     # 1. Log impersonation event to admin audit log
     audit_entry = AdminAuditLog(
@@ -181,7 +181,7 @@ async def update_user_role(
         target_user_id=user_id,
         ip_address=client_ip,
         details={
-            "old_role": target_user.role.value if hasattr(target_user.role, 'value') else str(target_user.role),
+            "old_role": enum_value(target_user.role),
             "new_role": clean_role
         }
     )
