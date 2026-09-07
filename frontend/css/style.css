@@ -2044,6 +2044,10 @@ code, pre, .font-mono {
     display: none !important;
   }
 
+  .cockpit-topbar {
+    display: none !important;
+  }
+
   .mobile-top-bar {
     display: flex !important;
   }
@@ -2112,7 +2116,7 @@ code, pre, .font-mono {
     grid-template-columns: 1fr !important;
   }
 
-  .stat-card-grid {
+  .telemetry-hud {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 
@@ -2124,7 +2128,7 @@ code, pre, .font-mono {
 }
 
 @media (max-width: 480px) {
-  .stat-card-grid {
+  .telemetry-hud {
     grid-template-columns: 1fr !important;
   }
 
