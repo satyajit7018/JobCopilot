@@ -199,6 +199,7 @@ class DatabaseManager(DatabaseAdapter):
                 self._ensure_columns(conn, "profiles", {
                     "user_id": "TEXT NOT NULL DEFAULT 'default'"
                 })
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_profiles_user ON profiles(user_id, updated_at DESC);")
 
                 # 3. Vault Table
                 cursor.execute("""
@@ -1620,17 +1621,18 @@ class DatabaseManager(DatabaseAdapter):
         """Computes conversion funnel metrics strictly for the authenticated tenant."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) as total FROM jobs WHERE user_id = ?", (user_id,))
-            total_sourced = cursor.fetchone()["total"]
-
-            cursor.execute("SELECT COUNT(*) as applied FROM jobs WHERE user_id = ? AND status IN ('SUBMITTED', 'RESPONDED', 'INTERVIEW', 'OFFER')", (user_id,))
-            total_applied = cursor.fetchone()["applied"]
-
-            cursor.execute("SELECT COUNT(*) as interviews FROM jobs WHERE user_id = ? AND status = 'INTERVIEW'", (user_id,))
-            interviews = cursor.fetchone()["interviews"]
-
-            cursor.execute("SELECT COUNT(*) as offers FROM jobs WHERE user_id = ? AND status = 'OFFER'", (user_id,))
-            offers = cursor.fetchone()["offers"]
+            cursor.execute("""
+            SELECT COUNT(*) AS total,
+                   COALESCE(SUM(CASE WHEN status IN ('SUBMITTED','RESPONDED','INTERVIEW','OFFER') THEN 1 ELSE 0 END),0) AS applied,
+                   COALESCE(SUM(CASE WHEN status='INTERVIEW' THEN 1 ELSE 0 END),0) AS interviews,
+                   COALESCE(SUM(CASE WHEN status='OFFER' THEN 1 ELSE 0 END),0) AS offers
+            FROM jobs WHERE user_id = ?
+            """, (user_id,))
+            funnel_row = cursor.fetchone()
+            total_sourced = funnel_row["total"]
+            total_applied = funnel_row["applied"]
+            interviews = funnel_row["interviews"]
+            offers = funnel_row["offers"]
 
             cursor.execute("SELECT COUNT(*) as responses FROM emails WHERE user_id = ? AND intent IN ('INTERVIEW_INVITE', 'ASSESSMENT')", (user_id,))
             recruiter_responses = cursor.fetchone()["responses"]
@@ -1931,17 +1933,18 @@ class DatabaseManager(DatabaseAdapter):
         """Calculates global SaaS platform metrics for admin dashboard."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) as c FROM users")
-            total_users = cursor.fetchone()["c"]
-
-            cursor.execute("SELECT COUNT(*) as c FROM jobs")
-            total_jobs = cursor.fetchone()["c"]
-
-            cursor.execute("SELECT COUNT(*) as c FROM apply_ledger WHERE status = 'SUBMITTED'")
-            total_applications = cursor.fetchone()["c"]
-
-            cursor.execute("SELECT COUNT(*) as c FROM organizations")
-            total_organizations = cursor.fetchone()["c"]
+            cursor.execute("""
+                SELECT
+                    (SELECT COUNT(*) FROM users) AS total_users,
+                    (SELECT COUNT(*) FROM jobs) AS total_jobs,
+                    (SELECT COUNT(*) FROM apply_ledger WHERE status = 'SUBMITTED') AS total_applications,
+                    (SELECT COUNT(*) FROM organizations) AS total_organizations
+            """)
+            metrics_row = cursor.fetchone()
+            total_users = metrics_row["total_users"]
+            total_jobs = metrics_row["total_jobs"]
+            total_applications = metrics_row["total_applications"]
+            total_organizations = metrics_row["total_organizations"]
 
             cursor.execute("SELECT role, COUNT(*) as c FROM users GROUP BY role")
             active_subscriptions = {"FREE": 0, "PRO": 0, "ELITE": 0, "ADMIN": 0}

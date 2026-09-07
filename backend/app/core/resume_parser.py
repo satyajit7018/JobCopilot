@@ -5,6 +5,7 @@ with section segmentation, date parsing, and categorized skill taxonomy.
 """
 
 import re
+import asyncio
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 try:
@@ -420,8 +421,8 @@ class ResumeParser:
         Asynchronously parses any PDF, DOCX, or text resume using LLM structured extraction,
         with seamless deterministic heuristic fallback to parse_to_profile().
         """
-        text = cls.extract_raw_text(source_path_or_text)
-        fallback_profile = cls.parse_to_profile(text, profile_id=profile_id)
+        text = await asyncio.to_thread(cls.extract_raw_text, source_path_or_text)
+        fallback_profile = await asyncio.to_thread(cls.parse_to_profile, text, profile_id=profile_id)
 
         try:
             from app.core.llm_client import llm_client
