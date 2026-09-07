@@ -55,6 +55,15 @@ function el(tag, attrs = {}, ...children) {
 window.el = el;
 window.escapeHTML = escapeHTML;
 
+// Coalesce rapid calls (e.g. per-keystroke handlers) into a single trailing call.
+function debounce(fn, wait = 160) {
+  let timer = null;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+
 function sanitizeUrl(url) {
   if (!url) return '#';
   const clean = String(url).trim();
@@ -947,9 +956,9 @@ window.filterPipeline = function(filter, btn) {
 };
 
 if (els.pipelineSearchInput) {
-  els.pipelineSearchInput.addEventListener('input', () => {
+  els.pipelineSearchInput.addEventListener('input', debounce(() => {
     renderKanbanBoard();
-  });
+  }, 160));
 }
 
 function renderKanbanBoard() {
@@ -973,13 +982,15 @@ function renderKanbanBoard() {
     return true;
   });
 
-  const columns = {
-    discovered: filtered.filter(j => j.status === 'DISCOVERED'),
-    queued: filtered.filter(j => j.status === 'QUEUED' || j.status === 'NEEDS_REVIEW'),
-    submitted: filtered.filter(j => j.status === 'SUBMITTED'),
-    interview: filtered.filter(j => j.status === 'INTERVIEW'),
-    offer: filtered.filter(j => j.status === 'OFFER')
-  };
+  // Bucket by status in a single pass instead of five filter() scans.
+  const columns = { discovered: [], queued: [], submitted: [], interview: [], offer: [] };
+  for (const j of filtered) {
+    if (j.status === 'DISCOVERED') columns.discovered.push(j);
+    else if (j.status === 'QUEUED' || j.status === 'NEEDS_REVIEW') columns.queued.push(j);
+    else if (j.status === 'SUBMITTED') columns.submitted.push(j);
+    else if (j.status === 'INTERVIEW') columns.interview.push(j);
+    else if (j.status === 'OFFER') columns.offer.push(j);
+  }
 
   if (els.countDiscovered) els.countDiscovered.textContent = columns.discovered.length;
   if (els.countQueued) els.countQueued.textContent = columns.queued.length;
