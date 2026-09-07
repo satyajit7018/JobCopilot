@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app.core.config import settings
 from app.core.database import db
 from app.core.models import User
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, enum_value
 from app.core.circuit_breaker import stripe_api_breaker, CircuitOpenError
 
 router = APIRouter(tags=["billing"])
@@ -26,6 +26,19 @@ class CheckoutRequest(BaseModel):
 
 class CustomerPortalRequest(BaseModel):
     return_url: Optional[str] = None
+
+
+async def _call_stripe_via_breaker(func, unavailable_detail: str, error_detail_prefix: str):
+    """
+    Invokes a Stripe API callable through the shared circuit breaker, translating
+    a tripped breaker or any Stripe API failure into the equivalent HTTPException.
+    """
+    try:
+        return await stripe_api_breaker.call(func)
+    except CircuitOpenError as ce:
+        raise HTTPException(status_code=503, detail=f"{unavailable_detail} (circuit open): {str(ce)}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"{error_detail_prefix}: {str(e)}")
 
 
 @router.post("/billing/webhook")
@@ -99,26 +112,21 @@ async def create_checkout_session(
         success_url = payload.success_url or f"http://localhost:{settings.FRONTEND_PORT}/#billing-success?session_id={{CHECKOUT_SESSION_ID}}"
         cancel_url = payload.cancel_url or f"http://localhost:{settings.FRONTEND_PORT}/#billing"
 
-        try:
-            def _create_session():
-                return stripe.checkout.Session.create(
-                    mode="subscription",
-                    payment_method_types=["card"],
-                    line_items=[{"price": price_id, "quantity": 1}],
-                    success_url=success_url,
-                    cancel_url=cancel_url,
-                    client_reference_id=current_user.user_id,
-                    customer_email=current_user.email,
-                    metadata={"user_id": current_user.user_id, "tier": requested_tier}
-                )
+        def _create_session():
+            return stripe.checkout.Session.create(
+                mode="subscription",
+                payment_method_types=["card"],
+                line_items=[{"price": price_id, "quantity": 1}],
+                success_url=success_url,
+                cancel_url=cancel_url,
+                client_reference_id=current_user.user_id,
+                customer_email=current_user.email,
+                metadata={"user_id": current_user.user_id, "tier": requested_tier}
+            )
 
-            session = await stripe_api_breaker.call(_create_session)
-            checkout_url = session.url or f"https://checkout.stripe.com/pay/{session.id}"
-            session_id = session.id
-        except CircuitOpenError as ce:
-            raise HTTPException(status_code=503, detail=f"Billing service unavailable (circuit open): {str(ce)}")
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"Stripe API error: {str(e)}")
+        session = await _call_stripe_via_breaker(_create_session, "Billing service unavailable", "Stripe API error")
+        checkout_url = session.url or f"https://checkout.stripe.com/pay/{session.id}"
+        session_id = session.id
     else:
         session_id = f"cs_sim_{current_user.user_id}_{requested_tier}"
         checkout_url = f"https://checkout.stripe.com/pay/{session_id}"
@@ -142,19 +150,14 @@ async def create_customer_portal_session(
     if settings.STRIPE_SECRET_KEY:
         import stripe
         stripe.api_key = settings.STRIPE_SECRET_KEY
-        try:
-            def _create_portal():
-                return stripe.billing_portal.Session.create(
-                    customer=current_user.user_id,
-                    return_url=return_url
-                )
+        def _create_portal():
+            return stripe.billing_portal.Session.create(
+                customer=current_user.user_id,
+                return_url=return_url
+            )
 
-            portal_session = await stripe_api_breaker.call(_create_portal)
-            portal_url = portal_session.url
-        except CircuitOpenError as ce:
-            raise HTTPException(status_code=503, detail=f"Customer portal unavailable (circuit open): {str(ce)}")
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"Stripe Customer Portal error: {str(e)}")
+        portal_session = await _call_stripe_via_breaker(_create_portal, "Customer portal unavailable", "Stripe Customer Portal error")
+        portal_url = portal_session.url
     else:
         portal_url = f"https://billing.stripe.com/p/session/sim_{current_user.user_id}"
 
@@ -172,7 +175,7 @@ async def sync_subscription_tier(current_user: User = Depends(get_current_user))
     """
     from app.core.rate_limiter import rate_limiter, SubscriptionTier
     user_id = current_user.user_id
-    active_tier = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    active_tier = enum_value(current_user.role)
 
     if settings.STRIPE_SECRET_KEY:
         import stripe
@@ -218,7 +221,7 @@ async def preview_proration(
         raise HTTPException(status_code=400, detail="Invalid target tier.")
 
     prices = {"FREE": 0, "PRO": 29, "ELITE": 79}
-    current_tier = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    current_tier = enum_value(current_user.role)
     current_price = prices.get(current_tier, 0)
     target_price = prices.get(target_tier, 0)
 

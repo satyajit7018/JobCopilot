@@ -76,6 +76,8 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     updated_at VARCHAR(64) NOT NULL
                 );
 
+                CREATE INDEX IF NOT EXISTS idx_pg_profiles_user ON profiles(user_id, updated_at DESC);
+
                 CREATE TABLE IF NOT EXISTS vault (
                     qa_id VARCHAR(64) PRIMARY KEY,
                     user_id VARCHAR(64) NOT NULL DEFAULT 'default',
@@ -89,6 +91,8 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     last_used_at VARCHAR(64),
                     created_at VARCHAR(64) NOT NULL
                 );
+
+                CREATE INDEX IF NOT EXISTS idx_pg_vault_user_key ON vault(user_id, slot_key);
 
                 CREATE TABLE IF NOT EXISTS jobs (
                     job_id VARCHAR(64) PRIMARY KEY,
@@ -699,17 +703,14 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) FROM jobs WHERE user_id = %s", (user_id,))
-                total_sourced = cursor.fetchone()[0]
-
-                cursor.execute("SELECT COUNT(*) FROM jobs WHERE user_id = %s AND status IN ('SUBMITTED', 'RESPONDED', 'INTERVIEW', 'OFFER')", (user_id,))
-                total_applied = cursor.fetchone()[0]
-
-                cursor.execute("SELECT COUNT(*) FROM jobs WHERE user_id = %s AND status = 'INTERVIEW'", (user_id,))
-                interviews = cursor.fetchone()[0]
-
-                cursor.execute("SELECT COUNT(*) FROM jobs WHERE user_id = %s AND status = 'OFFER'", (user_id,))
-                offers = cursor.fetchone()[0]
+                cursor.execute("""
+                SELECT COUNT(*) AS total,
+                       COALESCE(SUM(CASE WHEN status IN ('SUBMITTED','RESPONDED','INTERVIEW','OFFER') THEN 1 ELSE 0 END),0) AS applied,
+                       COALESCE(SUM(CASE WHEN status='INTERVIEW' THEN 1 ELSE 0 END),0) AS interviews,
+                       COALESCE(SUM(CASE WHEN status='OFFER' THEN 1 ELSE 0 END),0) AS offers
+                FROM jobs WHERE user_id = %s
+                """, (user_id,))
+                total_sourced, total_applied, interviews, offers = cursor.fetchone()
 
                 cursor.execute("SELECT COUNT(*) FROM emails WHERE user_id = %s AND intent IN ('INTERVIEW_INVITE', 'ASSESSMENT')", (user_id,))
                 recruiter_responses = cursor.fetchone()[0]
@@ -842,6 +843,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             return False
         finally:
             self.release_connection(conn)
@@ -931,6 +933,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             return False
         finally:
             self.release_connection(conn)
@@ -1004,6 +1007,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             return False
         finally:
             self.release_connection(conn)
@@ -1100,14 +1104,14 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) FROM users")
-                total_users = cursor.fetchone()[0]
-                cursor.execute("SELECT COUNT(*) FROM jobs")
-                total_jobs = cursor.fetchone()[0]
-                cursor.execute("SELECT COUNT(*) FROM apply_ledger WHERE status = 'SUBMITTED'")
-                total_applications = cursor.fetchone()[0]
-                cursor.execute("SELECT COUNT(*) FROM organizations")
-                total_organizations = cursor.fetchone()[0]
+                cursor.execute("""
+                    SELECT
+                        (SELECT COUNT(*) FROM users) AS total_users,
+                        (SELECT COUNT(*) FROM jobs) AS total_jobs,
+                        (SELECT COUNT(*) FROM apply_ledger WHERE status = 'SUBMITTED') AS total_applications,
+                        (SELECT COUNT(*) FROM organizations) AS total_organizations
+                """)
+                total_users, total_jobs, total_applications, total_organizations = cursor.fetchone()
                 cursor.execute("SELECT role, COUNT(*) FROM users GROUP BY role")
                 active_subscriptions = {"FREE": 0, "PRO": 0, "ELITE": 0, "ADMIN": 0}
                 for row in cursor.fetchall():
@@ -1124,11 +1128,13 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
             self.release_connection(conn)
 
     def export_user_data(self, user_id: str) -> Dict[str, Any]:
+        user = self.get_user_by_id(user_id)
+        profile = self.get_profile(user_id)
         return {
             "user_id": user_id,
             "exported_at": datetime.now().isoformat(),
-            "account": self.get_user_by_id(user_id).dict() if self.get_user_by_id(user_id) else {},
-            "profile": self.get_profile(user_id).dict() if self.get_profile(user_id) else {},
+            "account": user.dict() if user else {},
+            "profile": profile.dict() if profile else {},
             "jobs": [j.dict() for j in self.get_jobs(user_id)],
             "knowledge_vault": [v.dict() for v in self.get_vault_entries(user_id)],
             "apply_ledger": [l.dict() for l in self.list_user_apply_ledger(user_id, limit=10000)],
@@ -1153,6 +1159,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1190,6 +1197,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1245,6 +1253,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1258,6 +1267,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1272,6 +1282,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return 0
         finally:
@@ -1325,6 +1336,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1338,6 +1350,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1367,6 +1380,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1440,6 +1454,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1462,6 +1477,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return 0
         finally:
@@ -1479,6 +1495,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:
@@ -1507,6 +1524,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 conn.commit()
                 return True
         except Exception:
+            logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
             return False
         finally:

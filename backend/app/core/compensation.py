@@ -4,6 +4,7 @@ Handles conversions, parsing, and formatting across INR, USD, EUR, GBP, and CAD
 for diverse ATS salary input fields (Annual, Monthly, Hourly, LPA).
 """
 
+import functools
 import re
 from typing import Dict, Any, Tuple
 
@@ -23,6 +24,7 @@ class CompensationConverter:
     }
 
     @classmethod
+    @functools.lru_cache(maxsize=256)
     def parse_to_base_inr(cls, ctc_string: str) -> float:
         """Parses strings like '15 LPA', '24 - 38 LPA', '₹15,00,000', '$120,000 - $160,000', '120k', '€85,000' into annual INR."""
         if not ctc_string:

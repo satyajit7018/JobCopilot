@@ -300,7 +300,7 @@ class ResumeCompiler:
                 f"--print-to-pdf={str(output_path)}",
                 temp_html_path
             ]
-            proc = subprocess.run(cmd, capture_output=True)
+            proc = await asyncio.to_thread(subprocess.run, cmd, capture_output=True)
             try:
                 os.remove(temp_html_path)
             except Exception:

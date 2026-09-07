@@ -219,6 +219,49 @@ def decode_jwt_token(token: str) -> Dict[str, Any]:
 
 
 # =========================================================================
+# Shared Helpers (behavior-preserving deduplication)
+# =========================================================================
+def enum_value(v):
+    """Coerces an Enum member (or an already-plain value) to its string value."""
+    return v.value if hasattr(v, 'value') else str(v)
+
+
+def client_ip(request: Request) -> str:
+    """Extracts the client's IP address from the request, defaulting to loopback."""
+    return request.client.host if request.client else "127.0.0.1"
+
+
+def get_token_jti(auth: Optional[HTTPAuthorizationCredentials]) -> Optional[str]:
+    """Best-effort extraction of the 'jti' claim from a Bearer credential; None if missing/invalid."""
+    if auth and auth.credentials:
+        try:
+            payload = decode_jwt_token(auth.credentials)
+            return payload.get("jti")
+        except Exception:
+            return None
+    return None
+
+
+def issue_token_pair(user: User, role_str: str) -> Tuple[str, str]:
+    """Issues a matched access+refresh JWT token pair for the given user."""
+    access = create_jwt_token(
+        {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access"},
+        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    refresh = create_jwt_token(
+        {"sub": user.user_id, "type": "refresh"},
+        timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+    return access, refresh
+
+
+def register_session(user: User, access_token: str, ip: str, ua: Optional[str]) -> None:
+    """Registers a new active session keyed by the access token's jti."""
+    jti = decode_jwt_token(access_token).get("jti", "")
+    session_manager.create_session(user_id=user.user_id, token_jti=jti, ip_address=ip, user_agent=ua)
+
+
+# =========================================================================
 # FastAPI Security Dependencies (F-01, F-02, F-08)
 # =========================================================================
 async def get_current_user_optional(
@@ -315,7 +358,7 @@ async def require_admin(
     current_user: User = Depends(get_current_user)
 ) -> User:
     """Requires the authenticated user to hold the ADMIN role."""
-    role_str = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    role_str = enum_value(current_user.role)
     if role_str != "ADMIN" and current_user.role != UserRole.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -344,7 +387,7 @@ async def require_org_admin(
 ) -> Membership:
     """Requires the authenticated user to be an OWNER or ADMIN of the specified organization."""
     membership = await get_current_org_membership(org_id, current_user)
-    role_val = membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
+    role_val = enum_value(membership.role)
     if role_val not in ["OWNER", "ADMIN"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -359,7 +402,7 @@ async def require_org_owner(
 ) -> Membership:
     """Requires the authenticated user to be the OWNER of the specified organization."""
     membership = await get_current_org_membership(org_id, current_user)
-    role_val = membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
+    role_val = enum_value(membership.role)
     if role_val != "OWNER":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -415,14 +458,7 @@ async def register_user(request: Request, req: UserRegisterRequest):
     )
     mailer.send_verification_email(clean_email, verify_token)
 
-    access_token = create_jwt_token(
-        {"sub": new_user_id, "email": clean_email, "role": "FREE", "type": "access"},
-        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    refresh_token = create_jwt_token(
-        {"sub": new_user_id, "type": "refresh"},
-        timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    )
+    access_token, refresh_token = issue_token_pair(new_user, "FREE")
 
     return TokenResponse(
         access_token=access_token,
@@ -438,16 +474,16 @@ async def register_user(request: Request, req: UserRegisterRequest):
 async def login_user(request: Request, req: UserLoginRequest):
     """Authenticates user credentials, enforces brute-force lockout, MFA gate, and issues JWT tokens."""
     clean_email = req.email.lower().strip()
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    ip_addr = client_ip(request)
     user_agent = request.headers.get("User-Agent")
 
     # Check brute-force lockout
-    if db.check_login_lockout(clean_email, client_ip):
+    if db.check_login_lockout(clean_email, ip_addr):
         security_logger.log_event(
             "auth.lockout",
             user_id=clean_email,
             severity="WARNING",
-            ip_address=client_ip,
+            ip_address=ip_addr,
             user_agent=user_agent
         )
         raise HTTPException(
@@ -457,24 +493,24 @@ async def login_user(request: Request, req: UserLoginRequest):
 
     user = db.get_user_by_email(clean_email)
     if not user:
-        db.record_login_attempt(clean_email, client_ip, success=False)
+        db.record_login_attempt(clean_email, ip_addr, success=False)
         security_logger.log_event(
             "auth.login.failed",
             user_id=clean_email,
             severity="WARNING",
-            ip_address=client_ip,
+            ip_address=ip_addr,
             user_agent=user_agent
         )
         raise HTTPException(status_code=401, detail="Invalid email or password.")
-    
+
     is_valid, needs_rehash = verify_password(req.password, user.password_hash)
     if not is_valid:
-        db.record_login_attempt(clean_email, client_ip, success=False)
+        db.record_login_attempt(clean_email, ip_addr, success=False)
         security_logger.log_event(
             "auth.login.failed",
             user_id=user.user_id,
             severity="WARNING",
-            ip_address=client_ip,
+            ip_address=ip_addr,
             user_agent=user_agent
         )
         raise HTTPException(status_code=401, detail="Invalid email or password.")
@@ -482,7 +518,7 @@ async def login_user(request: Request, req: UserLoginRequest):
         raise HTTPException(status_code=403, detail="User account is deactivated.")
 
     # Record successful attempt to reset failed counter
-    db.record_login_attempt(clean_email, client_ip, success=True)
+    db.record_login_attempt(clean_email, ip_addr, success=True)
 
     # Seamless automatic upgrade from PBKDF2 to Argon2id on successful login
     if needs_rehash:
@@ -492,7 +528,7 @@ async def login_user(request: Request, req: UserLoginRequest):
         except Exception:
             pass
 
-    role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
+    role_str = enum_value(user.role)
 
     # --- Epic F: MFA Enforcement Gate ---
     mfa_cred = db.get_mfa_credentials(user.user_id)
@@ -504,7 +540,7 @@ async def login_user(request: Request, req: UserLoginRequest):
         security_logger.log_event(
             "auth.mfa.challenge_issued",
             user_id=user.user_id,
-            ip_address=client_ip,
+            ip_address=ip_addr,
             user_agent=user_agent
         )
         return TokenResponse(
@@ -518,28 +554,15 @@ async def login_user(request: Request, req: UserLoginRequest):
         )
 
     # Direct login when MFA is disabled
-    access_token = create_jwt_token(
-        {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access"},
-        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    refresh_token = create_jwt_token(
-        {"sub": user.user_id, "type": "refresh"},
-        timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    )
+    access_token, refresh_token = issue_token_pair(user, role_str)
 
     # Register active session
-    token_payload = decode_jwt_token(access_token)
-    session_manager.create_session(
-        user_id=user.user_id,
-        token_jti=token_payload.get("jti", ""),
-        ip_address=client_ip,
-        user_agent=user_agent
-    )
+    register_session(user, access_token, ip_addr, user_agent)
 
     security_logger.log_event(
         "auth.login.success",
         user_id=user.user_id,
-        ip_address=client_ip,
+        ip_address=ip_addr,
         user_agent=user_agent
     )
 
@@ -581,15 +604,8 @@ async def refresh_token(request: Request, payload: RefreshTokenRequest):
     # Opportunistically prune expired revoked tokens
     db.prune_revoked_tokens()
 
-    role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
-    new_access_token = create_jwt_token(
-        {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access"},
-        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    new_refresh_token = create_jwt_token(
-        {"sub": user.user_id, "type": "refresh"},
-        timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    )
+    role_str = enum_value(user.role)
+    new_access_token, new_refresh_token = issue_token_pair(user, role_str)
 
     return TokenResponse(
         access_token=new_access_token,
@@ -693,7 +709,7 @@ async def logout_user(
     security_logger.log_event(
         "auth.logout",
         user_id=current_user.user_id,
-        ip_address=request.client.host if request.client else "127.0.0.1",
+        ip_address=client_ip(request),
         user_agent=request.headers.get("User-Agent")
     )
     return {"status": "success", "message": "Successfully logged out and token revoked."}
@@ -702,7 +718,7 @@ async def logout_user(
 @router.get("/me", response_model=UserResponse)
 async def get_my_profile(current_user: User = Depends(get_current_user)):
     """Returns the authenticated candidate's identity and subscription tier."""
-    role_str = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    role_str = enum_value(current_user.role)
     return UserResponse(
         user_id=current_user.user_id,
         email=current_user.email,
@@ -735,7 +751,7 @@ async def setup_mfa(request: Request, current_user: User = Depends(get_current_u
     security_logger.log_event(
         "auth.mfa.setup",
         user_id=current_user.user_id,
-        ip_address=request.client.host if request.client else "127.0.0.1",
+        ip_address=client_ip(request),
         user_agent=request.headers.get("User-Agent")
     )
 
@@ -769,7 +785,7 @@ async def verify_and_enable_mfa(request: Request, req: MFAVerifyRequest, current
     security_logger.log_event(
         "auth.mfa.enabled",
         user_id=current_user.user_id,
-        ip_address=request.client.host if request.client else "127.0.0.1",
+        ip_address=client_ip(request),
         user_agent=request.headers.get("User-Agent")
     )
 
@@ -795,7 +811,7 @@ async def complete_mfa_login(request: Request, req: MFALoginChallengeRequest):
     if not mfa_cred or not mfa_cred.get("is_enabled"):
         raise HTTPException(status_code=400, detail="MFA is not enabled for this account.")
 
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    ip_addr = client_ip(request)
     user_agent = request.headers.get("User-Agent")
 
     # 1. Try TOTP code
@@ -818,7 +834,7 @@ async def complete_mfa_login(request: Request, req: MFALoginChallengeRequest):
             security_logger.log_event(
                 "auth.mfa.recovery_used",
                 user_id=user.user_id,
-                ip_address=client_ip,
+                ip_address=ip_addr,
                 user_agent=user_agent
             )
         else:
@@ -826,34 +842,21 @@ async def complete_mfa_login(request: Request, req: MFALoginChallengeRequest):
                 "auth.mfa.challenge_failed",
                 user_id=user.user_id,
                 severity="WARNING",
-                ip_address=client_ip,
+                ip_address=ip_addr,
                 user_agent=user_agent
             )
             raise HTTPException(status_code=401, detail="Invalid TOTP code or backup recovery code.")
 
-    role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
-    access_token = create_jwt_token(
-        {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access"},
-        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    refresh_token = create_jwt_token(
-        {"sub": user.user_id, "type": "refresh"},
-        timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    )
+    role_str = enum_value(user.role)
+    access_token, refresh_token = issue_token_pair(user, role_str)
 
     # Register active session
-    access_jti = decode_jwt_token(access_token).get("jti", "")
-    session_manager.create_session(
-        user_id=user.user_id,
-        token_jti=access_jti,
-        ip_address=client_ip,
-        user_agent=user_agent
-    )
+    register_session(user, access_token, ip_addr, user_agent)
 
     security_logger.log_event(
         "auth.login.success",
         user_id=user.user_id,
-        ip_address=client_ip,
+        ip_address=ip_addr,
         user_agent=user_agent,
         details={"mfa_verified": True, "recovery_code": used_recovery}
     )
@@ -894,7 +897,7 @@ async def disable_mfa(
         "auth.mfa.disabled",
         user_id=current_user.user_id,
         severity="WARNING",
-        ip_address=request.client.host if request.client else "127.0.0.1",
+        ip_address=client_ip(request),
         user_agent=request.headers.get("User-Agent")
     )
     return {"status": "success", "message": "Two-factor authentication has been disabled."}
@@ -909,13 +912,7 @@ async def list_active_sessions(
     auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ):
     """Lists all active device sessions for the authenticated candidate."""
-    current_jti = None
-    if auth and auth.credentials:
-        try:
-            payload = decode_jwt_token(auth.credentials)
-            current_jti = payload.get("jti")
-        except Exception:
-            pass
+    current_jti = get_token_jti(auth)
 
     sessions = session_manager.list_active_sessions(current_user.user_id, current_jti=current_jti)
     return SessionListResponse(sessions=sessions, total=len(sessions))
@@ -935,7 +932,7 @@ async def revoke_user_session(
     security_logger.log_event(
         "auth.session.revoked",
         user_id=current_user.user_id,
-        ip_address=request.client.host if request.client else "127.0.0.1",
+        ip_address=client_ip(request),
         user_agent=request.headers.get("User-Agent"),
         details={"revoked_session_id": session_id}
     )
@@ -949,19 +946,13 @@ async def revoke_all_other_sessions(
     auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ):
     """Revokes all active sessions for the user except the current one."""
-    current_jti = None
-    if auth and auth.credentials:
-        try:
-            payload = decode_jwt_token(auth.credentials)
-            current_jti = payload.get("jti")
-        except Exception:
-            pass
+    current_jti = get_token_jti(auth)
 
     revoked_count = session_manager.revoke_all_sessions(current_user.user_id, except_jti=current_jti)
     security_logger.log_event(
         "auth.session.revoked_all",
         user_id=current_user.user_id,
-        ip_address=request.client.host if request.client else "127.0.0.1",
+        ip_address=client_ip(request),
         user_agent=request.headers.get("User-Agent"),
         details={"revoked_count": revoked_count}
     )

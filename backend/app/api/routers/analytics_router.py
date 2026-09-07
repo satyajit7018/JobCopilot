@@ -13,6 +13,11 @@ from app.core.database import get_db
 router = APIRouter(tags=["analytics"])
 
 
+def _model_dict(obj):
+    """Pydantic v1/v2 compatible dict-conversion shim."""
+    return obj.model_dump() if hasattr(obj, "model_dump") else obj.dict()
+
+
 @router.get("/analytics/funnel")
 async def get_funnel_analytics(current_user: User = Depends(get_current_user)):
     """Returns aggregated pipeline funnel metrics for authenticated tenant with multi-tier caching."""
@@ -77,7 +82,7 @@ async def list_telemetry_events(
     return {
         "status": "success",
         "total": len(events),
-        "events": [e.model_dump() if hasattr(e, "model_dump") else e.dict() for e in events]
+        "events": [_model_dict(e) for e in events]
     }
 
 
@@ -137,7 +142,7 @@ async def list_ab_experiments(current_user: User = Depends(get_current_user)):
     experiments = db.list_ab_experiments(user_id=current_user.user_id)
     return {
         "status": "success",
-        "experiments": [e.model_dump() if hasattr(e, "model_dump") else e.dict() for e in experiments]
+        "experiments": [_model_dict(e) for e in experiments]
     }
 
 
@@ -161,7 +166,7 @@ async def create_ab_experiment(
     )
     return {
         "status": "success",
-        "experiment": experiment.model_dump() if hasattr(experiment, "model_dump") else experiment.dict()
+        "experiment": _model_dict(experiment)
     }
 
 

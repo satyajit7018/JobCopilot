@@ -214,19 +214,3 @@ class ATSApiFeeders:
                 logger.debug(f"Ashby fetch error for {company_slug}: {e}")
 
             return jobs
-
-    @classmethod
-    async def fetch_all_company_jobs(cls, company_slug: str) -> List[Dict[str, Any]]:
-        """Tries Greenhouse, Lever, and Ashby in parallel for a given company slug."""
-        async with httpx.AsyncClient(http2=HAS_H2) as client:
-            results = await asyncio.gather(
-                cls.fetch_greenhouse_jobs(company_slug, client),
-                cls.fetch_lever_jobs(company_slug, client),
-                cls.fetch_ashby_jobs(company_slug, client),
-                return_exceptions=True
-            )
-            all_jobs = []
-            for res in results:
-                if isinstance(res, list):
-                    all_jobs.extend(res)
-            return all_jobs

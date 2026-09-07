@@ -74,7 +74,8 @@ class HITLAgent:
     ) -> Optional[str]:
         """Polls database until user resolves the HITL event in the UI modal."""
         elapsed = 0.0
-        while elapsed < max_timeout:
+
+        def _poll_once():
             with db.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT status, user_answer, question_text FROM hitl_events WHERE event_id = ? AND user_id = ?", (event_id, user_id))
@@ -88,6 +89,12 @@ class HITLAgent:
                         user_id=user_id
                     )
                     return user_ans
+            return None
+
+        while elapsed < max_timeout:
+            user_ans = await asyncio.to_thread(_poll_once)
+            if user_ans:
+                return user_ans
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
 

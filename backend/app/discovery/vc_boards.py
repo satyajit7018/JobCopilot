@@ -39,6 +39,7 @@ class VCBoardFeeders:
             if res.status_code == 200:
                 submitted = res.json().get("submitted", [])
                 story_id = None
+                story_detail = None
                 for sid in submitted[:5]:
                     story_res = await client.get(f"https://hacker-news.firebaseio.com/v0/item/{sid}.json", headers=cls.HEADERS)
                     if story_res.status_code == 200:
@@ -46,10 +47,10 @@ class VCBoardFeeders:
                         title = story_data.get("title", "")
                         if "Ask HN: Who is hiring?" in title:
                             story_id = sid
+                            story_detail = story_data
                             break
 
-                if story_id:
-                    story_detail = (await client.get(f"https://hacker-news.firebaseio.com/v0/item/{story_id}.json", headers=cls.HEADERS)).json()
+                if story_detail:
                     comment_ids = story_detail.get("kids", [])[:max_posts]
 
                     tasks = [client.get(f"https://hacker-news.firebaseio.com/v0/item/{cid}.json", headers=cls.HEADERS) for cid in comment_ids]
@@ -112,7 +113,7 @@ class VCBoardFeeders:
         return None
 
     @classmethod
-    async def fetch_yc_fast_track_jobs(cls, role_keyword: str = "Engineer") -> List[Dict[str, Any]]:
+    async def fetch_yc_fast_track_jobs(cls, role_keyword: str = "Engineer", client: Optional[httpx.AsyncClient] = None) -> List[Dict[str, Any]]:
         """Curated high-signal Y Combinator startup job listings."""
         yc_tech_hubs = [
             ("superkalam", "SuperKalam (YC W23)", "Greenhouse"),
@@ -128,7 +129,12 @@ class VCBoardFeeders:
         from app.discovery.ats_apis import ATSApiFeeders
 
         all_yc_jobs = []
-        async with httpx.AsyncClient(http2=True, timeout=8.0) as client:
+        should_close = False
+        if client is None:
+            client = httpx.AsyncClient(http2=True, timeout=8.0)
+            should_close = True
+
+        try:
             tasks = []
             for slug, brand_name, platform in yc_tech_hubs:
                 if platform == "Greenhouse":
@@ -144,5 +150,8 @@ class VCBoardFeeders:
                     for j in res:
                         j["platform"] = "Y Combinator"
                         all_yc_jobs.append(j)
+        finally:
+            if should_close:
+                await client.aclose()
 
         return all_yc_jobs

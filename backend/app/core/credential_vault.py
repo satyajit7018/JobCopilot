@@ -402,25 +402,4 @@ class CredentialVault:
         except Exception:
             return {}
 
-    def store_credential(self, service: str, cred_data: Any, master_password: Optional[str] = None):
-        secrets = self.load_secrets(master_password)
-        secrets[service] = cred_data
-        self.save_secrets(secrets, master_password)
-
-    def get_credential(self, service: str, master_password: Optional[str] = None) -> Optional[Any]:
-        secrets = self.load_secrets(master_password)
-        return secrets.get(service)
-
-    def save_platform_session(self, platform: str, session_data: Dict[str, Any], master_password: Optional[str] = None):
-        secrets = self.load_secrets(master_password)
-        if "platform_sessions" not in secrets:
-            secrets["platform_sessions"] = {}
-        secrets["platform_sessions"][platform.lower()] = session_data
-        self.save_secrets(secrets, master_password)
-
-    def load_platform_session(self, platform: str, master_password: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        secrets = self.load_secrets(master_password)
-        return secrets.get("platform_sessions", {}).get(platform.lower())
-
-
 cred_vault = CredentialVault()
