@@ -2151,6 +2151,16 @@ code, pre, .font-mono {
     padding: 2px 6px !important;
   }
 
+  .stepper-nav {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 1.25rem !important;
+  }
+
+  .stepper-step {
+    padding: 10px 12px !important;
+  }
+
   .modal-dialog {
     width: 95vw !important;
     margin: 1rem !important;
@@ -2160,6 +2170,10 @@ code, pre, .font-mono {
 
 @media (max-width: 480px) {
   .telemetry-hud {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stepper-nav {
     grid-template-columns: 1fr !important;
   }
 
