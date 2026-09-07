@@ -2161,6 +2161,15 @@ code, pre, .font-mono {
     padding: 10px 12px !important;
   }
 
+  .glass-card-header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .studio-grid {
+    grid-template-columns: 1fr !important;
+  }
+
   .modal-dialog {
     width: 95vw !important;
     margin: 1rem !important;

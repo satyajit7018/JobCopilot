@@ -799,7 +799,7 @@
         </div>
 
         <!-- Studio Grid Layout -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+        <div class="studio-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
           
           <!-- Card 1: Interactive Audio Visualizer & Question Prompter -->
           <div class="glass-card" style="margin-bottom: 0;">
@@ -824,8 +824,8 @@
 
             <!-- Question Prompter Box -->
             <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.25rem;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; row-gap: 6px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                   <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-cyan);" id="mock-q-category">System Design</span>
                   <span class="hud-pill" id="mock-q-company-tag" style="font-size: 10px; padding: 1px 6px; color: #a5b4fc;">Stripe</span>
                 </div>
