@@ -4,6 +4,7 @@ Compiles pixel-perfect, ATS-parseable PDF resumes in < 150ms using
 Chromium CSS Paged Media. Requires zero heavy LaTeX installations.
 """
 
+import asyncio
 import html
 import os
 from pathlib import Path
