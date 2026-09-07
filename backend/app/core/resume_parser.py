@@ -167,6 +167,7 @@ class ResumeParser:
         text_lower = text.lower()
         categorized = CategorizedSkills()
         all_skills = []
+        seen = set()
 
         for category, skills in cls.SKILL_TAXONOMY.items():
             bucket = []
@@ -175,7 +176,8 @@ class ResumeParser:
                 pattern = r'(?<!\w)' + re.escape(skill.lower()) + r'(?!\w)'
                 if re.search(pattern, text_lower):
                     bucket.append(skill)
-                    if skill not in all_skills:
+                    if skill not in seen:
+                        seen.add(skill)
                         all_skills.append(skill)
             setattr(categorized, category, bucket)
 

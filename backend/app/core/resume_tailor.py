@@ -81,9 +81,10 @@ class ResumeTailor:
         # 4. Reorder Work Experience Highlights (incorporating A/B testing strategy)
         for exp in tailored.experience:
             def highlight_relevance(h: str) -> int:
-                relevance = sum(1 for s in jd_skills_lower if s in h.lower())
+                hl = h.lower()
+                relevance = sum(1 for s in jd_skills_lower if s in hl)
                 if strategy in ("treatment_star", "variant_b"):
-                    has_metric = 1 if any(w in h.lower() for w in ["%", "$", "reduced", "scaled", "improved", "optimized", "increased", "latency"]) else 0
+                    has_metric = 1 if any(w in hl for w in ["%", "$", "reduced", "scaled", "improved", "optimized", "increased", "latency"]) else 0
                     relevance += has_metric * 2
                 return relevance
             exp.highlights.sort(key=highlight_relevance, reverse=True)

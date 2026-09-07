@@ -1025,28 +1025,6 @@ class DatabaseManager(DatabaseAdapter):
 
     get_all_vault_entries = get_vault_entries
 
-    def get_vault_entry_by_key(self, slot_key: str, user_id: str) -> Optional[VaultEntry]:
-        """Finds entry by slot key strictly for the user."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM vault WHERE user_id = ? AND slot_key = ? LIMIT 1", (user_id, slot_key))
-            r = cursor.fetchone()
-            if r:
-                return VaultEntry(
-                    qa_id=r["qa_id"],
-                    user_id=user_id,
-                    slot_type=r["slot_type"],
-                    slot_key=r["slot_key"],
-                    question_pattern=r["question_pattern"],
-                    embedding=json.loads(r["embedding"]),
-                    answer_template=r["answer_template"],
-                    dynamic_variables=json.loads(r["dynamic_variables"]),
-                    usage_count=r["usage_count"],
-                    last_used_at=r["last_used_at"],
-                    created_at=r["created_at"]
-                )
-            return None
-
     def increment_vault_usage(self, qa_id: str):
         """Increments usage counter atomically."""
         with self._lock:
@@ -1197,14 +1175,6 @@ class DatabaseManager(DatabaseAdapter):
         return None
 
     get_job = get_job_by_id
-
-    def get_job_by_fingerprint(self, fingerprint: str, user_id: str) -> Optional[JobListing]:
-        """Checks for existing job by fingerprint strictly for the specified user."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM jobs WHERE fingerprint = ? AND user_id = ? LIMIT 1", (fingerprint, user_id))
-            row = cursor.fetchone()
-            return self._row_to_job(row) if row else None
 
     def _row_to_job(self, r: sqlite3.Row) -> JobListing:
         keys = r.keys()
