@@ -3,7 +3,6 @@ JobCopilot - Interview Studio Prompts (v1.0)
 Versioned templates for STAR interview response evaluation and company briefings.
 """
 
-from typing import Dict, Any, List
 
 
 class InterviewPrompts:

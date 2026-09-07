@@ -5,13 +5,14 @@ response evaluation, reverse interview strategies, interviewer recon, and calend
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.core.models import User
-from app.core.database import db
 from app.api.auth import get_current_user
 from app.api.ws_gateway import ws_manager
+from app.core.database import db
+from app.core.models import User
 
 router = APIRouter(tags=["interview"])
 

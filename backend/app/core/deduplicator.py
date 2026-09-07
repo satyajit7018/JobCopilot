@@ -4,9 +4,8 @@ Detects duplicate job listings across multiple ATS boards and portals using
 canonical entity normalization and SimHash locality-sensitive hashing.
 """
 
-import re
 import hashlib
-from typing import List, Dict, Any, Optional
+import re
 from collections import Counter
 
 
@@ -49,7 +48,7 @@ class JobDeduplicator:
         # Remove common prefixes / levels
         text = re.sub(r'\b(sr|senior|junior|jr|lead|principal|staff|associate|mid|level\s*\d+|i{1,3}|iv|v)\b', '', text)
         text = re.sub(r'[^\w\s]', ' ', text)
-        
+
         # Apply synonyms
         words = text.split()
         normalized_words = [cls.TITLE_SYNONYMS.get(w, w) for w in words]

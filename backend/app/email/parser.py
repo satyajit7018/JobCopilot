@@ -4,9 +4,9 @@ Strips tracking pixels, web beacons, and surveillance telemetry from recruiter
 emails before parsing plain text and scheduling links.
 """
 
-import re
 import html
-from typing import Tuple, Dict, Any, Optional
+import re
+from typing import Any, Dict, Optional, Tuple
 
 
 class EmailParser:
@@ -78,7 +78,7 @@ class EmailParser:
     def parse_raw_email(cls, sender: str, recipient: str, subject: str, body_html: str, body_text: Optional[str] = None) -> Dict[str, Any]:
         """Parses raw email payload with privacy stripping."""
         sanitized_html, has_pixels = cls.strip_tracking_pixels(body_html or "")
-        
+
         final_text = body_text
         if not final_text or len(final_text.strip()) < 10:
             final_text = cls.html_to_clean_text(sanitized_html)

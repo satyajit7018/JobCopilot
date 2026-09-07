@@ -4,13 +4,13 @@ Dispatches real-time alerts when low-confidence recruiter questions or CAPTCHAs
 are encountered, blocks gracefully, saves answers to the Knowledge Vault, and resumes.
 """
 
-import uuid
 import asyncio
+import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import List, Optional
 
-from app.core.models import HITLEvent
 from app.core.database import db
+from app.core.models import HITLEvent
 from app.core.vector_vault import vault
 
 

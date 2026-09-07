@@ -6,10 +6,10 @@ Provides prioritized asynchronous execution for:
 - low: Background 0-day discovery & email radar sync
 """
 
-import os
 import asyncio
 import logging
-from typing import Dict, Any, Callable, Optional
+import os
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger("jobcopilot.tasks")
 

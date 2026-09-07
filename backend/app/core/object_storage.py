@@ -5,10 +5,9 @@ supporting Local FileSystem, AWS S3, and Cloudflare R2 (zero egress fees).
 """
 
 import os
-import io
 import time
 from pathlib import Path
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Union
 
 
 class ObjectStorageAdapter:

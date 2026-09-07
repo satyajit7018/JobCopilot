@@ -4,9 +4,10 @@ Computes real-time conversion rates, pipeline velocity, platform distributions,
 and Knowledge Vault automation coverage metrics.
 """
 
-from typing import Dict, Any, List
-from app.core.models import ApplicationStatus
+from typing import Any, Dict
+
 from app.core.database import db
+from app.core.models import ApplicationStatus
 
 
 class AnalyticsEngine:

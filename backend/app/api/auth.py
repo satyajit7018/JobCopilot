@@ -5,20 +5,20 @@ Argon2id password hashing with legacy PBKDF2 upgrade,
 FastAPI security dependencies, and tenant session resolution.
 """
 
-import os
-import time
-import hmac
-import hashlib
 import base64
+import hashlib
+import hmac
 import json
-import uuid
-import secrets
 import logging
+import os
+import secrets
+import time
+import uuid
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Depends, Header, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 try:
     from argon2 import PasswordHasher
@@ -29,25 +29,36 @@ except ImportError:
     _ph = None
     HAS_ARGON2 = False
 
-from starlette.requests import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from starlette.requests import Request
 
-from app.core.settings import settings
-from app.core.mailer import mailer
-from app.core.models import (
-    User, UserRole, UserRegisterRequest, UserLoginRequest,
-    RefreshTokenRequest, TokenResponse, UserResponse,
-    VerifyEmailRequest, RequestPasswordResetRequest, ResetPasswordRequest,
-    Membership, OrgRole,
-    MFASetupResponse, MFAVerifyRequest, MFALoginChallengeRequest, MFADisableRequest,
-    SessionResponse, SessionListResponse, SecurityLogListResponse
-)
-from app.core.database import db
 from app.core.credential_vault import cred_vault
+from app.core.database import db
+from app.core.mailer import mailer
 from app.core.mfa import mfa_engine
-from app.core.session_manager import session_manager
+from app.core.models import (
+    Membership,
+    MFADisableRequest,
+    MFALoginChallengeRequest,
+    MFASetupResponse,
+    MFAVerifyRequest,
+    RefreshTokenRequest,
+    RequestPasswordResetRequest,
+    ResetPasswordRequest,
+    SecurityLogListResponse,
+    SessionListResponse,
+    TokenResponse,
+    User,
+    UserLoginRequest,
+    UserRegisterRequest,
+    UserResponse,
+    UserRole,
+    VerifyEmailRequest,
+)
 from app.core.security_logger import security_logger
+from app.core.session_manager import session_manager
+from app.core.settings import settings
 
 # =========================================================================
 # Fail-Closed JWT Configuration (F-05)
@@ -133,7 +144,7 @@ def verify_password(password: str, hashed: str) -> Tuple[bool, bool]:
     """
     if not hashed:
         return False, False
-    
+
     # 1. Argon2id Hash
     if hashed.startswith("$argon2"):
         if HAS_ARGON2 and _ph is not None:
@@ -185,7 +196,7 @@ def create_jwt_token(payload: Dict[str, Any], expires_delta: timedelta) -> str:
 
     header_bytes = _b64url_encode(json.dumps(header).encode('utf-8'))
     payload_bytes = _b64url_encode(json.dumps(payload_copy).encode('utf-8'))
-    signing_input = f"{header_bytes}.{payload_bytes}".encode('utf-8')
+    signing_input = f"{header_bytes}.{payload_bytes}".encode()
     signature = hmac.new(JWT_SECRET.encode('utf-8'), signing_input, hashlib.sha256).digest()
     sig_b64 = _b64url_encode(signature)
 
@@ -200,7 +211,7 @@ def decode_jwt_token(token: str) -> Dict[str, Any]:
             raise HTTPException(status_code=401, detail="Invalid token format.")
         header_b64, payload_b64, sig_b64 = parts
 
-        signing_input = f"{header_b64}.{payload_b64}".encode('utf-8')
+        signing_input = f"{header_b64}.{payload_b64}".encode()
         expected_sig = hmac.new(JWT_SECRET.encode('utf-8'), signing_input, hashlib.sha256).digest()
         actual_sig = _b64url_decode(sig_b64)
 
@@ -323,7 +334,7 @@ async def get_current_user(
         )
 
     payload = decode_jwt_token(auth.credentials)
-    
+
     # Assert token type is strictly 'access' (F-08)
     if payload.get("type") != "access":
         raise HTTPException(
@@ -342,14 +353,14 @@ async def get_current_user(
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
-    
+
     user = db.get_user_by_id(user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account not found or disabled.")
-    
+
     # Attach impersonation metadata if token was issued via admin impersonation
     if payload.get("impersonated_by"):
-        setattr(user, "impersonated_by", payload.get("impersonated_by"))
+        user.impersonated_by = payload.get("impersonated_by")
 
     return user
 
@@ -421,7 +432,7 @@ async def register_user(request: Request, req: UserRegisterRequest):
     clean_email = req.email.lower().strip()
     if not clean_email or "@" not in clean_email:
         raise HTTPException(status_code=400, detail="A valid email address is required.")
-    
+
     if len(req.password) < settings.PASSWORD_MIN_LENGTH:
         raise HTTPException(
             status_code=400,
@@ -582,7 +593,7 @@ async def refresh_token(request: Request, payload: RefreshTokenRequest):
     token_payload = decode_jwt_token(payload.refresh_token)
     if token_payload.get("type") != "refresh":
         raise HTTPException(status_code=400, detail="Invalid token type for refresh.")
-    
+
     old_jti = token_payload.get("jti")
     user_id = token_payload.get("sub")
     if not user_id:
@@ -622,11 +633,11 @@ async def verify_email(req: VerifyEmailRequest):
     payload = decode_jwt_token(req.token)
     if payload.get("type") != "verify_email":
         raise HTTPException(status_code=400, detail="Invalid verification token type.")
-    
+
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=400, detail="Invalid token subject.")
-    
+
     db.set_email_verified(user_id, True)
     return {"status": "success", "message": "Email address verified successfully!"}
 
@@ -663,7 +674,7 @@ async def reset_password(request: Request, req: ResetPasswordRequest):
     payload = decode_jwt_token(req.token)
     if payload.get("type") != "reset_password":
         raise HTTPException(status_code=400, detail="Invalid reset token type.")
-    
+
     jti = payload.get("jti")
     if jti and db.is_token_revoked(jti):
         raise HTTPException(status_code=401, detail="Reset token has already been used or revoked.")

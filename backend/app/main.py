@@ -3,26 +3,30 @@ JobCopilot - Backend Server Application
 FastAPI Server with WebSockets, SQLite WAL, Static File Hosting, and Cryptographic Vault.
 """
 
+import json
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from datetime import datetime
-import json
-from fastapi.responses import Response, FileResponse
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-
-from slowapi.errors import RateLimitExceeded
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
-from app.core.settings import settings
-from app.api.middleware import (
-    SecurityHeadersMiddleware, RequestTracingMiddleware, IdempotencyMiddleware, ApiDeprecationMiddleware
-)
 from app.api.auth import limiter
-from app.api.endpoints import router as api_router, ws_manager
+from app.api.endpoints import router as api_router
+from app.api.endpoints import ws_manager
+from app.api.middleware import (
+    ApiDeprecationMiddleware,
+    IdempotencyMiddleware,
+    RequestTracingMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.core.database import get_db
+from app.core.settings import settings
 
 # Sentry Exception Tracking in Production
 if settings.SENTRY_DSN:

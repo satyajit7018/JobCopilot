@@ -6,7 +6,7 @@ supporting smart retries and preventing repetitive doomed submissions.
 
 import random
 from enum import Enum
-from typing import Optional, Any
+from typing import Any, Optional
 
 
 class BotErrorCategory(str, Enum):

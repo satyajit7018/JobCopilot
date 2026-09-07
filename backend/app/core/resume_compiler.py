@@ -4,13 +4,11 @@ Compiles pixel-perfect, ATS-parseable PDF resumes in < 150ms using
 Chromium CSS Paged Media. Requires zero heavy LaTeX installations.
 """
 
-import os
 import html
-import asyncio
+import os
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import List, Optional
 
-from app.core.config import RESUMES_DIR
 from app.core.models import CandidateProfile
 
 
@@ -275,9 +273,9 @@ class ResumeCompiler:
             pass
 
         # 2. Fallback to System Chrome Binary
-        import tempfile
-        import subprocess
         import shutil
+        import subprocess
+        import tempfile
 
         chrome_candidates = [
             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",

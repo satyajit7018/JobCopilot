@@ -4,17 +4,18 @@ Handles resume uploading/parsing, candidate profile management, and recruiter qu
 """
 
 from pathlib import Path
-from typing import Dict, Any, Optional
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from app.core.config import RESUMES_DIR
-from app.core.models import User, CandidateProfile
-from app.core.database import db
-from app.core.resume_parser import ResumeParser
-from app.core.questionnaire import QuestionnaireEngine
-from app.core.vector_vault import vault
 from app.api.auth import get_current_user
+from app.core.config import RESUMES_DIR
+from app.core.database import db
+from app.core.models import CandidateProfile, User
+from app.core.questionnaire import QuestionnaireEngine
+from app.core.resume_parser import ResumeParser
+from app.core.vector_vault import vault
 
 router = APIRouter(tags=["profile"])
 

@@ -6,18 +6,19 @@ streaming responses, structured JSON schema mode, and universal text embeddings.
 Guarantees 100% offline availability and zero external dependency failures.
 """
 
-import time
-import math
-import json
-import hashlib
-import logging
 import asyncio
+import hashlib
+import json
+import logging
+import math
+import time
 from datetime import datetime
-from typing import Optional, Dict, Any, List, AsyncGenerator, Tuple
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
+
 import httpx
 
+from app.core.circuit_breaker import CircuitOpenError, llm_api_breaker
 from app.core.settings import settings
-from app.core.circuit_breaker import llm_api_breaker, CircuitOpenError
 from app.core.telemetry import telemetry
 
 logger = logging.getLogger("jobcopilot.llm")
@@ -325,7 +326,7 @@ class LLMClient:
 
         # Instruct model to return pure JSON
         effective_system = (system_prompt or "") + "\nYou MUST output strictly valid, raw JSON. Do not include markdown code blocks or conversational commentary."
-        
+
         raw_text = await self.generate_completion(
             prompt=prompt,
             system_prompt=effective_system.strip(),
@@ -475,7 +476,7 @@ class LLMClient:
         Asynchronously computes normalized dense vector embedding.
         Calls OpenAI text-embedding-3-small if available; otherwise uses deterministic feature hasher.
         """
-        cache_key = hashlib.sha256(f"emb:{text.strip()}".encode("utf-8")).hexdigest()
+        cache_key = hashlib.sha256(f"emb:{text.strip()}".encode()).hexdigest()
         cached = self.get_cached_response(cache_key)
         if cached is not None and isinstance(cached, list):
             return cached

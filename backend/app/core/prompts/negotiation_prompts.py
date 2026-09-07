@@ -3,7 +3,7 @@ JobCopilot - Salary Negotiation Prompts (v1.0)
 Versioned templates for high-leverage compensation pushbacks and counter-offer emails.
 """
 
-from typing import Dict, Any, Optional
+from typing import Optional
 
 
 class NegotiationPrompts:

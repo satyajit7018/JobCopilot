@@ -3,9 +3,10 @@ JobCopilot - Distributed Background Task Execution Engine
 Powered by Celery and Redis with automatic in-memory task fallback for local development.
 """
 
-import uuid
 import logging
-from typing import Dict, Any, Optional
+import uuid
+from typing import Any, Dict, Optional
+
 from celery import Celery
 
 from app.core.settings import settings
@@ -49,7 +50,7 @@ class TaskManager:
     def dispatch_apply_task(cls, job_id: str, user_id: str, submission_mode: str = "DRY_RUN") -> str:
         """Dispatches an autonomous job application task returning a unique task_id."""
         task_id = f"task_{uuid.uuid4().hex[:12]}"
-        
+
         # Record initial task state
         _IN_MEMORY_TASKS[task_id] = {
             "task_id": task_id,

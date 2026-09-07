@@ -4,10 +4,10 @@ Handles password reset links, email verification tokens, and candidate alert dis
 with safe asynchronous fallback for development environments.
 """
 
-import smtplib
 import logging
-from email.mime.text import MIMEText
+import smtplib
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import Optional
 
 from app.core.settings import settings

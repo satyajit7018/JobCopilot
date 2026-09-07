@@ -4,12 +4,11 @@ Provides complete per-tenant data portability export (GDPR Article 20)
 and permanent cryptographic account erasure (GDPR Article 17).
 """
 
-from fastapi import APIRouter, HTTPException, Depends, status, Response
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.database import db
-from app.core.models import User, AccountExportResponse, DeleteAccountRequest
 from app.api.auth import get_current_user, verify_password
+from app.core.database import db
+from app.core.models import AccountExportResponse, DeleteAccountRequest, User
 
 router = APIRouter(prefix="/account", tags=["account"])
 

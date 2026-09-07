@@ -4,14 +4,14 @@ RFC 6238 Time-Based One-Time Password generation, URI provisioning,
 cryptographic verification, and single-use backup recovery code management.
 """
 
-import time
-import hmac
-import hashlib
-import struct
 import base64
+import hashlib
+import hmac
 import secrets
+import struct
+import time
 from datetime import datetime
-from typing import List, Dict, Tuple, Optional, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import pyotp

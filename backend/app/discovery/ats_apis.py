@@ -4,15 +4,15 @@ High-throughput, asynchronous ingestion for Greenhouse, Lever, and Ashby job boa
 Extracts 0-day openings directly from public JSON APIs in < 150ms per company.
 """
 
-import re
-import html
 import asyncio
+import html
 import logging
-from typing import List, Dict, Any, Optional
+import re
+from typing import Any, Dict, List, Optional
+
 import httpx
 
-from app.core.models import JobListing, ApplicationStatus
-from app.core.circuit_breaker import ats_api_breaker, CircuitOpenError
+from app.core.circuit_breaker import CircuitOpenError, ats_api_breaker
 from app.core.telemetry import telemetry
 
 logger = logging.getLogger(__name__)

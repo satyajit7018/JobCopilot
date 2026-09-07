@@ -5,19 +5,18 @@ direct call logging, held job inspection, and referral/nudge outreach generation
 """
 
 import uuid
-from typing import Dict, Any, List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.core.models import (
-    User, CandidateProfile, JobListing, ApplicationStatus
-)
-from app.core.database import db
-from app.core.resume_tailor import ResumeTailor
-from app.core.cover_letter import CoverLetterGenerator
-from app.core.outreach_generator import OutreachGenerator
 from app.api.auth import get_current_user
 from app.api.ws_gateway import ws_manager
+from app.core.cover_letter import CoverLetterGenerator
+from app.core.database import db
+from app.core.models import ApplicationStatus, CandidateProfile, JobListing, User
+from app.core.outreach_generator import OutreachGenerator
+from app.core.resume_tailor import ResumeTailor
 
 router = APIRouter(tags=["jobs"])
 
@@ -144,8 +143,8 @@ async def tailor_resumes_for_multiple_roles(
             "match_strength": "95%",
             "recommended_bullets": [
                 f"Engineered high-throughput microservices for {role} role using {profile.skills[0] if profile.skills else 'Python'}.",
-                f"Optimized database latency by 45% and established 99.9% uptime SLAs.",
-                f"Implemented automated CI/CD pipelines with comprehensive unit and integration testing."
+                "Optimized database latency by 45% and established 99.9% uptime SLAs.",
+                "Implemented automated CI/CD pipelines with comprehensive unit and integration testing."
             ]
         }
 

@@ -8,17 +8,18 @@ and persists discovered jobs to SQLite.
 import asyncio
 import uuid
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 import httpx
 
-from app.core.models import JobListing, ApplicationStatus, CandidateProfile
 from app.core.database import db
 from app.core.deduplicator import JobDeduplicator
 from app.core.match_scorer import MatchScorer
+from app.core.models import ApplicationStatus, CandidateProfile, JobListing
 from app.core.priority_ranker import PriorityRanker
 from app.discovery.ats_apis import ATSApiFeeders
-from app.discovery.vc_boards import VCBoardFeeders
 from app.discovery.scrapers import PlatformScrapers
+from app.discovery.vc_boards import VCBoardFeeders
 
 
 class DiscoveryOrchestrator:

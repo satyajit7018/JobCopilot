@@ -4,24 +4,41 @@ Configured with Write-Ahead Logging (WAL Mode), Connection Pooling,
 Atomic Transactions, Dynamic Multi-Tenant Migration, and User Isolation.
 """
 
-import sqlite3
 import json
-import threading
 import logging
-from pathlib import Path
-from typing import List, Dict, Optional, Any
+import sqlite3
+import threading
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from app.core.config import DB_PATH
-from app.core.models import (
-    User, CandidateProfile, VaultEntry, JobListing, HITLEvent,
-    ApplicationStatus, OutreachRecord, OutreachChannel, EmailMessage, JobCheckpoint,
-    ApplyLedgerEntry, ApplyLedgerStatus,
-    Organization, Membership, AdminAuditLog, OrgRole,
-    AnalyticsEvent, ABExperiment, ABVariant, ABAssignment, ConversionSignal,
-    UserConsent, ConsentType
-)
-from app.core.db_adapter import DatabaseAdapter
 from app.core.credential_vault import cred_vault
+from app.core.db_adapter import DatabaseAdapter
+from app.core.models import (
+    ABAssignment,
+    ABExperiment,
+    ABVariant,
+    AdminAuditLog,
+    AnalyticsEvent,
+    ApplicationStatus,
+    ApplyLedgerEntry,
+    ApplyLedgerStatus,
+    CandidateProfile,
+    ConsentType,
+    ConversionSignal,
+    EmailMessage,
+    HITLEvent,
+    JobCheckpoint,
+    JobListing,
+    Membership,
+    Organization,
+    OrgRole,
+    OutreachRecord,
+    User,
+    UserConsent,
+    VaultEntry,
+)
 
 logger = logging.getLogger("jobcopilot.database")
 
@@ -118,7 +135,7 @@ SAMPLE_PREVIEW_JOBS_CATALOG: Dict[str, Dict[str, Any]] = {
 
 class DatabaseManager(DatabaseAdapter):
     """Thread-safe Multi-Tenant SQLite Database Manager with WAL mode and atomic user isolation."""
-    
+
     def __init__(self, db_path: Path = DB_PATH):
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1976,6 +1993,7 @@ class DatabaseManager(DatabaseAdapter):
     def hard_delete_user_account(self, user_id: str) -> bool:
         """Executes full GDPR Article 17 hard erasure across all tenant-scoped tables and disk storage."""
         import shutil
+
         from app.core.config import settings
         with self._lock:
             with self.get_connection() as conn:

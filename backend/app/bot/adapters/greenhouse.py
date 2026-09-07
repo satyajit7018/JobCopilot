@@ -5,15 +5,16 @@ and demographic field matching.
 """
 
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 try:
     from playwright.async_api import Page
 except ImportError:
     Page = Any  # type: ignore
 
+from app.bot.human_behavior import HumanBehaviorEngine
 from app.core.models import CandidateProfile
 from app.core.vector_vault import vault
-from app.bot.human_behavior import HumanBehaviorEngine
 
 
 class GreenhouseAdapter:

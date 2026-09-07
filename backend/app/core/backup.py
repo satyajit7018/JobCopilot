@@ -4,15 +4,15 @@ Exports full local profile, Knowledge Vault, and application pipeline into
 tamper-proof AES-256-GCM encrypted archives (.jobcopilot.enc) with SHA-256 checksums.
 """
 
-import json
 import hashlib
-from pathlib import Path
-from typing import Dict, Any, Optional
+import json
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 from app.core.config import DATA_DIR
-from app.core.database import db, DatabaseManager
 from app.core.credential_vault import CredentialVault
+from app.core.database import DatabaseManager, db
 
 
 class BackupManager:
@@ -31,14 +31,14 @@ class BackupManager:
 
         with target_db.get_connection() as conn:
             cursor = conn.cursor()
-            
+
             # Fetch user-scoped profiles
             if user_id:
                 cursor.execute("SELECT * FROM profiles WHERE user_id = ?", (user_id,))
             else:
                 cursor.execute("SELECT * FROM profiles")
             profiles = [dict(r) for r in cursor.fetchall()]
-            
+
             # Fetch vault
             if user_id:
                 cursor.execute("SELECT * FROM vault WHERE user_id = ?", (user_id,))

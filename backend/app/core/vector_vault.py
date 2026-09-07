@@ -6,10 +6,11 @@ and deterministic slot key resolution for zero-repeat autonomous form filling.
 
 import uuid
 from datetime import datetime
-from typing import Optional, List, Dict, Tuple, Any
-from app.core.models import VaultEntry, SlotType, CandidateProfile
-from app.core.slot_matcher import SlotMatcher
+from typing import Any, Dict, List, Optional, Tuple
+
 from app.core.database import db
+from app.core.models import CandidateProfile, SlotType, VaultEntry
+from app.core.slot_matcher import SlotMatcher
 
 
 class KnowledgeVault:
@@ -38,7 +39,7 @@ class KnowledgeVault:
             ("Are you willing to relocate for this role?", SlotType.EXACT_PARAM, "willing_to_relocate", "{relocation_answer}"),
             ("What is your preferred work arrangement (Remote / Hybrid / On-site)?", SlotType.EXACT_PARAM, "remote_preference", "{remote_preference}"),
             ("Total years of professional engineering experience?", SlotType.EXACT_PARAM, "years_of_experience", "{years_of_experience} years"),
-            ("Why do you want to work at our company?", SlotType.PARAMETRIC_ESSAY, "why_join_company", 
+            ("Why do you want to work at our company?", SlotType.PARAMETRIC_ESSAY, "why_join_company",
              "I am excited about {company}'s focus on {domain}. With experience in building scalable Python backends, machine learning pipelines, and vector search systems, I am eager to contribute directly to {company}'s engineering goals."),
             ("Why should we hire you for this role?", SlotType.PARAMETRIC_ESSAY, "why_hire_me",
              "I bring strong hands-on experience in {top_skills} combined with a track record of delivering high-performance software. I thrive in collaborative, fast-paced environments and take full ownership of backend reliability and feature delivery."),
@@ -186,14 +187,14 @@ class KnowledgeVault:
     ) -> Tuple[Optional[str], float, Optional[VaultEntry]]:
         """Queries the Knowledge Vault using deterministic slot resolution and hybrid search."""
         target_user = user_id or (profile.user_id if profile else "system_baseline")
-        
+
         user_entries = self._get_entries(user_id=target_user) if target_user != "system_baseline" else []
         baseline_entries = self._get_entries(user_id="system_baseline")
-        
+
         # User overrides take precedence over universal system baselines
         user_keys = {e.slot_key for e in user_entries if e.slot_key}
         entries = list(user_entries) + [b for b in baseline_entries if b.slot_key not in user_keys]
-        
+
         if not entries:
             return None, 0.0, None
 

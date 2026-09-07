@@ -4,11 +4,12 @@ Maps arbitrary recruiter question strings to structured slot types using
 dense embeddings and lexical token matching with Reciprocal Rank Fusion (RRF).
 """
 
-import re
-import math
 import functools
-from typing import List, Dict, Tuple, Optional
+import math
+import re
 from collections import Counter
+from typing import List, Tuple
+
 from app.core.models import SlotType
 
 _WORD_REGEX = re.compile(r'\b[a-zA-Z0-9]+\b')
@@ -41,7 +42,7 @@ class SlotMatcher:
         tokens = self.tokenize(text)
         counts = Counter(tokens)
         text_lower = text.lower()
-        
+
         vector = []
         for word in self.VOCABULARY:
             tf = float(counts.get(word, 0))
