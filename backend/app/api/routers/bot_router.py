@@ -32,6 +32,23 @@ class ResolveHeldApplicationRequest(BaseModel):
     save_to_vault: bool = True
 
 
+def _assert_can_apply(user_id: str, job_id: str) -> None:
+    """Shared idempotency-ledger + rate-limit precondition check for apply endpoints."""
+    existing_ledger = apply_ledger.get_ledger_for_job(user_id, job_id)
+    if existing_ledger:
+        if existing_ledger.status == ApplyLedgerStatus.SUBMITTED:
+            raise HTTPException(status_code=409, detail=f"Application already submitted on {existing_ledger.updated_at}.")
+        if existing_ledger.status == ApplyLedgerStatus.IN_PROGRESS:
+            raise HTTPException(status_code=409, detail="Application is currently actively executing.")
+
+    from app.core.rate_limiter import rate_limiter
+    if not rate_limiter.can_apply(user_id):
+        raise HTTPException(
+            status_code=429,
+            detail="Daily application limit reached for your plan. Please upgrade to Pro or Elite to continue applying."
+        )
+
+
 @router.get("/hitl/pending")
 async def get_pending_hitl(current_user: User = Depends(get_current_user)):
     """Returns all pending HITL questions for authenticated tenant."""
@@ -117,20 +134,9 @@ async def apply_to_job(
 ):
     """Executes full autonomous stealth application workflow with persistent rate limiting and idempotency."""
     # Check Idempotent Apply Ledger before executing
-    existing_ledger = apply_ledger.get_ledger_for_job(current_user.user_id, job_id)
-    if existing_ledger:
-        if existing_ledger.status == ApplyLedgerStatus.SUBMITTED:
-            raise HTTPException(status_code=409, detail=f"Application already submitted on {existing_ledger.updated_at}.")
-        if existing_ledger.status == ApplyLedgerStatus.IN_PROGRESS:
-            raise HTTPException(status_code=409, detail="Application is currently actively executing.")
+    _assert_can_apply(current_user.user_id, job_id)
 
     from app.core.rate_limiter import rate_limiter
-    if not rate_limiter.can_apply(current_user.user_id):
-        raise HTTPException(
-            status_code=429,
-            detail="Daily application limit reached for your plan. Please upgrade to Pro or Elite to continue applying."
-        )
-
     from app.bot.runner import AutonomousJobRunner
     runner = AutonomousJobRunner(mode=mode or DEFAULT_SUBMISSION_MODE)
     result = await runner.execute_application(
@@ -158,21 +164,10 @@ async def apply_to_job_async(
     Returns HTTP 202 Accepted with a unique task_id for progress polling.
     """
     # Check Idempotent Apply Ledger
-    existing_ledger = apply_ledger.get_ledger_for_job(current_user.user_id, job_id)
-    if existing_ledger:
-        if existing_ledger.status == ApplyLedgerStatus.SUBMITTED:
-            raise HTTPException(status_code=409, detail=f"Application already submitted on {existing_ledger.updated_at}.")
-        if existing_ledger.status == ApplyLedgerStatus.IN_PROGRESS:
-            raise HTTPException(status_code=409, detail="Application is currently actively executing.")
+    _assert_can_apply(current_user.user_id, job_id)
 
     from app.core.rate_limiter import rate_limiter
     from app.core.celery_app import TaskManager
-
-    if not rate_limiter.can_apply(current_user.user_id):
-        raise HTTPException(
-            status_code=429,
-            detail="Daily application limit reached for your plan. Please upgrade to Pro or Elite to continue applying."
-        )
 
     task_id = TaskManager.dispatch_apply_task(
         job_id=job_id,

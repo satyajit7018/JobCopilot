@@ -2488,3 +2488,24 @@ textarea:focus-visible,
   color: var(--accent-emerald);
 }
 
+/* Shared inline-style-replacement utility classes for empty/loading/error state text */
+.empty-state-text {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.table-empty-cell {
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.table-error-cell {
+  text-align: center;
+  color: var(--accent-rose);
+}
+
+.meta-muted-11 {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
