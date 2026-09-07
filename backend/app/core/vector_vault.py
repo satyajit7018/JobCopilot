@@ -91,10 +91,6 @@ class KnowledgeVault:
                 user_id=uid
             )
 
-    def learn_question(self, question: str, answer: str, **kwargs) -> VaultEntry:
-        """Alias for learn_answer."""
-        return self.learn_answer(question=question, answer_template=answer, **kwargs)
-
     def learn_answer(
         self,
         question: str,

@@ -8,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, enum_value
 from app.core.database import db
 from app.core.models import User
 from app.core.vector_vault import vault
@@ -107,7 +107,7 @@ async def semantic_search_vault(
             "question_pattern": entry.question_pattern,
             "answer_template": entry.answer_template,
             "slot_key": entry.slot_key,
-            "slot_type": entry.slot_type.value if hasattr(entry.slot_type, "value") else str(entry.slot_type),
+            "slot_type": enum_value(entry.slot_type),
             "similarity_score": round(score, 4)
         })
     return {

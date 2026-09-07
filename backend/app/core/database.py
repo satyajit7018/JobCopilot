@@ -5,6 +5,7 @@ Atomic Transactions, Dynamic Multi-Tenant Migration, and User Isolation.
 """
 
 import json
+import logging
 import sqlite3
 import threading
 from datetime import datetime
@@ -38,6 +39,8 @@ from app.core.models import (
     UserConsent,
     VaultEntry,
 )
+
+logger = logging.getLogger("jobcopilot.database")
 
 SAMPLE_PREVIEW_JOBS_CATALOG: Dict[str, Dict[str, Any]] = {
     "sample_swiggy_01": {
@@ -213,6 +216,7 @@ class DatabaseManager(DatabaseAdapter):
                 self._ensure_columns(conn, "profiles", {
                     "user_id": "TEXT NOT NULL DEFAULT 'default'"
                 })
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_profiles_user ON profiles(user_id, updated_at DESC);")
 
                 # 3. Vault Table
                 cursor.execute("""
@@ -1038,28 +1042,6 @@ class DatabaseManager(DatabaseAdapter):
 
     get_all_vault_entries = get_vault_entries
 
-    def get_vault_entry_by_key(self, slot_key: str, user_id: str) -> Optional[VaultEntry]:
-        """Finds entry by slot key strictly for the user."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM vault WHERE user_id = ? AND slot_key = ? LIMIT 1", (user_id, slot_key))
-            r = cursor.fetchone()
-            if r:
-                return VaultEntry(
-                    qa_id=r["qa_id"],
-                    user_id=user_id,
-                    slot_type=r["slot_type"],
-                    slot_key=r["slot_key"],
-                    question_pattern=r["question_pattern"],
-                    embedding=json.loads(r["embedding"]),
-                    answer_template=r["answer_template"],
-                    dynamic_variables=json.loads(r["dynamic_variables"]),
-                    usage_count=r["usage_count"],
-                    last_used_at=r["last_used_at"],
-                    created_at=r["created_at"]
-                )
-            return None
-
     def increment_vault_usage(self, qa_id: str):
         """Increments usage counter atomically."""
         with self._lock:
@@ -1210,14 +1192,6 @@ class DatabaseManager(DatabaseAdapter):
         return None
 
     get_job = get_job_by_id
-
-    def get_job_by_fingerprint(self, fingerprint: str, user_id: str) -> Optional[JobListing]:
-        """Checks for existing job by fingerprint strictly for the specified user."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM jobs WHERE fingerprint = ? AND user_id = ? LIMIT 1", (fingerprint, user_id))
-            row = cursor.fetchone()
-            return self._row_to_job(row) if row else None
 
     def _row_to_job(self, r: sqlite3.Row) -> JobListing:
         keys = r.keys()
@@ -1634,17 +1608,18 @@ class DatabaseManager(DatabaseAdapter):
         """Computes conversion funnel metrics strictly for the authenticated tenant."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) as total FROM jobs WHERE user_id = ?", (user_id,))
-            total_sourced = cursor.fetchone()["total"]
-
-            cursor.execute("SELECT COUNT(*) as applied FROM jobs WHERE user_id = ? AND status IN ('SUBMITTED', 'RESPONDED', 'INTERVIEW', 'OFFER')", (user_id,))
-            total_applied = cursor.fetchone()["applied"]
-
-            cursor.execute("SELECT COUNT(*) as interviews FROM jobs WHERE user_id = ? AND status = 'INTERVIEW'", (user_id,))
-            interviews = cursor.fetchone()["interviews"]
-
-            cursor.execute("SELECT COUNT(*) as offers FROM jobs WHERE user_id = ? AND status = 'OFFER'", (user_id,))
-            offers = cursor.fetchone()["offers"]
+            cursor.execute("""
+            SELECT COUNT(*) AS total,
+                   COALESCE(SUM(CASE WHEN status IN ('SUBMITTED','RESPONDED','INTERVIEW','OFFER') THEN 1 ELSE 0 END),0) AS applied,
+                   COALESCE(SUM(CASE WHEN status='INTERVIEW' THEN 1 ELSE 0 END),0) AS interviews,
+                   COALESCE(SUM(CASE WHEN status='OFFER' THEN 1 ELSE 0 END),0) AS offers
+            FROM jobs WHERE user_id = ?
+            """, (user_id,))
+            funnel_row = cursor.fetchone()
+            total_sourced = funnel_row["total"]
+            total_applied = funnel_row["applied"]
+            interviews = funnel_row["interviews"]
+            offers = funnel_row["offers"]
 
             cursor.execute("SELECT COUNT(*) as responses FROM emails WHERE user_id = ? AND intent IN ('INTERVIEW_INVITE', 'ASSESSMENT')", (user_id,))
             recruiter_responses = cursor.fetchone()["responses"]
@@ -1684,6 +1659,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("create_organization failed")
                     return False
 
     def get_organization(self, org_id: str) -> Optional[Organization]:
@@ -1779,6 +1755,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("add_membership failed")
                     return False
 
     def get_membership(self, org_id: str, user_id: str) -> Optional[Membership]:
@@ -1858,6 +1835,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("log_admin_action failed")
                     return False
 
     def list_admin_audit_logs(self, limit: int = 50, offset: int = 0) -> List[AdminAuditLog]:
@@ -1942,17 +1920,18 @@ class DatabaseManager(DatabaseAdapter):
         """Calculates global SaaS platform metrics for admin dashboard."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) as c FROM users")
-            total_users = cursor.fetchone()["c"]
-
-            cursor.execute("SELECT COUNT(*) as c FROM jobs")
-            total_jobs = cursor.fetchone()["c"]
-
-            cursor.execute("SELECT COUNT(*) as c FROM apply_ledger WHERE status = 'SUBMITTED'")
-            total_applications = cursor.fetchone()["c"]
-
-            cursor.execute("SELECT COUNT(*) as c FROM organizations")
-            total_organizations = cursor.fetchone()["c"]
+            cursor.execute("""
+                SELECT
+                    (SELECT COUNT(*) FROM users) AS total_users,
+                    (SELECT COUNT(*) FROM jobs) AS total_jobs,
+                    (SELECT COUNT(*) FROM apply_ledger WHERE status = 'SUBMITTED') AS total_applications,
+                    (SELECT COUNT(*) FROM organizations) AS total_organizations
+            """)
+            metrics_row = cursor.fetchone()
+            total_users = metrics_row["total_users"]
+            total_jobs = metrics_row["total_jobs"]
+            total_applications = metrics_row["total_applications"]
+            total_organizations = metrics_row["total_organizations"]
 
             cursor.execute("SELECT role, COUNT(*) as c FROM users GROUP BY role")
             active_subscriptions = {"FREE": 0, "PRO": 0, "ELITE": 0, "ADMIN": 0}
@@ -2042,6 +2021,7 @@ class DatabaseManager(DatabaseAdapter):
 
                     return True
                 except Exception:
+                    logger.exception("hard_delete_user_account failed")
                     conn.rollback()
                     return False
 
@@ -2081,6 +2061,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("save_idempotency_record failed")
                     conn.rollback()
                     return False
 
@@ -2144,6 +2125,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount > 0
                 except Exception:
+                    logger.exception("update_idempotency_record failed")
                     conn.rollback()
                     return False
 
@@ -2157,6 +2139,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount > 0
                 except Exception:
+                    logger.exception("delete_idempotency_record failed")
                     conn.rollback()
                     return False
 
@@ -2171,6 +2154,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount
                 except Exception:
+                    logger.exception("cleanup_expired_idempotency_keys failed")
                     conn.rollback()
                     return 0
 
@@ -2220,6 +2204,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("save_mfa_credentials failed")
                     conn.rollback()
                     return False
 
@@ -2232,6 +2217,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount > 0
                 except Exception:
+                    logger.exception("delete_mfa_credentials failed")
                     conn.rollback()
                     return False
 
@@ -2260,6 +2246,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("create_session failed")
                     conn.rollback()
                     return False
 
@@ -2326,6 +2313,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount > 0
                 except Exception:
+                    logger.exception("revoke_session failed")
                     conn.rollback()
                     return False
 
@@ -2347,6 +2335,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount
                 except Exception:
+                    logger.exception("revoke_all_user_sessions failed")
                     conn.rollback()
                     return 0
 
@@ -2363,6 +2352,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return cursor.rowcount > 0
                 except Exception:
+                    logger.exception("update_session_activity failed")
                     conn.rollback()
                     return False
 
@@ -2390,6 +2380,7 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
                     return True
                 except Exception:
+                    logger.exception("insert_security_audit_log failed")
                     conn.rollback()
                     return False
 
@@ -2825,6 +2816,7 @@ def get_db() -> DatabaseAdapter:
             from app.core.postgres_adapter import PostgresDatabaseAdapter
             return PostgresDatabaseAdapter(settings.DATABASE_URL)
         except Exception:
+            logger.critical("Postgres adapter init failed; falling back to local SQLite", exc_info=True)
             return db
     return db
 

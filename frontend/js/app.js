@@ -55,6 +55,15 @@ function el(tag, attrs = {}, ...children) {
 window.el = el;
 window.escapeHTML = escapeHTML;
 
+// Coalesce rapid calls (e.g. per-keystroke handlers) into a single trailing call.
+function debounce(fn, wait = 160) {
+  let timer = null;
+  return function (...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+
 function sanitizeUrl(url) {
   if (!url) return '#';
   const clean = String(url).trim();
@@ -647,7 +656,7 @@ async function renderMultiResumeWorkshop() {
         <div class="multi-resume-card-header">
           <div>
             <div style="font-weight: 700; font-size: 14.5px; color: var(--accent-cyan);">${escapeHTML(role)}</div>
-            <div style="font-size: 11px; color: var(--text-muted);">ATS Tailored Variant</div>
+            <div class="meta-muted-11">ATS Tailored Variant</div>
           </div>
           <span class="match-ring-badge match-high">${escapeHTML(r.match_strength || '95%')} Match</span>
         </div>
@@ -947,9 +956,9 @@ window.filterPipeline = function(filter, btn) {
 };
 
 if (els.pipelineSearchInput) {
-  els.pipelineSearchInput.addEventListener('input', () => {
+  els.pipelineSearchInput.addEventListener('input', debounce(() => {
     renderKanbanBoard();
-  });
+  }, 160));
 }
 
 function renderKanbanBoard() {
@@ -973,13 +982,15 @@ function renderKanbanBoard() {
     return true;
   });
 
-  const columns = {
-    discovered: filtered.filter(j => j.status === 'DISCOVERED'),
-    queued: filtered.filter(j => j.status === 'QUEUED' || j.status === 'NEEDS_REVIEW'),
-    submitted: filtered.filter(j => j.status === 'SUBMITTED'),
-    interview: filtered.filter(j => j.status === 'INTERVIEW'),
-    offer: filtered.filter(j => j.status === 'OFFER')
-  };
+  // Bucket by status in a single pass instead of five filter() scans.
+  const columns = { discovered: [], queued: [], submitted: [], interview: [], offer: [] };
+  for (const j of filtered) {
+    if (j.status === 'DISCOVERED') columns.discovered.push(j);
+    else if (j.status === 'QUEUED' || j.status === 'NEEDS_REVIEW') columns.queued.push(j);
+    else if (j.status === 'SUBMITTED') columns.submitted.push(j);
+    else if (j.status === 'INTERVIEW') columns.interview.push(j);
+    else if (j.status === 'OFFER') columns.offer.push(j);
+  }
 
   if (els.countDiscovered) els.countDiscovered.textContent = columns.discovered.length;
   if (els.countQueued) els.countQueued.textContent = columns.queued.length;
@@ -1005,11 +1016,11 @@ function renderKanbanBoard() {
   const mobSegOff = document.getElementById('mob-seg-count-offer');
   if (mobSegOff) mobSegOff.textContent = columns.offer.length;
 
-  if (els.cardsDiscovered) els.cardsDiscovered.innerHTML = columns.discovered.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No leads discovered.</p>';
-  if (els.cardsQueued) els.cardsQueued.innerHTML = columns.queued.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">Queue is empty.</p>';
-  if (els.cardsSubmitted) els.cardsSubmitted.innerHTML = columns.submitted.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No applications submitted yet.</p>';
-  if (els.cardsInterview) els.cardsInterview.innerHTML = columns.interview.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No active interviews.</p>';
-  if (els.cardsOffer) els.cardsOffer.innerHTML = columns.offer.map(j => renderJobCardHTML(j)).join('') || '<p style="color: var(--text-muted); font-size: 12px;">No offers recorded.</p>';
+  if (els.cardsDiscovered) els.cardsDiscovered.innerHTML = columns.discovered.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No leads discovered.</p>';
+  if (els.cardsQueued) els.cardsQueued.innerHTML = columns.queued.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">Queue is empty.</p>';
+  if (els.cardsSubmitted) els.cardsSubmitted.innerHTML = columns.submitted.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No applications submitted yet.</p>';
+  if (els.cardsInterview) els.cardsInterview.innerHTML = columns.interview.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No active interviews.</p>';
+  if (els.cardsOffer) els.cardsOffer.innerHTML = columns.offer.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No offers recorded.</p>';
 }
 
 function getCompanyAvatarData(company) {
@@ -1345,7 +1356,7 @@ function renderVaultEntries(entries) {
     <div style="background: rgba(10, 14, 24, 0.6); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 12px 14px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
         <span class="badge badge-info" style="font-size: 10px;">${escapeHTML(e.slot_type || '')}</span>
-        <span style="font-size: 11px; color: var(--text-muted);">Used ${escapeHTML(String(e.usage_count || 0))}x</span>
+        <span class="meta-muted-11">Used ${escapeHTML(String(e.usage_count || 0))}x</span>
       </div>
       <div style="font-weight: 600; font-size: 13px; color: #f1f5f9; margin-bottom: 4px;">${escapeHTML(e.question_pattern || '')}</div>
       <div style="font-size: 12px; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 6px 8px; border-radius: 4px;">
@@ -2089,7 +2100,7 @@ window.fetchReverseInterviewQuestions = async function() {
       window.playProceduralChime('success');
     }
   } catch (err) {
-    container.innerHTML = '<div style="color: var(--text-muted); font-size: 12px;">Tailored reverse-interview questions ready.</div>';
+    container.innerHTML = '<div class="empty-state-text">Tailored reverse-interview questions ready.</div>';
   }
 };
 
@@ -3077,17 +3088,17 @@ window.closeManageOrgModal = function() {
 window.loadOrgMembers = async function(orgId) {
   const tbody = document.getElementById('org-members-tbody');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Loading members...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" class="table-empty-cell">Loading members...</td></tr>';
 
   try {
     const res = await authFetch(`${API_BASE}/orgs/${orgId}/members`);
     if (!res.ok) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--accent-rose);">Failed to load team members.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="table-error-cell">Failed to load team members.</td></tr>';
       return;
     }
     const members = await res.json();
     if (!members || members.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No members registered yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="table-empty-cell">No members registered yet.</td></tr>';
       return;
     }
 
@@ -3099,7 +3110,7 @@ window.loadOrgMembers = async function(orgId) {
         <tr>
           <td>
             <div style="font-weight: 600;">${escapeHTML(m.user_id)}</div>
-            <div style="font-size: 11px; color: var(--text-muted);">${escapeHTML(m.email || '')}</div>
+            <div class="meta-muted-11">${escapeHTML(m.email || '')}</div>
           </td>
           <td><span class="${roleBadgeClass}">${escapeHTML(m.role)}</span></td>
           <td style="font-size: 12px; color: var(--text-muted);">${m.created_at ? escapeHTML(m.created_at.slice(0, 10)) : '--'}</td>
@@ -3112,14 +3123,14 @@ window.loadOrgMembers = async function(orgId) {
                 </select>
                 <button class="btn btn-secondary btn-sm" style="color: #fda4af; padding: 2px 8px; font-size: 11px;" data-action="removeOrgMember" data-user-id="${escapeHTML(m.user_id)}">Remove</button>
               </div>
-            ` : '<span style="font-size: 11px; color: var(--text-muted);">Primary Owner</span>'}
+            ` : '<span class="meta-muted-11">Primary Owner</span>'}
           </td>
         </tr>
       `;
     });
     tbody.innerHTML = rows;
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--accent-rose);">${escapeHTML(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="table-error-cell">${escapeHTML(err.message)}</td></tr>`;
   }
 };
 
@@ -3285,19 +3296,19 @@ window.loadAdminMetrics = async function() {
 window.loadAdminUsers = async function(search = '') {
   const tbody = document.getElementById('admin-users-tbody');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Fetching users...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" class="table-empty-cell">Fetching users...</td></tr>';
 
   try {
     const url = search ? `${API_BASE}/admin/users?search=${encodeURIComponent(search)}` : `${API_BASE}/admin/users`;
     const res = await authFetch(url);
     if (!res.ok) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--accent-rose);">Unauthorized or failed to load users.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="table-error-cell">Unauthorized or failed to load users.</td></tr>';
       return;
     }
     const data = await res.json();
     const users = data.users || [];
     if (users.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No users found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="table-empty-cell">No users found.</td></tr>';
       return;
     }
 
@@ -3320,7 +3331,7 @@ window.loadAdminUsers = async function(search = '') {
     });
     tbody.innerHTML = rows;
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-rose);">${escapeHTML(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="table-error-cell">${escapeHTML(err.message)}</td></tr>`;
   }
 };
 
@@ -3340,7 +3351,7 @@ window.loadAdminOrgs = async function() {
     const data = await res.json();
     const orgs = data.organizations || [];
     if (orgs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No organizations created.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="table-empty-cell">No organizations created.</td></tr>';
       return;
     }
 
@@ -3373,7 +3384,7 @@ window.loadAdminLogs = async function() {
     const data = await res.json();
     const logs = data.logs || data.audit_logs || [];
     if (logs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No audit log events recorded yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="table-empty-cell">No audit log events recorded yet.</td></tr>';
       return;
     }
 
@@ -3386,7 +3397,7 @@ window.loadAdminLogs = async function() {
           <td><span style="font-weight: 700; color: var(--accent-amber);">${escapeHTML(l.action)}</span></td>
           <td><code>${escapeHTML(l.target_user_id || l.target_org_id || '--')}</code></td>
           <td style="font-family: 'JetBrains Mono', monospace; font-size: 11px;">${escapeHTML(l.ip_address || '127.0.0.1')}</td>
-          <td style="font-size: 11px; color: var(--text-muted);">${l.created_at ? escapeHTML(l.created_at.replace('T', ' ').slice(0, 19)) : '--'}</td>
+          <td class="meta-muted-11">${l.created_at ? escapeHTML(l.created_at.replace('T', ' ').slice(0, 19)) : '--'}</td>
         </tr>
       `;
     });

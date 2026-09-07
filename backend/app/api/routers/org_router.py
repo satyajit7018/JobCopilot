@@ -10,7 +10,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.auth import get_current_org_membership, get_current_user, require_org_admin, require_org_owner
+from app.api.auth import enum_value, get_current_org_membership, get_current_user, require_org_admin, require_org_owner
 from app.core.database import db
 from app.core.models import (
     CreateOrgRequest,
@@ -32,6 +32,27 @@ def _slugify(name: str) -> str:
     """Converts a human-readable organization name into a clean, URL-safe slug."""
     s = re.sub(r'[^\w\s-]', '', name.lower().strip())
     return re.sub(r'[-\s]+', '-', s)
+
+
+def _get_org_or_404(org_id: str) -> Organization:
+    """Fetches an organization by id or raises a 404 HTTPException."""
+    org = db.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+    return org
+
+
+def _org_to_response(org: Organization, role) -> OrgResponse:
+    """Builds an OrgResponse from an Organization model and a role (enum or plain value)."""
+    return OrgResponse(
+        org_id=org.org_id,
+        name=org.name,
+        slug=org.slug,
+        owner_id=org.owner_id,
+        plan_tier=org.plan_tier,
+        created_at=org.created_at,
+        role=enum_value(role)
+    )
 
 
 @router.post("", response_model=OrgResponse, status_code=status.HTTP_201_CREATED)
@@ -78,15 +99,7 @@ async def create_organization(
     )
     db.add_membership(membership)
 
-    return OrgResponse(
-        org_id=new_org.org_id,
-        name=new_org.name,
-        slug=new_org.slug,
-        owner_id=new_org.owner_id,
-        plan_tier=new_org.plan_tier,
-        created_at=new_org.created_at,
-        role=OrgRole.OWNER.value
-    )
+    return _org_to_response(new_org, OrgRole.OWNER)
 
 
 @router.get("", response_model=List[OrgResponse])
@@ -113,19 +126,9 @@ async def get_organization_details(
 ):
     """Gets details of an organization if the user is a member."""
     membership = await get_current_org_membership(org_id, current_user)
-    org = db.get_organization(org_id)
-    if not org:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+    org = _get_org_or_404(org_id)
 
-    return OrgResponse(
-        org_id=org.org_id,
-        name=org.name,
-        slug=org.slug,
-        owner_id=org.owner_id,
-        plan_tier=org.plan_tier,
-        created_at=org.created_at,
-        role=membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
-    )
+    return _org_to_response(org, membership.role)
 
 
 @router.patch("/{org_id}", response_model=OrgResponse)
@@ -136,24 +139,14 @@ async def update_organization_settings(
 ):
     """Updates organization name or plan tier (requires OWNER or ADMIN)."""
     membership = await require_org_admin(org_id, current_user)
-    org = db.get_organization(org_id)
-    if not org:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+    _get_org_or_404(org_id)
 
     success = db.update_organization(org_id, name=payload.name, plan_tier=payload.plan_tier)
     if not success:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update organization.")
 
     updated_org = db.get_organization(org_id)
-    return OrgResponse(
-        org_id=updated_org.org_id,
-        name=updated_org.name,
-        slug=updated_org.slug,
-        owner_id=updated_org.owner_id,
-        plan_tier=updated_org.plan_tier,
-        created_at=updated_org.created_at,
-        role=membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
-    )
+    return _org_to_response(updated_org, membership.role)
 
 
 @router.get("/{org_id}/members", response_model=List[MemberResponse])
@@ -212,7 +205,7 @@ async def invite_organization_member(
         user_id=target_user.user_id,
         email=target_user.email,
         full_name=target_user.full_name,
-        role=new_mem.role.value if hasattr(new_mem.role, 'value') else str(new_mem.role),
+        role=enum_value(new_mem.role),
         created_at=new_mem.created_at
     )
 
@@ -234,7 +227,7 @@ async def update_organization_member_role(
     if user_id == current_user.user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot change your own role as owner.")
 
-    role_val = payload.role.value if hasattr(payload.role, 'value') else str(payload.role)
+    role_val = enum_value(payload.role)
     success = db.update_member_role(org_id, user_id, role_val)
     if not success:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update member role.")
@@ -255,7 +248,7 @@ async def remove_organization_member(
 ):
     """Removes a member from the organization or allows a member to leave."""
     membership = await get_current_org_membership(org_id, current_user)
-    current_role = membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
+    current_role = enum_value(membership.role)
 
     # If leaving own membership
     if user_id == current_user.user_id:
@@ -277,7 +270,7 @@ async def remove_organization_member(
     if not target_membership:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found in organization.")
 
-    target_role = target_membership.role.value if hasattr(target_membership.role, 'value') else str(target_membership.role)
+    target_role = enum_value(target_membership.role)
     if target_role == "OWNER":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot remove the organization owner.")
     if current_role == "ADMIN" and target_role == "ADMIN":

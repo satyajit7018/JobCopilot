@@ -491,18 +491,6 @@ class DeleteAccountRequest(BaseModel):
 
 
 # --- Epic F: MFA & TOTP Models ---
-class MFACredentials(BaseModel):
-    user_id: str
-    secret: str
-    backup_codes: List[Dict[str, Any]] = Field(default_factory=list)
-    is_enabled: bool = False
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-    def dict(self, *args, **kwargs):
-        return self.model_dump(*args, **kwargs)
-
-
 class MFASetupResponse(BaseModel):
     secret: str
     provisioning_uri: str
@@ -526,21 +514,6 @@ class MFADisableRequest(BaseModel):
 
 
 # --- Epic F: Session & Device Management Models ---
-class UserSession(BaseModel):
-    session_id: str
-    user_id: str
-    token_jti: str
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    device_name: Optional[str] = None
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-    last_active: str = Field(default_factory=lambda: datetime.now().isoformat())
-    is_active: bool = True
-
-    def dict(self, *args, **kwargs):
-        return self.model_dump(*args, **kwargs)
-
-
 class SessionResponse(BaseModel):
     session_id: str
     device_name: str
@@ -556,20 +529,6 @@ class SessionListResponse(BaseModel):
 
 
 # --- Epic F: Security Audit Log Models ---
-class SecurityAuditLog(BaseModel):
-    log_id: str
-    user_id: Optional[str] = None
-    event_type: str
-    severity: str = "INFO"  # INFO, WARNING, CRITICAL
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    details: Dict[str, Any] = Field(default_factory=dict)
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-    def dict(self, *args, **kwargs):
-        return self.model_dump(*args, **kwargs)
-
-
 class SecurityLogListResponse(BaseModel):
     logs: List[Dict[str, Any]]
     total: int
@@ -589,22 +548,6 @@ class AnalyticsEvent(BaseModel):
 
     def dict(self, *args, **kwargs):
         return self.model_dump(*args, **kwargs)
-
-
-class EventBatch(BaseModel):
-    events: List[AnalyticsEvent]
-
-
-class CohortBucket(BaseModel):
-    cohort_id: str
-    start_date: str
-    end_date: str
-    total_candidates: int = 0
-    applied_count: int = 0
-    interview_count: int = 0
-    offer_count: int = 0
-    rejected_count: int = 0
-    conversion_rate: float = 0.0
 
 
 class ABVariant(BaseModel):

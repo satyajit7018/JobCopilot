@@ -60,7 +60,7 @@ class DiscoveryOrchestrator:
                 tasks.append(ATSApiFeeders.fetch_ashby_jobs(comp, client))
 
             # VC & Fast-Track Boards
-            tasks.append(VCBoardFeeders.fetch_yc_fast_track_jobs())
+            tasks.append(VCBoardFeeders.fetch_yc_fast_track_jobs(client=client))
             tasks.append(VCBoardFeeders.fetch_hn_who_is_hiring(max_posts=15, client=client))
 
             # Indian Tech Portals & Startup Feeds (Prioritized)

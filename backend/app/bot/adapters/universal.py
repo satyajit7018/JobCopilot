@@ -50,11 +50,12 @@ class UniversalATSAdapter:
         # 1. Fill Text Inputs
         inputs = await page.query_selector_all("input[type='text'], input[type='email'], input[type='tel'], textarea")
         for inp in inputs:
-            # Check attribute hints
-            name_attr = (await inp.get_attribute("name") or "").lower()
-            id_attr = (await inp.get_attribute("id") or "").lower()
-            placeholder = (await inp.get_attribute("placeholder") or "").lower()
-            aria_label = (await inp.get_attribute("aria-label") or "").lower()
+            # Check attribute hints (single round-trip instead of 4 serial get_attribute calls)
+            hints = await inp.evaluate("el => ({name: el.name||'', id: el.id||'', placeholder: el.placeholder||'', aria: el.getAttribute('aria-label')||''})")
+            name_attr = hints["name"].lower()
+            id_attr = hints["id"].lower()
+            placeholder = hints["placeholder"].lower()
+            aria_label = hints["aria"].lower()
             combined_hint = f"{name_attr} {id_attr} {placeholder} {aria_label}"
 
             if any(k in combined_hint for k in ["first", "fname"]) and not any(k in combined_hint for k in ["last", "lname"]):

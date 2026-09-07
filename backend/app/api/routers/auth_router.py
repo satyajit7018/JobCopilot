@@ -5,25 +5,22 @@ Handles healthchecks, Google SSO token verification, JWT issuance, and authentic
 
 import os
 import uuid
-from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.api.auth import (
-    ACCESS_TOKEN_EXPIRE_MINUTES,
-    REFRESH_TOKEN_EXPIRE_DAYS,
-    create_jwt_token,
-    decode_jwt_token,
+    enum_value,
     get_current_user,
     hash_password,
+    issue_token_pair,
+    register_session,
+    router as core_auth_router,
 )
-from app.api.auth import router as core_auth_router
 from app.core.database import db
 from app.core.models import CandidateProfile, TokenResponse, User, UserRole
 from app.core.security_logger import security_logger
-from app.core.session_manager import session_manager
 
 router = APIRouter(tags=["auth"])
 router.include_router(core_auth_router)
@@ -101,23 +98,10 @@ async def google_sso_auth(payload: GoogleSSORequest):
         )
         db.save_profile(profile, user_id=user_id)
 
-    role_str = user.role.value if hasattr(user.role, 'value') else str(user.role)
-    access_token = create_jwt_token(
-        {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access"},
-        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    refresh_token = create_jwt_token(
-        {"sub": user.user_id, "type": "refresh"},
-        timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    )
+    role_str = enum_value(user.role)
+    access_token, refresh_token = issue_token_pair(user, role_str)
 
-    access_jti = decode_jwt_token(access_token).get("jti", "")
-    session_manager.create_session(
-        user_id=user.user_id,
-        token_jti=access_jti,
-        ip_address="127.0.0.1",
-        user_agent="Google SSO Client"
-    )
+    register_session(user, access_token, "127.0.0.1", "Google SSO Client")
     security_logger.log_event(
         "auth.login.google_sso",
         user_id=user.user_id,
@@ -143,5 +127,5 @@ async def auth_status(current_user: User = Depends(get_current_user)):
         "keychain_storage": "OS_KEYCHAIN_SECURE",
         "user_id": current_user.user_id,
         "email": current_user.email,
-        "role": current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+        "role": enum_value(current_user.role)
     }

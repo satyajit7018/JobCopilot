@@ -10,7 +10,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.api.auth import create_jwt_token, require_admin
+from app.api.auth import create_jwt_token, enum_value, require_admin
 from app.core.database import db
 from app.core.models import (
     AdminAuditLog,
@@ -66,6 +66,19 @@ async def get_admin_metrics(admin_user: User = Depends(require_admin)):
     return AdminStatsResponse(**metrics)
 
 
+def _write_admin_audit_log(admin_user: User, action: str, target_user_id: str, ip_address: str, details: dict) -> None:
+    """Shared admin audit-log construction, used by impersonate_user and update_user_role."""
+    audit_entry = AdminAuditLog(
+        log_id=f"audit_{uuid.uuid4().hex[:12]}",
+        admin_id=admin_user.user_id,
+        action=action,
+        target_user_id=target_user_id,
+        ip_address=ip_address,
+        details=details
+    )
+    db.log_admin_action(audit_entry)
+
+
 @router.post("/impersonate/{user_id}", response_model=AdminImpersonateResponse)
 async def impersonate_user(
     user_id: str,
@@ -81,12 +94,11 @@ async def impersonate_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target user not found.")
 
     client_ip = request.client.host if request.client else "unknown"
-    role_str = target_user.role.value if hasattr(target_user.role, 'value') else str(target_user.role)
+    role_str = enum_value(target_user.role)
 
     # 1. Log impersonation event to admin audit log
-    audit_entry = AdminAuditLog(
-        log_id=f"audit_{uuid.uuid4().hex[:12]}",
-        admin_id=admin_user.user_id,
+    _write_admin_audit_log(
+        admin_user=admin_user,
         action="USER_IMPERSONATION",
         target_user_id=target_user.user_id,
         ip_address=client_ip,
@@ -96,7 +108,6 @@ async def impersonate_user(
             "reason": "Administrative support / diagnostics"
         }
     )
-    db.log_admin_action(audit_entry)
 
     # 2. Issue scoped access token with impersonation claim
     token_claims = {
@@ -179,18 +190,16 @@ async def update_user_role(
 
     # Log role change in admin audit logs
     client_ip = request.client.host if request.client else "unknown"
-    audit_entry = AdminAuditLog(
-        log_id=f"audit_{uuid.uuid4().hex[:12]}",
-        admin_id=admin_user.user_id,
+    _write_admin_audit_log(
+        admin_user=admin_user,
         action="UPDATE_USER_ROLE",
         target_user_id=user_id,
         ip_address=client_ip,
         details={
-            "old_role": target_user.role.value if hasattr(target_user.role, 'value') else str(target_user.role),
+            "old_role": enum_value(target_user.role),
             "new_role": clean_role
         }
     )
-    db.log_admin_action(audit_entry)
 
     return {
         "status": "success",

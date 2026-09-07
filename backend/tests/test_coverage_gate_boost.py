@@ -171,7 +171,7 @@ def test_postgres_adapter_mocked():
         assert len(emails) == 1
 
         # 8. Funnel metrics
-        mock_cursor.fetchone.side_effect = [(10,), (5,), (3,), (2,), (1,)]
+        mock_cursor.fetchone.side_effect = [(10, 5, 3, 2), (1,)]
         metrics = adapter.get_funnel_metrics(user_id="usr_pg_1")
         assert metrics["total_sourced"] == 10
         assert metrics["total_applied"] == 5
@@ -255,7 +255,7 @@ def test_postgres_adapter_mocked():
         all_orgs = adapter.list_all_organizations()
         assert len(all_orgs) == 1
 
-        mock_cursor.fetchone.side_effect = [(10,), (25,), (15,), (3,)]
+        mock_cursor.fetchone.side_effect = [(10, 25, 15, 3)]
         mock_cursor.fetchall.return_value = [("PRO", 5), ("FREE", 5)]
         pg_metrics = adapter.get_admin_system_metrics()
         assert pg_metrics["total_users"] == 10

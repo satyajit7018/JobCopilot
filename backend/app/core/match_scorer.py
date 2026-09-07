@@ -106,7 +106,7 @@ class MatchScorer:
         # 2. Title Alignment (30% weight)
         title_clean = job_title.lower()
         title_score = 0.0
-        profile_skills_lower = set(candidate_skills_lower.keys())
+        profile_skills_lower = set(candidate_skills_lower)
         is_engineer = any(w in title_clean for w in ["engineer", "developer", "architect", "programmer", "specialist", "scientist"])
 
         if is_engineer:

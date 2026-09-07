@@ -5,6 +5,7 @@ with section segmentation, date parsing, and categorized skill taxonomy.
 """
 
 import re
+import asyncio
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -171,6 +172,7 @@ class ResumeParser:
         text_lower = text.lower()
         categorized = CategorizedSkills()
         all_skills = []
+        seen = set()
 
         for category, skills in cls.SKILL_TAXONOMY.items():
             bucket = []
@@ -179,7 +181,8 @@ class ResumeParser:
                 pattern = r'(?<!\w)' + re.escape(skill.lower()) + r'(?!\w)'
                 if re.search(pattern, text_lower):
                     bucket.append(skill)
-                    if skill not in all_skills:
+                    if skill not in seen:
+                        seen.add(skill)
                         all_skills.append(skill)
             setattr(categorized, category, bucket)
 
@@ -271,7 +274,9 @@ class ResumeParser:
                     p_name = parts[0].strip()
                     p_desc = parts[1].strip()
                     if 3 < len(p_name) < 70 and len(p_desc) > 5:
-                        proj_techs = [s for s in all_skills if s.lower() in p_desc.lower() or s.lower() in p_name.lower()]
+                        p_desc_lower = p_desc.lower()
+                        p_name_lower = p_name.lower()
+                        proj_techs = [s for s in all_skills if s.lower() in p_desc_lower or s.lower() in p_name_lower]
                         projects.append(Project(
                             name=p_name,
                             description=p_desc[:200],
@@ -423,8 +428,8 @@ class ResumeParser:
         Asynchronously parses any PDF, DOCX, or text resume using LLM structured extraction,
         with seamless deterministic heuristic fallback to parse_to_profile().
         """
-        text = cls.extract_raw_text(source_path_or_text)
-        fallback_profile = cls.parse_to_profile(text, profile_id=profile_id)
+        text = await asyncio.to_thread(cls.extract_raw_text, source_path_or_text)
+        fallback_profile = await asyncio.to_thread(cls.parse_to_profile, text, profile_id=profile_id)
 
         try:
             from app.core.llm_client import llm_client
