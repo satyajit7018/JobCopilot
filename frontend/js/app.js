@@ -143,6 +143,17 @@ async function authFetch(url, options = {}) {
     }
   }
 
+  if (response.status === 401) {
+    const hasToken = localStorage.getItem('jobcopilot_access_token');
+    if (hasToken && !window._sessionExpiryNotified) {
+      window._sessionExpiryNotified = true;
+      if (typeof showToast === 'function') {
+        showToast('Session expired. Please sign in via Google SSO to reconnect.', 'info');
+      }
+      setTimeout(() => { window._sessionExpiryNotified = false; }, 30000);
+    }
+  }
+
   return response;
 }
 
@@ -564,7 +575,13 @@ window.switchTab = function(viewId) {
   if (viewId === 'studio' || viewId === 'interview-studio') viewId = 'interview';
   if (viewId === 'backups') viewId = 'settings';
   if (viewId === 'accelerator') viewId = 'interview';
-  if (viewId === 'billing') viewId = 'settings';
+  if (viewId === 'admin') {
+    const role = state.currentUser?.role;
+    if (role !== 'ADMIN') {
+      showToast('Admin portal requires administrator privileges.', 'error');
+      return;
+    }
+  }
 
   document.querySelectorAll('.nav-item').forEach(t => {
     const v = t.getAttribute('data-view');
