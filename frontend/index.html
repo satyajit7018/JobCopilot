@@ -1609,6 +1609,76 @@
       </div>
     </div>
 
+    <!-- ==================== JOB DETAILS & ATS MATCH BREAKDOWN MODAL ==================== -->
+    <div class="modal-overlay" id="modal-job-details" role="dialog" aria-modal="true" aria-labelledby="title-job-details">
+      <div class="modal-box" style="max-width: 720px; max-height: 85vh; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div id="details-company-avatar" class="company-avatar-box" style="width: 44px; height: 44px; font-size: 20px;">⚡</div>
+            <div>
+              <h3 id="title-job-details" style="font-size: 17px; font-weight: 800; color: var(--text-primary); margin: 0;">Role Title</h3>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 3px; flex-wrap: wrap;">
+                <span id="details-company-name" style="font-weight: 700; color: var(--accent-cyan); font-size: 13px;">Company</span>
+                <span style="color: var(--text-muted); font-size: 11px;">•</span>
+                <span id="details-location" style="color: var(--text-secondary); font-size: 12px;">Remote</span>
+                <span id="details-platform-pill" class="job-tag">Direct</span>
+                <span id="details-salary-pill" class="job-salary-pill">Competitive</span>
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <a id="details-external-url" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="font-size: 11.5px; padding: 4px 10px; text-decoration: none;">
+              <span>🔗 Open ATS Post</span>
+            </a>
+            <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="modal-job-details" aria-label="Close job details">✕</button>
+          </div>
+        </div>
+
+        <div style="overflow-y: auto; flex: 1; padding-right: 4px;">
+          <!-- Match Score & Skills Breakdown -->
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--accent-cyan); letter-spacing: 0.5px;">⚡ ATS Match Intelligence</span>
+              <span id="details-match-pill" class="hud-pill" style="color: var(--accent-emerald); font-weight: 700;">90% Match</span>
+            </div>
+            
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">Match Reasons:</div>
+            <ul id="details-match-reasons" style="margin: 0 0 10px 16px; padding: 0; font-size: 12.5px; color: var(--text-secondary); line-height: 1.4;">
+              <li>Key skills align with candidate profile</li>
+            </ul>
+
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">Missing Skills to Study / Emphasize:</div>
+            <div id="details-missing-skills" style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <span class="hud-pill" style="font-size: 11px;">None Detected</span>
+            </div>
+          </div>
+
+          <!-- Job Description -->
+          <div style="margin-bottom: 1rem;">
+            <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Job Description &amp; Scope:</div>
+            <div id="details-job-description" style="font-size: 12.5px; color: #cbd5e1; line-height: 1.6; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 12px; max-height: 240px; overflow-y: auto; white-space: pre-line;"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 0.75rem; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label for="details-stage-changer" style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">Stage:</label>
+            <select id="details-stage-changer" class="form-select" style="padding: 4px 8px; font-size: 12px; width: auto;">
+              <option value="DISCOVERED">Discovered</option>
+              <option value="QUEUED">Queued / Tailored</option>
+              <option value="SUBMITTED">Submitted / Applied</option>
+              <option value="INTERVIEW">Interviewing</option>
+              <option value="OFFER">Offer Received</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary btn-sm" id="btn-details-tailor">🎯 Tailor Assets</button>
+            <button class="btn btn-primary btn-sm" id="btn-details-apply">⚡ Apply Now</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ==================== TRIPLE-THREAT OUTREACH & RESUME MODAL ==================== -->
     <div class="modal-overlay" id="outreach-modal" role="dialog" aria-modal="true" aria-labelledby="outreach-modal-title">
       <div class="modal-box" style="max-width: 680px;">

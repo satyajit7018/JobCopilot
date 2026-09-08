@@ -2686,6 +2686,114 @@ window.copyActiveOutreach = function() {
   }
 };
 
+window.openJobDetails = function(jobId) {
+  const job = (state.jobsList || []).find(j => String(j.job_id ?? j.id) === String(jobId));
+  if (!job) {
+    showToast('Job details not found in active cache.', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('modal-job-details');
+  if (!modal) return;
+
+  const avatar = getCompanyAvatarData(job.company);
+  const avatarEl = document.getElementById('details-company-avatar');
+  if (avatarEl) {
+    avatarEl.style.background = avatar.bg;
+    avatarEl.textContent = avatar.icon;
+  }
+
+  const titleEl = document.getElementById('title-job-details');
+  if (titleEl) titleEl.textContent = job.title || 'Role Details';
+
+  const compEl = document.getElementById('details-company-name');
+  if (compEl) compEl.textContent = job.company || 'Company';
+
+  const locEl = document.getElementById('details-location');
+  if (locEl) locEl.textContent = job.location || 'Remote';
+
+  const platEl = document.getElementById('details-platform-pill');
+  if (platEl) platEl.textContent = job.platform || 'Direct';
+
+  const salEl = document.getElementById('details-salary-pill');
+  if (salEl) {
+    salEl.textContent = job.salary_range ? `⚡ ${job.salary_range}` : 'Compensation Open';
+  }
+
+  const urlEl = document.getElementById('details-external-url');
+  if (urlEl) {
+    urlEl.href = job.url ? sanitizeUrl(job.url) : '#';
+    urlEl.style.display = job.url ? 'inline-flex' : 'none';
+  }
+
+  const matchPct = Math.round((job.match_score || 0) * 100);
+  const matchPill = document.getElementById('details-match-pill');
+  if (matchPill) matchPill.textContent = `${matchPct}% Match Score`;
+
+  // Match Reasons
+  const reasonsEl = document.getElementById('details-match-reasons');
+  if (reasonsEl) {
+    const reasons = (job.match_reasons && job.match_reasons.length > 0)
+      ? job.match_reasons
+      : ['Profile matches target core competencies and title taxonomy.'];
+    reasonsEl.innerHTML = reasons.map(r => `<li>${escapeHTML(r)}</li>`).join('');
+  }
+
+  // Missing Skills
+  const skillsEl = document.getElementById('details-missing-skills');
+  if (skillsEl) {
+    const skills = (job.missing_skills && job.missing_skills.length > 0)
+      ? job.missing_skills
+      : [];
+    if (skills.length > 0) {
+      skillsEl.innerHTML = skills.map(s => `<span class="hud-pill" style="color: var(--accent-amber); border-color: rgba(245, 158, 11, 0.4); font-size: 11px;">⚠️ ${escapeHTML(s)}</span>`).join('');
+    } else {
+      skillsEl.innerHTML = '<span class="hud-pill" style="color: var(--accent-emerald); font-size: 11px;">✓ Complete Skill Alignment</span>';
+    }
+  }
+
+  // Job Description
+  const descEl = document.getElementById('details-job-description');
+  if (descEl) {
+    descEl.textContent = job.description || 'No extended job description provided by source feed.';
+  }
+
+  // Stage Selector
+  const stageSelect = document.getElementById('details-stage-changer');
+  if (stageSelect) {
+    stageSelect.value = job.status || 'DISCOVERED';
+    stageSelect.onchange = () => {
+      window.optimisticStatusChange(jobId, stageSelect.value);
+    };
+  }
+
+  // Action Buttons
+  const tailorBtn = document.getElementById('btn-details-tailor');
+  if (tailorBtn) {
+    tailorBtn.onclick = () => {
+      modal.classList.remove('active');
+      if (typeof window.tailorJobAssets === 'function') window.tailorJobAssets(jobId);
+    };
+  }
+
+  const applyBtn = document.getElementById('btn-details-apply');
+  if (applyBtn) {
+    if (job.status === 'SUBMITTED') {
+      applyBtn.textContent = '✓ Already Applied';
+      applyBtn.disabled = true;
+    } else {
+      applyBtn.textContent = '⚡ Apply Now';
+      applyBtn.disabled = false;
+      applyBtn.onclick = () => {
+        modal.classList.remove('active');
+        if (typeof window.applyToJob === 'function') window.applyToJob(jobId);
+      };
+    }
+  }
+
+  modal.classList.add('active');
+};
+
 window.tailorJobAssets = async function(jobId) {
   showToast(`Tailoring Triple-Threat outreach for Job #${jobId}...`, 'info');
   try {
@@ -3219,6 +3327,13 @@ document.addEventListener('click', (event) => {
       const jobId = target.getAttribute('data-job-id');
       if (jobId && typeof window.tailorJobAssets === 'function') {
         window.tailorJobAssets(jobId);
+      }
+      break;
+    }
+    case 'openJobDetails': {
+      const jobId = target.getAttribute('data-job-id');
+      if (jobId && typeof window.openJobDetails === 'function') {
+        window.openJobDetails(jobId);
       }
       break;
     }
