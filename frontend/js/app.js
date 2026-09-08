@@ -143,6 +143,17 @@ async function authFetch(url, options = {}) {
     }
   }
 
+  if (response.status === 401) {
+    const hasToken = localStorage.getItem('jobcopilot_access_token');
+    if (hasToken && !window._sessionExpiryNotified) {
+      window._sessionExpiryNotified = true;
+      if (typeof showToast === 'function') {
+        showToast('Session expired. Please sign in via Google SSO to reconnect.', 'info');
+      }
+      setTimeout(() => { window._sessionExpiryNotified = false; }, 30000);
+    }
+  }
+
   return response;
 }
 
@@ -565,6 +576,13 @@ window.switchTab = function(viewId) {
   if (viewId === 'backups') viewId = 'settings';
   if (viewId === 'accelerator') viewId = 'interview';
   if (viewId === 'billing') viewId = 'settings';
+  if (viewId === 'admin') {
+    const role = state.currentUser?.role;
+    if (role !== 'ADMIN') {
+      showToast('Admin portal requires administrator privileges.', 'error');
+      return;
+    }
+  }
 
   document.querySelectorAll('.nav-item').forEach(t => {
     const v = t.getAttribute('data-view');
@@ -974,6 +992,101 @@ if (els.pipelineSearchInput) {
   }, 160));
 }
 
+const vaultSearchInput = document.getElementById('vault-search-input');
+if (vaultSearchInput) {
+  vaultSearchInput.addEventListener('input', debounce(() => {
+    renderVaultEntries();
+  }, 140));
+}
+
+function renderEmptyKanbanCol({ icon, title, desc, action, actionText, extraAttr = '' }) {
+  return `
+    <div class="empty-state-card">
+      <div class="empty-state-icon">${icon}</div>
+      <div class="empty-state-title">${escapeHTML(title)}</div>
+      <div class="empty-state-desc">${escapeHTML(desc)}</div>
+      ${action && actionText ? `
+        <button class="empty-state-cta" data-action="${escapeHTML(action)}" ${extraAttr}>
+          <span>${escapeHTML(actionText)}</span>
+        </button>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderSkeletonCards(count = 2) {
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    html += `
+      <div class="skeleton-card">
+        <div class="skeleton-line short"></div>
+        <div class="skeleton-line medium"></div>
+        <div class="skeleton-line" style="width: 85%;"></div>
+      </div>
+    `;
+  }
+  return html;
+}
+
+let draggedJobId = null;
+
+function initKanbanDragDrop() {
+  const colMapping = {
+    'col-discovered': 'DISCOVERED',
+    'col-queued': 'QUEUED',
+    'col-submitted': 'SUBMITTED',
+    'col-interview': 'INTERVIEW',
+    'col-offer': 'OFFER'
+  };
+
+  Object.entries(colMapping).forEach(([colId, targetStatus]) => {
+    const col = document.getElementById(colId);
+    if (!col || col._dragBound) return;
+    col._dragBound = true;
+
+    col.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      col.classList.add('drag-over');
+    });
+
+    col.addEventListener('dragleave', (e) => {
+      if (!col.contains(e.relatedTarget)) {
+        col.classList.remove('drag-over');
+      }
+    });
+
+    col.addEventListener('drop', (e) => {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      const jobId = e.dataTransfer?.getData('text/plain') || draggedJobId;
+      if (jobId && typeof window.optimisticStatusChange === 'function') {
+        window.optimisticStatusChange(jobId, targetStatus);
+      }
+    });
+  });
+}
+
+// Delegated Drag Handlers for Job Cards
+document.addEventListener('dragstart', (e) => {
+  const card = e.target.closest('.job-card');
+  if (card) {
+    draggedJobId = card.getAttribute('data-job-id');
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggedJobId);
+    }
+    card.classList.add('dragging');
+  }
+});
+
+document.addEventListener('dragend', (e) => {
+  const card = e.target.closest('.job-card');
+  if (card) card.classList.remove('dragging');
+  document.querySelectorAll('.kanban-col').forEach(c => c.classList.remove('drag-over'));
+  draggedJobId = null;
+});
+
 function renderKanbanBoard() {
   const query = (els.pipelineSearchInput ? els.pipelineSearchInput.value : '').toLowerCase();
   const filter = state.currentPipelineFilter;
@@ -1029,11 +1142,60 @@ function renderKanbanBoard() {
   const mobSegOff = document.getElementById('mob-seg-count-offer');
   if (mobSegOff) mobSegOff.textContent = columns.offer.length;
 
-  if (els.cardsDiscovered) els.cardsDiscovered.innerHTML = columns.discovered.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No leads discovered.</p>';
-  if (els.cardsQueued) els.cardsQueued.innerHTML = columns.queued.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">Queue is empty.</p>';
-  if (els.cardsSubmitted) els.cardsSubmitted.innerHTML = columns.submitted.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No applications submitted yet.</p>';
-  if (els.cardsInterview) els.cardsInterview.innerHTML = columns.interview.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No active interviews.</p>';
-  if (els.cardsOffer) els.cardsOffer.innerHTML = columns.offer.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No offers recorded.</p>';
+  if (els.cardsDiscovered) {
+    els.cardsDiscovered.innerHTML = columns.discovered.map(j => renderJobCardHTML(j)).join('') ||
+      renderEmptyKanbanCol({
+        icon: '🛰️',
+        title: 'No leads discovered',
+        desc: 'Fetch 0-day feeds from ATS portals (Greenhouse, Lever, Ashby).',
+        action: 'triggerDiscoveryCycle',
+        actionText: '⚡ Fetch 0-Day Openings'
+      });
+  }
+  if (els.cardsQueued) {
+    els.cardsQueued.innerHTML = columns.queued.map(j => renderJobCardHTML(j)).join('') ||
+      renderEmptyKanbanCol({
+        icon: '📦',
+        title: 'Queue is empty',
+        desc: 'Review discovered leads or log recruiter outreach to queue.',
+        action: 'openLogCallModal',
+        actionText: '+ Log Recruiter Call'
+      });
+  }
+  if (els.cardsSubmitted) {
+    els.cardsSubmitted.innerHTML = columns.submitted.map(j => renderJobCardHTML(j)).join('') ||
+      renderEmptyKanbanCol({
+        icon: '🚀',
+        title: 'No applications submitted',
+        desc: 'Click Apply Now on any discovered job to launch stealth bot.',
+        action: 'triggerDiscoveryCycle',
+        actionText: '⚡ Find Openings'
+      });
+  }
+  if (els.cardsInterview) {
+    els.cardsInterview.innerHTML = columns.interview.map(j => renderJobCardHTML(j)).join('') ||
+      renderEmptyKanbanCol({
+        icon: '🎯',
+        title: 'No active interviews',
+        desc: 'Log recruiter screens or practice drills in Interview Studio.',
+        action: 'openLogCallModal',
+        actionText: '+ Log Interview'
+      });
+  }
+  if (els.cardsOffer) {
+    els.cardsOffer.innerHTML = columns.offer.map(j => renderJobCardHTML(j)).join('') ||
+      renderEmptyKanbanCol({
+        icon: '💎',
+        title: 'No offers recorded yet',
+        desc: 'Compare multi-offers & ESOP in the Salary & Equity Modeler.',
+        action: 'switchTab',
+        actionText: 'Open Salary Modeler',
+        extraAttr: 'data-tab="negotiation"'
+      });
+  }
+
+  // Bind drag-and-drop event handlers to kanban columns
+  initKanbanDragDrop();
 }
 
 function getCompanyAvatarData(company) {
@@ -1133,10 +1295,40 @@ function renderJobCardHTML(job) {
   const matchLink = (job.notes || '').match(/(https?:\/\/(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com)[^\s]+)/i);
   if (matchLink) gmeetLink = sanitizeUrl(matchLink[1]);
 
+  // Stage-adaptive card actions
+  let actionsHTML = '';
+  if (job.status === 'SUBMITTED') {
+    actionsHTML = `
+      <span class="btn-applied-badge" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 5px 10px; font-size: 11.5px; font-weight: 700; color: #34d399; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-sm); flex: 1.2;">✓ Applied</span>
+      <button class="btn btn-secondary btn-sm" data-action="openLogCallModal" style="flex: 1;">📞 Log Call</button>
+    `;
+  } else if (job.status === 'INTERVIEW') {
+    actionsHTML = `
+      <button class="btn btn-primary btn-sm" data-action="launchTailoredInterview" data-company="${company}" data-title="${title}" style="flex: 1.2; background: linear-gradient(135deg, #10b981, #06b6d4);">🎙️ Mock Drill</button>
+      <button class="btn btn-secondary btn-sm" data-action="sendJobToNegotiation" data-job-id="${jobId}" style="flex: 1;">💎 Model</button>
+    `;
+  } else if (job.status === 'OFFER') {
+    actionsHTML = `
+      <button class="btn btn-primary btn-sm" data-action="sendJobToNegotiation" data-job-id="${jobId}" style="flex: 1.2; background: linear-gradient(135deg, #f59e0b, #ec4899);">💎 Model Offer</button>
+      <button class="btn btn-secondary btn-sm" data-action="openLogCallModal" style="flex: 1;">📝 Notes</button>
+    `;
+  } else if (job.status === 'QUEUED' || job.status === 'NEEDS_REVIEW') {
+    actionsHTML = `
+      <button class="btn btn-primary btn-sm" data-action="applyToJob" data-job-id="${jobId}" style="flex: 1.2;">⚡ Launch Apply</button>
+      <button class="btn btn-secondary btn-sm" data-action="tailorJobAssets" data-job-id="${jobId}" style="flex: 1;">🎯 Assets</button>
+    `;
+  } else {
+    // DISCOVERED
+    actionsHTML = `
+      <button class="btn btn-primary btn-sm" data-action="applyToJob" data-job-id="${jobId}" style="flex: 1.2;">⚡ Apply Now</button>
+      <button class="btn btn-secondary btn-sm" data-action="tailorJobAssets" data-job-id="${jobId}" style="flex: 1;">🎯 Tailor</button>
+    `;
+  }
+
   return `
-    <div class="job-card" id="card-${jobId}">
+    <div class="job-card" id="card-${jobId}" draggable="true" data-job-id="${jobId}" data-status="${escapeHTML(job.status || 'DISCOVERED')}">
       <div class="job-card-header">
-        <div class="job-card-brand">
+        <div class="job-card-brand" data-action="openJobDetails" data-job-id="${jobId}" style="cursor: pointer;" title="Click to view full job description">
           <div class="company-avatar-box" style="background: ${avatar.bg};">
             <span>${avatar.icon}</span>
           </div>
@@ -1148,7 +1340,7 @@ function renderJobCardHTML(job) {
         ${renderMatchGaugeSVG(matchPct)}
       </div>
 
-      <div class="job-title">${title}</div>
+      <div class="job-title" data-action="openJobDetails" data-job-id="${jobId}" style="cursor: pointer;" title="Click to view full job description">${title}</div>
 
       <div class="job-tags-row">
         <span class="job-tag ${platformBadgeClass}">${platform}</span>
@@ -1163,15 +1355,8 @@ function renderJobCardHTML(job) {
         </a>
       ` : ''}
 
-      ${job.status === 'INTERVIEW' ? `
-        <button class="btn btn-secondary btn-sm" data-action="launchTailoredInterview" data-company="${company}" data-title="${title}" style="margin-top: 8px; width: 100%; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.25)); border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe; font-size: 11.5px; padding: 6px 10px; justify-content: center;">
-          <span>🎙️ Practice Voice Mock Interview</span>
-        </button>
-      ` : ''}
-
       <div class="job-card-actions">
-        <button class="btn btn-primary btn-sm" data-action="applyToJob" data-job-id="${jobId}" style="flex: 1.2;">⚡ Apply Now</button>
-        <button class="btn btn-secondary btn-sm" data-action="tailorJobAssets" data-job-id="${jobId}" style="flex: 1;">🎯 Tailor</button>
+        ${actionsHTML}
       </div>
     </div>
   `;
@@ -1260,7 +1445,7 @@ window.applyToJob = async function(jobId) {
       appendTerminalLog('BOT', `Completed form filling for ${data.company || job?.company || 'job'}. Screenshot saved.`, false, true);
       fetchFunnelMetrics();
     } else {
-      throw new Error(data.detail || 'Apply failed');
+      throw new Error(data.detail || data.message || 'Apply failed');
     }
   } catch (err) {
     if (job) {
@@ -1436,11 +1621,43 @@ async function fetchVaultEntries() {
 }
 
 function renderVaultEntries(entries) {
+  if (entries) state.vaultEntries = entries;
   if (!els.vaultEntriesList) return;
-  els.vaultEntriesList.innerHTML = entries.map(e => `
+  const list = state.vaultEntries || [];
+  const searchInput = document.getElementById('vault-search-input');
+  const search = (searchInput?.value || '').toLowerCase().trim();
+  const category = (state.vaultFilterCategory || 'ALL').toUpperCase();
+
+  const filtered = list.filter(e => {
+    const q = (e.question_pattern || '').toLowerCase();
+    const a = (e.answer_template || '').toLowerCase();
+    const t = (e.slot_type || '').toLowerCase();
+    if (search && !q.includes(search) && !a.includes(search) && !t.includes(search)) return false;
+    if (category !== 'ALL' && (e.slot_type || '').toUpperCase() !== category) return false;
+    return true;
+  });
+
+  const badge = document.getElementById('vault-total-badge');
+  if (badge) badge.textContent = `${filtered.length} of ${list.length} Slots Active`;
+
+  if (filtered.length === 0) {
+    els.vaultEntriesList.innerHTML = `
+      <div class="empty-state-card" style="padding: 1.5rem 1rem;">
+        <div class="empty-state-icon">🧠</div>
+        <div class="empty-state-title">No matching Q&amp;A slots</div>
+        <div class="empty-state-desc">Index a custom screening answer to train the autonomous form filler.</div>
+        <button class="empty-state-cta" data-action="openNewSlotModal">
+          <span>+ Add Custom Q&amp;A Slot</span>
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  els.vaultEntriesList.innerHTML = filtered.map(e => `
     <div style="background: rgba(10, 14, 24, 0.6); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 12px 14px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-        <span class="badge badge-info" style="font-size: 10px;">${escapeHTML(e.slot_type || '')}</span>
+        <span class="badge badge-info" style="font-size: 10px;">${escapeHTML(e.slot_type || 'CUSTOM')}</span>
         <span class="meta-muted-11">Used ${escapeHTML(String(e.usage_count || 0))}x</span>
       </div>
       <div style="font-weight: 600; font-size: 13px; color: #f1f5f9; margin-bottom: 4px;">${escapeHTML(e.question_pattern || '')}</div>
@@ -1451,28 +1668,73 @@ function renderVaultEntries(entries) {
   `).join('');
 }
 
-window.openNewSlotModal = async function() {
-  const question = prompt('Enter the screening question pattern (e.g. "What is your expected notice period?"):');
-  if (!question || !question.trim()) return;
-  const answer = prompt('Enter your authoritative standard answer:');
-  if (!answer || !answer.trim()) return;
+window.filterVaultCategory = function(target) {
+  const cat = target.getAttribute('data-vcat') || 'ALL';
+  state.vaultFilterCategory = cat;
+  document.querySelectorAll('#vault-filter-pills .filter-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-vcat') === cat);
+  });
+  renderVaultEntries();
+};
+
+window.openNewSlotModal = function() {
+  const modal = document.getElementById('modal-add-slot');
+  if (!modal) return;
+  const qInput = document.getElementById('slot-modal-question');
+  const aInput = document.getElementById('slot-modal-answer');
+  const tSelect = document.getElementById('slot-modal-type');
+  if (qInput) qInput.value = '';
+  if (aInput) aInput.value = '';
+  if (tSelect) tSelect.value = 'CUSTOM';
+  modal.classList.add('active');
+  if (qInput) setTimeout(() => qInput.focus(), 50);
+};
+
+window.submitNewVaultSlot = async function(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  const qInput = document.getElementById('slot-modal-question');
+  const aInput = document.getElementById('slot-modal-answer');
+  const tSelect = document.getElementById('slot-modal-type');
+  const question = (qInput?.value || '').trim();
+  const answer = (aInput?.value || '').trim();
+  const slotType = tSelect?.value || 'CUSTOM';
+
+  if (!question || !answer) {
+    showToast('Both question pattern and standard answer are required.', 'error');
+    return;
+  }
+
+  const saveBtn = document.getElementById('btn-save-slot');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Indexing...';
+  }
 
   try {
     const res = await authFetch(`${API_BASE}/vault/learn`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: question.trim(), answer: answer.trim() })
+      body: JSON.stringify({ question, answer, slot_type: slotType })
     });
     const data = await res.json();
     if (data.status === 'success') {
       showToast('Custom Q&A slot indexed in Knowledge Vault!', 'success');
-      window.playProceduralChime('success');
+      if (typeof window.playProceduralChime === 'function') {
+        window.playProceduralChime('success');
+      }
+      const modal = document.getElementById('modal-add-slot');
+      if (modal) modal.classList.remove('active');
       fetchVaultEntries();
     } else {
-      showToast('Failed to index slot.', 'error');
+      showToast(data.detail || data.message || 'Failed to index slot.', 'error');
     }
   } catch (err) {
     showToast(`Error adding vault slot: ${err.message}`, 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save & Index into Vault';
+    }
   }
 };
 
@@ -1530,7 +1792,7 @@ function renderEmailRadar(emails) {
     return;
   }
 
-  els.emailRadarFeed.innerHTML = emails.map(m => {
+  els.emailRadarFeed.innerHTML = emails.map((m, idx) => {
     let badgeClass = 'badge-info';
     if (m.intent === 'INTERVIEW_INVITE') badgeClass = 'badge-low';
     if (m.intent === 'REJECTION') badgeClass = 'badge-critical';
@@ -1538,6 +1800,7 @@ function renderEmailRadar(emails) {
     const matchLink = (m.body_text || '').match(/(https?:\/\/(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com|calendly\.com)[^\s]+)/i);
     const rawMeetingUrl = matchLink ? matchLink[1] : null;
     const meetingUrl = rawMeetingUrl ? sanitizeUrl(rawMeetingUrl) : null;
+    const boxId = `email-reply-box-${idx}`;
 
     return `
       <div class="glass-card" style="margin-bottom: 0;">
@@ -1551,13 +1814,20 @@ function renderEmailRadar(emails) {
         <div style="font-weight: 600; font-size: 13px; color: var(--accent-cyan); margin-bottom: 6px;">${escapeHTML(m.subject || '')}</div>
         <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.4;">${escapeHTML(m.body_text || '')}</div>
 
-        ${meetingUrl ? `
-          <div style="margin-top: 10px;">
-            <a href="${meetingUrl}" target="_blank" class="gmeet-btn">
+        <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+          ${meetingUrl ? `
+            <a href="${meetingUrl}" target="_blank" rel="noopener noreferrer" class="gmeet-btn" style="flex: 1; min-width: 160px;">
               <span>📹 Join Video Interview Meeting</span>
             </a>
-          </div>
-        ` : ''}
+          ` : ''}
+          <button class="btn btn-secondary btn-sm" data-action="generateEmailReply" data-sender="${escapeHTML(m.sender || '')}" data-intent="${escapeHTML(m.intent || '')}" data-subject="${escapeHTML(m.subject || '')}" data-box-id="${boxId}" style="font-size: 11.5px; padding: 5px 10px;">
+            <span>✉️ Quick AI Reply</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" data-action="openLogCallModal" style="font-size: 11.5px; padding: 5px 10px;">
+            <span>📞 Log Call / Update</span>
+          </button>
+        </div>
+        <div id="${boxId}" style="display: none; margin-top: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px;"></div>
       </div>
     `;
   }).join('');
@@ -2342,10 +2612,13 @@ window.generateAdvancedCounterScript = async function() {
           <strong style="color: var(--accent-cyan); font-size: 13.5px;">📧 Executive Counter-Offer Email:</strong>
           <button class="btn btn-secondary btn-sm" data-action="copyCounterEmail">Copy Email</button>
         </div>
-        <textarea id="counter-email-box" class="form-textarea" rows="6" readonly style="font-size: 12.5px; margin-bottom: 12px;">${scripts.negotiation_email || ''}</textarea>
+        <textarea id="counter-email-box" class="form-textarea" rows="6" readonly style="font-size: 12.5px; margin-bottom: 12px;">${escapeHTML(scripts.negotiation_email || '')}</textarea>
 
-        <strong style="color: #fbbf24; font-size: 13.5px; display: block; margin-bottom: 6px;">📞 Phone Negotiation Talking Points:</strong>
-        <textarea class="form-textarea" rows="5" readonly style="font-size: 12px; color: #cbd5e1;">${scripts.phone_talking_points || ''}</textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="color: #fbbf24; font-size: 13.5px;">📞 Phone Negotiation Talking Points:</strong>
+          <button class="btn btn-secondary btn-sm" data-action="copyCounterPhone">Copy Talking Points</button>
+        </div>
+        <textarea id="counter-phone-box" class="form-textarea" rows="5" readonly style="font-size: 12px; color: #cbd5e1;">${escapeHTML(scripts.phone_talking_points || '')}</textarea>
       </div>
     `;
     showToast('Executive negotiation package generated!', 'success');
@@ -2464,9 +2737,197 @@ window.copyActiveOutreach = function() {
   };
   const ta = document.getElementById(mapping[id] || 'outreach-cover-letter-text');
   if (ta && ta.value) {
-    navigator.clipboard.writeText(ta.value);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).catch(() => {});
+    }
     showToast('Copied text to clipboard!', 'success');
     window.playProceduralChime('tap');
+  }
+};
+
+window.openJobDetails = function(jobId) {
+  const job = (state.jobsList || []).find(j => String(j.job_id ?? j.id) === String(jobId));
+  if (!job) {
+    showToast('Job details not found in active cache.', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('modal-job-details');
+  if (!modal) return;
+
+  const avatar = getCompanyAvatarData(job.company);
+  const avatarEl = document.getElementById('details-company-avatar');
+  if (avatarEl) {
+    avatarEl.style.background = avatar.bg;
+    avatarEl.textContent = avatar.icon;
+  }
+
+  const titleEl = document.getElementById('title-job-details');
+  if (titleEl) titleEl.textContent = job.title || 'Role Details';
+
+  const compEl = document.getElementById('details-company-name');
+  if (compEl) compEl.textContent = job.company || 'Company';
+
+  const locEl = document.getElementById('details-location');
+  if (locEl) locEl.textContent = job.location || 'Remote';
+
+  const platEl = document.getElementById('details-platform-pill');
+  if (platEl) platEl.textContent = job.platform || 'Direct';
+
+  const salEl = document.getElementById('details-salary-pill');
+  if (salEl) {
+    salEl.textContent = job.salary_range ? `⚡ ${job.salary_range}` : 'Compensation Open';
+  }
+
+  const urlEl = document.getElementById('details-external-url');
+  if (urlEl) {
+    urlEl.href = job.url ? sanitizeUrl(job.url) : '#';
+    urlEl.style.display = job.url ? 'inline-flex' : 'none';
+  }
+
+  const matchPct = Math.round((job.match_score || 0) * 100);
+  const matchPill = document.getElementById('details-match-pill');
+  if (matchPill) matchPill.textContent = `${matchPct}% Match Score`;
+
+  // Match Reasons
+  const reasonsEl = document.getElementById('details-match-reasons');
+  if (reasonsEl) {
+    const reasons = (job.match_reasons && job.match_reasons.length > 0)
+      ? job.match_reasons
+      : ['Profile matches target core competencies and title taxonomy.'];
+    reasonsEl.innerHTML = reasons.map(r => `<li>${escapeHTML(r)}</li>`).join('');
+  }
+
+  // Missing Skills
+  const skillsEl = document.getElementById('details-missing-skills');
+  if (skillsEl) {
+    const skills = (job.missing_skills && job.missing_skills.length > 0)
+      ? job.missing_skills
+      : [];
+    if (skills.length > 0) {
+      skillsEl.innerHTML = skills.map(s => `<span class="hud-pill" style="color: var(--accent-amber); border-color: rgba(245, 158, 11, 0.4); font-size: 11px;">⚠️ ${escapeHTML(s)}</span>`).join('');
+    } else {
+      skillsEl.innerHTML = '<span class="hud-pill" style="color: var(--accent-emerald); font-size: 11px;">✓ Complete Skill Alignment</span>';
+    }
+  }
+
+  // Job Description
+  const descEl = document.getElementById('details-job-description');
+  if (descEl) {
+    descEl.textContent = job.description || 'No extended job description provided by source feed.';
+  }
+
+  // Stage Selector
+  const stageSelect = document.getElementById('details-stage-changer');
+  if (stageSelect) {
+    stageSelect.value = job.status || 'DISCOVERED';
+    stageSelect.onchange = () => {
+      window.optimisticStatusChange(jobId, stageSelect.value);
+    };
+  }
+
+  // Action Buttons
+  const tailorBtn = document.getElementById('btn-details-tailor');
+  if (tailorBtn) {
+    tailorBtn.onclick = () => {
+      modal.classList.remove('active');
+      if (typeof window.tailorJobAssets === 'function') window.tailorJobAssets(jobId);
+    };
+  }
+
+  const applyBtn = document.getElementById('btn-details-apply');
+  if (applyBtn) {
+    if (job.status === 'SUBMITTED') {
+      applyBtn.textContent = '✓ Already Applied';
+      applyBtn.disabled = true;
+    } else {
+      applyBtn.textContent = '⚡ Apply Now';
+      applyBtn.disabled = false;
+      applyBtn.onclick = () => {
+        modal.classList.remove('active');
+        if (typeof window.applyToJob === 'function') window.applyToJob(jobId);
+      };
+    }
+  }
+
+  modal.classList.add('active');
+};
+
+window.closeJobDetailsModal = function() {
+  const modal = document.getElementById('modal-job-details');
+  if (modal) modal.classList.remove('active');
+};
+
+window.sendJobToNegotiation = function(jobId) {
+  const job = (state.jobsList || []).find(j => String(j.job_id ?? j.id) === String(jobId));
+  if (!job) {
+    showToast('Job details not found in active cache.', 'error');
+    return;
+  }
+
+  window.switchTab('negotiation');
+
+  const negComp = document.getElementById('neg-company-name');
+  if (negComp) negComp.value = job.company || 'Target Company';
+
+  const negRole = document.getElementById('neg-role-title');
+  if (negRole) negRole.value = job.title || 'Senior Software Engineer';
+
+  const offer1Comp = document.getElementById('offer1-comp');
+  if (offer1Comp) offer1Comp.value = job.company || 'Offer A';
+
+  const counterTarget = document.getElementById('counter-target-comp');
+  if (counterTarget) counterTarget.value = job.company || 'Target Company';
+
+  if (job.salary_range) {
+    const match = job.salary_range.match(/(\d+(?:\.\d+)?)/);
+    if (match) {
+      const val = parseFloat(match[1]);
+      const offer1Base = document.getElementById('offer1-base');
+      if (offer1Base && !isNaN(val)) offer1Base.value = val;
+    }
+  }
+
+  showToast(`Loaded ${job.company} into Salary & Comp Modeler!`, 'success');
+  if (typeof window.playProceduralChime === 'function') window.playProceduralChime('success');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.generateEmailReply = function(target) {
+  const sender = target.getAttribute('data-sender') || 'Recruiter';
+  const intent = target.getAttribute('data-intent') || 'INQUIRY';
+  const boxId = target.getAttribute('data-box-id');
+  const box = document.getElementById(boxId);
+  if (!box) return;
+
+  let replyText = '';
+  if (intent === 'INTERVIEW_INVITE') {
+    replyText = `Hi ${sender},\n\nThank you so much for the invitation! I would be delighted to speak with the team. The proposed time works well for me. Looking forward to discussing the role further.\n\nBest regards,\nAlex Mercer`;
+  } else if (intent === 'REJECTION') {
+    replyText = `Hi ${sender},\n\nThank you for letting me know. While I am disappointed, I genuinely appreciate the team's time and consideration. Please feel free to keep my details on file for future engineering opportunities.\n\nBest regards,\nAlex Mercer`;
+  } else {
+    replyText = `Hi ${sender},\n\nThank you for reaching out regarding the opportunity! I have attached my latest resume and would be delighted to schedule a brief introductory call.\n\nBest regards,\nAlex Mercer`;
+  }
+
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+      <span style="font-size: 11.5px; font-weight: 700; color: var(--accent-cyan);">🤖 AI Draft Response (${escapeHTML(intent)}):</span>
+      <button class="btn btn-primary btn-sm" id="btn-copy-ai-reply-${escapeHTML(boxId)}" style="font-size: 11px; padding: 2px 8px;">Copy Reply</button>
+    </div>
+    <textarea id="ta-reply-${escapeHTML(boxId)}" class="form-textarea" rows="4" style="margin-top: 4px; font-size: 12px; width: 100%; display: block;" readonly>${escapeHTML(replyText)}</textarea>
+  `;
+
+  const copyBtn = document.getElementById(`btn-copy-ai-reply-${boxId}`);
+  const ta = document.getElementById(`ta-reply-${boxId}`);
+  if (copyBtn && ta) {
+    copyBtn.onclick = () => {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ta.value).catch(() => {});
+      }
+      showToast('AI draft reply copied to clipboard!', 'success');
+      if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
+    };
   }
 };
 
@@ -3006,6 +3467,13 @@ document.addEventListener('click', (event) => {
       }
       break;
     }
+    case 'openJobDetails': {
+      const jobId = target.getAttribute('data-job-id');
+      if (jobId && typeof window.openJobDetails === 'function') {
+        window.openJobDetails(jobId);
+      }
+      break;
+    }
     case 'resolveHeldApplication': {
       const eventId = target.getAttribute('data-event-id');
       if (eventId && typeof window.resolveHeldApplication === 'function') {
@@ -3023,10 +3491,42 @@ document.addEventListener('click', (event) => {
     }
     case 'copyCounterEmail': {
       const box = document.getElementById('counter-email-box');
-      if (box) {
-        navigator.clipboard.writeText(box.value);
+      if (box && box.value) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(box.value).catch(() => {});
+        }
         if (typeof showToast === 'function') showToast('Email copied to clipboard!', 'success');
         if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
+      }
+      break;
+    }
+    case 'copyCounterPhone': {
+      const box = document.getElementById('counter-phone-box');
+      if (box && box.value) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(box.value).catch(() => {});
+        }
+        if (typeof showToast === 'function') showToast('Phone talking points copied to clipboard!', 'success');
+        if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
+      }
+      break;
+    }
+    case 'filterVaultCategory': {
+      if (typeof window.filterVaultCategory === 'function') {
+        window.filterVaultCategory(target);
+      }
+      break;
+    }
+    case 'sendJobToNegotiation': {
+      const jobId = target.getAttribute('data-job-id');
+      if (jobId && typeof window.sendJobToNegotiation === 'function') {
+        window.sendJobToNegotiation(jobId);
+      }
+      break;
+    }
+    case 'generateEmailReply': {
+      if (typeof window.generateEmailReply === 'function') {
+        window.generateEmailReply(target);
       }
       break;
     }
@@ -3038,6 +3538,22 @@ document.addEventListener('click', (event) => {
     }
   }
 });
+
+// Progressive Disclosure State Persistence
+document.addEventListener('toggle', (e) => {
+  if (e.target && e.target.classList && e.target.classList.contains('disclosure') && e.target.id) {
+    try {
+      localStorage.setItem(`disclosure_${e.target.id}`, e.target.open ? '1' : '0');
+    } catch (_) {}
+  }
+}, true);
+
+try {
+  document.querySelectorAll('details.disclosure[id]').forEach(d => {
+    const saved = localStorage.getItem(`disclosure_${d.id}`);
+    if (saved !== null) d.open = saved === '1';
+  });
+} catch (_) {}
 
 // Delegated Change Handler
 document.addEventListener('change', (event) => {

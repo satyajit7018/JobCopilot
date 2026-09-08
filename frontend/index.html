@@ -732,7 +732,21 @@
               <h3 class="glass-card-title">Indexed Recruiter Screening Slots</h3>
               <span class="hud-pill" id="vault-total-badge" style="color: var(--accent-emerald);">20+ Slots Active</span>
             </div>
-            <div id="vault-entries-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 520px; overflow-y: auto;">
+
+            <!-- Live Vault Search & Category Filters -->
+            <div style="margin-bottom: 0.75rem;">
+              <input type="text" id="vault-search-input" class="form-input" placeholder="🔍 Search screening questions, answers, keywords..." style="margin-bottom: 0.6rem; padding: 7px 12px; font-size: 13px;">
+              <div class="filter-pills" id="vault-filter-pills" style="margin-bottom: 0;">
+                <button type="button" class="filter-pill active" data-vcat="ALL" data-action="filterVaultCategory">All Q&amp;As</button>
+                <button type="button" class="filter-pill" data-vcat="BEHAVIORAL" data-action="filterVaultCategory">Behavioral</button>
+                <button type="button" class="filter-pill" data-vcat="TECHNICAL" data-action="filterVaultCategory">Technical</button>
+                <button type="button" class="filter-pill" data-vcat="COMPENSATION" data-action="filterVaultCategory">Comp &amp; Notice</button>
+                <button type="button" class="filter-pill" data-vcat="WORK_AUTH" data-action="filterVaultCategory">Work Auth</button>
+                <button type="button" class="filter-pill" data-vcat="CUSTOM" data-action="filterVaultCategory">Custom</button>
+              </div>
+            </div>
+
+            <div id="vault-entries-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto;">
               <!-- Dynamically populated via app.js -->
             </div>
           </div>
@@ -983,72 +997,83 @@
         </div>
 
         <!-- Card 3: Target Company Architecture Dossier Generator -->
-        <div class="glass-card">
-          <div class="glass-card-header">
-            <div style="display: flex; align-items: center; gap: 8px;">
+        <details class="disclosure" id="disc-company-dossier" open>
+          <summary class="disclosure-header">
+            <div class="disclosure-title">
               <span style="font-size: 18px;">🏢</span>
-              <h3 class="glass-card-title">Target Company Architecture Dossier &amp; System Design Breakdown</h3>
+              <span>Target Company Architecture Dossier &amp; System Design Breakdown</span>
+              <span class="hud-pill" style="color: var(--accent-indigo); font-size: 10px; margin-left: 8px;">Deep Synthesis</span>
             </div>
-            <span class="hud-pill" style="color: var(--accent-indigo);">Deep Synthesis</span>
-          </div>
-          <div class="form-grid" style="margin-bottom: 1.25rem;">
-            <div class="form-group">
-              <label class="form-label">Company Name</label>
-              <input type="text" id="mock-company-name" class="form-input" value="Stripe" placeholder="e.g. Stripe, OpenAI, Google, Meta, Uber, Netflix">
+            <span class="disclosure-chevron">▼</span>
+          </summary>
+          <div class="disclosure-body" style="padding-top: 1rem;">
+            <div class="form-grid" style="margin-bottom: 1.25rem;">
+              <div class="form-group">
+                <label class="form-label" for="mock-company-name">Company Name</label>
+                <input type="text" id="mock-company-name" class="form-input" value="Stripe" placeholder="e.g. Stripe, OpenAI, Google, Meta, Uber, Netflix">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="mock-role-title">Target Role Title</label>
+                <input type="text" id="mock-role-title" class="form-input" value="Senior Backend Engineer" placeholder="e.g. Senior Distributed Systems Engineer">
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Target Role Title</label>
-              <input type="text" id="mock-role-title" class="form-input" value="Senior Backend Engineer" placeholder="e.g. Senior Distributed Systems Engineer">
-            </div>
-          </div>
-          <button class="btn btn-secondary" data-action="loadInterviewQuestions">
-            <span>⚡ Generate Architectural Dossier &amp; 4-Round Rubric</span>
-          </button>
-          <div id="interview-dossier-container" style="margin-top: 1.5rem;"></div>
-        </div>
-
-        <!-- Card 3: Reverse Interview Intelligence & Hiring Manager Questions -->
-        <div class="glass-card">
-          <div class="glass-card-header">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 18px;">💡</span>
-              <h3 class="glass-card-title">Reverse-Interview Intelligence: Strategic Questions to Ask Hiring Manager</h3>
-            </div>
-            <button class="btn btn-secondary btn-sm" data-action="fetchReverseInterviewQuestions">
-              <span>🔄 Generate 3 Strategic Questions</span>
+            <button class="btn btn-secondary" data-action="loadInterviewQuestions">
+              <span>⚡ Generate Architectural Dossier &amp; 4-Round Rubric</span>
             </button>
+            <div id="interview-dossier-container" style="margin-top: 1.5rem;"></div>
           </div>
-          <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 1rem;">
-            Stand out in your interview by asking executive-level questions regarding architecture bottlenecks, on-call error budgets, and 90-day impact.
-          </p>
-          <div id="reverse-questions-container">
-            <div style="color: var(--text-muted); font-size: 12px; font-style: italic;">Click Generate to load tailored reverse-interview questions.</div>
-          </div>
-        </div>
+        </details>
 
-        <!-- Card 4: Interviewer Persona Sleuth & Engineering Blog Intel -->
-        <div class="glass-card">
-          <div class="glass-card-header">
-            <div style="display: flex; align-items: center; gap: 8px;">
+        <!-- Card 4: Reverse Interview Intelligence & Hiring Manager Questions -->
+        <details class="disclosure" id="disc-reverse-interview">
+          <summary class="disclosure-header">
+            <div class="disclosure-title">
+              <span style="font-size: 18px;">💡</span>
+              <span>Reverse-Interview Intelligence: Strategic Questions to Ask Hiring Manager</span>
+            </div>
+            <span class="disclosure-chevron">▼</span>
+          </summary>
+          <div class="disclosure-body" style="padding-top: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0;">
+                Stand out in your interview by asking executive-level questions regarding architecture bottlenecks, on-call error budgets, and 90-day impact.
+              </p>
+              <button class="btn btn-secondary btn-sm" data-action="fetchReverseInterviewQuestions">
+                <span>🔄 Generate 3 Questions</span>
+              </button>
+            </div>
+            <div id="reverse-questions-container">
+              <div style="color: var(--text-muted); font-size: 12px; font-style: italic;">Click Generate to load tailored reverse-interview questions.</div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Card 5: Interviewer Persona Sleuth & Engineering Blog Intel -->
+        <details class="disclosure" id="disc-persona-sleuth">
+          <summary class="disclosure-header">
+            <div class="disclosure-title">
               <span style="font-size: 18px;">🕵️</span>
-              <h3 class="glass-card-title">Interviewer Persona Sleuth &amp; Company Tech Blog Intel</h3>
+              <span>Interviewer Persona Sleuth &amp; Company Tech Blog Intel</span>
             </div>
+            <span class="disclosure-chevron">▼</span>
+          </summary>
+          <div class="disclosure-body" style="padding-top: 1rem;">
+            <div class="form-grid" style="margin-bottom: 1rem;">
+              <div class="form-group">
+                <label class="form-label" for="sleuth-interviewer-name">Interviewer Name</label>
+                <input type="text" id="sleuth-interviewer-name" class="form-input" placeholder="e.g. David Lin">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="sleuth-interviewer-role">Interviewer Role / Persona</label>
+                <input type="text" id="sleuth-interviewer-role" class="form-input" value="Principal Systems Architect (ex-Amazon Bar Raiser)" placeholder="e.g. Engineering Manager, Staff Architect">
+              </div>
+            </div>
+            <button class="btn btn-secondary" data-action="analyzeInterviewerSleuth">
+              <span>🔍 Analyze Persona &amp; Tech Biases</span>
+            </button>
+            <div id="sleuth-results-container" style="margin-top: 1rem;"></div>
           </div>
-          <div class="form-grid" style="margin-bottom: 1rem;">
-            <div class="form-group">
-              <label class="form-label">Interviewer Name</label>
-              <input type="text" id="sleuth-interviewer-name" class="form-input" placeholder="e.g. David Lin">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Interviewer Role / Persona</label>
-              <input type="text" id="sleuth-interviewer-role" class="form-input" value="Principal Systems Architect (ex-Amazon Bar Raiser)" placeholder="e.g. Engineering Manager, Staff Architect">
-            </div>
-          </div>
-          <button class="btn btn-secondary" data-action="analyzeInterviewerSleuth">
-            <span>🔍 Analyze Persona &amp; Tech Biases</span>
-          </button>
-          <div id="sleuth-results-container" style="margin-top: 1rem;"></div>
-        </div>
+        </details>
       </section>
 
       <!-- ==================== VIEW 6: SALARY NEGOTIATION & ESOP MODELER ==================== -->
@@ -1533,6 +1558,47 @@
       </div>
     </div>
 
+    <!-- ==================== KNOWLEDGE VAULT ADD SLOT MODAL ==================== -->
+    <div class="modal-overlay" id="modal-add-slot" role="dialog" aria-modal="true" aria-labelledby="title-add-slot">
+      <div class="modal-box" style="max-width: 540px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 20px;">🧠</span>
+            <div>
+              <h3 id="title-add-slot" style="font-size: 16px; font-weight: 700;">+ Add Custom Q&amp;A Slot</h3>
+              <div style="font-size: 11px; color: var(--text-muted);">INDEX AUTHORITATIVE ANSWER FOR ATS FORM AUTO-FILLING</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="modal-add-slot" aria-label="Close add slot modal">✕</button>
+        </div>
+        <form id="form-add-slot" data-form-action="submitNewVaultSlot">
+          <div class="form-group">
+            <label class="form-label" for="slot-modal-question">Screening Question Pattern / Keyword</label>
+            <input type="text" id="slot-modal-question" class="form-input" placeholder="e.g. What is your expected notice period?" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="slot-modal-type">Slot Category</label>
+            <select id="slot-modal-type" class="form-select">
+              <option value="CUSTOM">Custom Screening Question</option>
+              <option value="NOTICE_PERIOD">Notice Period / Availability</option>
+              <option value="COMPENSATION">Compensation &amp; Salary Expectations</option>
+              <option value="BEHAVIORAL">Behavioral / Culture Fit</option>
+              <option value="TECHNICAL">Technical Skills &amp; Architecture</option>
+              <option value="WORK_AUTH">Work Authorization &amp; Visa</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="slot-modal-answer">Authoritative Standard Answer</label>
+            <textarea id="slot-modal-answer" class="form-textarea" rows="4" placeholder="Provide candidate's canonical response for automated form filling..." required></textarea>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+            <button type="button" class="btn btn-secondary" data-action="closeModal" data-modal="modal-add-slot">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btn-save-slot">Save &amp; Index into Vault</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- ==================== HITL RESOLUTION MODAL ==================== -->
     <div class="modal-overlay" id="hitl-modal" role="dialog" aria-modal="true" aria-labelledby="title-hitl-modal">
       <div class="modal-box">
@@ -1553,6 +1619,76 @@
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
           <button class="btn btn-primary" id="btn-hitl-approve">Resolve &amp; Resume Application</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== JOB DETAILS & ATS MATCH BREAKDOWN MODAL ==================== -->
+    <div class="modal-overlay" id="modal-job-details" role="dialog" aria-modal="true" aria-labelledby="title-job-details">
+      <div class="modal-box" style="max-width: 720px; max-height: 85vh; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div id="details-company-avatar" class="company-avatar-box" style="width: 44px; height: 44px; font-size: 20px;">⚡</div>
+            <div>
+              <h3 id="title-job-details" style="font-size: 17px; font-weight: 800; color: var(--text-primary); margin: 0;">Role Title</h3>
+              <div style="display: flex; align-items: center; gap: 8px; margin-top: 3px; flex-wrap: wrap;">
+                <span id="details-company-name" style="font-weight: 700; color: var(--accent-cyan); font-size: 13px;">Company</span>
+                <span style="color: var(--text-muted); font-size: 11px;">•</span>
+                <span id="details-location" style="color: var(--text-secondary); font-size: 12px;">Remote</span>
+                <span id="details-platform-pill" class="job-tag">Direct</span>
+                <span id="details-salary-pill" class="job-salary-pill">Competitive</span>
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <a id="details-external-url" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" style="font-size: 11.5px; padding: 4px 10px; text-decoration: none;">
+              <span>🔗 Open ATS Post</span>
+            </a>
+            <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="modal-job-details" aria-label="Close job details">✕</button>
+          </div>
+        </div>
+
+        <div style="overflow-y: auto; flex: 1; padding-right: 4px;">
+          <!-- Match Score & Skills Breakdown -->
+          <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--accent-cyan); letter-spacing: 0.5px;">⚡ ATS Match Intelligence</span>
+              <span id="details-match-pill" class="hud-pill" style="color: var(--accent-emerald); font-weight: 700;">90% Match</span>
+            </div>
+            
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">Match Reasons:</div>
+            <ul id="details-match-reasons" style="margin: 0 0 10px 16px; padding: 0; font-size: 12.5px; color: var(--text-secondary); line-height: 1.4;">
+              <li>Key skills align with candidate profile</li>
+            </ul>
+
+            <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">Missing Skills to Study / Emphasize:</div>
+            <div id="details-missing-skills" style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <span class="hud-pill" style="font-size: 11px;">None Detected</span>
+            </div>
+          </div>
+
+          <!-- Job Description -->
+          <div style="margin-bottom: 1rem;">
+            <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Job Description &amp; Scope:</div>
+            <div id="details-job-description" style="font-size: 12.5px; color: #cbd5e1; line-height: 1.6; background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 12px; max-height: 240px; overflow-y: auto; white-space: pre-line;"></div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; border-top: 1px solid var(--border-subtle); padding-top: 0.75rem; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label for="details-stage-changer" style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">Stage:</label>
+            <select id="details-stage-changer" class="form-select" style="padding: 4px 8px; font-size: 12px; width: auto;">
+              <option value="DISCOVERED">Discovered</option>
+              <option value="QUEUED">Queued / Tailored</option>
+              <option value="SUBMITTED">Submitted / Applied</option>
+              <option value="INTERVIEW">Interviewing</option>
+              <option value="OFFER">Offer Received</option>
+            </select>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary btn-sm" id="btn-details-tailor">🎯 Tailor Assets</button>
+            <button class="btn btn-primary btn-sm" id="btn-details-apply">⚡ Apply Now</button>
+          </div>
         </div>
       </div>
     </div>
