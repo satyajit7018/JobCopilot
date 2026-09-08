@@ -1244,7 +1244,19 @@ window.applyToJob = async function(jobId) {
     });
     const data = await res.json();
     if (data.status === 'success') {
-      showToast(`Applied to ${data.company || job?.company || 'job'} (${data.mode})`, 'success');
+      showToast(`Applied to ${data.company || job?.company || 'job'} (${data.mode})`, 'success', {
+        label: 'Undo',
+        onClick: () => {
+          if (job && prev) {
+            job.status = prev;
+            renderKanbanBoard();
+            syncStatus(jobId, prev).catch(err => {
+              showToast(`Undo failed to sync: ${err.message}`, 'error');
+            });
+            fetchFunnelMetrics();
+          }
+        }
+      });
       appendTerminalLog('BOT', `Completed form filling for ${data.company || job?.company || 'job'}. Screenshot saved.`, false, true);
       fetchFunnelMetrics();
     } else {
