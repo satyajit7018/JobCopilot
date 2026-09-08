@@ -2737,7 +2737,9 @@ window.copyActiveOutreach = function() {
   };
   const ta = document.getElementById(mapping[id] || 'outreach-cover-letter-text');
   if (ta && ta.value) {
-    navigator.clipboard.writeText(ta.value);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).catch(() => {});
+    }
     showToast('Copied text to clipboard!', 'success');
     window.playProceduralChime('tap');
   }
@@ -2920,7 +2922,9 @@ window.generateEmailReply = function(target) {
   const ta = document.getElementById(`ta-reply-${boxId}`);
   if (copyBtn && ta) {
     copyBtn.onclick = () => {
-      navigator.clipboard.writeText(ta.value);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ta.value).catch(() => {});
+      }
       showToast('AI draft reply copied to clipboard!', 'success');
       if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
     };
@@ -3488,7 +3492,9 @@ document.addEventListener('click', (event) => {
     case 'copyCounterEmail': {
       const box = document.getElementById('counter-email-box');
       if (box && box.value) {
-        navigator.clipboard.writeText(box.value);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(box.value).catch(() => {});
+        }
         if (typeof showToast === 'function') showToast('Email copied to clipboard!', 'success');
         if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
       }
@@ -3497,7 +3503,9 @@ document.addEventListener('click', (event) => {
     case 'copyCounterPhone': {
       const box = document.getElementById('counter-phone-box');
       if (box && box.value) {
-        navigator.clipboard.writeText(box.value);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(box.value).catch(() => {});
+        }
         if (typeof showToast === 'function') showToast('Phone talking points copied to clipboard!', 'success');
         if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
       }
