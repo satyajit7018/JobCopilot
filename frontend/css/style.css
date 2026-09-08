@@ -1362,8 +1362,8 @@ code, pre, .font-mono {
   transition: var(--trans-fast);
 }
 
-.cmd-item:hover, .cmd-item.selected {
-  background: var(--grad-subtle);
+.cmd-item:hover, .cmd-item.selected, .cmd-item.cmd-active {
+  background: rgba(99, 102, 241, 0.18);
   color: var(--text-primary);
   border: 1px solid rgba(99, 102, 241, 0.3);
 }
