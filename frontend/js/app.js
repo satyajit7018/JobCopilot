@@ -1260,7 +1260,7 @@ window.applyToJob = async function(jobId) {
       appendTerminalLog('BOT', `Completed form filling for ${data.company || job?.company || 'job'}. Screenshot saved.`, false, true);
       fetchFunnelMetrics();
     } else {
-      throw new Error(data.detail || 'Apply failed');
+      throw new Error(data.detail || data.message || 'Apply failed');
     }
   } catch (err) {
     if (job) {
@@ -1451,28 +1451,64 @@ function renderVaultEntries(entries) {
   `).join('');
 }
 
-window.openNewSlotModal = async function() {
-  const question = prompt('Enter the screening question pattern (e.g. "What is your expected notice period?"):');
-  if (!question || !question.trim()) return;
-  const answer = prompt('Enter your authoritative standard answer:');
-  if (!answer || !answer.trim()) return;
+window.openNewSlotModal = function() {
+  const modal = document.getElementById('modal-add-slot');
+  if (!modal) return;
+  const qInput = document.getElementById('slot-modal-question');
+  const aInput = document.getElementById('slot-modal-answer');
+  const tSelect = document.getElementById('slot-modal-type');
+  if (qInput) qInput.value = '';
+  if (aInput) aInput.value = '';
+  if (tSelect) tSelect.value = 'CUSTOM';
+  modal.classList.add('active');
+  if (qInput) setTimeout(() => qInput.focus(), 50);
+};
+
+window.submitNewVaultSlot = async function(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+  const qInput = document.getElementById('slot-modal-question');
+  const aInput = document.getElementById('slot-modal-answer');
+  const tSelect = document.getElementById('slot-modal-type');
+  const question = (qInput?.value || '').trim();
+  const answer = (aInput?.value || '').trim();
+  const slotType = tSelect?.value || 'CUSTOM';
+
+  if (!question || !answer) {
+    showToast('Both question pattern and standard answer are required.', 'error');
+    return;
+  }
+
+  const saveBtn = document.getElementById('btn-save-slot');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Indexing...';
+  }
 
   try {
     const res = await authFetch(`${API_BASE}/vault/learn`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: question.trim(), answer: answer.trim() })
+      body: JSON.stringify({ question, answer, slot_type: slotType })
     });
     const data = await res.json();
     if (data.status === 'success') {
       showToast('Custom Q&A slot indexed in Knowledge Vault!', 'success');
-      window.playProceduralChime('success');
+      if (typeof window.playProceduralChime === 'function') {
+        window.playProceduralChime('success');
+      }
+      const modal = document.getElementById('modal-add-slot');
+      if (modal) modal.classList.remove('active');
       fetchVaultEntries();
     } else {
-      showToast('Failed to index slot.', 'error');
+      showToast(data.detail || data.message || 'Failed to index slot.', 'error');
     }
   } catch (err) {
     showToast(`Error adding vault slot: ${err.message}`, 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save & Index into Vault';
+    }
   }
 };
 

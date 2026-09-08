@@ -1533,6 +1533,47 @@
       </div>
     </div>
 
+    <!-- ==================== KNOWLEDGE VAULT ADD SLOT MODAL ==================== -->
+    <div class="modal-overlay" id="modal-add-slot" role="dialog" aria-modal="true" aria-labelledby="title-add-slot">
+      <div class="modal-box" style="max-width: 540px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 20px;">🧠</span>
+            <div>
+              <h3 id="title-add-slot" style="font-size: 16px; font-weight: 700;">+ Add Custom Q&amp;A Slot</h3>
+              <div style="font-size: 11px; color: var(--text-muted);">INDEX AUTHORITATIVE ANSWER FOR ATS FORM AUTO-FILLING</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" data-action="closeModal" data-modal="modal-add-slot" aria-label="Close add slot modal">✕</button>
+        </div>
+        <form id="form-add-slot" data-form-action="submitNewVaultSlot">
+          <div class="form-group">
+            <label class="form-label" for="slot-modal-question">Screening Question Pattern / Keyword</label>
+            <input type="text" id="slot-modal-question" class="form-input" placeholder="e.g. What is your expected notice period?" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="slot-modal-type">Slot Category</label>
+            <select id="slot-modal-type" class="form-select">
+              <option value="CUSTOM">Custom Screening Question</option>
+              <option value="NOTICE_PERIOD">Notice Period / Availability</option>
+              <option value="COMPENSATION">Compensation &amp; Salary Expectations</option>
+              <option value="BEHAVIORAL">Behavioral / Culture Fit</option>
+              <option value="TECHNICAL">Technical Skills &amp; Architecture</option>
+              <option value="WORK_AUTH">Work Authorization &amp; Visa</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="slot-modal-answer">Authoritative Standard Answer</label>
+            <textarea id="slot-modal-answer" class="form-textarea" rows="4" placeholder="Provide candidate's canonical response for automated form filling..." required></textarea>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+            <button type="button" class="btn btn-secondary" data-action="closeModal" data-modal="modal-add-slot">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btn-save-slot">Save &amp; Index into Vault</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- ==================== HITL RESOLUTION MODAL ==================== -->
     <div class="modal-overlay" id="hitl-modal" role="dialog" aria-modal="true" aria-labelledby="title-hitl-modal">
       <div class="modal-box">
