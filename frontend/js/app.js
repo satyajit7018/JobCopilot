@@ -2453,10 +2453,13 @@ window.generateAdvancedCounterScript = async function() {
           <strong style="color: var(--accent-cyan); font-size: 13.5px;">📧 Executive Counter-Offer Email:</strong>
           <button class="btn btn-secondary btn-sm" data-action="copyCounterEmail">Copy Email</button>
         </div>
-        <textarea id="counter-email-box" class="form-textarea" rows="6" readonly style="font-size: 12.5px; margin-bottom: 12px;">${scripts.negotiation_email || ''}</textarea>
+        <textarea id="counter-email-box" class="form-textarea" rows="6" readonly style="font-size: 12.5px; margin-bottom: 12px;">${escapeHTML(scripts.negotiation_email || '')}</textarea>
 
-        <strong style="color: #fbbf24; font-size: 13.5px; display: block; margin-bottom: 6px;">📞 Phone Negotiation Talking Points:</strong>
-        <textarea class="form-textarea" rows="5" readonly style="font-size: 12px; color: #cbd5e1;">${scripts.phone_talking_points || ''}</textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong style="color: #fbbf24; font-size: 13.5px;">📞 Phone Negotiation Talking Points:</strong>
+          <button class="btn btn-secondary btn-sm" data-action="copyCounterPhone">Copy Talking Points</button>
+        </div>
+        <textarea id="counter-phone-box" class="form-textarea" rows="5" readonly style="font-size: 12px; color: #cbd5e1;">${escapeHTML(scripts.phone_talking_points || '')}</textarea>
       </div>
     `;
     showToast('Executive negotiation package generated!', 'success');
@@ -3134,9 +3137,18 @@ document.addEventListener('click', (event) => {
     }
     case 'copyCounterEmail': {
       const box = document.getElementById('counter-email-box');
-      if (box) {
+      if (box && box.value) {
         navigator.clipboard.writeText(box.value);
         if (typeof showToast === 'function') showToast('Email copied to clipboard!', 'success');
+        if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
+      }
+      break;
+    }
+    case 'copyCounterPhone': {
+      const box = document.getElementById('counter-phone-box');
+      if (box && box.value) {
+        navigator.clipboard.writeText(box.value);
+        if (typeof showToast === 'function') showToast('Phone talking points copied to clipboard!', 'success');
         if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
       }
       break;
@@ -3149,6 +3161,22 @@ document.addEventListener('click', (event) => {
     }
   }
 });
+
+// Progressive Disclosure State Persistence
+document.addEventListener('toggle', (e) => {
+  if (e.target && e.target.classList && e.target.classList.contains('disclosure') && e.target.id) {
+    try {
+      localStorage.setItem(`disclosure_${e.target.id}`, e.target.open ? '1' : '0');
+    } catch (_) {}
+  }
+}, true);
+
+try {
+  document.querySelectorAll('details.disclosure[id]').forEach(d => {
+    const saved = localStorage.getItem(`disclosure_${d.id}`);
+    if (saved !== null) d.open = saved === '1';
+  });
+} catch (_) {}
 
 // Delegated Change Handler
 document.addEventListener('change', (event) => {

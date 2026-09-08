@@ -983,72 +983,83 @@
         </div>
 
         <!-- Card 3: Target Company Architecture Dossier Generator -->
-        <div class="glass-card">
-          <div class="glass-card-header">
-            <div style="display: flex; align-items: center; gap: 8px;">
+        <details class="disclosure" id="disc-company-dossier" open>
+          <summary class="disclosure-header">
+            <div class="disclosure-title">
               <span style="font-size: 18px;">🏢</span>
-              <h3 class="glass-card-title">Target Company Architecture Dossier &amp; System Design Breakdown</h3>
+              <span>Target Company Architecture Dossier &amp; System Design Breakdown</span>
+              <span class="hud-pill" style="color: var(--accent-indigo); font-size: 10px; margin-left: 8px;">Deep Synthesis</span>
             </div>
-            <span class="hud-pill" style="color: var(--accent-indigo);">Deep Synthesis</span>
-          </div>
-          <div class="form-grid" style="margin-bottom: 1.25rem;">
-            <div class="form-group">
-              <label class="form-label">Company Name</label>
-              <input type="text" id="mock-company-name" class="form-input" value="Stripe" placeholder="e.g. Stripe, OpenAI, Google, Meta, Uber, Netflix">
+            <span class="disclosure-chevron">▼</span>
+          </summary>
+          <div class="disclosure-body" style="padding-top: 1rem;">
+            <div class="form-grid" style="margin-bottom: 1.25rem;">
+              <div class="form-group">
+                <label class="form-label" for="mock-company-name">Company Name</label>
+                <input type="text" id="mock-company-name" class="form-input" value="Stripe" placeholder="e.g. Stripe, OpenAI, Google, Meta, Uber, Netflix">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="mock-role-title">Target Role Title</label>
+                <input type="text" id="mock-role-title" class="form-input" value="Senior Backend Engineer" placeholder="e.g. Senior Distributed Systems Engineer">
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Target Role Title</label>
-              <input type="text" id="mock-role-title" class="form-input" value="Senior Backend Engineer" placeholder="e.g. Senior Distributed Systems Engineer">
-            </div>
-          </div>
-          <button class="btn btn-secondary" data-action="loadInterviewQuestions">
-            <span>⚡ Generate Architectural Dossier &amp; 4-Round Rubric</span>
-          </button>
-          <div id="interview-dossier-container" style="margin-top: 1.5rem;"></div>
-        </div>
-
-        <!-- Card 3: Reverse Interview Intelligence & Hiring Manager Questions -->
-        <div class="glass-card">
-          <div class="glass-card-header">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-size: 18px;">💡</span>
-              <h3 class="glass-card-title">Reverse-Interview Intelligence: Strategic Questions to Ask Hiring Manager</h3>
-            </div>
-            <button class="btn btn-secondary btn-sm" data-action="fetchReverseInterviewQuestions">
-              <span>🔄 Generate 3 Strategic Questions</span>
+            <button class="btn btn-secondary" data-action="loadInterviewQuestions">
+              <span>⚡ Generate Architectural Dossier &amp; 4-Round Rubric</span>
             </button>
+            <div id="interview-dossier-container" style="margin-top: 1.5rem;"></div>
           </div>
-          <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 1rem;">
-            Stand out in your interview by asking executive-level questions regarding architecture bottlenecks, on-call error budgets, and 90-day impact.
-          </p>
-          <div id="reverse-questions-container">
-            <div style="color: var(--text-muted); font-size: 12px; font-style: italic;">Click Generate to load tailored reverse-interview questions.</div>
-          </div>
-        </div>
+        </details>
 
-        <!-- Card 4: Interviewer Persona Sleuth & Engineering Blog Intel -->
-        <div class="glass-card">
-          <div class="glass-card-header">
-            <div style="display: flex; align-items: center; gap: 8px;">
+        <!-- Card 4: Reverse Interview Intelligence & Hiring Manager Questions -->
+        <details class="disclosure" id="disc-reverse-interview">
+          <summary class="disclosure-header">
+            <div class="disclosure-title">
+              <span style="font-size: 18px;">💡</span>
+              <span>Reverse-Interview Intelligence: Strategic Questions to Ask Hiring Manager</span>
+            </div>
+            <span class="disclosure-chevron">▼</span>
+          </summary>
+          <div class="disclosure-body" style="padding-top: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <p style="font-size: 12.5px; color: var(--text-secondary); margin: 0;">
+                Stand out in your interview by asking executive-level questions regarding architecture bottlenecks, on-call error budgets, and 90-day impact.
+              </p>
+              <button class="btn btn-secondary btn-sm" data-action="fetchReverseInterviewQuestions">
+                <span>🔄 Generate 3 Questions</span>
+              </button>
+            </div>
+            <div id="reverse-questions-container">
+              <div style="color: var(--text-muted); font-size: 12px; font-style: italic;">Click Generate to load tailored reverse-interview questions.</div>
+            </div>
+          </div>
+        </details>
+
+        <!-- Card 5: Interviewer Persona Sleuth & Engineering Blog Intel -->
+        <details class="disclosure" id="disc-persona-sleuth">
+          <summary class="disclosure-header">
+            <div class="disclosure-title">
               <span style="font-size: 18px;">🕵️</span>
-              <h3 class="glass-card-title">Interviewer Persona Sleuth &amp; Company Tech Blog Intel</h3>
+              <span>Interviewer Persona Sleuth &amp; Company Tech Blog Intel</span>
             </div>
+            <span class="disclosure-chevron">▼</span>
+          </summary>
+          <div class="disclosure-body" style="padding-top: 1rem;">
+            <div class="form-grid" style="margin-bottom: 1rem;">
+              <div class="form-group">
+                <label class="form-label" for="sleuth-interviewer-name">Interviewer Name</label>
+                <input type="text" id="sleuth-interviewer-name" class="form-input" placeholder="e.g. David Lin">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="sleuth-interviewer-role">Interviewer Role / Persona</label>
+                <input type="text" id="sleuth-interviewer-role" class="form-input" value="Principal Systems Architect (ex-Amazon Bar Raiser)" placeholder="e.g. Engineering Manager, Staff Architect">
+              </div>
+            </div>
+            <button class="btn btn-secondary" data-action="analyzeInterviewerSleuth">
+              <span>🔍 Analyze Persona &amp; Tech Biases</span>
+            </button>
+            <div id="sleuth-results-container" style="margin-top: 1rem;"></div>
           </div>
-          <div class="form-grid" style="margin-bottom: 1rem;">
-            <div class="form-group">
-              <label class="form-label">Interviewer Name</label>
-              <input type="text" id="sleuth-interviewer-name" class="form-input" placeholder="e.g. David Lin">
-            </div>
-            <div class="form-group">
-              <label class="form-label">Interviewer Role / Persona</label>
-              <input type="text" id="sleuth-interviewer-role" class="form-input" value="Principal Systems Architect (ex-Amazon Bar Raiser)" placeholder="e.g. Engineering Manager, Staff Architect">
-            </div>
-          </div>
-          <button class="btn btn-secondary" data-action="analyzeInterviewerSleuth">
-            <span>🔍 Analyze Persona &amp; Tech Biases</span>
-          </button>
-          <div id="sleuth-results-container" style="margin-top: 1rem;"></div>
-        </div>
+        </details>
       </section>
 
       <!-- ==================== VIEW 6: SALARY NEGOTIATION & ESOP MODELER ==================== -->
