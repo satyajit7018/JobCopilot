@@ -285,7 +285,7 @@ const els = {
 // ==========================================================================
 // Toast Notification Engine
 // ==========================================================================
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', action = null) {
   if (!els.toastContainer) return;
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
@@ -295,15 +295,28 @@ function showToast(message, type = 'info') {
   if (type === 'info') icon = 'ℹ';
 
   toast.innerHTML = `<span style="font-weight: 700;">${icon}</span><span>${message}</span>`;
+  if (action && action.label) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-action-btn';
+    btn.textContent = action.label;
+    btn.onclick = () => {
+      if (typeof action.onClick === 'function') action.onClick();
+      toast.remove();
+    };
+    toast.appendChild(btn);
+  }
   els.toastContainer.appendChild(toast);
 
+  const ttl = action ? 6000 : 4000;
   setTimeout(() => {
     toast.style.opacity = '0';
     toast.style.transform = 'translateY(10px)';
     toast.style.transition = 'all 0.3s ease';
     setTimeout(() => toast.remove(), 300);
-  }, 4000);
+  }, ttl);
 }
+
+window.showToast = showToast;
 
 // ==========================================================================
 // WebSocket Real-Time Gateway Connection
@@ -1164,9 +1177,64 @@ function renderJobCardHTML(job) {
   `;
 }
 
-// 1-Click Apply Action
+// ==========================================================================
+// Optimistic UI State Synchronizer
+// ==========================================================================
+// Optimistically change a job's status, re-render, sync to server, roll back on failure.
+async function optimisticStatusChange(jobId, newStatus, { verb = 'Moved', endpoint, method = 'PATCH', body } = {}) {
+  const job = (state.jobsList || []).find(j => String(j.job_id ?? j.id) === String(jobId));
+  if (!job) return;
+  const prevStatus = job.status;
+  if (prevStatus === newStatus) return;
+
+  // 1. Optimistic local update
+  job.status = newStatus;
+  renderKanbanBoard();
+
+  // 2. Success toast with Undo affordance
+  showToast(`${verb} ${job.company || 'job'}`, 'success', {
+    label: 'Undo',
+    onClick: () => {
+      job.status = prevStatus;
+      renderKanbanBoard();
+      syncStatus(jobId, prevStatus, endpoint, method, body).catch(err => {
+        showToast(`Undo failed to sync: ${err.message}`, 'error');
+      });
+    }
+  });
+
+  // 3. Background sync; roll back if it fails
+  try {
+    await syncStatus(jobId, newStatus, endpoint, method, body);
+  } catch (err) {
+    job.status = prevStatus;
+    renderKanbanBoard();
+    showToast(`Couldn't save — reverted. ${err.message}`, 'error');
+  }
+}
+
+async function syncStatus(jobId, status, endpoint, method = 'PATCH', body) {
+  const url = endpoint || `${API_BASE}/jobs/${jobId}/status`;
+  const res = await authFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || { status })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json().catch(() => ({}));
+}
+
+window.optimisticStatusChange = optimisticStatusChange;
+window.syncStatus = syncStatus;
+
+// 1-Click Apply Action (Optimistic UI)
 window.applyToJob = async function(jobId) {
-  showToast(`Initializing stealth bot for job #${jobId}...`, 'info');
+  const job = (state.jobsList || []).find(j => String(j.job_id ?? j.id) === String(jobId));
+  const prev = job ? job.status : null;
+  if (job) {
+    job.status = 'SUBMITTED';
+    renderKanbanBoard();
+  }
   appendTerminalLog('BOT', `Launching Playwright Chromium session for Job ID: ${jobId}`);
 
   try {
@@ -1176,13 +1244,18 @@ window.applyToJob = async function(jobId) {
     });
     const data = await res.json();
     if (data.status === 'success') {
-      showToast(`Application successfully processed (${data.mode})!`, 'success');
-      appendTerminalLog('BOT', `Completed form filling for ${data.company}. Screenshot saved.`, false, true);
-      fetchJobsList();
+      showToast(`Applied to ${data.company || job?.company || 'job'} (${data.mode})`, 'success');
+      appendTerminalLog('BOT', `Completed form filling for ${data.company || job?.company || 'job'}. Screenshot saved.`, false, true);
       fetchFunnelMetrics();
+    } else {
+      throw new Error(data.detail || 'Apply failed');
     }
   } catch (err) {
-    showToast(`Bot apply error: ${err.message}`, 'error');
+    if (job) {
+      job.status = prev;
+      renderKanbanBoard();
+    }
+    showToast(`Apply failed — reverted. ${err.message}`, 'error');
   }
 };
 
@@ -2682,13 +2755,86 @@ window.exportEncryptedBackup = async function() {
 // ==========================================================================
 // Command Palette (Cmd + K)
 // ==========================================================================
-window.toggleCmdPalette = function() {
+const PALETTE_COMMANDS = [
+  { icon: '🎯', label: 'Jump to Job Pipeline',        key: 'P', run: () => window.switchTab('pipeline') },
+  { icon: '⚡', label: 'Run 0-Day Discovery Cycle',   key: 'D', run: () => window.triggerDiscoveryCycle() },
+  { icon: '🧠', label: 'Open Knowledge Vault',        key: 'V', run: () => window.switchTab('vault') },
+  { icon: '🎙️', label: 'Open Mock Interview Studio',  key: 'I', run: () => window.switchTab('interview') },
+  { icon: '💎', label: 'Salary & ESOP Modeler',       key: 'S', run: () => window.switchTab('negotiation') },
+  { icon: '📧', label: 'Open Email Outreach',                    run: () => window.switchTab('email') },
+  { icon: '🤖', label: 'Open Autopilot Bot',                     run: () => window.switchTab('bot') },
+  { icon: '⚙️', label: 'Open Settings',                          run: () => window.switchTab('settings') },
+  { icon: '🔒', label: 'Export Encrypted Backup',     key: 'B', run: () => window.exportEncryptedBackup && window.exportEncryptedBackup() },
+];
+
+let paletteActiveIndex = 0;
+
+function buildPaletteItems(query) {
+  const q = (query || '').trim().toLowerCase();
+  const cmds = PALETTE_COMMANDS
+    .filter(c => !q || c.label.toLowerCase().includes(q))
+    .map(c => ({ type: 'cmd', icon: c.icon, label: c.label, badge: c.key || '', run: c.run }));
+
+  let jobs = [];
+  if (q.length >= 2 && Array.isArray(state.jobsList)) {
+    jobs = state.jobsList
+      .filter(j => ((j.company || '') + ' ' + (j.title || '')).toLowerCase().includes(q))
+      .slice(0, 6)
+      .map(j => ({
+        type: 'job',
+        icon: '💼',
+        label: `${escapeHTML(j.company || 'Company')} — ${escapeHTML(j.title || 'Role')}`,
+        badge: j.status || '',
+        run: () => {
+          window.switchTab('pipeline');
+          if (els.pipelineSearchInput) {
+            els.pipelineSearchInput.value = j.company || '';
+          }
+          renderKanbanBoard();
+        }
+      }));
+  }
+  return [...cmds, ...jobs];
+}
+
+function renderPaletteResults(query) {
+  const list = document.getElementById('cmd-palette-list');
+  if (!list) return;
+  const items = buildPaletteItems(query);
+  paletteActiveIndex = 0;
+  if (!items.length) {
+    list.innerHTML = '<div class="cmd-empty" style="padding: 16px; color: var(--text-muted); text-align: center; font-size: 13px;">No matches.</div>';
+    list._items = [];
+    return;
+  }
+  list._items = items;
+  list.innerHTML = items.map((it, i) => `
+    <div class="cmd-item ${i === 0 ? 'cmd-active' : ''}" data-palette-index="${i}">
+      <span style="display: flex; align-items: center; gap: 8px;"><span>${it.icon}</span> <span>${it.label}</span></span>
+      ${it.badge ? `<span class="cmd-k-badge">${escapeHTML(String(it.badge))}</span>` : ''}
+    </div>`).join('');
+}
+
+function runPaletteItem(i) {
+  const list = document.getElementById('cmd-palette-list');
+  const item = list && list._items && list._items[i];
+  if (!item) return;
+  window.toggleCmdPalette(false);
+  setTimeout(() => item.run(), 60);
+}
+
+window.toggleCmdPalette = function(forceOpen) {
   const overlay = document.getElementById('cmd-palette-overlay');
-  if (overlay) {
-    overlay.classList.toggle('active');
-    if (overlay.classList.contains('active')) {
-      document.getElementById('cmd-palette-input')?.focus();
+  if (!overlay) return;
+  const isOpen = forceOpen !== undefined ? forceOpen : !overlay.classList.contains('active');
+  overlay.classList.toggle('active', isOpen);
+  if (isOpen) {
+    const input = document.getElementById('cmd-palette-input');
+    if (input) {
+      input.value = '';
+      input.focus();
     }
+    renderPaletteResults('');
   }
 };
 
@@ -2698,6 +2844,48 @@ document.addEventListener('keydown', (e) => {
     window.toggleCmdPalette();
   }
 });
+
+function initPalette() {
+  const input = document.getElementById('cmd-palette-input');
+  const list = document.getElementById('cmd-palette-list');
+  if (!input || !list) return;
+
+  input.addEventListener('input', () => renderPaletteResults(input.value));
+
+  input.addEventListener('keydown', (e) => {
+    const items = list._items || [];
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      paletteActiveIndex = Math.min(paletteActiveIndex + 1, Math.max(0, items.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      paletteActiveIndex = Math.max(paletteActiveIndex - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      runPaletteItem(paletteActiveIndex);
+      return;
+    } else {
+      return;
+    }
+    list.querySelectorAll('.cmd-item').forEach((el, i) =>
+      el.classList.toggle('cmd-active', i === paletteActiveIndex));
+    const active = list.querySelector('.cmd-active');
+    if (active) active.scrollIntoView({ block: 'nearest' });
+  });
+
+  list.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-palette-index]');
+    if (row) {
+      runPaletteItem(parseInt(row.getAttribute('data-palette-index'), 10));
+    }
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initPalette);
+} else {
+  initPalette();
+}
 
 // ==========================================================================
 // User Session & Logout

@@ -53,6 +53,10 @@ class LogDirectCallRequest(BaseModel):
     meeting_link: Optional[str] = None
 
 
+class UpdateJobStatusRequest(BaseModel):
+    status: str
+
+
 @router.get("/jobs")
 async def get_jobs(
     status: Optional[str] = None,
@@ -63,6 +67,36 @@ async def get_jobs(
     return {
         "count": len(jobs),
         "jobs": [j.dict() for j in jobs]
+    }
+
+
+@router.patch("/jobs/{job_id}/status")
+async def update_job_status(
+    job_id: str,
+    payload: UpdateJobStatusRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Updates the pipeline status of a tracked job application."""
+    try:
+        new_status = ApplicationStatus(payload.status.upper())
+    except ValueError:
+        valid_statuses = [s.value for s in ApplicationStatus]
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status '{payload.status}'. Valid statuses: {valid_statuses}"
+        )
+
+    job = db.get_job_by_id(job_id, user_id=current_user.user_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    job.status = new_status
+    db.save_job(job, user_id=current_user.user_id)
+
+    return {
+        "status": "success",
+        "job_id": job.job_id,
+        "new_status": new_status.value
     }
 
 

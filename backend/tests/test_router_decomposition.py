@@ -20,6 +20,7 @@ from app.api.endpoints import (
     RecruiterNudgeRequest,
     MultiRoleTailorRequest,
     LogDirectCallRequest,
+    UpdateJobStatusRequest,
     HITLResolveRequest,
     ResolveHeldApplicationRequest,
     InboundEmailPayload,
@@ -129,6 +130,7 @@ def test_route_topology_coverage(client: TestClient):
         "/api/discovery/status",
         # Jobs Router
         "/api/jobs",
+        "/api/jobs/{job_id}/status",
         "/api/jobs/{job_id}/tailor",
         "/api/resumes/tailor-multi",
         "/api/jobs/log-call",
@@ -288,3 +290,32 @@ def test_authenticated_domain_router_responses(auth_client: TestClient):
     res_disc = auth_client.get("/api/discovery/status")
     assert res_disc.status_code == 200
     assert "total_discovered" in res_disc.json()
+
+
+def test_update_job_status_route(auth_client: TestClient):
+    """Verifies that PATCH /api/jobs/{job_id}/status updates pipeline status optimistically."""
+    res_log = auth_client.post("/api/jobs/log-call", json={
+        "company": "Linear",
+        "role_title": "Product Engineer",
+        "status": "DISCOVERED"
+    })
+    assert res_log.status_code == 200
+    job_id = res_log.json()["job_id"]
+
+    res_patch = auth_client.patch(f"/api/jobs/{job_id}/status", json={
+        "status": "SUBMITTED"
+    })
+    assert res_patch.status_code == 200
+    assert res_patch.json()["status"] == "success"
+    assert res_patch.json()["new_status"] == "SUBMITTED"
+
+    res_bad = auth_client.patch(f"/api/jobs/{job_id}/status", json={
+        "status": "NOT_A_REAL_STATUS"
+    })
+    assert res_bad.status_code == 400
+
+    res_404 = auth_client.patch("/api/jobs/job_non_existent_9999/status", json={
+        "status": "OFFER"
+    })
+    assert res_404.status_code == 404
+
