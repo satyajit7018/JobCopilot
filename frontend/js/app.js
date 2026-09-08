@@ -974,6 +974,35 @@ if (els.pipelineSearchInput) {
   }, 160));
 }
 
+function renderEmptyKanbanCol({ icon, title, desc, action, actionText, extraAttr = '' }) {
+  return `
+    <div class="empty-state-card">
+      <div class="empty-state-icon">${icon}</div>
+      <div class="empty-state-title">${escapeHTML(title)}</div>
+      <div class="empty-state-desc">${escapeHTML(desc)}</div>
+      ${action && actionText ? `
+        <button class="empty-state-cta" data-action="${escapeHTML(action)}" ${extraAttr}>
+          <span>${escapeHTML(actionText)}</span>
+        </button>
+      ` : ''}
+    </div>
+  `;
+}
+
+function renderSkeletonCards(count = 2) {
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    html += `
+      <div class="skeleton-card">
+        <div class="skeleton-line short"></div>
+        <div class="skeleton-line medium"></div>
+        <div class="skeleton-line" style="width: 85%;"></div>
+      </div>
+    `;
+  }
+  return html;
+}
+
 function renderKanbanBoard() {
   const query = (els.pipelineSearchInput ? els.pipelineSearchInput.value : '').toLowerCase();
   const filter = state.currentPipelineFilter;
@@ -1029,11 +1058,57 @@ function renderKanbanBoard() {
   const mobSegOff = document.getElementById('mob-seg-count-offer');
   if (mobSegOff) mobSegOff.textContent = columns.offer.length;
 
-  if (els.cardsDiscovered) els.cardsDiscovered.innerHTML = columns.discovered.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No leads discovered.</p>';
-  if (els.cardsQueued) els.cardsQueued.innerHTML = columns.queued.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">Queue is empty.</p>';
-  if (els.cardsSubmitted) els.cardsSubmitted.innerHTML = columns.submitted.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No applications submitted yet.</p>';
-  if (els.cardsInterview) els.cardsInterview.innerHTML = columns.interview.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No active interviews.</p>';
-  if (els.cardsOffer) els.cardsOffer.innerHTML = columns.offer.map(j => renderJobCardHTML(j)).join('') || '<p class="empty-state-text">No offers recorded.</p>';
+  if (els.cardsDiscovered) {
+    els.cardsDiscovered.innerHTML = columns.discovered.map(j => renderJobCardHTML(j)).join('') ||
+      renderEmptyKanbanCol({
+        icon: '🛰️',
+        title: 'No leads discovered',
+        desc: 'Fetch 0-day feeds from ATS portals (Greenhouse, Lever, Ashby).',
+        action: 'triggerDiscoveryCycle',
+        actionText: '⚡ Fetch 0-Day Openings'
+      });
+  }
+  if (els.cardsQueued) {
+    els.cardsQueued.innerHTML = columns.queued.map(j => renderJobCardHTML(j)).join('') ||
+      renderEmptyKanbanCol({
+        icon: '📦',
+        title: 'Queue is empty',
+        desc: 'Review discovered leads or log recruiter outreach to queue.',
+        action: 'openLogCallModal',
+        actionText: '+ Log Recruiter Call'
+      });
+  }
+  if (els.cardsSubmitted) {
+    els.cardsSubmitted.innerHTML = columns.submitted.map(j => renderJobCardHTML(j)).join('') ||
+      renderEmptyKanbanCol({
+        icon: '🚀',
+        title: 'No applications submitted',
+        desc: 'Click Apply Now on any discovered job to launch stealth bot.',
+        action: 'triggerDiscoveryCycle',
+        actionText: '⚡ Find Openings'
+      });
+  }
+  if (els.cardsInterview) {
+    els.cardsInterview.innerHTML = columns.interview.map(j => renderJobCardHTML(j)).join('') ||
+      renderEmptyKanbanCol({
+        icon: '🎯',
+        title: 'No active interviews',
+        desc: 'Log recruiter screens or practice drills in Interview Studio.',
+        action: 'openLogCallModal',
+        actionText: '+ Log Interview'
+      });
+  }
+  if (els.cardsOffer) {
+    els.cardsOffer.innerHTML = columns.offer.map(j => renderJobCardHTML(j)).join('') ||
+      renderEmptyKanbanCol({
+        icon: '💎',
+        title: 'No offers recorded yet',
+        desc: 'Compare multi-offers & ESOP in the Salary & Equity Modeler.',
+        action: 'switchTab',
+        actionText: 'Open Salary Modeler',
+        extraAttr: 'data-tab="negotiation"'
+      });
+  }
 }
 
 function getCompanyAvatarData(company) {
