@@ -991,6 +991,13 @@ if (els.pipelineSearchInput) {
   }, 160));
 }
 
+const vaultSearchInput = document.getElementById('vault-search-input');
+if (vaultSearchInput) {
+  vaultSearchInput.addEventListener('input', debounce(() => {
+    renderVaultEntries();
+  }, 140));
+}
+
 function renderEmptyKanbanCol({ icon, title, desc, action, actionText, extraAttr = '' }) {
   return `
     <div class="empty-state-card">
@@ -1613,11 +1620,43 @@ async function fetchVaultEntries() {
 }
 
 function renderVaultEntries(entries) {
+  if (entries) state.vaultEntries = entries;
   if (!els.vaultEntriesList) return;
-  els.vaultEntriesList.innerHTML = entries.map(e => `
+  const list = state.vaultEntries || [];
+  const searchInput = document.getElementById('vault-search-input');
+  const search = (searchInput?.value || '').toLowerCase().trim();
+  const category = (state.vaultFilterCategory || 'ALL').toUpperCase();
+
+  const filtered = list.filter(e => {
+    const q = (e.question_pattern || '').toLowerCase();
+    const a = (e.answer_template || '').toLowerCase();
+    const t = (e.slot_type || '').toLowerCase();
+    if (search && !q.includes(search) && !a.includes(search) && !t.includes(search)) return false;
+    if (category !== 'ALL' && (e.slot_type || '').toUpperCase() !== category) return false;
+    return true;
+  });
+
+  const badge = document.getElementById('vault-total-badge');
+  if (badge) badge.textContent = `${filtered.length} of ${list.length} Slots Active`;
+
+  if (filtered.length === 0) {
+    els.vaultEntriesList.innerHTML = `
+      <div class="empty-state-card" style="padding: 1.5rem 1rem;">
+        <div class="empty-state-icon">🧠</div>
+        <div class="empty-state-title">No matching Q&amp;A slots</div>
+        <div class="empty-state-desc">Index a custom screening answer to train the autonomous form filler.</div>
+        <button class="empty-state-cta" data-action="openNewSlotModal">
+          <span>+ Add Custom Q&amp;A Slot</span>
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  els.vaultEntriesList.innerHTML = filtered.map(e => `
     <div style="background: rgba(10, 14, 24, 0.6); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 12px 14px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-        <span class="badge badge-info" style="font-size: 10px;">${escapeHTML(e.slot_type || '')}</span>
+        <span class="badge badge-info" style="font-size: 10px;">${escapeHTML(e.slot_type || 'CUSTOM')}</span>
         <span class="meta-muted-11">Used ${escapeHTML(String(e.usage_count || 0))}x</span>
       </div>
       <div style="font-weight: 600; font-size: 13px; color: #f1f5f9; margin-bottom: 4px;">${escapeHTML(e.question_pattern || '')}</div>
@@ -1627,6 +1666,15 @@ function renderVaultEntries(entries) {
     </div>
   `).join('');
 }
+
+window.filterVaultCategory = function(target) {
+  const cat = target.getAttribute('data-vcat') || 'ALL';
+  state.vaultFilterCategory = cat;
+  document.querySelectorAll('#vault-filter-pills .filter-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-vcat') === cat);
+  });
+  renderVaultEntries();
+};
 
 window.openNewSlotModal = function() {
   const modal = document.getElementById('modal-add-slot');
@@ -3367,6 +3415,12 @@ document.addEventListener('click', (event) => {
         navigator.clipboard.writeText(box.value);
         if (typeof showToast === 'function') showToast('Phone talking points copied to clipboard!', 'success');
         if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
+      }
+      break;
+    }
+    case 'filterVaultCategory': {
+      if (typeof window.filterVaultCategory === 'function') {
+        window.filterVaultCategory(target);
       }
       break;
     }

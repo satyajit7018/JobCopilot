@@ -732,7 +732,21 @@
               <h3 class="glass-card-title">Indexed Recruiter Screening Slots</h3>
               <span class="hud-pill" id="vault-total-badge" style="color: var(--accent-emerald);">20+ Slots Active</span>
             </div>
-            <div id="vault-entries-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 520px; overflow-y: auto;">
+
+            <!-- Live Vault Search & Category Filters -->
+            <div style="margin-bottom: 0.75rem;">
+              <input type="text" id="vault-search-input" class="form-input" placeholder="🔍 Search screening questions, answers, keywords..." style="margin-bottom: 0.6rem; padding: 7px 12px; font-size: 13px;">
+              <div class="filter-pills" id="vault-filter-pills" style="margin-bottom: 0;">
+                <button type="button" class="filter-pill active" data-vcat="ALL" data-action="filterVaultCategory">All Q&amp;As</button>
+                <button type="button" class="filter-pill" data-vcat="BEHAVIORAL" data-action="filterVaultCategory">Behavioral</button>
+                <button type="button" class="filter-pill" data-vcat="TECHNICAL" data-action="filterVaultCategory">Technical</button>
+                <button type="button" class="filter-pill" data-vcat="COMPENSATION" data-action="filterVaultCategory">Comp &amp; Notice</button>
+                <button type="button" class="filter-pill" data-vcat="WORK_AUTH" data-action="filterVaultCategory">Work Auth</button>
+                <button type="button" class="filter-pill" data-vcat="CUSTOM" data-action="filterVaultCategory">Custom</button>
+              </div>
+            </div>
+
+            <div id="vault-entries-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto;">
               <!-- Dynamically populated via app.js -->
             </div>
           </div>
