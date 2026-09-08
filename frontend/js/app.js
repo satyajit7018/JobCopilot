@@ -285,7 +285,7 @@ const els = {
 // ==========================================================================
 // Toast Notification Engine
 // ==========================================================================
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', action = null) {
   if (!els.toastContainer) return;
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
@@ -295,15 +295,28 @@ function showToast(message, type = 'info') {
   if (type === 'info') icon = 'ℹ';
 
   toast.innerHTML = `<span style="font-weight: 700;">${icon}</span><span>${message}</span>`;
+  if (action && action.label) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-action-btn';
+    btn.textContent = action.label;
+    btn.onclick = () => {
+      if (typeof action.onClick === 'function') action.onClick();
+      toast.remove();
+    };
+    toast.appendChild(btn);
+  }
   els.toastContainer.appendChild(toast);
 
+  const ttl = action ? 6000 : 4000;
   setTimeout(() => {
     toast.style.opacity = '0';
     toast.style.transform = 'translateY(10px)';
     toast.style.transition = 'all 0.3s ease';
     setTimeout(() => toast.remove(), 300);
-  }, 4000);
+  }, ttl);
 }
+
+window.showToast = showToast;
 
 // ==========================================================================
 // WebSocket Real-Time Gateway Connection
@@ -1164,9 +1177,64 @@ function renderJobCardHTML(job) {
   `;
 }
 
-// 1-Click Apply Action
+// ==========================================================================
+// Optimistic UI State Synchronizer
+// ==========================================================================
+// Optimistically change a job's status, re-render, sync to server, roll back on failure.
+async function optimisticStatusChange(jobId, newStatus, { verb = 'Moved', endpoint, method = 'PATCH', body } = {}) {
+  const job = (state.jobsList || []).find(j => String(j.job_id ?? j.id) === String(jobId));
+  if (!job) return;
+  const prevStatus = job.status;
+  if (prevStatus === newStatus) return;
+
+  // 1. Optimistic local update
+  job.status = newStatus;
+  renderKanbanBoard();
+
+  // 2. Success toast with Undo affordance
+  showToast(`${verb} ${job.company || 'job'}`, 'success', {
+    label: 'Undo',
+    onClick: () => {
+      job.status = prevStatus;
+      renderKanbanBoard();
+      syncStatus(jobId, prevStatus, endpoint, method, body).catch(err => {
+        showToast(`Undo failed to sync: ${err.message}`, 'error');
+      });
+    }
+  });
+
+  // 3. Background sync; roll back if it fails
+  try {
+    await syncStatus(jobId, newStatus, endpoint, method, body);
+  } catch (err) {
+    job.status = prevStatus;
+    renderKanbanBoard();
+    showToast(`Couldn't save — reverted. ${err.message}`, 'error');
+  }
+}
+
+async function syncStatus(jobId, status, endpoint, method = 'PATCH', body) {
+  const url = endpoint || `${API_BASE}/jobs/${jobId}/status`;
+  const res = await authFetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || { status })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json().catch(() => ({}));
+}
+
+window.optimisticStatusChange = optimisticStatusChange;
+window.syncStatus = syncStatus;
+
+// 1-Click Apply Action (Optimistic UI)
 window.applyToJob = async function(jobId) {
-  showToast(`Initializing stealth bot for job #${jobId}...`, 'info');
+  const job = (state.jobsList || []).find(j => String(j.job_id ?? j.id) === String(jobId));
+  const prev = job ? job.status : null;
+  if (job) {
+    job.status = 'SUBMITTED';
+    renderKanbanBoard();
+  }
   appendTerminalLog('BOT', `Launching Playwright Chromium session for Job ID: ${jobId}`);
 
   try {
@@ -1176,13 +1244,18 @@ window.applyToJob = async function(jobId) {
     });
     const data = await res.json();
     if (data.status === 'success') {
-      showToast(`Application successfully processed (${data.mode})!`, 'success');
-      appendTerminalLog('BOT', `Completed form filling for ${data.company}. Screenshot saved.`, false, true);
-      fetchJobsList();
+      showToast(`Applied to ${data.company || job?.company || 'job'} (${data.mode})`, 'success');
+      appendTerminalLog('BOT', `Completed form filling for ${data.company || job?.company || 'job'}. Screenshot saved.`, false, true);
       fetchFunnelMetrics();
+    } else {
+      throw new Error(data.detail || 'Apply failed');
     }
   } catch (err) {
-    showToast(`Bot apply error: ${err.message}`, 'error');
+    if (job) {
+      job.status = prev;
+      renderKanbanBoard();
+    }
+    showToast(`Apply failed — reverted. ${err.message}`, 'error');
   }
 };
 

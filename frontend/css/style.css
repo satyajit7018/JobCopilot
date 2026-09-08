@@ -1441,6 +1441,22 @@ code, pre, .font-mono {
   to { opacity: 1; transform: translateX(0); }
 }
 
+.toast-action-btn {
+  margin-left: 12px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.15);
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-weight: 700;
+  font-size: 12px;
+  transition: background 0.15s ease;
+}
+.toast-action-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
 /* Responsive adjustments */
 @media (max-width: 900px) {
   .cockpit-layout {

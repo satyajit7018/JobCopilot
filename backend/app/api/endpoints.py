@@ -45,6 +45,7 @@ from app.api.routers.jobs_router import (
     LogDirectCallRequest,
     MultiRoleTailorRequest,
     RecruiterNudgeRequest,
+    UpdateJobStatusRequest,
 )
 from app.api.routers.negotiation_router import (
     AdvancedCounterOfferRequest,
@@ -160,5 +161,6 @@ __all__ = [
     "UserConsent",
     "ConsentGrantRequest",
     "ConsentStatusResponse",
+    "UpdateJobStatusRequest",
 ]
 
