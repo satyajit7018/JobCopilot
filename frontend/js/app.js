@@ -1791,7 +1791,7 @@ function renderEmailRadar(emails) {
     return;
   }
 
-  els.emailRadarFeed.innerHTML = emails.map(m => {
+  els.emailRadarFeed.innerHTML = emails.map((m, idx) => {
     let badgeClass = 'badge-info';
     if (m.intent === 'INTERVIEW_INVITE') badgeClass = 'badge-low';
     if (m.intent === 'REJECTION') badgeClass = 'badge-critical';
@@ -1799,6 +1799,7 @@ function renderEmailRadar(emails) {
     const matchLink = (m.body_text || '').match(/(https?:\/\/(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com|calendly\.com)[^\s]+)/i);
     const rawMeetingUrl = matchLink ? matchLink[1] : null;
     const meetingUrl = rawMeetingUrl ? sanitizeUrl(rawMeetingUrl) : null;
+    const boxId = `email-reply-box-${idx}`;
 
     return `
       <div class="glass-card" style="margin-bottom: 0;">
@@ -1812,13 +1813,20 @@ function renderEmailRadar(emails) {
         <div style="font-weight: 600; font-size: 13px; color: var(--accent-cyan); margin-bottom: 6px;">${escapeHTML(m.subject || '')}</div>
         <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.4;">${escapeHTML(m.body_text || '')}</div>
 
-        ${meetingUrl ? `
-          <div style="margin-top: 10px;">
-            <a href="${meetingUrl}" target="_blank" class="gmeet-btn">
+        <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
+          ${meetingUrl ? `
+            <a href="${meetingUrl}" target="_blank" rel="noopener noreferrer" class="gmeet-btn" style="flex: 1; min-width: 160px;">
               <span>📹 Join Video Interview Meeting</span>
             </a>
-          </div>
-        ` : ''}
+          ` : ''}
+          <button class="btn btn-secondary btn-sm" data-action="generateEmailReply" data-sender="${escapeHTML(m.sender || '')}" data-intent="${escapeHTML(m.intent || '')}" data-subject="${escapeHTML(m.subject || '')}" data-box-id="${boxId}" style="font-size: 11.5px; padding: 5px 10px;">
+            <span>✉️ Quick AI Reply</span>
+          </button>
+          <button class="btn btn-secondary btn-sm" data-action="openLogCallModal" style="font-size: 11.5px; padding: 5px 10px;">
+            <span>📞 Log Call / Update</span>
+          </button>
+        </div>
+        <div id="${boxId}" style="display: none; margin-top: 8px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 8px;"></div>
       </div>
     `;
   }).join('');
@@ -2842,6 +2850,77 @@ window.openJobDetails = function(jobId) {
   modal.classList.add('active');
 };
 
+window.sendJobToNegotiation = function(jobId) {
+  const job = (state.jobsList || []).find(j => String(j.job_id ?? j.id) === String(jobId));
+  if (!job) {
+    showToast('Job details not found in active cache.', 'error');
+    return;
+  }
+
+  window.switchTab('negotiation');
+
+  const negComp = document.getElementById('neg-company-name');
+  if (negComp) negComp.value = job.company || 'Target Company';
+
+  const negRole = document.getElementById('neg-role-title');
+  if (negRole) negRole.value = job.title || 'Senior Software Engineer';
+
+  const offer1Comp = document.getElementById('offer1-comp');
+  if (offer1Comp) offer1Comp.value = job.company || 'Offer A';
+
+  const counterTarget = document.getElementById('counter-target-comp');
+  if (counterTarget) counterTarget.value = job.company || 'Target Company';
+
+  if (job.salary_range) {
+    const match = job.salary_range.match(/(\d+(?:\.\d+)?)/);
+    if (match) {
+      const val = parseFloat(match[1]);
+      const offer1Base = document.getElementById('offer1-base');
+      if (offer1Base && !isNaN(val)) offer1Base.value = val;
+    }
+  }
+
+  showToast(`Loaded ${job.company} into Salary & Comp Modeler!`, 'success');
+  if (typeof window.playProceduralChime === 'function') window.playProceduralChime('success');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+window.generateEmailReply = function(target) {
+  const sender = target.getAttribute('data-sender') || 'Recruiter';
+  const intent = target.getAttribute('data-intent') || 'INQUIRY';
+  const boxId = target.getAttribute('data-box-id');
+  const box = document.getElementById(boxId);
+  if (!box) return;
+
+  let replyText = '';
+  if (intent === 'INTERVIEW_INVITE') {
+    replyText = `Hi ${sender},\n\nThank you so much for the invitation! I would be delighted to speak with the team. The proposed time works well for me. Looking forward to discussing the role further.\n\nBest regards,\nAlex Mercer`;
+  } else if (intent === 'REJECTION') {
+    replyText = `Hi ${sender},\n\nThank you for letting me know. While I am disappointed, I genuinely appreciate the team's time and consideration. Please feel free to keep my details on file for future engineering opportunities.\n\nBest regards,\nAlex Mercer`;
+  } else {
+    replyText = `Hi ${sender},\n\nThank you for reaching out regarding the opportunity! I have attached my latest resume and would be delighted to schedule a brief introductory call.\n\nBest regards,\nAlex Mercer`;
+  }
+
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+      <span style="font-size: 11.5px; font-weight: 700; color: var(--accent-cyan);">🤖 AI Draft Response (${escapeHTML(intent)}):</span>
+      <button class="btn btn-primary btn-sm" id="btn-copy-ai-reply-${escapeHTML(boxId)}" style="font-size: 11px; padding: 2px 8px;">Copy Reply</button>
+    </div>
+    <textarea id="ta-reply-${escapeHTML(boxId)}" class="form-textarea" rows="4" style="margin-top: 4px; font-size: 12px; width: 100%; display: block;" readonly>${escapeHTML(replyText)}</textarea>
+  `;
+
+  const copyBtn = document.getElementById(`btn-copy-ai-reply-${boxId}`);
+  const ta = document.getElementById(`ta-reply-${boxId}`);
+  if (copyBtn && ta) {
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(ta.value);
+      showToast('AI draft reply copied to clipboard!', 'success');
+      if (typeof window.playProceduralChime === 'function') window.playProceduralChime('tap');
+    };
+  }
+};
+
 window.tailorJobAssets = async function(jobId) {
   showToast(`Tailoring Triple-Threat outreach for Job #${jobId}...`, 'info');
   try {
@@ -3421,6 +3500,19 @@ document.addEventListener('click', (event) => {
     case 'filterVaultCategory': {
       if (typeof window.filterVaultCategory === 'function') {
         window.filterVaultCategory(target);
+      }
+      break;
+    }
+    case 'sendJobToNegotiation': {
+      const jobId = target.getAttribute('data-job-id');
+      if (jobId && typeof window.sendJobToNegotiation === 'function') {
+        window.sendJobToNegotiation(jobId);
+      }
+      break;
+    }
+    case 'generateEmailReply': {
+      if (typeof window.generateEmailReply === 'function') {
+        window.generateEmailReply(target);
       }
       break;
     }
