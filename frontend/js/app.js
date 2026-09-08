@@ -1020,6 +1020,65 @@ function renderSkeletonCards(count = 2) {
   return html;
 }
 
+let draggedJobId = null;
+
+function initKanbanDragDrop() {
+  const colMapping = {
+    'col-discovered': 'DISCOVERED',
+    'col-queued': 'QUEUED',
+    'col-submitted': 'SUBMITTED',
+    'col-interview': 'INTERVIEW',
+    'col-offer': 'OFFER'
+  };
+
+  Object.entries(colMapping).forEach(([colId, targetStatus]) => {
+    const col = document.getElementById(colId);
+    if (!col || col._dragBound) return;
+    col._dragBound = true;
+
+    col.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      col.classList.add('drag-over');
+    });
+
+    col.addEventListener('dragleave', (e) => {
+      if (!col.contains(e.relatedTarget)) {
+        col.classList.remove('drag-over');
+      }
+    });
+
+    col.addEventListener('drop', (e) => {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      const jobId = e.dataTransfer?.getData('text/plain') || draggedJobId;
+      if (jobId && typeof window.optimisticStatusChange === 'function') {
+        window.optimisticStatusChange(jobId, targetStatus);
+      }
+    });
+  });
+}
+
+// Delegated Drag Handlers for Job Cards
+document.addEventListener('dragstart', (e) => {
+  const card = e.target.closest('.job-card');
+  if (card) {
+    draggedJobId = card.getAttribute('data-job-id');
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggedJobId);
+    }
+    card.classList.add('dragging');
+  }
+});
+
+document.addEventListener('dragend', (e) => {
+  const card = e.target.closest('.job-card');
+  if (card) card.classList.remove('dragging');
+  document.querySelectorAll('.kanban-col').forEach(c => c.classList.remove('drag-over'));
+  draggedJobId = null;
+});
+
 function renderKanbanBoard() {
   const query = (els.pipelineSearchInput ? els.pipelineSearchInput.value : '').toLowerCase();
   const filter = state.currentPipelineFilter;
@@ -1126,6 +1185,9 @@ function renderKanbanBoard() {
         extraAttr: 'data-tab="negotiation"'
       });
   }
+
+  // Bind drag-and-drop event handlers to kanban columns
+  initKanbanDragDrop();
 }
 
 function getCompanyAvatarData(company) {
@@ -1225,10 +1287,40 @@ function renderJobCardHTML(job) {
   const matchLink = (job.notes || '').match(/(https?:\/\/(?:meet\.google\.com|zoom\.us|teams\.microsoft\.com)[^\s]+)/i);
   if (matchLink) gmeetLink = sanitizeUrl(matchLink[1]);
 
+  // Stage-adaptive card actions
+  let actionsHTML = '';
+  if (job.status === 'SUBMITTED') {
+    actionsHTML = `
+      <span class="btn-applied-badge" style="display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 5px 10px; font-size: 11.5px; font-weight: 700; color: #34d399; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-sm); flex: 1.2;">✓ Applied</span>
+      <button class="btn btn-secondary btn-sm" data-action="openLogCallModal" style="flex: 1;">📞 Log Call</button>
+    `;
+  } else if (job.status === 'INTERVIEW') {
+    actionsHTML = `
+      <button class="btn btn-primary btn-sm" data-action="launchTailoredInterview" data-company="${company}" data-title="${title}" style="flex: 1.2; background: linear-gradient(135deg, #10b981, #06b6d4);">🎙️ Mock Drill</button>
+      <button class="btn btn-secondary btn-sm" data-action="sendJobToNegotiation" data-job-id="${jobId}" style="flex: 1;">💎 Model</button>
+    `;
+  } else if (job.status === 'OFFER') {
+    actionsHTML = `
+      <button class="btn btn-primary btn-sm" data-action="sendJobToNegotiation" data-job-id="${jobId}" style="flex: 1.2; background: linear-gradient(135deg, #f59e0b, #ec4899);">💎 Model Offer</button>
+      <button class="btn btn-secondary btn-sm" data-action="openLogCallModal" style="flex: 1;">📝 Notes</button>
+    `;
+  } else if (job.status === 'QUEUED' || job.status === 'NEEDS_REVIEW') {
+    actionsHTML = `
+      <button class="btn btn-primary btn-sm" data-action="applyToJob" data-job-id="${jobId}" style="flex: 1.2;">⚡ Launch Apply</button>
+      <button class="btn btn-secondary btn-sm" data-action="tailorJobAssets" data-job-id="${jobId}" style="flex: 1;">🎯 Assets</button>
+    `;
+  } else {
+    // DISCOVERED
+    actionsHTML = `
+      <button class="btn btn-primary btn-sm" data-action="applyToJob" data-job-id="${jobId}" style="flex: 1.2;">⚡ Apply Now</button>
+      <button class="btn btn-secondary btn-sm" data-action="tailorJobAssets" data-job-id="${jobId}" style="flex: 1;">🎯 Tailor</button>
+    `;
+  }
+
   return `
-    <div class="job-card" id="card-${jobId}">
+    <div class="job-card" id="card-${jobId}" draggable="true" data-job-id="${jobId}" data-status="${escapeHTML(job.status || 'DISCOVERED')}">
       <div class="job-card-header">
-        <div class="job-card-brand">
+        <div class="job-card-brand" data-action="openJobDetails" data-job-id="${jobId}" style="cursor: pointer;" title="Click to view full job description">
           <div class="company-avatar-box" style="background: ${avatar.bg};">
             <span>${avatar.icon}</span>
           </div>
@@ -1240,7 +1332,7 @@ function renderJobCardHTML(job) {
         ${renderMatchGaugeSVG(matchPct)}
       </div>
 
-      <div class="job-title">${title}</div>
+      <div class="job-title" data-action="openJobDetails" data-job-id="${jobId}" style="cursor: pointer;" title="Click to view full job description">${title}</div>
 
       <div class="job-tags-row">
         <span class="job-tag ${platformBadgeClass}">${platform}</span>
@@ -1255,15 +1347,8 @@ function renderJobCardHTML(job) {
         </a>
       ` : ''}
 
-      ${job.status === 'INTERVIEW' ? `
-        <button class="btn btn-secondary btn-sm" data-action="launchTailoredInterview" data-company="${company}" data-title="${title}" style="margin-top: 8px; width: 100%; background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(6, 182, 212, 0.25)); border-color: rgba(99, 102, 241, 0.5); color: #c7d2fe; font-size: 11.5px; padding: 6px 10px; justify-content: center;">
-          <span>🎙️ Practice Voice Mock Interview</span>
-        </button>
-      ` : ''}
-
       <div class="job-card-actions">
-        <button class="btn btn-primary btn-sm" data-action="applyToJob" data-job-id="${jobId}" style="flex: 1.2;">⚡ Apply Now</button>
-        <button class="btn btn-secondary btn-sm" data-action="tailorJobAssets" data-job-id="${jobId}" style="flex: 1;">🎯 Tailor</button>
+        ${actionsHTML}
       </div>
     </div>
   `;

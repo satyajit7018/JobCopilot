@@ -2739,3 +2739,31 @@ details.disclosure .disclosure-body {
   border-top: 1px solid var(--border-subtle);
 }
 
+/* Drag and Drop Kanban Styles */
+.job-card[draggable="true"] {
+  cursor: grab;
+  user-select: none;
+}
+
+.job-card[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.job-card.dragging {
+  opacity: 0.4;
+  transform: scale(0.97);
+  border: 1px dashed var(--accent-cyan) !important;
+  box-shadow: 0 0 16px rgba(0, 242, 254, 0.25);
+}
+
+.kanban-col {
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.kanban-col.drag-over {
+  background: rgba(99, 102, 241, 0.12) !important;
+  border: 1px dashed rgba(99, 102, 241, 0.6) !important;
+  border-radius: var(--radius-md);
+}
+
+
