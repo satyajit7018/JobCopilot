@@ -2851,6 +2851,11 @@ window.openJobDetails = function(jobId) {
   modal.classList.add('active');
 };
 
+window.closeJobDetailsModal = function() {
+  const modal = document.getElementById('modal-job-details');
+  if (modal) modal.classList.remove('active');
+};
+
 window.sendJobToNegotiation = function(jobId) {
   const job = (state.jobsList || []).find(j => String(j.job_id ?? j.id) === String(jobId));
   if (!job) {
