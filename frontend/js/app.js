@@ -575,6 +575,7 @@ window.switchTab = function(viewId) {
   if (viewId === 'studio' || viewId === 'interview-studio') viewId = 'interview';
   if (viewId === 'backups') viewId = 'settings';
   if (viewId === 'accelerator') viewId = 'interview';
+  if (viewId === 'billing') viewId = 'settings';
   if (viewId === 'admin') {
     const role = state.currentUser?.role;
     if (role !== 'ADMIN') {
