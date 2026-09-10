@@ -2766,4 +2766,258 @@ details.disclosure .disclosure-body {
   border-radius: var(--radius-md);
 }
 
+/* ==========================================================================
+   ONBOARDING MODE: Full-Bleed Auth & Discovery Funnel
+   ========================================================================== */
+body.onboarding-mode .cockpit-sidebar { display: none !important; }
+body.onboarding-mode .cockpit-topbar { display: none !important; }
+body.onboarding-mode .telemetry-hud { display: none !important; }
+body.onboarding-mode .mobile-top-bar { display: none !important; }
+body.onboarding-mode .mobile-bottom-nav { display: none !important; }
+body.onboarding-mode .mobile-drawer-overlay,
+body.onboarding-mode .mobile-drawer { display: none !important; }
+body.onboarding-mode .impersonation-alert-banner { display: none !important; }
+body.onboarding-mode .offline-alert-banner { display: none !important; }
 
+/* Full-bleed layout without sidebar grid */
+body.onboarding-mode .cockpit-layout {
+  display: block !important;
+  grid-template-columns: 1fr !important;
+}
+
+body.onboarding-mode .cockpit-content {
+  margin-left: 0 !important;
+  padding: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* ==========================================================================
+   VIEW 0A: LOGIN GATE SCREEN
+   ========================================================================== */
+.login-gate-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(6, 182, 212, 0.12) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(217, 70, 239, 0.08) 0%, transparent 60%);
+}
+
+.login-hero-card {
+  max-width: 460px;
+  width: 100%;
+  background: rgba(15, 22, 36, 0.85);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--radius-lg);
+  padding: 3rem 2.5rem;
+  text-align: center;
+  box-shadow: var(--shadow-lg), var(--glow-indigo);
+  animation: loginCardAppear 0.6s var(--ease-spring) both;
+}
+
+@keyframes loginCardAppear {
+  from { opacity: 0; transform: translateY(24px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.login-brand { margin-bottom: 1.5rem; }
+.login-logo-icon { font-size: 48px; margin-bottom: 0.5rem; }
+.login-brand-title { font-family: 'Outfit', sans-serif; font-size: 28px; font-weight: 800; color: #fff; }
+.login-brand-tagline { font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; text-transform: uppercase; letter-spacing: 0.15em; margin-top: 4px; }
+
+.login-headline { font-family: 'Outfit', sans-serif; font-size: 26px; font-weight: 800; color: #fff; line-height: 1.2; margin-bottom: 0.5rem; }
+.login-subline { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 1.5rem; }
+
+.login-value-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 2rem; }
+.login-value-pill { font-size: 11.5px; padding: 5px 12px; border-radius: var(--radius-full); background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.25); color: #c7d2fe; font-weight: 600; }
+
+.login-email-group { margin-bottom: 1rem; }
+.login-email-input { width: 100%; padding: 12px 16px; border-radius: var(--radius-md); background: var(--bg-glass-input); border: 1px solid var(--border-subtle); color: var(--text-primary); font-size: 14px; font-family: inherit; transition: border-color 0.2s ease; }
+.login-email-input:focus { outline: none; border-color: var(--accent-indigo); box-shadow: 0 0 12px rgba(99, 102, 241, 0.2); }
+
+.btn-login-google { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 13px; border-radius: var(--radius-md); background: #fff; color: #1f2937; font-size: 15px; font-weight: 700; font-family: inherit; border: none; cursor: pointer; transition: all 0.2s ease; box-shadow: var(--shadow-sm); }
+.btn-login-google:hover { transform: translateY(-1px); box-shadow: 0 8px 25px rgba(255, 255, 255, 0.15); }
+
+.btn-login-demo { width: 100%; padding: 12px; border-radius: var(--radius-md); background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); color: #c7d2fe; font-size: 14px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 0.75rem; transition: all 0.2s ease; }
+.btn-login-demo:hover { background: rgba(99, 102, 241, 0.25); border-color: var(--accent-indigo); box-shadow: var(--glow-indigo); }
+
+.login-footer { margin-top: 1.5rem; font-size: 11.5px; color: var(--text-muted); }
+.login-footer a { color: var(--accent-cyan); text-decoration: none; }
+.login-footer a:hover { text-decoration: underline; }
+
+/* ==========================================================================
+   VIEW 0B: CONNECT JOB PORTALS SCREEN
+   ========================================================================== */
+.portals-container {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  animation: loginCardAppear 0.5s var(--ease-spring) 0.1s both;
+}
+
+.portals-step-badge { display: inline-block; font-size: 11px; font-weight: 700; color: var(--accent-cyan); background: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: var(--radius-full); padding: 3px 12px; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.portals-title { font-family: 'Outfit', sans-serif; font-size: 28px; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+.portals-subtitle { font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 2rem; }
+
+.portals-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 2rem; }
+
+.portal-card { background: rgba(15, 22, 36, 0.75); backdrop-filter: blur(16px); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.25rem; cursor: pointer; transition: all 0.25s ease; display: flex; flex-direction: column; gap: 0.5rem; }
+.portal-card:hover { border-color: rgba(99, 102, 241, 0.4); background: rgba(22, 32, 54, 0.8); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.portal-card.connected { border-color: rgba(16, 185, 129, 0.5); box-shadow: 0 0 16px rgba(16, 185, 129, 0.15); background: rgba(16, 185, 129, 0.06); }
+
+.portal-card-top { display: flex; align-items: center; justify-content: space-between; }
+.portal-icon { font-size: 24px; }
+.portal-name { font-weight: 700; font-size: 14px; color: var(--text-primary); }
+.portal-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+
+.portal-status { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: var(--radius-full); transition: all 0.2s ease; }
+.portal-status.ready { color: var(--text-muted); background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-subtle); }
+.portal-status.connected { color: var(--accent-emerald); background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); }
+
+.portals-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: center; margin-top: auto; padding-top: 1rem; }
+.btn-text-link { background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; text-decoration: underline; font-family: inherit; transition: color 0.2s ease; }
+.btn-text-link:hover { color: var(--text-secondary); }
+
+/* Mobile responsive for portals & login */
+@media (max-width: 768px) {
+  .portals-container { padding: 2rem 1rem 7rem 1rem; }
+  .portals-grid { grid-template-columns: 1fr; gap: 0.75rem; }
+  .portals-title { font-size: 22px; }
+  .portals-actions {
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+  }
+  .portals-actions .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 12px;
+  }
+  .login-hero-card { padding: 2rem 1.5rem; }
+  .login-headline { font-size: 22px; }
+}
+
+/* ==========================================================================
+   USER-CENTRIC POLISH & ERGONOMIC REFINEMENTS
+   ========================================================================== */
+
+/* Login email validation feedback */
+.login-input-feedback {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #f87171;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Connect Portals Trust & Privacy Footnote */
+.portals-trust-note {
+  margin-top: 1.5rem;
+  margin-bottom: 2rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  max-width: 660px;
+  margin-left: auto;
+  margin-right: auto;
+  backdrop-filter: blur(10px);
+}
+
+/* 0-Day Pipeline First-Run Celebratory Welcome Banner */
+.pipeline-welcome-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.35rem;
+  margin-bottom: 1.25rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.14) 0%, rgba(6, 182, 212, 0.1) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), 0 0 16px rgba(99, 102, 241, 0.1);
+  animation: loginCardAppear 0.4s var(--ease-spring) both;
+}
+
+.welcome-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.welcome-banner-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.welcome-banner-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.welcome-banner-desc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+.welcome-banner-link {
+  color: var(--accent-cyan);
+  text-decoration: underline;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.welcome-banner-link:hover {
+  color: #fff;
+}
+
+.welcome-banner-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.welcome-banner-close:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* "⭐ My Portals" Filter Pill Highlight */
+.filter-pill[data-filter="CONNECTED"].active {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(99, 102, 241, 0.25));
+  border-color: rgba(245, 158, 11, 0.6);
+  color: #fef08a;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+}

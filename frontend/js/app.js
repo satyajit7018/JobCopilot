@@ -171,6 +171,14 @@ const state = {
   activeOutreachPackage: null,
   activeOutreachTab: 'cover',
   isDiscovering: false,
+  connectedPortals: {
+    linkedin: false,
+    naukri: false,
+    instahyre: false,
+    ats: false,
+    cuvette: false,
+    indeed: false
+  },
   currentUser: {
     email: 'candidate@jobcopilot.local',
     full_name: 'Candidate',
@@ -432,8 +440,8 @@ window.triggerGoogleSSO = async function() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'alex.mercer.dev@gmail.com',
-        full_name: 'Alex Mercer',
+        email: window._loginOverrideEmail || 'alex.mercer.dev@gmail.com',
+        full_name: window._loginOverrideEmail ? window._loginOverrideEmail.split('@')[0] : 'Alex Mercer',
         avatar_url: 'https://lh3.googleusercontent.com/a/default-user',
         auto_login_permissions: document.getElementById('chk-auto-login-perm')?.checked ?? true
       })
@@ -444,23 +452,229 @@ window.triggerGoogleSSO = async function() {
       if (data.refresh_token) {
         localStorage.setItem('jobcopilot_refresh_token', data.refresh_token);
       }
+      const fullName = data.full_name || (window._loginOverrideEmail ? window._loginOverrideEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Alex Mercer');
       state.currentUser = {
-        email: data.email || 'alex.mercer.dev@gmail.com',
-        full_name: 'Alex Mercer',
+        email: data.email || window._loginOverrideEmail || 'alex.mercer.dev@gmail.com',
+        full_name: fullName,
         user_id: data.user_id,
         role: data.role
       };
+      try {
+        localStorage.setItem('jobcopilot_user_name', fullName);
+      } catch (_) {}
       if (els.userDisplayName) els.userDisplayName.textContent = state.currentUser.full_name;
       if (els.authEmailDisplay) els.authEmailDisplay.textContent = state.currentUser.email;
       showToast(`Signed in successfully as ${state.currentUser.full_name}!`, 'success');
       appendTerminalLog('AUTH', `Google Single Sign-On session active for ${state.currentUser.email}`, false, true);
       initWebSocket();
+
+      // Route based on portal configuration state
+      const portalsConfigured = localStorage.getItem('jobcopilot_portals_configured') === 'true';
+      if (portalsConfigured) {
+        window.switchTab('pipeline');
+      } else {
+        window.switchTab('connect-portals');
+        renderPortalCards();
+      }
+
+      // Trigger deferred data fetches now that we're authenticated
+      fetchJobsList();
+      fetchFunnelMetrics();
+      fetchVaultEntries();
+      fetchHeldApplications();
+      window.checkAdminStatus();
+      window.loadUserWorkspaces();
     } else {
       showToast(`Google SSO error: ${data.detail || 'Authentication failed'}`, 'error');
     }
   } catch (err) {
     showToast(`Google SSO error: ${err.message}`, 'error');
   }
+};
+
+// Login screen: Sign in with Google using email from input
+window.loginWithGoogle = async function() {
+  const emailInput = document.getElementById('login-email-input');
+  const errorEl = document.getElementById('login-email-error');
+  const email = emailInput?.value?.trim();
+  if (email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      if (errorEl) {
+        errorEl.textContent = '⚠️ Please enter a valid email address (e.g. you@gmail.com)';
+        errorEl.style.display = 'flex';
+      }
+      showToast('Please enter a valid email address', 'error');
+      emailInput.focus();
+      return;
+    }
+    if (errorEl) errorEl.style.display = 'none';
+    window._loginOverrideEmail = email;
+  } else {
+    if (errorEl) errorEl.style.display = 'none';
+    window._loginOverrideEmail = null;
+  }
+  await window.triggerGoogleSSO();
+  window._loginOverrideEmail = null;
+};
+
+// Login screen: Demo mode with default Alex Mercer credentials
+window.loginDemoMode = async function() {
+  window._loginOverrideEmail = null;
+  await window.triggerGoogleSSO();
+};
+
+// ==========================================================================
+// Portal Connection State Machine & Onboarding
+// ==========================================================================
+const PORTAL_DEFS = [
+  { id: 'linkedin',  icon: '💼', name: 'LinkedIn Jobs',              desc: 'Easy Apply bot & InMail Radar for 800M+ professionals.' },
+  { id: 'naukri',    icon: '🇮🇳', name: 'Naukri.com',                 desc: "India's #1 tech hiring portal — 0-day openings from Swiggy, Zepto, PhonePe." },
+  { id: 'instahyre', icon: '🎯', name: 'Instahyre & Cutshort',       desc: 'AI-curated tech candidate matching with direct recruiter connections.' },
+  { id: 'ats',       icon: '🏢', name: 'Greenhouse, Lever & Ashby',  desc: 'Direct enterprise ATS career feeds (Stripe, Figma, Uber).' },
+  { id: 'cuvette',   icon: '🚀', name: 'Cuvette & YC Startups',      desc: 'High-growth startups & seed-stage openings from Y Combinator network.' },
+  { id: 'indeed',    icon: '🌍', name: 'Indeed & Wellfound',          desc: 'Global remote & startup tech jobs across 60+ countries.' }
+];
+
+function renderPortalCards() {
+  const grid = document.getElementById('portals-grid');
+  if (grid) {
+    grid.innerHTML = PORTAL_DEFS.map(p => {
+      const isConn = state.connectedPortals[p.id];
+      return `
+        <div class="portal-card ${isConn ? 'connected' : ''}" data-portal-id="${p.id}"
+             data-action="togglePortalConnection" data-portal="${p.id}">
+          <div class="portal-card-top">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="portal-icon">${p.icon}</span>
+              <span class="portal-name">${p.name}</span>
+            </div>
+            <span class="portal-status ${isConn ? 'connected' : 'ready'}" id="portal-status-${p.id}">
+              ${isConn ? '✓ Connected' : 'Ready to Connect'}
+            </span>
+          </div>
+          <div class="portal-desc">${p.desc}</div>
+        </div>`;
+    }).join('');
+  }
+
+  const settingsStatus = document.getElementById('settings-portals-status');
+  if (settingsStatus) {
+    settingsStatus.innerHTML = PORTAL_DEFS.map(p => {
+      const isConn = state.connectedPortals[p.id];
+      return `
+        <div style="padding: 8px 12px; border-radius: var(--radius-sm); background: ${isConn ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.04)'}; border: 1px solid ${isConn ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-subtle)'}; display: flex; align-items: center; gap: 8px;">
+          <span>${p.icon}</span>
+          <span style="font-size: 12px; font-weight: 600; color: ${isConn ? 'var(--accent-emerald)' : 'var(--text-muted)'};">${p.name}</span>
+        </div>`;
+    }).join('');
+  }
+  if (typeof window.updatePortalCtaButton === 'function') window.updatePortalCtaButton();
+}
+
+window.updatePortalCtaButton = function() {
+  const textEl = document.getElementById('btn-continue-cockpit-text');
+  if (!textEl) return;
+  const connectedCount = Object.values(state.connectedPortals || {}).filter(Boolean).length;
+  if (connectedCount === 6) {
+    textEl.textContent = 'Continue with All 6 Portals ➔';
+  } else if (connectedCount > 0) {
+    textEl.textContent = `Continue with ${connectedCount} Connected Portal${connectedCount > 1 ? 's' : ''} ➔`;
+  } else {
+    textEl.textContent = 'Continue to Main Cockpit (Skip for now) ➔';
+  }
+};
+
+window.togglePortalConnection = function(target) {
+  const portalId = (typeof target === 'string') ? target : target?.getAttribute?.('data-portal') || target?.closest?.('[data-portal]')?.getAttribute('data-portal');
+  if (!portalId || !state.connectedPortals.hasOwnProperty(portalId)) return;
+
+  state.connectedPortals[portalId] = !state.connectedPortals[portalId];
+  try {
+    localStorage.setItem('jobcopilot_connected_portals', JSON.stringify(state.connectedPortals));
+  } catch (_) {}
+
+  const card = document.querySelector(`.portal-card[data-portal-id="${portalId}"]`);
+  const badge = document.getElementById(`portal-status-${portalId}`);
+  if (card) card.classList.toggle('connected', state.connectedPortals[portalId]);
+  if (badge) {
+    badge.className = `portal-status ${state.connectedPortals[portalId] ? 'connected' : 'ready'}`;
+    badge.textContent = state.connectedPortals[portalId] ? '✓ Connected' : 'Ready to Connect';
+  }
+
+  // Update dynamic CTA button copy
+  window.updatePortalCtaButton();
+
+  // Update Settings badges if Settings view is loaded
+  const settingsStatus = document.getElementById('settings-portals-status');
+  if (settingsStatus) renderPortalCards();
+
+  if (state.connectedPortals[portalId]) {
+    showToast(`${PORTAL_DEFS.find(p => p.id === portalId)?.name || portalId} connected!`, 'success');
+    if (typeof window.playProceduralChime === 'function') window.playProceduralChime('success');
+  }
+};
+
+window.connectAllPortals = function() {
+  Object.keys(state.connectedPortals).forEach(id => {
+    state.connectedPortals[id] = true;
+  });
+  try {
+    localStorage.setItem('jobcopilot_connected_portals', JSON.stringify(state.connectedPortals));
+  } catch (_) {}
+  renderPortalCards();
+  window.updatePortalCtaButton();
+  showToast('All 6 job portals connected! Ready to discover openings.', 'success');
+  if (typeof window.playProceduralChime === 'function') window.playProceduralChime('success');
+};
+
+window.completePortalOnboarding = function() {
+  localStorage.setItem('jobcopilot_portals_configured', 'true');
+  try {
+    localStorage.setItem('jobcopilot_connected_portals', JSON.stringify(state.connectedPortals));
+  } catch (_) {}
+
+  const connectedPortalsList = PORTAL_DEFS.filter(p => state.connectedPortals[p.id]);
+  const hasConnected = connectedPortalsList.length > 0;
+
+  // Auto-select "⭐ My Portals" filter if portals are connected
+  if (hasConnected) {
+    state.currentPipelineFilter = 'CONNECTED';
+    document.querySelectorAll('.filter-pill').forEach(p => {
+      p.classList.toggle('active', p.getAttribute('data-filter') === 'CONNECTED');
+    });
+  } else {
+    state.currentPipelineFilter = 'ALL';
+    document.querySelectorAll('.filter-pill').forEach(p => {
+      p.classList.toggle('active', p.getAttribute('data-filter') === 'ALL');
+    });
+  }
+
+  window.switchTab('pipeline');
+
+  // Trigger welcome banner if not previously dismissed
+  const isDismissed = localStorage.getItem('jobcopilot_welcome_banner_dismissed') === 'true';
+  const banner = document.getElementById('pipeline-welcome-banner');
+  if (banner && !isDismissed) {
+    const summaryEl = document.getElementById('welcome-banner-portals-summary');
+    if (summaryEl) {
+      const namesStr = hasConnected
+        ? connectedPortalsList.map(p => p.name).join(', ')
+        : 'your chosen sources';
+      summaryEl.innerHTML = `Actively monitoring <strong>${escapeHTML(namesStr)}</strong>. <a href="#" data-action="switchTab" data-tab="onboarding" class="welcome-banner-link">Upload your resume</a> anytime in Profile &amp; Resume to calibrate 95%+ precision match scoring.`;
+    }
+    banner.style.display = 'flex';
+  }
+
+  showToast('Welcome to your cockpit! Pipeline is ready for 0-day discovery.', 'success');
+};
+
+window.dismissWelcomeBanner = function() {
+  const banner = document.getElementById('pipeline-welcome-banner');
+  if (banner) banner.style.display = 'none';
+  try {
+    localStorage.setItem('jobcopilot_welcome_banner_dismissed', 'true');
+  } catch (_) {}
 };
 
 // ==========================================================================
@@ -576,6 +790,10 @@ window.switchTab = function(viewId) {
   if (viewId === 'backups') viewId = 'settings';
   if (viewId === 'accelerator') viewId = 'interview';
   if (viewId === 'billing') viewId = 'settings';
+
+  // Toggle onboarding mode (hides cockpit chrome)
+  const ONBOARDING_VIEWS = ['login', 'connect-portals'];
+  document.body.classList.toggle('onboarding-mode', ONBOARDING_VIEWS.includes(viewId));
   if (viewId === 'admin') {
     const role = state.currentUser?.role;
     if (role !== 'ADMIN') {
@@ -1096,6 +1314,20 @@ function renderKanbanBoard() {
     if (!textMatch) return false;
 
     if (filter === 'ALL') return true;
+    if (filter === 'CONNECTED') {
+      const plat = (j.platform || '').toLowerCase();
+      const cp = state.connectedPortals || {};
+      const hasAny = Object.values(cp).some(Boolean);
+      if (!hasAny) return true;
+      let matches = false;
+      if (cp.linkedin && (plat.includes('linkedin') || plat.includes('direct'))) matches = true;
+      if (cp.naukri && plat.includes('naukri')) matches = true;
+      if (cp.instahyre && (plat.includes('instahyre') || plat.includes('cutshort'))) matches = true;
+      if (cp.ats && (plat.includes('greenhouse') || plat.includes('lever') || plat.includes('ashby') || plat.includes('workday'))) matches = true;
+      if (cp.cuvette && (plat.includes('cuvette') || plat.includes('yc'))) matches = true;
+      if (cp.indeed && (plat.includes('indeed') || plat.includes('wellfound'))) matches = true;
+      return matches;
+    }
     if (filter === 'HIGH_MATCH') return (j.match_score || 0) >= 0.75;
     if (filter === 'NAUKRI') return (j.platform || '').toLowerCase().includes('naukri');
     if (filter === 'INSTAHYRE') return (j.platform || '').toLowerCase().includes('instahyre');
@@ -3314,6 +3546,7 @@ window.toggleCmdPalette = function(forceOpen) {
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault();
+    if (document.body.classList.contains('onboarding-mode')) return;
     window.toggleCmdPalette();
   }
 });
@@ -3366,8 +3599,16 @@ if (document.readyState === 'loading') {
 window.logoutUser = function() {
   localStorage.removeItem('jobcopilot_access_token');
   localStorage.removeItem('jobcopilot_refresh_token');
+  localStorage.removeItem('jobcopilot_portals_configured');
+  localStorage.removeItem('jobcopilot_connected_portals');
+  localStorage.removeItem('jobcopilot_user_name');
+  localStorage.removeItem('jobcopilot_welcome_banner_dismissed');
   showToast('Signed out successfully.', 'info');
-  setTimeout(() => window.location.reload(), 300);
+  state.currentUser = { email: 'candidate@jobcopilot.local', full_name: 'Candidate', auto_login_enabled: true };
+  state.connectedPortals = { linkedin: false, naukri: false, instahyre: false, ats: false, cuvette: false, indeed: false };
+  if (els.userDisplayName) els.userDisplayName.textContent = 'Candidate';
+  if (state.ws) { state.ws.close(); state.ws = null; }
+  window.switchTab('login');
 };
 
 // ==========================================================================
@@ -3527,6 +3768,48 @@ document.addEventListener('click', (event) => {
     case 'generateEmailReply': {
       if (typeof window.generateEmailReply === 'function') {
         window.generateEmailReply(target);
+      }
+      break;
+    }
+    case 'togglePortalConnection': {
+      if (typeof window.togglePortalConnection === 'function') {
+        window.togglePortalConnection(target);
+      }
+      break;
+    }
+    case 'connectAllPortals': {
+      if (typeof window.connectAllPortals === 'function') {
+        window.connectAllPortals();
+      }
+      break;
+    }
+    case 'completePortalOnboarding': {
+      if (typeof window.completePortalOnboarding === 'function') {
+        window.completePortalOnboarding();
+      }
+      break;
+    }
+    case 'dismissWelcomeBanner': {
+      if (typeof window.dismissWelcomeBanner === 'function') {
+        window.dismissWelcomeBanner();
+      }
+      break;
+    }
+    case 'submitLoginForm': {
+      if (typeof window.loginWithGoogle === 'function') {
+        window.loginWithGoogle();
+      }
+      break;
+    }
+    case 'loginWithGoogle': {
+      if (typeof window.loginWithGoogle === 'function') {
+        window.loginWithGoogle();
+      }
+      break;
+    }
+    case 'loginDemoMode': {
+      if (typeof window.loginDemoMode === 'function') {
+        window.loginDemoMode();
       }
       break;
     }
@@ -4477,6 +4760,53 @@ document.addEventListener('keydown', (event) => {
 // Initialization on Load
 // ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
+  // Restore connected portals from localStorage if available
+  try {
+    const savedPortals = localStorage.getItem('jobcopilot_connected_portals');
+    if (savedPortals) {
+      state.connectedPortals = Object.assign(state.connectedPortals, JSON.parse(savedPortals));
+    }
+  } catch (_) {}
+
+  const token = localStorage.getItem('jobcopilot_access_token');
+  const portalsConfigured = localStorage.getItem('jobcopilot_portals_configured') === 'true';
+
+  // Restore saved candidate display name
+  const savedCandidateName = localStorage.getItem('jobcopilot_user_name');
+  if (savedCandidateName) {
+    if (els.userDisplayName) els.userDisplayName.textContent = savedCandidateName;
+    if (state.currentUser) state.currentUser.full_name = savedCandidateName;
+  }
+
+  // Bind Enter key and input clearing for Login email
+  const loginEmailInput = document.getElementById('login-email-input');
+  if (loginEmailInput) {
+    loginEmailInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        window.loginWithGoogle();
+      }
+    });
+    loginEmailInput.addEventListener('input', () => {
+      const errEl = document.getElementById('login-email-error');
+      if (errEl) errEl.style.display = 'none';
+    });
+  }
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      window.loginWithGoogle();
+    });
+  }
+
+  if (!token) {
+    // No auth — show login gate, skip all data fetches
+    window.switchTab('login');
+    return;
+  }
+
+  // Authenticated — initialize data layer
   initWebSocket();
   fetchJobsList();
   fetchFunnelMetrics();
@@ -4488,6 +4818,18 @@ document.addEventListener('DOMContentLoaded', () => {
   window.loadUserWorkspaces();
   window.initOfflineQueue();
 
-  const initialView = window.location.hash ? window.location.hash.replace('#', '') : 'pipeline';
-  window.switchTab(initialView);
+  if (!portalsConfigured) {
+    // Authenticated but portals not yet configured — show portal screen
+    window.switchTab('connect-portals');
+    renderPortalCards();
+  } else {
+    // Fully onboarded — go to requested view or pipeline
+    const initialView = window.location.hash ? window.location.hash.replace('#', '') : 'pipeline';
+    if (initialView === 'login' || initialView === 'connect-portals') {
+      window.switchTab('pipeline');
+    } else {
+      window.switchTab(initialView);
+    }
+    renderPortalCards();
+  }
 });
