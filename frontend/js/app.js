@@ -484,6 +484,7 @@ window.triggerGoogleSSO = async function() {
       fetchHeldApplications();
       window.checkAdminStatus();
       window.loadUserWorkspaces();
+      window.initOfflineQueue();
     } else {
       showToast(`Google SSO error: ${data.detail || 'Authentication failed'}`, 'error');
     }
@@ -651,6 +652,7 @@ window.completePortalOnboarding = function() {
   }
 
   window.switchTab('pipeline');
+  renderKanbanBoard(); // filter pill was toggled programmatically above — re-render to match
 
   // Trigger welcome banner if not previously dismissed
   const isDismissed = localStorage.getItem('jobcopilot_welcome_banner_dismissed') === 'true';
@@ -4667,6 +4669,8 @@ window.executeAccountDeletion = async function() {
 // 5. PWA Offline Queue & Native Push Notifications
 // --------------------------------------------------------------------------
 window.initOfflineQueue = function() {
+  if (window._offlineQueueInitialized) return; // avoid double-binding on re-login
+  window._offlineQueueInitialized = true;
   const updateOfflineState = () => {
     const offlineBanner = document.getElementById('offline-banner');
     if (!navigator.onLine) {
