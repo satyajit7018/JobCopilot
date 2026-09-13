@@ -1201,6 +1201,7 @@ async function fetchJobsList() {
 
 window.filterPipeline = function(filter, btn) {
   state.currentPipelineFilter = filter;
+  state.columnLimits = {};
   document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
   if (btn) btn.classList.add('active');
   renderKanbanBoard();
@@ -1208,6 +1209,7 @@ window.filterPipeline = function(filter, btn) {
 
 if (els.pipelineSearchInput) {
   els.pipelineSearchInput.addEventListener('input', debounce(() => {
+    state.columnLimits = {};
     renderKanbanBoard();
   }, 160));
 }
@@ -1376,56 +1378,75 @@ function renderKanbanBoard() {
   const mobSegOff = document.getElementById('mob-seg-count-offer');
   if (mobSegOff) mobSegOff.textContent = columns.offer.length;
 
+  const COLUMN_PAGE_SIZE = 25;
+  state.columnLimits = state.columnLimits || {};
+
+  function renderColumnCards(colKey, list, emptyConfig) {
+    if (!list || list.length === 0) {
+      return renderEmptyKanbanCol(emptyConfig);
+    }
+    const limit = state.columnLimits[colKey] || COLUMN_PAGE_SIZE;
+    const visible = list.slice(0, limit);
+    let html = visible.map(j => renderJobCardHTML(j)).join('');
+    if (list.length > limit) {
+      const remaining = list.length - limit;
+      const nextBatch = Math.min(COLUMN_PAGE_SIZE, remaining);
+      html += `
+        <div class="kanban-pagination-wrap" style="text-align: center; padding: 8px 4px 4px 4px;">
+          <button class="btn btn-secondary btn-sm" data-action="showMoreColumnCards" data-col="${colKey}" style="width: 100%; font-size: 11.5px; padding: 6px 10px; background: rgba(15, 23, 42, 0.7); border: 1px dashed rgba(0, 242, 254, 0.4); color: var(--accent-cyan);">
+            <span>Show ${nextBatch} more (${remaining} remaining) ▾</span>
+          </button>
+        </div>
+      `;
+    }
+    return html;
+  }
+
   if (els.cardsDiscovered) {
-    els.cardsDiscovered.innerHTML = columns.discovered.map(j => renderJobCardHTML(j)).join('') ||
-      renderEmptyKanbanCol({
-        icon: '🛰️',
-        title: 'No leads discovered',
-        desc: 'Fetch 0-day feeds from ATS portals (Greenhouse, Lever, Ashby).',
-        action: 'triggerDiscoveryCycle',
-        actionText: '⚡ Fetch 0-Day Openings'
-      });
+    els.cardsDiscovered.innerHTML = renderColumnCards('discovered', columns.discovered, {
+      icon: '🛰️',
+      title: 'No leads discovered',
+      desc: 'Fetch 0-day feeds from ATS portals (Greenhouse, Lever, Ashby).',
+      action: 'triggerDiscoveryCycle',
+      actionText: '⚡ Fetch 0-Day Openings'
+    });
   }
   if (els.cardsQueued) {
-    els.cardsQueued.innerHTML = columns.queued.map(j => renderJobCardHTML(j)).join('') ||
-      renderEmptyKanbanCol({
-        icon: '📦',
-        title: 'Queue is empty',
-        desc: 'Review discovered leads or log recruiter outreach to queue.',
-        action: 'openLogCallModal',
-        actionText: '+ Log Recruiter Call'
-      });
+    els.cardsQueued.innerHTML = renderColumnCards('queued', columns.queued, {
+      icon: '📦',
+      title: 'Queue is empty',
+      desc: 'Review discovered leads or log recruiter outreach to queue.',
+      action: 'openLogCallModal',
+      actionText: '+ Log Recruiter Call'
+    });
   }
   if (els.cardsSubmitted) {
-    els.cardsSubmitted.innerHTML = columns.submitted.map(j => renderJobCardHTML(j)).join('') ||
-      renderEmptyKanbanCol({
-        icon: '🚀',
-        title: 'No applications submitted',
-        desc: 'Click Apply Now on any discovered job to launch stealth bot.',
-        action: 'triggerDiscoveryCycle',
-        actionText: '⚡ Find Openings'
-      });
+    els.cardsSubmitted.innerHTML = renderColumnCards('submitted', columns.submitted, {
+      icon: '🚀',
+      title: 'No applications submitted',
+      desc: 'Click Apply Now on any discovered job to launch stealth bot.',
+      action: 'triggerDiscoveryCycle',
+      actionText: '⚡ Find Openings'
+    });
   }
   if (els.cardsInterview) {
-    els.cardsInterview.innerHTML = columns.interview.map(j => renderJobCardHTML(j)).join('') ||
-      renderEmptyKanbanCol({
-        icon: '🎯',
-        title: 'No active interviews',
-        desc: 'Log recruiter screens or practice drills in Interview Studio.',
-        action: 'openLogCallModal',
-        actionText: '+ Log Interview'
-      });
+    els.cardsInterview.innerHTML = renderColumnCards('interview', columns.interview, {
+      icon: '🎯',
+      title: 'No active interviews',
+      desc: 'Log recruiter screens or practice drills in Interview Studio.',
+      action: 'openLogCallModal',
+      actionText: '+ Log Interview'
+    });
   }
   if (els.cardsOffer) {
-    els.cardsOffer.innerHTML = columns.offer.map(j => renderJobCardHTML(j)).join('') ||
-      renderEmptyKanbanCol({
-        icon: '💎',
-        title: 'No offers recorded yet',
-        desc: 'Compare multi-offers & ESOP in the Salary & Equity Modeler.',
-        action: 'switchTab',
-        actionText: 'Open Salary Modeler',
-        extraAttr: 'data-tab="negotiation"'
-      });
+    els.cardsOffer.innerHTML = renderColumnCards('offer', columns.offer, {
+      icon: '💎',
+      title: 'No offers recorded yet',
+      desc: 'Compare multi-offers & ESOP in the Salary & Equity Modeler.',
+      action: 'switchTab',
+      actionText: 'Open Salary Modeler',
+      extraAttr: 'data-tab="negotiation"'
+    });
   }
 
   // Bind drag-and-drop event handlers to kanban columns
@@ -3685,6 +3706,15 @@ document.addEventListener('click', (event) => {
     case 'closeCmdPaletteOverlay': {
       if (event.target === target && typeof window.toggleCmdPalette === 'function') {
         window.toggleCmdPalette(false);
+      }
+      break;
+    }
+    case 'showMoreColumnCards': {
+      const col = target.getAttribute('data-col');
+      if (col) {
+        state.columnLimits = state.columnLimits || {};
+        state.columnLimits[col] = (state.columnLimits[col] || 25) + 25;
+        renderKanbanBoard();
       }
       break;
     }
