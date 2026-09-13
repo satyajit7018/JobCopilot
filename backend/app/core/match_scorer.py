@@ -34,20 +34,37 @@ class MatchScorer:
 
     @classmethod
     def infer_job_seniority(cls, title: str, description: str) -> str:
-        """Infers job seniority level from title and description text."""
-        combined = (title + " " + description[:300]).lower()
-        if "intern" in combined:
+        """Infers job seniority level from title and description text using word boundaries."""
+        t_clean = (title or "").lower()
+        # Title takes strict priority
+        if re.search(r'\b(intern|internship)\b', t_clean):
             return "Intern"
-        if "staff" in combined:
+        if re.search(r'\bstaff\b', t_clean):
             return "Staff"
-        if "principal" in combined:
+        if re.search(r'\bprincipal\b', t_clean):
             return "Principal"
-        if "lead" in combined:
+        if re.search(r'\blead\b', t_clean):
             return "Lead"
-        if "senior" in combined or "sr." in combined:
+        if re.search(r'\b(senior|sr\.)\b', t_clean):
             return "Senior"
-        if "junior" in combined or "jr." in combined or "entry" in combined or "graduate" in combined:
+        if re.search(r'\b(junior|jr\.|entry|graduate)\b', t_clean):
             return "Junior"
+
+        # Check description intro (first 300 chars) with word boundaries if title had no seniority token
+        desc_intro = (description or "")[:300].lower()
+        if re.search(r'\b(intern|internship)\b', desc_intro):
+            return "Intern"
+        if re.search(r'\bstaff\b', desc_intro):
+            return "Staff"
+        if re.search(r'\bprincipal\b', desc_intro):
+            return "Principal"
+        if re.search(r'\blead\b', desc_intro):
+            return "Lead"
+        if re.search(r'\b(senior|sr\.)\b', desc_intro):
+            return "Senior"
+        if re.search(r'\b(junior|jr\.|entry|graduate)\b', desc_intro):
+            return "Junior"
+
         return "Mid-Level"
 
     @classmethod
@@ -63,11 +80,19 @@ class MatchScorer:
         and missing required skills.
         """
         text = (job_title + " " + job_description).lower()
-        candidate_skills = profile.skills
+        candidate_skills = profile.skills or []
         candidate_skills_lower = {s.lower(): s for s in candidate_skills}
 
         match_reasons: List[str] = []
         missing_skills: List[str] = []
+
+        # Check if profile has substantial resume / skill calibration data
+        has_resume_data = bool(
+            (getattr(profile, "raw_resume_text", None) and profile.raw_resume_text.strip()) or
+            (profile.skills and len(profile.skills) > 0) or
+            (profile.experience and len(profile.experience) > 0) or
+            (profile.summary and profile.summary.strip())
+        )
 
         # 1. Technical Skill Overlap (40% weight)
         job_skills = cls.extract_job_required_skills(job_description)
@@ -124,11 +149,14 @@ class MatchScorer:
 
         # 3. Experience Level Alignment (15% weight)
         seniority = cls.infer_job_seniority(job_title, job_description)
-        yoe = profile.preferences.years_of_experience
+        yoe = profile.preferences.years_of_experience if profile.preferences else 0.0
         min_yoe, max_yoe = cls.SENIORITY_YOE_MAP.get(seniority.lower(), (1.0, 6.0))
 
         if is_engineer:
-            if min_yoe <= yoe <= max_yoe + 1.0:
+            if not has_resume_data or (not profile.skills and yoe <= 0.0):
+                exp_score = 0.05
+                match_reasons.append("Provisional match score — upload your resume in Profile & Resume to calibrate precision.")
+            elif min_yoe <= yoe <= max_yoe + 1.0:
                 exp_score = 0.15
                 match_reasons.append(f"Experience level ({yoe:.1f} yrs) fits {seniority} requirements.")
             elif yoe < min_yoe:
@@ -140,8 +168,8 @@ class MatchScorer:
 
         # 4. Location & Remote Compatibility (15% weight)
         loc_clean = job_location.lower()
-        remote_pref = profile.preferences.remote_preference.lower()
-        candidate_loc = profile.location.lower()
+        remote_pref = (profile.preferences.remote_preference if profile.preferences else "").lower()
+        candidate_loc = (profile.location or "").lower()
 
         if is_engineer:
             if "remote" in loc_clean or "remote" in remote_pref:
@@ -151,12 +179,16 @@ class MatchScorer:
                 loc_score = 0.15
                 match_reasons.append("Local geographic match.")
             else:
-                loc_score = 0.08 if profile.preferences.willing_to_relocate else 0.02
+                willing = profile.preferences.willing_to_relocate if profile.preferences else False
+                loc_score = 0.08 if willing else 0.02
         else:
             loc_score = 0.0
 
         # Aggregate total score
         total_score = skill_score + title_score + exp_score + loc_score
+        if not has_resume_data or not profile.skills:
+            # Cap provisional uncalibrated profiles so they do not claim false high confidence
+            total_score = min(total_score, 0.35)
         final_clamped = min(max(round(total_score, 2), 0.05), 0.99)
 
         return final_clamped, match_reasons, missing_skills[:6]
@@ -179,6 +211,16 @@ class MatchScorer:
         base_score, match_reasons, missing_skills = cls.compute_match_score(
             profile, job_title, job_description, job_location
         )
+
+        has_resume_data = bool(
+            (getattr(profile, "raw_resume_text", None) and profile.raw_resume_text.strip()) or
+            (profile.skills and len(profile.skills) > 0) or
+            (profile.experience and len(profile.experience) > 0) or
+            (profile.summary and profile.summary.strip())
+        )
+
+        if not has_resume_data or not profile.skills:
+            return base_score, match_reasons, missing_skills
 
         profile_text = (
             f"{profile.summary} "
