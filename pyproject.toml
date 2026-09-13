@@ -105,6 +105,10 @@ omit = [
     "backend/tests/*",
     "backend/venv/*",
     "backend/alembic/*",
+    # PostgreSQL dialect adapter — integration-tested against a live Postgres,
+    # not exercised by the CI unit suite (which runs on SQLite). The db-adapter
+    # parity test guarantees it implements the full DatabaseAdapter ABC.
+    "backend/app/core/postgres_adapter.py",
 ]
 
 [tool.coverage.report]
