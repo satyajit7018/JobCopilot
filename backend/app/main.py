@@ -10,7 +10,7 @@ from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from slowapi import _rate_limit_exceeded_handler
@@ -203,6 +203,74 @@ if frontend_dir.exists():
     @app.get("/")
     async def serve_frontend():
         return FileResponse(str(frontend_dir / "index.html"))
+
+# Mount Legal Documentation Routes
+docs_dir = Path(__file__).resolve().parent.parent.parent / "docs"
+
+def _render_legal_doc(file_path: Path, title: str) -> HTMLResponse:
+    if not file_path.exists():
+        return HTMLResponse("<h1>Document Not Found</h1>", status_code=404)
+    content = file_path.read_text(encoding="utf-8")
+    try:
+        from markdown_it import MarkdownIt
+        md = MarkdownIt()
+        rendered_body = md.render(content)
+    except Exception:
+        import html
+        rendered_body = f"<pre>{html.escape(content)}</pre>"
+
+    page_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title} — JobCopilot</title>
+  <style>
+    body {{
+      background: #06080d;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      margin: 0;
+      padding: 2.5rem 1rem;
+    }}
+    .legal-container {{
+      max-width: 820px;
+      margin: 0 auto;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 2.5rem;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.6);
+    }}
+    h1, h2, h3, h4 {{ color: #ffffff; margin-top: 1.5rem; }}
+    a {{ color: #818cf8; text-decoration: none; }}
+    a:hover {{ text-decoration: underline; }}
+    pre, code {{ background: rgba(0, 0, 0, 0.4); padding: 2px 6px; border-radius: 4px; color: #38bdf8; font-family: monospace; font-size: 13px; }}
+    hr {{ border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 2rem 0; }}
+    .back-nav {{ margin-bottom: 1.5rem; font-size: 14px; font-weight: 600; }}
+    table {{ width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 13.5px; }}
+    th, td {{ border: 1px solid rgba(255, 255, 255, 0.12); padding: 8px 12px; text-align: left; }}
+    th {{ background: rgba(255, 255, 255, 0.05); color: #fff; }}
+  </style>
+</head>
+<body>
+  <div class="legal-container">
+    <div class="back-nav"><a href="/">&larr; Back to JobCopilot</a></div>
+    {rendered_body}
+  </div>
+</body>
+</html>"""
+    return HTMLResponse(content=page_html, status_code=200)
+
+@app.get("/legal/terms", response_class=HTMLResponse, tags=["Legal"])
+async def serve_terms():
+    return _render_legal_doc(docs_dir / "compliance" / "TERMS_OF_SERVICE.md", "Terms of Service")
+
+@app.get("/legal/privacy", response_class=HTMLResponse, tags=["Legal"])
+async def serve_privacy():
+    return _render_legal_doc(docs_dir / "PRIVACY.md", "Privacy Policy")
 
 
 if __name__ == "__main__":
