@@ -109,6 +109,20 @@ async function refreshAccessToken() {
   return null;
 }
 
+function forceReauth() {
+  ['jobcopilot_access_token', 'jobcopilot_refresh_token'].forEach(k => localStorage.removeItem(k));
+  if (!window._reauthRedirected) {
+    window._reauthRedirected = true;
+    if (typeof showToast === 'function') {
+      showToast('Session expired — please sign in again.', 'info');
+    }
+    if (typeof window.switchTab === 'function') {
+      window.switchTab('login');
+    }
+    setTimeout(() => { window._reauthRedirected = false; }, 5000);
+  }
+}
+
 async function authFetch(url, options = {}) {
   let token = localStorage.getItem('jobcopilot_access_token');
   const headers = { ...(options.headers || {}) };
@@ -144,14 +158,7 @@ async function authFetch(url, options = {}) {
   }
 
   if (response.status === 401) {
-    const hasToken = localStorage.getItem('jobcopilot_access_token');
-    if (hasToken && !window._sessionExpiryNotified) {
-      window._sessionExpiryNotified = true;
-      if (typeof showToast === 'function') {
-        showToast('Session expired. Please sign in via Google SSO to reconnect.', 'info');
-      }
-      setTimeout(() => { window._sessionExpiryNotified = false; }, 30000);
-    }
+    forceReauth();
   }
 
   return response;
@@ -498,23 +505,27 @@ window.loginWithGoogle = async function() {
   const emailInput = document.getElementById('login-email-input');
   const errorEl = document.getElementById('login-email-error');
   const email = emailInput?.value?.trim();
-  if (email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      if (errorEl) {
-        errorEl.textContent = '⚠️ Please enter a valid email address (e.g. you@gmail.com)';
-        errorEl.style.display = 'flex';
-      }
-      showToast('Please enter a valid email address', 'error');
-      emailInput.focus();
-      return;
+  if (!email) {
+    if (errorEl) {
+      errorEl.textContent = '⚠️ Please enter your email address to sign in';
+      errorEl.style.display = 'flex';
     }
-    if (errorEl) errorEl.style.display = 'none';
-    window._loginOverrideEmail = email;
-  } else {
-    if (errorEl) errorEl.style.display = 'none';
-    window._loginOverrideEmail = null;
+    showToast('Please enter your email address', 'error');
+    emailInput?.focus();
+    return;
   }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    if (errorEl) {
+      errorEl.textContent = '⚠️ Please enter a valid email address (e.g. you@gmail.com)';
+      errorEl.style.display = 'flex';
+    }
+    showToast('Please enter a valid email address', 'error');
+    emailInput.focus();
+    return;
+  }
+  if (errorEl) errorEl.style.display = 'none';
+  window._loginOverrideEmail = email;
   await window.triggerGoogleSSO();
   window._loginOverrideEmail = null;
 };
@@ -582,7 +593,7 @@ window.updatePortalCtaButton = function() {
   } else if (connectedCount > 0) {
     textEl.textContent = `Continue with ${connectedCount} Connected Portal${connectedCount > 1 ? 's' : ''} ➔`;
   } else {
-    textEl.textContent = 'Continue to Main Cockpit (Skip for now) ➔';
+    textEl.textContent = 'Continue to Main Cockpit ➔';
   }
 };
 
@@ -1097,106 +1108,29 @@ if (els.questionnaireForm) {
   });
 }
 
-const DEFAULT_PREVIEW_JOBS = [
-  {
-    job_id: 'sample_swiggy_01',
-    company: 'Swiggy',
-    title: 'SDE II (Logistics & Delivery Platform)',
-    location: 'Bangalore, 2 yrs exp',
-    platform: 'Naukri',
-    salary_range: '₹28-35 LPA',
-    match_score: 0.94,
-    status: 'DISCOVERED',
-    notes: ''
-  },
-  {
-    job_id: 'sample_razorpay_02',
-    company: 'Razorpay',
-    title: 'Backend Eng. (Payments Settlements)',
-    location: 'Remote (India)',
-    platform: 'Instahyre',
-    salary_range: '₹24-30 LPA',
-    match_score: 0.91,
-    status: 'DISCOVERED',
-    notes: ''
-  },
-  {
-    job_id: 'sample_zepto_03',
-    company: 'Zepto',
-    title: 'Lead Eng. (Realtime Search & Indexing)',
-    location: 'Mumbai / Bangalore',
-    platform: 'Cuvette',
-    salary_range: '₹40-50 LPA',
-    match_score: 0.91,
-    status: 'QUEUED',
-    notes: ''
-  },
-  {
-    job_id: 'sample_postman_04',
-    company: 'Postman',
-    title: 'Product Engineer (API Tooling)',
-    location: 'Bangalore',
-    platform: 'Cutshort',
-    salary_range: '₹32-38 LPA',
-    match_score: 0.88,
-    status: 'SUBMITTED',
-    notes: ''
-  },
-  {
-    job_id: 'sample_cred_05',
-    company: 'CRED',
-    title: 'UI/UX Full Stack SDE (Growth)',
-    location: 'Bangalore',
-    platform: 'Instahyre',
-    salary_range: '₹30-45 LPA',
-    match_score: 0.88,
-    status: 'INTERVIEW',
-    notes: 'https://meet.google.com/abc-defg-hij'
-  },
-  {
-    job_id: 'sample_flipkart_06',
-    company: 'Flipkart',
-    title: 'SDE-3 (Distributed Systems Architecture)',
-    location: 'Bangalore',
-    platform: 'Naukri',
-    salary_range: '₹35-50 LPA',
-    match_score: 0.88,
-    status: 'INTERVIEW',
-    notes: 'Round 2 System Design Scheduled'
-  },
-  {
-    job_id: 'sample_phonepe_07',
-    company: 'PhonePe',
-    title: 'SDE-3 (UPI Core High-Throughput Engine)',
-    location: 'Bangalore / Pune',
-    platform: 'Naukri',
-    salary_range: '₹35 LPA',
-    match_score: 0.89,
-    status: 'OFFER',
-    notes: 'Official offer letter received'
-  }
-];
-
 // ==========================================================================
 // 0-Day Job Pipeline & Interactive Kanban (Step 6, 8, 9)
 // ==========================================================================
 async function fetchJobsList() {
   try {
     const res = await authFetch(`${API_BASE}/jobs`);
-    const data = await res.json();
-    if (data.jobs && data.jobs.length > 0) {
-      state.jobsList = data.jobs;
-    } else {
-      state.jobsList = DEFAULT_PREVIEW_JOBS;
+    if (res.status === 401) {
+      // forceReauth() already fired inside authFetch — leave the board empty, never fabricate jobs.
+      state.jobsList = [];
+      const badgeCount = document.getElementById('badge-pipeline-count');
+      if (badgeCount) badgeCount.textContent = 0;
+      renderKanbanBoard();
+      return;
     }
-    const badgeCount = document.getElementById('badge-pipeline-count');
-    if (badgeCount) badgeCount.textContent = state.jobsList.length;
-    renderKanbanBoard();
+    const data = await res.json();
+    state.jobsList = (data.jobs && data.jobs.length > 0) ? data.jobs : [];
   } catch (err) {
     console.error('Failed to load job listings:', err);
-    state.jobsList = DEFAULT_PREVIEW_JOBS;
-    renderKanbanBoard();
+    state.jobsList = [];
   }
+  const badgeCount = document.getElementById('badge-pipeline-count');
+  if (badgeCount) badgeCount.textContent = state.jobsList.length;
+  renderKanbanBoard();
 }
 
 window.filterPipeline = function(filter, btn) {
@@ -1314,7 +1248,8 @@ function renderKanbanBoard() {
   const filter = state.currentPipelineFilter;
 
   const filtered = state.jobsList.filter(j => {
-    const textMatch = (j.company + ' ' + j.title + ' ' + (j.location || '')).toLowerCase().includes(query);
+    const skillsStr = (j.skills || j.tags || j.matched_skills || j.tech_stack || []).join(' ') + ' ' + (j.description || '');
+    const textMatch = (j.company + ' ' + j.title + ' ' + (j.location || '') + ' ' + skillsStr).toLowerCase().includes(query);
     if (!textMatch) return false;
 
     if (filter === 'ALL') return true;
@@ -1581,9 +1516,9 @@ function renderJobCardHTML(job) {
   }
 
   return `
-    <div class="job-card" id="card-${jobId}" draggable="true" data-job-id="${jobId}" data-status="${escapeHTML(job.status || 'DISCOVERED')}">
+    <div class="job-card" id="card-${jobId}" draggable="true" data-action="openJobDetails" data-job-id="${jobId}" data-status="${escapeHTML(job.status || 'DISCOVERED')}" style="cursor: pointer;">
       <div class="job-card-header">
-        <div class="job-card-brand" data-action="openJobDetails" data-job-id="${jobId}" style="cursor: pointer;" title="Click to view full job description">
+        <div class="job-card-brand">
           <div class="company-avatar-box" style="background: ${avatar.bg};">
             <span>${avatar.icon}</span>
           </div>
@@ -1595,7 +1530,7 @@ function renderJobCardHTML(job) {
         ${renderMatchGaugeSVG(matchPct)}
       </div>
 
-      <div class="job-title" data-action="openJobDetails" data-job-id="${jobId}" style="cursor: pointer;" title="Click to view full job description">${title}</div>
+      <div class="job-title">${title}</div>
 
       <div class="job-tags-row">
         <span class="job-tag ${platformBadgeClass}">${platform}</span>
@@ -1867,7 +1802,10 @@ async function fetchVaultEntries() {
     const res = await authFetch(`${API_BASE}/vault`);
     const data = await res.json();
     state.vaultEntries = data.entries || [];
-    if (els.badgeVaultCount) els.badgeVaultCount.textContent = `${state.vaultEntries.length}+`;
+    const vaultLabel = `${state.vaultEntries.length}+`;
+    if (els.badgeVaultCount) els.badgeVaultCount.textContent = vaultLabel;
+    const mobVault = document.getElementById('mob-badge-vault');
+    if (mobVault) mobVault.textContent = vaultLabel;
     if (els.vaultTotalBadge) els.vaultTotalBadge.textContent = `${state.vaultEntries.length} Slots Active`;
     renderVaultEntries(state.vaultEntries);
   } catch (err) {
@@ -2772,21 +2710,28 @@ window.analyzeInterviewerSleuth = async function() {
 // ==========================================================================
 // Multi-Offer Comparison Matrix & Counter-Offer Generator
 // ==========================================================================
+function posNum(id, fallback = 0) {
+  const el = document.getElementById(id);
+  if (!el) return fallback;
+  const v = parseFloat(el.value);
+  return (Number.isFinite(v) && v >= 0) ? v : fallback;
+}
+
 window.runMultiOfferComparison = async function() {
   const o1 = {
     company: document.getElementById('offer1-comp')?.value || 'Stripe',
-    base_lpa: parseFloat(document.getElementById('offer1-base')?.value || '50'),
-    bonus_lpa: parseFloat(document.getElementById('offer1-bonus')?.value || '10'),
-    equity_grant_total_lpa: parseFloat(document.getElementById('offer1-equity')?.value || '60'),
-    sign_on_lpa: parseFloat(document.getElementById('offer1-signon')?.value || '15'),
+    base_lpa: posNum('offer1-base', 50),
+    bonus_lpa: posNum('offer1-bonus', 10),
+    equity_grant_total_lpa: posNum('offer1-equity', 60),
+    sign_on_lpa: posNum('offer1-signon', 15),
     role_title: 'Senior Engineer'
   };
   const o2 = {
     company: document.getElementById('offer2-comp')?.value || 'Uber',
-    base_lpa: parseFloat(document.getElementById('offer2-base')?.value || '45'),
-    bonus_lpa: parseFloat(document.getElementById('offer2-bonus')?.value || '8'),
-    equity_grant_total_lpa: parseFloat(document.getElementById('offer2-equity')?.value || '80'),
-    sign_on_lpa: parseFloat(document.getElementById('offer2-signon')?.value || '10'),
+    base_lpa: posNum('offer2-base', 45),
+    bonus_lpa: posNum('offer2-bonus', 8),
+    equity_grant_total_lpa: posNum('offer2-equity', 80),
+    sign_on_lpa: posNum('offer2-signon', 10),
     role_title: 'Senior Engineer'
   };
 
@@ -2884,7 +2829,7 @@ window.generateAdvancedCounterScript = async function() {
 };
 
 window.evaluateOfferCompensation = async function() {
-  const baseSalary = parseFloat(document.getElementById('neg-base-salary')?.value || '35');
+  const baseSalary = posNum('neg-base-salary', 35);
   const company = document.getElementById('neg-company-name')?.value || 'Target Company';
   const roleTitle = document.getElementById('neg-role-title')?.value || 'Senior Software Engineer';
   const container = document.getElementById('negotiation-results-container');
@@ -2905,6 +2850,7 @@ window.evaluateOfferCompensation = async function() {
     });
     const data = await res.json();
     const ev = data.evaluation || {};
+    const recRange = ev.recommended_counter_range || (baseSalary > 0 ? ((baseSalary * 1.15).toFixed(1) + ' - ' + (baseSalary * 1.3).toFixed(1)) : '—');
     container.innerHTML = `
       <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -2913,7 +2859,7 @@ window.evaluateOfferCompensation = async function() {
         </div>
         <p style="font-size: 13px; color: #cbd5e1; margin-bottom: 10px;">${escapeHTML(ev.market_summary || ('Salary matches market benchmarks for ' + roleTitle))}</p>
         <div style="font-size: 12px; color: #94a3b8;">
-          <strong>Target Counter Range:</strong> ₹${escapeHTML(ev.recommended_counter_range || ((baseSalary * 1.15).toFixed(1) + ' - ' + (baseSalary * 1.3).toFixed(1)))} LPA
+          <strong>Target Counter Range:</strong> ₹${escapeHTML(recRange)} LPA
         </div>
       </div>
     `;
@@ -2925,9 +2871,9 @@ window.evaluateOfferCompensation = async function() {
 };
 
 window.simulateEsopEquity = async function() {
-  const options = parseInt(document.getElementById('esop-options-count')?.value || '15000', 10);
-  const totalShares = parseInt(document.getElementById('esop-total-shares')?.value || '10000000', 10);
-  const valuation = parseFloat(document.getElementById('esop-valuation-usd')?.value || '50000000');
+  const options = posNum('esop-options-count', 15000);
+  const totalShares = posNum('esop-total-shares', 10000000);
+  const valuation = posNum('esop-valuation-usd', 50000000);
   const container = document.getElementById('esop-results-container');
   if (!container) return;
 
@@ -2939,15 +2885,19 @@ window.simulateEsopEquity = async function() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         options_count: options,
-        total_company_shares: totalShares,
+        total_company_shares: totalShares > 0 ? totalShares : 1,
         current_valuation_usd: valuation,
         strike_price: 0.0
       })
     });
     const data = await res.json();
     const eq = data.equity_model || {};
-    const pct = ((options / totalShares) * 100).toFixed(4);
-    const currVal = ((options / totalShares) * valuation).toLocaleString();
+    const ownership = totalShares > 0 ? (options / totalShares) : 0;
+    const pct = Number.isFinite(ownership) ? (ownership * 100).toFixed(4) : '0.0000';
+    const currVal = Number.isFinite(ownership * valuation) ? Math.round(ownership * valuation).toLocaleString() : '0';
+
+    const exit3x = Number.isFinite(ownership * valuation * 3) ? Math.round(ownership * valuation * 3).toLocaleString() : '0';
+    const exit5x = Number.isFinite(ownership * valuation * 5) ? Math.round(ownership * valuation * 5).toLocaleString() : '0';
 
     container.innerHTML = `
       <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
@@ -2956,7 +2906,7 @@ window.simulateEsopEquity = async function() {
           <span style="font-size: 12px; color: #cbd5e1;">Current Value: $${currVal}</span>
         </div>
         <div style="font-size: 12px; color: #94a3b8; line-height: 1.5;">
-          ${eq.scenarios ? Object.entries(eq.scenarios).map(([k, v]) => `<div>• <strong>${escapeHTML(k)}:</strong> $${escapeHTML(String(v))}</div>`).join('') : '<div>• Projected 3x Exit: $' + (((options / totalShares) * valuation * 3)).toLocaleString() + '</div><div>• Projected 5x Exit: $' + (((options / totalShares) * valuation * 5)).toLocaleString() + '</div>'}
+          ${eq.scenarios ? Object.entries(eq.scenarios).map(([k, v]) => `<div>• <strong>${escapeHTML(k)}:</strong> $${escapeHTML(String(v))}</div>`).join('') : `<div>• Projected 3x Exit: $${exit3x}</div><div>• Projected 5x Exit: $${exit5x}</div>`}
         </div>
       </div>
     `;
@@ -3105,12 +3055,20 @@ window.openJobDetails = function(jobId) {
     }
   }
 
-  modal.classList.add('active');
+  if (typeof window.openModal === 'function') {
+    window.openModal(modal);
+  } else {
+    modal.classList.add('active');
+  }
 };
 
 window.closeJobDetailsModal = function() {
-  const modal = document.getElementById('modal-job-details');
-  if (modal) modal.classList.remove('active');
+  if (typeof window.closeModal === 'function') {
+    window.closeModal('modal-job-details');
+  } else {
+    const modal = document.getElementById('modal-job-details');
+    if (modal) modal.classList.remove('active');
+  }
 };
 
 window.sendJobToNegotiation = function(jobId) {
@@ -3698,8 +3656,12 @@ document.addEventListener('click', (event) => {
     case 'closeModal': {
       const modalId = target.getAttribute('data-modal');
       if (modalId) {
-        const modalEl = document.getElementById(modalId);
-        if (modalEl) modalEl.classList.remove('active');
+        if (typeof window.closeModal === 'function') {
+          window.closeModal(modalId);
+        } else {
+          const modalEl = document.getElementById(modalId);
+          if (modalEl) modalEl.classList.remove('active');
+        }
       }
       break;
     }
@@ -4829,6 +4791,8 @@ document.addEventListener('keydown', (event) => {
     window.toggleWorkspaceDropdown(false);
 
     const activeModals = [
+      'modal-job-details',
+      'modal-add-slot',
       'modal-create-org',
       'modal-manage-org',
       'modal-proration-preview',
