@@ -4727,7 +4727,73 @@ window.requestPushNotifications = async function() {
 // --------------------------------------------------------------------------
 // 6. WCAG 2.1 AA Keyboard Navigation & Focus Traps
 // --------------------------------------------------------------------------
+let _modalLastFocus = null;
+
+function getModalFocusableElements(container) {
+  if (!container) return [];
+  const selector = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  return Array.from(container.querySelectorAll(selector))
+    .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0);
+}
+
+// Moves focus into a modal on open and remembers the trigger element to restore focus on close.
+window.openModal = function(modalIdOrEl) {
+  const modal = typeof modalIdOrEl === 'string' ? document.getElementById(modalIdOrEl) : modalIdOrEl;
+  if (!modal) return;
+  _modalLastFocus = document.activeElement;
+  modal.classList.add('active');
+  if (modal.style.display === 'none') modal.style.display = 'flex';
+
+  requestAnimationFrame(() => {
+    const focusables = getModalFocusableElements(modal);
+    if (focusables.length > 0) {
+      focusables[0].focus();
+    } else {
+      modal.setAttribute('tabindex', '-1');
+      modal.focus();
+    }
+  });
+};
+
+// Closes a modal and restores focus to whatever triggered it.
+window.closeModal = function(modalIdOrEl) {
+  const modal = typeof modalIdOrEl === 'string' ? document.getElementById(modalIdOrEl) : modalIdOrEl;
+  if (!modal) return;
+  modal.classList.remove('active');
+  if (modal.style.display !== '') modal.style.display = 'none';
+
+  if (_modalLastFocus && typeof _modalLastFocus.focus === 'function') {
+    try { _modalLastFocus.focus(); } catch (_) {}
+    _modalLastFocus = null;
+  }
+};
+
 document.addEventListener('keydown', (event) => {
+  // Tab key focus trap inside the active modal dialog
+  if (event.key === 'Tab') {
+    const activeDialog = document.querySelector(
+      '.modal-overlay.active, .glass-booth-overlay.active, [role="dialog"].active, [role="dialog"][style*="display: flex"], [role="dialog"][style*="display: block"]'
+    );
+    if (activeDialog) {
+      const focusables = getModalFocusableElements(activeDialog);
+      if (focusables.length > 0) {
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (event.shiftKey) {
+          if (document.activeElement === first || !activeDialog.contains(document.activeElement)) {
+            event.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last || !activeDialog.contains(document.activeElement)) {
+            event.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    }
+  }
+
   // Escape key closes active modal dialogs or dropdowns
   if (event.key === 'Escape') {
     window.toggleWorkspaceDropdown(false);
@@ -4749,8 +4815,7 @@ document.addEventListener('keydown', (event) => {
     activeModals.forEach(id => {
       const el = document.getElementById(id);
       if (el && (el.classList.contains('active') || el.style.display === 'flex' || el.style.display === 'block')) {
-        el.classList.remove('active');
-        if (el.style.display !== '') el.style.display = 'none';
+        window.closeModal(el);
       }
     });
 
@@ -4759,6 +4824,35 @@ document.addEventListener('keydown', (event) => {
     }
   }
 });
+
+// Close a modal when clicking directly on its backdrop overlay
+document.addEventListener('click', (event) => {
+  if (event.target && event.target.classList && event.target.classList.contains('modal-overlay')) {
+    window.closeModal(event.target);
+  }
+});
+
+// Fallback: move focus into any dialog activated by code that doesn't call window.openModal directly.
+if (typeof MutationObserver !== 'undefined') {
+  const modalObserver = new MutationObserver((mutations) => {
+    for (const m of mutations) {
+      if (m.type === 'attributes' && (m.attributeName === 'class' || m.attributeName === 'style')) {
+        const target = m.target;
+        if (target && (target.classList.contains('modal-overlay') || target.classList.contains('glass-booth-overlay') || target.getAttribute('role') === 'dialog')) {
+          const isActive = target.classList.contains('active') || (target.style.display !== 'none' && target.style.display !== '');
+          if (isActive && !target.contains(document.activeElement)) {
+            if (!_modalLastFocus) _modalLastFocus = document.activeElement;
+            requestAnimationFrame(() => {
+              const focusables = getModalFocusableElements(target);
+              if (focusables.length > 0) focusables[0].focus();
+            });
+          }
+        }
+      }
+    }
+  });
+  modalObserver.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+}
 
 // ==========================================================================
 // Initialization on Load

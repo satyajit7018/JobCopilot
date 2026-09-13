@@ -20,6 +20,9 @@
 </head>
 <body class="onboarding-mode">
 
+  <!-- Accessibility Skip to Content Link -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
   <!-- Screen-Reader Only Accessible Live Announcement Region -->
   <div id="sr-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
@@ -221,7 +224,7 @@
     </header>
 
     <!-- Main Dynamic Content Cockpit -->
-    <main class="cockpit-content">
+    <main class="cockpit-content" id="main-content" tabindex="-1">
 
       <!-- Executive Deck Board HUD (Step 11: Applied, Responses, Accepted, Rejected, Converted %) -->
       <section class="telemetry-hud" id="global-telemetry-hud">
@@ -463,11 +466,11 @@
               <div class="dropzone-icon">📥</div>
               <div class="dropzone-title">Drag and drop candidate resume here</div>
               <div class="dropzone-subtitle">Supports PDF, DOCX, and TXT files</div>
-              <input type="file" id="resume-file-input" style="display: none;" accept=".pdf,.docx,.txt">
+              <input type="file" id="resume-file-input" style="display: none;" accept=".pdf,.docx,.txt" aria-label="Upload candidate resume file">
             </div>
 
             <div style="margin-top: 1.25rem;">
-              <label class="form-label">Or paste raw resume text:</label>
+              <label class="form-label" for="raw-resume-text">Or paste raw resume text:</label>
               <textarea id="raw-resume-text" class="form-textarea" placeholder="Paste full resume markdown or plain text here..." rows="3"></textarea>
             </div>
 
@@ -501,22 +504,22 @@
               <div class="form-grid">
                 
                 <div class="form-group">
-                  <label class="form-label">1. Candidate Full Name</label>
+                  <label class="form-label" for="q-full-name">1. Candidate Full Name</label>
                   <input type="text" id="q-full-name" class="form-input" required>
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">2. Email Address</label>
+                  <label class="form-label" for="q-email">2. Email Address</label>
                   <input type="email" id="q-email" class="form-input" required>
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">3. Phone Number</label>
+                  <label class="form-label" for="q-phone">3. Phone Number</label>
                   <input type="text" id="q-phone" class="form-input" required>
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">4. Geographic Location (City, Country)</label>
+                  <label class="form-label" for="q-location">4. Geographic Location (City, Country)</label>
                   <input type="text" id="q-location" class="form-input" required>
                 </div>
 
@@ -524,11 +527,11 @@
                 <div class="form-group" style="grid-column: 1 / -1;">
                   <div style="background: rgba(10, 14, 24, 0.6); padding: 1.25rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                      <label class="form-label" style="margin-bottom: 0; font-size: 13.5px;">5. Target Expected CTC / Compensation</label>
+                      <label class="form-label" for="salary-slider" style="margin-bottom: 0; font-size: 13.5px;">5. Target Expected CTC / Compensation</label>
                       <span style="font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800; color: var(--accent-cyan);" id="salary-display">15.0 LPA</span>
                     </div>
                     
-                    <input type="range" id="salary-slider" min="3" max="80" step="0.5" value="15" style="width: 100%; accent-color: var(--accent-cyan); cursor: pointer;">
+                    <input type="range" id="salary-slider" min="3" max="80" step="0.5" value="15" style="width: 100%; accent-color: var(--accent-cyan); cursor: pointer;" aria-label="Target Expected CTC Compensation Slider">
                     
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin-top: 1rem;">
                       <div style="background: rgba(255, 255, 255, 0.03); padding: 8px 10px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); text-align: center;">
@@ -552,7 +555,7 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">6. Notice Period / Availability</label>
+                  <label class="form-label" for="q-notice-period">6. Notice Period / Availability</label>
                   <select id="q-notice-period" class="form-select">
                     <option value="0">Immediate (0 days)</option>
                     <option value="15">15 days</option>
@@ -563,7 +566,7 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">7. Work Authorization</label>
+                  <label class="form-label" for="q-work-auth">7. Work Authorization</label>
                   <select id="q-work-auth" class="form-select">
                     <option value="Citizen / Permanent Resident">Citizen / Permanent Resident</option>
                     <option value="Authorized with OPT/CPT">Authorized with OPT/CPT</option>
@@ -573,7 +576,7 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">8. Visa Sponsorship Requirement</label>
+                  <label class="form-label" for="q-sponsorship">8. Visa Sponsorship Requirement</label>
                   <select id="q-sponsorship" class="form-select">
                     <option value="No">No, I do not require sponsorship</option>
                     <option value="Yes">Yes, now or in the future</option>
@@ -581,7 +584,7 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">9. Work Mode Preference</label>
+                  <label class="form-label" for="q-remote-pref">9. Work Mode Preference</label>
                   <select id="q-remote-pref" class="form-select">
                     <option value="Remote / Hybrid / On-site">Remote / Hybrid / On-site</option>
                     <option value="Remote Only">Remote Only</option>
@@ -591,7 +594,7 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">10. Willingness to Relocate</label>
+                  <label class="form-label" for="q-relocation">10. Willingness to Relocate</label>
                   <select id="q-relocation" class="form-select">
                     <option value="Yes">Yes, open to relocate</option>
                     <option value="No">No, local / remote only</option>
@@ -599,27 +602,27 @@
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">11. LinkedIn Profile URL</label>
+                  <label class="form-label" for="q-linkedin-url">11. LinkedIn Profile URL</label>
                   <input type="url" id="q-linkedin-url" class="form-input" placeholder="https://linkedin.com/in/username">
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">12. GitHub / Portfolio URL</label>
+                  <label class="form-label" for="q-github-url">12. GitHub / Portfolio URL</label>
                   <input type="url" id="q-github-url" class="form-input" placeholder="https://github.com/username">
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">13. Overall Years of Experience</label>
+                  <label class="form-label" for="q-yoe">13. Overall Years of Experience</label>
                   <input type="number" step="0.5" id="q-yoe" class="form-input" value="4.0">
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">14. Current Employer (Stealth Blacklisted)</label>
+                  <label class="form-label" for="q-current-employer">14. Current Employer (Stealth Blacklisted)</label>
                   <input type="text" id="q-current-employer" class="form-input" placeholder="e.g. Current Tech Company">
                 </div>
 
                 <div class="form-group" style="grid-column: 1 / -1;">
-                  <label class="form-label">15. Career Narrative (Why are you seeking a new challenge?)</label>
+                  <label class="form-label" for="q-why-looking">15. Career Narrative (Why are you seeking a new challenge?)</label>
                   <textarea id="q-why-looking" class="form-textarea" rows="2" placeholder="Brief motivation for recruiter essay prompts..."></textarea>
                 </div>
 
@@ -733,7 +736,7 @@
         <!-- Interactive Pipeline Filter Bar -->
         <div class="pipeline-filter-bar">
           <div style="display: flex; gap: 8px; align-items: center; flex: 1; max-width: 380px;">
-            <input type="text" id="pipeline-search-input" class="form-input" placeholder="Filter company, role, or skill..." style="padding: 7px 12px; font-size: 13px;">
+            <input type="text" id="pipeline-search-input" class="form-input" placeholder="Filter company, role, or skill..." style="padding: 7px 12px; font-size: 13px;" aria-label="Filter company, role, or skill">
           </div>
 
           <div class="filter-pills">
@@ -843,7 +846,7 @@
 
             <!-- Live Vault Search & Category Filters -->
             <div style="margin-bottom: 0.75rem;">
-              <input type="text" id="vault-search-input" class="form-input" placeholder="🔍 Search screening questions, answers, keywords..." style="margin-bottom: 0.6rem; padding: 7px 12px; font-size: 13px;">
+              <input type="text" id="vault-search-input" class="form-input" placeholder="🔍 Search screening questions, answers, keywords..." style="margin-bottom: 0.6rem; padding: 7px 12px; font-size: 13px;" aria-label="Search screening questions and answers">
               <div class="filter-pills" id="vault-filter-pills" style="margin-bottom: 0;">
                 <button type="button" class="filter-pill active" data-vcat="ALL" data-action="filterVaultCategory">All Q&amp;As</button>
                 <button type="button" class="filter-pill" data-vcat="BEHAVIORAL" data-action="filterVaultCategory">Behavioral</button>
@@ -868,7 +871,7 @@
               Test how the Knowledge Vault resolves novel recruiter screening prompts in real-time.
             </p>
             <div class="form-group">
-              <label class="form-label">Novel Recruiter Prompt</label>
+              <label class="form-label" for="vault-test-prompt">Novel Recruiter Prompt</label>
               <textarea id="vault-test-prompt" class="form-textarea" rows="3" placeholder="e.g. Do you have experience building event-driven microservices?"></textarea>
             </div>
             <button class="btn btn-primary" data-action="simulateVaultMatch">
@@ -938,7 +941,7 @@
 
             <!-- Question Jump Selector -->
             <div class="form-group" style="margin-bottom: 10px;">
-              <label class="form-label" style="font-size: 11.5px; color: var(--text-muted);">Jump to Interview Drill:</label>
+              <label class="form-label" for="mock-question-dropdown" style="font-size: 11.5px; color: var(--text-muted);">Jump to Interview Drill:</label>
               <select id="mock-question-dropdown" class="form-input" data-change-action="selectMockQuestionById" style="font-size: 12.5px; padding: 6px 10px; background: #0f172a;">
                 <!-- Populated dynamically via app.js -->
               </select>
@@ -996,7 +999,7 @@
             <!-- Real-time Speech-to-Text / Written Response Area -->
             <div class="form-group" style="margin-bottom: 1rem;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                <label class="form-label" style="margin-bottom: 0;">Live Speech-to-Text Transcript (Auto-Streamed)</label>
+                <label class="form-label" for="mock-candidate-answer" style="margin-bottom: 0;">Live Speech-to-Text Transcript (Auto-Streamed)</label>
                 <span style="font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;" id="transcript-word-count">0 words</span>
               </div>
               <textarea id="mock-candidate-answer" class="form-textarea" rows="4" placeholder="Speak into your microphone or type your response here... As you speak, Web Speech API will continuously transcribe your words." data-input-action="updateWordCount"></textarea>
