@@ -6,7 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { PORT, BASE_URL, BACKEND_DIR, VENV_PYTHON, PID_FILE, LOG_FILE } = require('./backend-env');
+const { PORT, BASE_URL, BACKEND_DIR, PYTHON, PID_FILE, LOG_FILE } = require('./backend-env');
 
 async function waitForHealthy(url, timeoutMs) {
   const start = Date.now();
@@ -27,19 +27,14 @@ async function waitForHealthy(url, timeoutMs) {
 }
 
 module.exports = async function globalSetup() {
-  if (!fs.existsSync(VENV_PYTHON)) {
-    throw new Error(
-      `Backend venv python not found at ${VENV_PYTHON}. Create it with:\n` +
-      `  python3 -m venv backend/venv && source backend/venv/bin/activate && pip install -r backend/requirements.txt`
-    );
-  }
-
+  // PYTHON is resolved in backend-env.js: env override -> local venv -> system python3.
+  // No hard failure when the venv is absent (CI installs deps into the runner's own Python).
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jobcopilot-e2e-data-'));
 
   const logStream = fs.createWriteStream(LOG_FILE, { flags: 'a' });
 
   const child = spawn(
-    VENV_PYTHON,
+    PYTHON,
     ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', PORT],
     {
       cwd: BACKEND_DIR,
