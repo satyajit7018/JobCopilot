@@ -17,6 +17,7 @@ from app.core.models import (
     ConversionSignal,
     EmailMessage,
     HITLEvent,
+    JobCheckpoint,
     JobListing,
     Membership,
     Organization,
@@ -96,6 +97,79 @@ class DatabaseAdapter(ABC):
 
     @abstractmethod
     def get_funnel_metrics(self, user_id: str) -> Dict[str, Any]:
+        pass
+
+    # --- Auth & Security: Login Lockout / Token Revocation (P0-0 parity) ---
+    @abstractmethod
+    def update_user_role(self, user_id: str, role: str) -> bool:
+        pass
+
+    @abstractmethod
+    def update_user_password(self, user_id: str, new_password_hash: str) -> bool:
+        pass
+
+    @abstractmethod
+    def set_email_verified(self, user_id: str, verified: bool = True) -> bool:
+        pass
+
+    @abstractmethod
+    def revoke_token(self, jti: str, user_id: str, expires_at: Optional[str] = None) -> bool:
+        pass
+
+    @abstractmethod
+    def is_token_revoked(self, jti: str) -> bool:
+        pass
+
+    @abstractmethod
+    def prune_revoked_tokens(self) -> int:
+        pass
+
+    @abstractmethod
+    def record_login_attempt(self, email: str, ip: str, success: bool) -> None:
+        pass
+
+    @abstractmethod
+    def check_login_lockout(self, email: str, ip: str, max_failures: int = 5, lockout_minutes: int = 15) -> bool:
+        pass
+
+    # --- Daily Usage Rate Limiting (P0-0 parity) ---
+    @abstractmethod
+    def get_daily_usage(self, user_id: str, date_str: str) -> int:
+        pass
+
+    @abstractmethod
+    def increment_daily_usage(self, user_id: str, date_str: str) -> int:
+        pass
+
+    # --- Profile / Vault Maintenance (P0-0 parity) ---
+    @abstractmethod
+    def migrate_plaintext_profiles(self) -> int:
+        pass
+
+    @abstractmethod
+    def increment_vault_usage(self, qa_id: str):
+        pass
+
+    # --- HITL Event Lookup / Resolution (P0-0 parity) ---
+    @abstractmethod
+    def get_hitl_event(self, event_id: str, user_id: str) -> Optional[HITLEvent]:
+        pass
+
+    @abstractmethod
+    def resolve_hitl_event(self, event_id: str, user_answer: str, user_id: str) -> bool:
+        pass
+
+    # --- Job Checkpoint Recovery (P0-0 parity) ---
+    @abstractmethod
+    def save_checkpoint(self, checkpoint: JobCheckpoint, user_id: str) -> bool:
+        pass
+
+    @abstractmethod
+    def get_checkpoint(self, job_id: str, user_id: str) -> Optional[JobCheckpoint]:
+        pass
+
+    @abstractmethod
+    def delete_checkpoint(self, job_id: str, user_id: str):
         pass
 
     # Apply Ledger Methods (with safe base defaults)

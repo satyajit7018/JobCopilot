@@ -7,7 +7,7 @@ multi-tenant query execution with fail-safe schema bootstrapping and PII encrypt
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from app.core.db_adapter import DatabaseAdapter
 from app.core.models import (
@@ -24,6 +24,7 @@ from app.core.models import (
     ConversionSignal,
     EmailMessage,
     HITLEvent,
+    JobCheckpoint,
     JobListing,
     Membership,
     Organization,
@@ -31,6 +32,7 @@ from app.core.models import (
     OutreachRecord,
     User,
     UserConsent,
+    UserRole,
     VaultEntry,
 )
 
@@ -194,6 +196,25 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     ip VARCHAR(64) NOT NULL,
                     attempted_at VARCHAR(64) NOT NULL,
                     success INTEGER NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS user_daily_usage (
+                    user_id VARCHAR(64) NOT NULL,
+                    date VARCHAR(16) NOT NULL,
+                    apply_count INTEGER DEFAULT 0,
+                    PRIMARY KEY (user_id, date)
+                );
+                CREATE INDEX IF NOT EXISTS idx_pg_user_daily_usage_user_date ON user_daily_usage(user_id, date);
+
+                CREATE TABLE IF NOT EXISTS job_checkpoints (
+                    job_id VARCHAR(64) PRIMARY KEY,
+                    user_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                    current_step INTEGER DEFAULT 1,
+                    total_steps INTEGER DEFAULT 1,
+                    filled_inputs JSONB NOT NULL,
+                    last_url TEXT,
+                    screenshot_path TEXT,
+                    updated_at VARCHAR(64) NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS apply_ledger (
@@ -422,10 +443,161 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
             with conn.cursor() as cursor:
                 cursor.execute("SELECT user_id, email, password_hash, full_name, role, is_active, email_verified, created_at, updated_at FROM users WHERE user_id = %s", (user_id,))
                 row = cursor.fetchone()
-                if not row: return None
+                if not row:
+                    return None
                 if len(row) >= 9:
-                    return User(user_id=row[0], email=row[1], password_hash=row[2], full_name=row[3], role=row[4], is_active=row[5], email_verified=row[6], created_at=row[7], updated_at=row[8])
-                return User(user_id=row[0], email=row[1], password_hash="", full_name=row[2] if len(row) > 2 else "", role=row[3] if len(row) > 3 else "FREE", is_active=bool(row[4]) if len(row) > 4 else True, email_verified=bool(row[5]) if len(row) > 5 else False, created_at=row[6] if len(row) > 6 else "", updated_at=row[7] if len(row) > 7 else "")
+                    return User(user_id=row[0], email=row[1], password_hash=row[2], full_name=row[3], role=UserRole(row[4]) if row[4] else UserRole.FREE, is_active=row[5], email_verified=row[6], created_at=row[7], updated_at=row[8])
+                return User(user_id=row[0], email=row[1], password_hash="", full_name=row[2] if len(row) > 2 else "", role=UserRole(row[3]) if len(row) > 3 and row[3] else UserRole.FREE, is_active=bool(row[4]) if len(row) > 4 else True, email_verified=bool(row[5]) if len(row) > 5 else False, created_at=row[6] if len(row) > 6 else "", updated_at=row[7] if len(row) > 7 else "")
+        finally:
+            self.release_connection(conn)
+
+    def update_user_role(self, user_id: str, role: str) -> bool:
+        """Updates user subscription tier."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE users SET role = %s, updated_at = %s WHERE user_id = %s",
+                    (role, datetime.now().isoformat(), user_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        finally:
+            self.release_connection(conn)
+
+    def update_user_password(self, user_id: str, new_password_hash: str) -> bool:
+        """Updates user password hash (e.g. during Argon2id migration)."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE users SET password_hash = %s, updated_at = %s WHERE user_id = %s",
+                    (new_password_hash, datetime.now().isoformat(), user_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        finally:
+            self.release_connection(conn)
+
+    def set_email_verified(self, user_id: str, verified: bool = True) -> bool:
+        """Marks user email as verified."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE users SET email_verified = %s, updated_at = %s WHERE user_id = %s",
+                    (verified, datetime.now().isoformat(), user_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        finally:
+            self.release_connection(conn)
+
+    # =========================================================================
+    # Token Revocation & Login Lockout (Security Parity with DatabaseManager)
+    # =========================================================================
+    def revoke_token(self, jti: str, user_id: str, expires_at: Optional[str] = None) -> bool:
+        """Adds a token's jti to the revoked_tokens blacklist."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                now_str = datetime.now().isoformat()
+                cursor.execute("""
+                INSERT INTO revoked_tokens (jti, user_id, revoked_at, expires_at)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (jti) DO UPDATE SET user_id = EXCLUDED.user_id, revoked_at = EXCLUDED.revoked_at, expires_at = EXCLUDED.expires_at
+                """, (jti, user_id, now_str, expires_at or ""))
+                conn.commit()
+                return True
+        finally:
+            self.release_connection(conn)
+
+    def is_token_revoked(self, jti: str) -> bool:
+        """Checks whether a token's jti is in the revoked blacklist."""
+        if not jti:
+            return False
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT 1 FROM revoked_tokens WHERE jti = %s LIMIT 1", (jti,))
+                return cursor.fetchone() is not None
+        finally:
+            self.release_connection(conn)
+
+    def prune_revoked_tokens(self) -> int:
+        """Removes expired tokens from the revocation blacklist."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                now_str = datetime.now().isoformat()
+                cursor.execute("DELETE FROM revoked_tokens WHERE expires_at != '' AND expires_at < %s", (now_str,))
+                deleted = cursor.rowcount
+                conn.commit()
+                return deleted
+        finally:
+            self.release_connection(conn)
+
+    def record_login_attempt(self, email: str, ip: str, success: bool) -> None:
+        """Records an authentication attempt for lockout and brute-force tracking."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                INSERT INTO login_attempts (email, ip, attempted_at, success)
+                VALUES (%s, %s, %s, %s)
+                """, (email.lower().strip(), ip, datetime.now().isoformat(), 1 if success else 0))
+                conn.commit()
+        finally:
+            self.release_connection(conn)
+
+    def check_login_lockout(self, email: str, ip: str, max_failures: int = 5, lockout_minutes: int = 15) -> bool:
+        """Returns True if email or IP has exceeded consecutive failure threshold."""
+        from datetime import timedelta
+        cutoff = (datetime.now() - timedelta(minutes=lockout_minutes)).isoformat()
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                SELECT success FROM login_attempts
+                WHERE (email = %s OR ip = %s) AND attempted_at >= %s
+                ORDER BY attempted_at DESC
+                LIMIT %s
+                """, (email.lower().strip(), ip, cutoff, max_failures))
+                rows = cursor.fetchall()
+                if len(rows) >= max_failures and all(r[0] == 0 for r in rows):
+                    return True
+                return False
+        finally:
+            self.release_connection(conn)
+
+    # =========================================================================
+    # Daily Usage Rate Limiting
+    # =========================================================================
+    def get_daily_usage(self, user_id: str, date_str: str) -> int:
+        """Gets count of daily applications for a user on a given date (YYYY-MM-DD)."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT apply_count FROM user_daily_usage WHERE user_id = %s AND date = %s", (user_id, date_str))
+                row = cursor.fetchone()
+                return int(row[0]) if row else 0
+        finally:
+            self.release_connection(conn)
+
+    def increment_daily_usage(self, user_id: str, date_str: str) -> int:
+        """Increments daily application count atomically and returns new total."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                INSERT INTO user_daily_usage (user_id, date, apply_count)
+                VALUES (%s, %s, 1)
+                ON CONFLICT (user_id, date) DO UPDATE SET apply_count = user_daily_usage.apply_count + 1
+                """, (user_id, date_str))
+                conn.commit()
+                cursor.execute("SELECT apply_count FROM user_daily_usage WHERE user_id = %s AND date = %s", (user_id, date_str))
+                row = cursor.fetchone()
+                return int(row[0]) if row else 1
         finally:
             self.release_connection(conn)
 
@@ -468,6 +640,32 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
         finally:
             self.release_connection(conn)
 
+    def migrate_plaintext_profiles(self) -> int:
+        """One-shot backfill helper to encrypt any legacy plaintext profile rows."""
+        from app.core.database import DatabaseManager
+        migrated = 0
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT id, user_id, data FROM profiles")
+                rows = cursor.fetchall()
+                for r in rows:
+                    try:
+                        data = r[2] if isinstance(r[2], dict) else json.loads(r[2])
+                        if not data.get("_pii_encrypted"):
+                            enc = DatabaseManager._encrypt_profile_dict(data)
+                            cursor.execute(
+                                "UPDATE profiles SET data = %s WHERE id = %s AND user_id = %s",
+                                (json.dumps(enc), r[0], r[1])
+                            )
+                            migrated += 1
+                    except Exception:
+                        pass
+                conn.commit()
+            return migrated
+        finally:
+            self.release_connection(conn)
+
     # Vault Operations
     def save_vault_entry(self, entry: VaultEntry, user_id: str) -> bool:
         conn = self.get_connection()
@@ -503,6 +701,20 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                         usage_count=r[8], last_used_at=r[9], created_at=r[10]
                     ))
                 return entries
+        finally:
+            self.release_connection(conn)
+
+    def increment_vault_usage(self, qa_id: str):
+        """Increments usage counter atomically."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                now_str = datetime.now().isoformat()
+                cursor.execute("""
+                UPDATE vault SET usage_count = usage_count + 1, last_used_at = %s
+                WHERE qa_id = %s
+                """, (now_str, qa_id))
+                conn.commit()
         finally:
             self.release_connection(conn)
 
@@ -639,6 +851,41 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
         finally:
             self.release_connection(conn)
 
+    def get_hitl_event(self, event_id: str, user_id: str) -> Optional[HITLEvent]:
+        """Retrieves a single HITL event by ID strictly for the specified user."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT event_id, user_id, job_id, company, role_title, question_text, input_type, options, ai_suggested_draft, user_answer, status, screenshot_path, dom_snapshot, field_selector, created_at, resolved_at FROM hitl_events WHERE event_id = %s AND user_id = %s LIMIT 1", (event_id, user_id))
+                r = cursor.fetchone()
+                if not r:
+                    return None
+                return HITLEvent(
+                    event_id=r[0], user_id=r[1], job_id=r[2], company=r[3], role_title=r[4],
+                    question_text=r[5], input_type=r[6],
+                    options=r[7] if isinstance(r[7], list) else json.loads(r[7] or '[]'),
+                    ai_suggested_draft=r[8], user_answer=r[9], status=r[10],
+                    screenshot_path=r[11], dom_snapshot=r[12], field_selector=r[13],
+                    created_at=r[14], resolved_at=r[15]
+                )
+        finally:
+            self.release_connection(conn)
+
+    def resolve_hitl_event(self, event_id: str, user_answer: str, user_id: str) -> bool:
+        """Atomically resolves a pending HITL question strictly for the user."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                now_str = datetime.now().isoformat()
+                cursor.execute("""
+                UPDATE hitl_events SET status = 'RESOLVED', user_answer = %s, resolved_at = %s
+                WHERE event_id = %s AND user_id = %s AND status = 'PENDING'
+                """, (user_answer, now_str, event_id, user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        finally:
+            self.release_connection(conn)
+
     def save_email(self, email: EmailMessage, user_id: str) -> bool:
         conn = self.get_connection()
         try:
@@ -738,6 +985,74 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     "recruiter_responses": recruiter_responses,
                     "response_rate_percent": round(response_rate, 2)
                 }
+        finally:
+            self.release_connection(conn)
+
+    # =========================================================================
+    # Job Checkpoint Recovery (Multi-Tenant)
+    # =========================================================================
+    def save_checkpoint(self, checkpoint: JobCheckpoint, user_id: str) -> bool:
+        """Saves current automation execution step strictly for the user."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                INSERT INTO job_checkpoints (
+                    job_id, user_id, current_step, total_steps, filled_inputs,
+                    last_url, screenshot_path, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (job_id) DO UPDATE SET
+                    user_id = EXCLUDED.user_id, current_step = EXCLUDED.current_step,
+                    total_steps = EXCLUDED.total_steps, filled_inputs = EXCLUDED.filled_inputs,
+                    last_url = EXCLUDED.last_url, screenshot_path = EXCLUDED.screenshot_path,
+                    updated_at = EXCLUDED.updated_at
+                """, (
+                    checkpoint.job_id,
+                    user_id,
+                    checkpoint.current_step,
+                    checkpoint.total_steps,
+                    json.dumps(checkpoint.filled_inputs),
+                    checkpoint.last_url,
+                    checkpoint.screenshot_path,
+                    checkpoint.updated_at
+                ))
+                conn.commit()
+                return True
+        finally:
+            self.release_connection(conn)
+
+    def get_checkpoint(self, job_id: str, user_id: str) -> Optional[JobCheckpoint]:
+        """Retrieves active checkpoint strictly for the user."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                SELECT job_id, user_id, current_step, total_steps, filled_inputs, last_url, screenshot_path, updated_at
+                FROM job_checkpoints WHERE job_id = %s AND user_id = %s
+                """, (job_id, user_id))
+                row = cursor.fetchone()
+                if row:
+                    return JobCheckpoint(
+                        job_id=row[0],
+                        user_id=row[1],
+                        current_step=row[2],
+                        total_steps=row[3],
+                        filled_inputs=row[4] if isinstance(row[4], dict) else json.loads(row[4]),
+                        last_url=row[5],
+                        screenshot_path=row[6],
+                        updated_at=row[7]
+                    )
+                return None
+        finally:
+            self.release_connection(conn)
+
+    def delete_checkpoint(self, job_id: str, user_id: str):
+        """Deletes checkpoint strictly for the user."""
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM job_checkpoints WHERE job_id = %s AND user_id = %s", (job_id, user_id))
+                conn.commit()
         finally:
             self.release_connection(conn)
 
@@ -1684,7 +1999,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                         experiment.user_id,
                         experiment.name,
                         experiment.description,
-                        json.dumps([v.model_dump() if hasattr(v, "model_dump") else v.dict() for v in experiment.variants]),
+                        json.dumps([v.model_dump() for v in experiment.variants]),
                         experiment.status,
                         experiment.created_at,
                         experiment.ended_at
@@ -1983,12 +2298,12 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
         finally:
             self.release_connection(conn)
 
-    def get_user_consent_history(self, user_id: str, consent_type: Optional[str] = None) -> List[UserConsent]:
+    def get_user_consent_history(self, user_id: str, consent_type: Optional[Union[ConsentType, str]] = None) -> List[UserConsent]:
         """Returns immutable audit trail of consent events for user, optionally filtered by type in PostgreSQL."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
-                type_val = consent_type.value if hasattr(consent_type, "value") else consent_type
+                type_val = consent_type.value if isinstance(consent_type, ConsentType) else consent_type
                 query = (
                     "SELECT consent_id, user_id, consent_type, version, consented, ip_address, user_agent, created_at "
                     "FROM user_consents WHERE user_id = %s "

@@ -2805,18 +2805,35 @@ class DatabaseManager(DatabaseAdapter):
             return history
 
 
-db = DatabaseManager()
+# Raw SQLite engine — the default and the fallback if a configured Postgres adapter fails to init.
+_sqlite_db = DatabaseManager()
+
+# Single active adapter, resolved once from DATABASE_URL. All call sites share this instance,
+# so the app never talks to two databases at once (avoids the historical split-brain where the
+# module-level singleton was always SQLite while get_db() callers reached Postgres).
+_active_db: DatabaseAdapter = None  # type: ignore[assignment]
 
 
 def get_db() -> DatabaseAdapter:
-    """Returns active database adapter (PostgreSQL if configured, else SQLite WAL engine)."""
+    """Returns the single active database adapter (PostgreSQL if DATABASE_URL is a postgres URL,
+    else the SQLite WAL engine), resolved once and cached."""
+    global _active_db
+    if _active_db is not None:
+        return _active_db
     from app.core.settings import settings
     if settings.DATABASE_URL and settings.DATABASE_URL.startswith("postgres"):
         try:
             from app.core.postgres_adapter import PostgresDatabaseAdapter
-            return PostgresDatabaseAdapter(settings.DATABASE_URL)
+            _active_db = PostgresDatabaseAdapter(settings.DATABASE_URL)
         except Exception:
             logger.critical("Postgres adapter init failed; falling back to local SQLite", exc_info=True)
-            return db
-    return db
+            _active_db = _sqlite_db
+    else:
+        _active_db = _sqlite_db
+    return _active_db
+
+
+# The shared instance every `from app.core.database import db` receives. With DATABASE_URL unset
+# this is the SQLite engine — byte-identical to the previous behavior.
+db = get_db()
 
