@@ -1,0 +1,13 @@
+{
+  "name": "jobcopilot-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright E2E suite for JobCopilot frontend (P0-1)",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
