@@ -20,7 +20,10 @@ DEFAULT_MATCH_THRESHOLD = 0.60
 DEFAULT_DAILY_CAP = 30
 DEFAULT_FRESHNESS_DAYS = 30
 DEFAULT_BUSINESS_HOURS = {"start": "08:30", "end": "17:30"}
-DEFAULT_SUBMISSION_MODE = "FULL_AUTO"
+# Safe by default: DRY_RUN fills and verifies application forms without actually
+# submitting. LIVE submission must be opted into explicitly per apply request.
+# (Note: the bot runner only recognizes "DRY_RUN"; any other value = live submit.)
+DEFAULT_SUBMISSION_MODE = "DRY_RUN"
 
 API_PORT = settings.API_PORT
 FRONTEND_PORT = settings.FRONTEND_PORT
