@@ -306,6 +306,13 @@
               <div class="login-value-pill">💎 Salary &amp; ESOP Modeler</div>
             </div>
 
+            <!-- Real Google Identity Services button (rendered when a client id is configured). -->
+            <div id="gsi-button-container" style="display:flex; justify-content:center; min-height:44px;"></div>
+            <div id="gsi-unavailable-msg" class="login-input-feedback" style="display:none;">
+              Google Sign-In isn't configured on this deployment. Please contact the administrator.
+            </div>
+
+            <!-- Dev/demo fallback: email + button + demo. Hidden in production by app.js. -->
             <!-- Email Input -->
             <form id="login-form" class="login-email-group" data-action="submitLoginForm">
               <input type="email" id="login-email-input" class="login-email-input"
@@ -313,7 +320,7 @@
               <div id="login-email-error" class="login-input-feedback" style="display: none;"></div>
             </form>
 
-            <!-- Primary CTA: Google SSO -->
+            <!-- Dev-only CTA: email-based SSO (rejected by the backend when ENV=production) -->
             <button class="btn-login-google" id="btn-login-google"
                     data-action="loginWithGoogle">
               <svg viewBox="0 0 24 24" width="20" height="20" style="flex-shrink:0;">
@@ -2325,6 +2332,8 @@
 
   </div>
 
+  <!-- Google Identity Services — real "Sign in with Google" (returns an id_token). -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

@@ -65,8 +65,10 @@ def test_csp_pwa_security_headers(client: TestClient):
     csp = res.headers.get("content-security-policy", "")
     assert "manifest-src 'self'" in csp
     assert "worker-src 'self'" in csp
-    assert "script-src 'self';" in csp
-    # Enforce that script-src has dropped 'unsafe-inline' for structural XSS immunity
+    # script-src is 'self' plus the Google Identity Services origin (real Sign in
+    # with Google) — and nothing else.
     script_directive = [p.strip() for p in csp.split(";") if p.strip().startswith("script-src")][0]
+    assert script_directive == "script-src 'self' https://accounts.google.com"
+    # Enforce that script-src has dropped 'unsafe-inline' for structural XSS immunity
     assert "'unsafe-inline'" not in script_directive
     assert "microphone=(self)" in res.headers.get("permissions-policy", "")
