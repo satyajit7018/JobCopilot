@@ -25,6 +25,7 @@ const SOURCES = [
   'js/error-reporter.js',
   'js/app.js',
   'js/modules/command-palette.js',
+  'js/modules/interview-studio.js',
 ];
 
 async function main() {
