@@ -9,6 +9,17 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+def test_static_cache_control_headers(client: TestClient):
+    """App code must revalidate (no stale app.js); API responses are left untouched."""
+    # HTML shell + manifest: must revalidate so code/config changes propagate.
+    for path in ("/", "/manifest.json"):
+        res = client.get(path)
+        assert "no-cache" in res.headers.get("cache-control", ""), path
+    # API responses must not get the static no-cache header from this middleware.
+    api_res = client.get("/api/auth/public-config")
+    assert "no-cache" not in api_res.headers.get("cache-control", "").lower()
+
+
 def test_pwa_manifest_endpoint(client: TestClient):
     """Validates /manifest.json returns valid PWA config for Android installation."""
     res = client.get("/manifest.json")

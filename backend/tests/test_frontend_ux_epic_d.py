@@ -179,12 +179,16 @@ def test_css_wcag_focus_visible_and_tokens():
 
 
 def test_service_worker_v1_1_and_sync_handlers():
-    """Verifies Service Worker v1.1 includes Background Sync and Push listeners."""
+    """Verifies the Service Worker is network-first for app code and keeps its handlers."""
     sw_path = FRONTEND_DIR / "sw.js"
     assert sw_path.exists()
     sw_content = sw_path.read_text(encoding="utf-8")
 
-    assert "jobcopilot-pwa-v1.1" in sw_content, "sw.js cache must be bumped to v1.1"
+    assert "jobcopilot-pwa-v1.2" in sw_content, "sw.js cache version must be current"
+    # App code must NOT be precached cache-first (that caused stale app.js); the
+    # shell precache list no longer contains it and the strategy is network-first.
+    assert "'/js/app.js'" not in sw_content, "app.js must not be precached cache-first"
+    assert "NETWORK-FIRST" in sw_content
     assert "sync" in sw_content, "sw.js must contain background sync handler"
     assert "push" in sw_content, "sw.js must contain push notification handler"
     assert "notificationclick" in sw_content
