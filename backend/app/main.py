@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -153,6 +153,34 @@ async def health_check():
         status_code=status_code,
         media_type="application/json"
     )
+
+@app.post("/api/client-errors", tags=["Observability"], status_code=204)
+@limiter.limit("30/minute")
+async def report_client_error(request: Request):
+    """Sink for uncaught client-side JS errors so frontend failures aren't invisible.
+
+    Best-effort and never fails the caller: logs the error (with the request id
+    for correlation) and forwards to Sentry when configured. Rate-limited per
+    user/IP to prevent a broken client from flooding the backend.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    if isinstance(payload, dict):
+        info = {k: payload.get(k) for k in ("message", "source", "line", "col", "url", "stack", "userAgent")}
+    else:
+        info = {"message": str(payload)[:500]}
+    request_id = getattr(request.state, "request_id", None)
+    logger.warning("client_error request_id=%s %s", request_id, {k: v for k, v in info.items() if k != "stack"})
+    if settings.SENTRY_DSN:
+        try:
+            import sentry_sdk
+            sentry_sdk.capture_message(f"[client] {info.get('message')}", level="error")
+        except Exception:
+            logger.debug("Sentry capture of client error failed", exc_info=True)
+    return Response(status_code=204)
+
 
 # Include REST Router
 app.include_router(api_router)

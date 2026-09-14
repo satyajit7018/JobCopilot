@@ -2334,6 +2334,8 @@
 
   <!-- Google Identity Services — real "Sign in with Google" (returns an id_token). -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Client error reporter — loaded before app.js so it captures early failures too. -->
+  <script src="/js/error-reporter.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

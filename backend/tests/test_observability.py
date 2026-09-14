@@ -57,6 +57,24 @@ async def test_metrics_expose_alert_referenced_gauges():
 
 
 @pytest.mark.asyncio
+async def test_client_error_sink_accepts_reports():
+    """The client-error sink accepts an uncaught-JS-error payload and returns 204."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        res = await ac.post("/api/client-errors", json={
+            "message": "TypeError: undefined is not a function",
+            "source": "/js/app.js",
+            "line": 123,
+            "stack": "at foo (/js/app.js:123)",
+        })
+        assert res.status_code == 204
+        # Malformed / non-JSON bodies must not 500 the sink.
+        res2 = await ac.post("/api/client-errors", content=b"not json",
+                             headers={"Content-Type": "application/json"})
+        assert res2.status_code == 204
+
+
+@pytest.mark.asyncio
 async def test_request_tracing_correlation_id():
     """Asserts X-Request-ID is injected onto all responses."""
     transport = ASGITransport(app=app)
