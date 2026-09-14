@@ -27,6 +27,7 @@ const SOURCES = [
   'js/modules/command-palette.js',
   'js/modules/interview-studio.js',
   'js/modules/knowledge-vault.js',
+  'js/modules/negotiation.js',
 ];
 
 async function main() {
