@@ -16,6 +16,8 @@ from app.api.auth import (
     hash_password,
     issue_token_pair,
     register_session,
+)
+from app.api.auth import (
     router as core_auth_router,
 )
 from app.core.database import db
@@ -39,6 +41,25 @@ class GoogleSSORequest(BaseModel):
 async def health_check():
     """Public healthcheck endpoint."""
     return {"status": "ok", "version": "1.0.0", "storage": "sqlite_wal"}
+
+
+@router.get("/auth/public-config")
+async def public_auth_config():
+    """Unauthenticated config the login gate needs to render the correct sign-in UI.
+
+    Exposes only the public OAuth client id (safe to ship to browsers) and whether
+    the demo/email-only path should be offered — never any secret.
+    """
+    from app.core.settings import settings
+
+    client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID") or ""
+    return {
+        "google_client_id": client_id,
+        "is_production": settings.is_production,
+        # The bare-email/demo login path is dev-only; production requires a real
+        # Google id_token (enforced in google_sso_auth below).
+        "demo_enabled": not settings.is_production,
+    }
 
 
 @router.post("/auth/google-sso", response_model=TokenResponse)

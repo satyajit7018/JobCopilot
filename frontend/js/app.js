@@ -440,18 +440,24 @@ function appendTerminalLog(module, text, isError = false, isSuccess = false) {
 // ==========================================================================
 // Google SSO & Authentication Gateway (Step 1 & 3)
 // ==========================================================================
-window.triggerGoogleSSO = async function() {
+window.triggerGoogleSSO = async function(opts = {}) {
+  const idToken = opts.idToken || null;
   showToast('Connecting to Google Single Sign-On...', 'info');
   try {
+    // Production path: send the verified Google id_token. Dev/demo path: send a
+    // bare email (the backend rejects this when ENV=production).
+    const body = idToken
+      ? { id_token: idToken }
+      : {
+          email: window._loginOverrideEmail || 'alex.mercer.dev@gmail.com',
+          full_name: window._loginOverrideEmail ? window._loginOverrideEmail.split('@')[0] : 'Alex Mercer',
+          avatar_url: 'https://lh3.googleusercontent.com/a/default-user',
+          auto_login_permissions: document.getElementById('chk-auto-login-perm')?.checked ?? true
+        };
     const res = await fetch(`${API_BASE}/auth/google-sso`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: window._loginOverrideEmail || 'alex.mercer.dev@gmail.com',
-        full_name: window._loginOverrideEmail ? window._loginOverrideEmail.split('@')[0] : 'Alex Mercer',
-        avatar_url: 'https://lh3.googleusercontent.com/a/default-user',
-        auto_login_permissions: document.getElementById('chk-auto-login-perm')?.checked ?? true
-      })
+      body: JSON.stringify(body)
     });
     const data = await res.json();
     if (data.access_token) {
@@ -534,6 +540,71 @@ window.loginWithGoogle = async function() {
 window.loginDemoMode = async function() {
   window._loginOverrideEmail = null;
   await window.triggerGoogleSSO();
+};
+
+// Callback GIS invokes with the signed credential (a Google id_token / JWT).
+window.handleGoogleCredential = function(response) {
+  const idToken = response && response.credential;
+  if (!idToken) {
+    showToast('Google Sign-In did not return a credential. Please try again.', 'error');
+    return;
+  }
+  window.triggerGoogleSSO({ idToken });
+};
+
+// Fetch public auth config and wire up real "Sign in with Google" (GIS). In
+// production the dev email/demo path is hidden so the only way in is a verified
+// Google id_token — matching the backend, which 401s a bare-email POST in prod.
+window.initGoogleSignIn = async function() {
+  let cfg = { google_client_id: '', is_production: false, demo_enabled: true };
+  try {
+    const res = await fetch(`${API_BASE}/auth/public-config`);
+    if (res.ok) cfg = await res.json();
+  } catch (_) { /* offline / dev — fall back to demo path */ }
+
+  const demoBtn = document.getElementById('btn-login-demo');
+  const emailBtn = document.getElementById('btn-login-google');
+  const emailForm = document.getElementById('login-form');
+  const unavailable = document.getElementById('gsi-unavailable-msg');
+
+  // Hide the dev email/demo path in production.
+  if (cfg.is_production) {
+    if (demoBtn) demoBtn.style.display = 'none';
+    if (emailBtn) emailBtn.style.display = 'none';
+    if (emailForm) emailForm.style.display = 'none';
+  } else if (demoBtn) {
+    demoBtn.style.display = '';
+  }
+
+  const container = document.getElementById('gsi-button-container');
+  if (!cfg.google_client_id) {
+    // No client id configured. In production this means login is unavailable;
+    // in dev the demo/email path remains usable.
+    if (container) container.style.display = 'none';
+    if (cfg.is_production && unavailable) unavailable.style.display = 'flex';
+    return;
+  }
+
+  // GIS script loads async — poll briefly until google.accounts.id is ready.
+  const render = () => {
+    if (!(window.google && google.accounts && google.accounts.id)) return false;
+    google.accounts.id.initialize({
+      client_id: cfg.google_client_id,
+      callback: window.handleGoogleCredential
+    });
+    if (container) {
+      container.innerHTML = '';
+      google.accounts.id.renderButton(container, {
+        theme: 'filled_blue', size: 'large', width: 320, text: 'signin_with'
+      });
+    }
+    return true;
+  };
+  if (render()) return;
+  let tries = 0;
+  const timer = setInterval(() => {
+    if (render() || ++tries > 40) clearInterval(timer);  // ~10s max
+  }, 250);
 };
 
 // ==========================================================================
@@ -4891,6 +4962,9 @@ document.addEventListener('DOMContentLoaded', () => {
       window.loginWithGoogle();
     });
   }
+
+  // Wire up real Google Sign-In (and apply production gating of the demo path).
+  window.initGoogleSignIn();
 
   if (!token) {
     // No auth — show login gate, skip all data fetches

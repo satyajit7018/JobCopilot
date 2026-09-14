@@ -27,12 +27,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # 1. Content Security Policy
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self'; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            # accounts.google.com: Google Identity Services (real Sign in with Google).
+            "script-src 'self' https://accounts.google.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
             "manifest-src 'self'; "
             "worker-src 'self'; "
+            "frame-src 'self' https://accounts.google.com; "
             "connect-src 'self' ws: wss: http: https:;"
         )
 

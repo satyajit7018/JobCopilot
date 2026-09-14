@@ -9,14 +9,15 @@ Validates:
 """
 
 import uuid
-import pytest
 from datetime import timedelta
-from httpx import AsyncClient, ASGITransport
 
-from app.main import app
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from app.api.auth import create_jwt_token, hash_password
 from app.core.database import db
 from app.core.models import User, UserRole
-from app.api.auth import hash_password, create_jwt_token
+from app.main import app
 
 
 @pytest.mark.asyncio
@@ -38,7 +39,7 @@ async def test_login_lockout_after_consecutive_failures():
     user_id = f"usr_lock_{uuid.uuid4().hex[:6]}"
     email = f"{user_id}@test.com"
     correct_pw = "ValidPassword123!"
-    
+
     user = User(
         user_id=user_id,
         email=email,
@@ -111,7 +112,7 @@ async def test_email_verification_workflow():
     """Asserts verify-email updates user's email_verified status."""
     user_id = f"usr_verify_{uuid.uuid4().hex[:6]}"
     email = f"{user_id}@test.com"
-    
+
     user = User(
         user_id=user_id,
         email=email,
@@ -136,3 +137,28 @@ async def test_email_verification_workflow():
     updated = db.get_user_by_id(user_id)
     assert updated is not None
     assert updated.email_verified is True
+
+
+@pytest.mark.asyncio
+async def test_public_auth_config_shape():
+    """The login gate's public config exposes client id + flags, never a secret."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        res = await ac.get("/api/auth/public-config")
+        assert res.status_code == 200
+        body = res.json()
+        assert set(body) == {"google_client_id", "is_production", "demo_enabled"}
+        # In the (non-production) test env, the demo/email path is offered.
+        assert body["is_production"] is False
+        assert body["demo_enabled"] is True
+
+
+@pytest.mark.asyncio
+async def test_google_sso_rejects_bare_email_in_production(monkeypatch):
+    """With ENV=production, a bare-email SSO POST (no id_token) must 401."""
+    monkeypatch.setenv("ENV", "production")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        res = await ac.post("/api/auth/google-sso", json={"email": "someone@gmail.com"})
+        assert res.status_code == 401
+        assert "id token required" in res.json().get("detail", "").lower()
