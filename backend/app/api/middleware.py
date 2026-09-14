@@ -54,6 +54,17 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if settings.ENV.lower() == "production":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
+        # 7. Cache-Control for static assets: app code must always revalidate so
+        #    code changes propagate (no more stale app.js); long-lived immutable
+        #    assets (icons/images/fonts) may be cached hard. API responses are left
+        #    untouched.
+        path = request.url.path
+        if not path.startswith("/api/") and not path.startswith("/auth/"):
+            if path == "/" or path.endswith((".html", ".js", ".css", ".json")) or path.endswith("/sw.js"):
+                response.headers.setdefault("Cache-Control", "no-cache, must-revalidate")
+            elif path.endswith((".png", ".jpg", ".jpeg", ".svg", ".webp", ".ico", ".woff", ".woff2", ".ttf")):
+                response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+
         return response
 
 

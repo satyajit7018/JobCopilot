@@ -3,12 +3,10 @@
  * Manages caching, offline reliability, background sync hooks, and native push notifications.
  */
 
-const CACHE_NAME = 'jobcopilot-pwa-v1.1';
+const CACHE_NAME = 'jobcopilot-pwa-v1.2';
+// Precache only rarely-changing shell assets. Code (HTML/JS/CSS) is served
+// network-first (see fetch handler) so updates reach users immediately.
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/app.js',
   '/manifest.json',
   '/icons/icon.svg',
   '/icons/icon-192.png',
@@ -43,7 +41,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch Interception - Cache-First for Static, Network-First for API
+// Fetch Interception - Network-First for API + app code, Cache-First for media assets
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
@@ -73,7 +71,35 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Static Assets & App Shell: Cache-First, Fallback to Network
+  // 2. App code — HTML navigations, JS, CSS: NETWORK-FIRST so code updates reach
+  //    users immediately (the previous cache-first strategy served stale app.js
+  //    until CACHE_NAME was bumped). Cache is kept only as an offline fallback.
+  const isAppCode =
+    event.request.mode === 'navigate' ||
+    /\.(?:js|css|html)$/.test(url.pathname) ||
+    url.pathname === '/';
+  if (isAppCode) {
+    event.respondWith(
+      fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
+        }
+        return networkResponse;
+      }).catch(() => {
+        // Offline: fall back to cache, and to index.html for navigations.
+        return caches.match(event.request).then((cached) => {
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') return caches.match('/index.html');
+          return undefined;
+        });
+      })
+    );
+    return;
+  }
+
+  // 3. Other static assets (icons, images, fonts): CACHE-FIRST — they rarely
+  //    change and benefit from instant loads.
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -83,17 +109,11 @@ self.addEventListener('fetch', (event) => {
         if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
           return networkResponse;
         }
-        // Opportunistically cache newly fetched static files
         const responseToCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => {
           cache.put(event.request, responseToCache);
         });
         return networkResponse;
-      }).catch(() => {
-        // Fallback to cached index.html for navigation requests
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
       });
     })
   );
