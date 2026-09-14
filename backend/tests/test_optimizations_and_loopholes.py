@@ -147,3 +147,15 @@ def test_self_healing_preview_job_resolution():
     persisted = db.get_job_by_id("sample_swiggy_01", user_id=test_user)
     assert persisted is not None
     assert persisted.company == "Swiggy"
+
+
+def test_preview_job_seeding_disabled_in_production(monkeypatch):
+    """In production the demo catalog must never materialize fake jobs (P0-5)."""
+    from app.core.settings import settings
+
+    monkeypatch.setattr(settings, "ENV", "production")
+    assert settings.is_production is True
+
+    # A never-before-seen user requesting a catalog id gets nothing in production.
+    result = db.get_job_by_id("sample_razorpay_02", user_id="user_prod_boundary_01")
+    assert result is None

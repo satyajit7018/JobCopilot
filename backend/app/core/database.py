@@ -1167,8 +1167,11 @@ class DatabaseManager(DatabaseAdapter):
             if row:
                 return self._row_to_job(row)
 
-        # Self-healing fallback for preview job leads
-        if job_id in SAMPLE_PREVIEW_JOBS_CATALOG:
+        # Self-healing fallback for preview/demo job leads. Never materialize demo
+        # data in production — a fresh production deploy must show an honest,
+        # empty pipeline until real discovery runs (P0-5 data boundary).
+        from app.core.settings import settings
+        if not settings.is_production and job_id in SAMPLE_PREVIEW_JOBS_CATALOG:
             raw = SAMPLE_PREVIEW_JOBS_CATALOG[job_id]
             seed_job = JobListing(
                 job_id=job_id,

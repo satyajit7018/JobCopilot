@@ -128,6 +128,11 @@ class Settings(BaseSettings):
         return self
 
     @property
+    def is_production(self) -> bool:
+        """True when running under the production environment."""
+        return self.ENV.lower() == "production"
+
+    @property
     def app_dir(self) -> Path:
         base = Path(self.JOBCOPILOT_DATA_DIR) if self.JOBCOPILOT_DATA_DIR else Path(os.path.expanduser("~/.jobcopilot"))
         base.mkdir(parents=True, exist_ok=True)
