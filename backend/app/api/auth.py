@@ -22,7 +22,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 try:
     from argon2 import PasswordHasher
-    from argon2.exceptions import VerifyMismatchError
     _ph = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4, hash_len=32)
     HAS_ARGON2 = True
 except ImportError:
@@ -109,7 +108,8 @@ def get_user_or_ip(request: Request) -> str:
             if sub:
                 return f"usr:{sub}"
         except Exception:
-            pass
+            # Unauthenticated / invalid token — expected; rate-limit by IP instead.
+            logging.getLogger("jobcopilot.auth").debug("Rate-limit key: token decode failed, using IP", exc_info=True)
     return f"ip:{get_remote_address(request)}"
 
 
@@ -167,7 +167,8 @@ def verify_password(password: str, hashed: str) -> Tuple[bool, bool]:
             is_valid = hmac.compare_digest(computed_key, expected_key)
             return is_valid, True  # Needs rehash to Argon2id
     except Exception:
-        pass
+        # Malformed/undecodable hash — treat as a failed verification, but record it.
+        logging.getLogger("jobcopilot.auth").warning("Password hash verification errored; treating as invalid", exc_info=True)
 
     return False, False
 
@@ -295,7 +296,7 @@ async def get_current_user_optional(
                     if user and user.is_active:
                         return user
         except Exception:
-            pass
+            logging.getLogger("jobcopilot.auth").debug("Optional user resolution failed", exc_info=True)
 
     # Gated dev escape hatch (F-02)
     if os.getenv("JOBCOPILOT_DEV_AUTH") == "1" and os.getenv("ENV", "").lower() != "production":
@@ -537,7 +538,8 @@ async def login_user(request: Request, req: UserLoginRequest):
             new_hash = hash_password(req.password)
             db.update_user_password(user.user_id, new_hash)
         except Exception:
-            pass
+            # Non-fatal: login still succeeds, but the legacy hash wasn't upgraded.
+            logging.getLogger("jobcopilot.auth").warning("Password rehash-on-login failed for %s", user.user_id, exc_info=True)
 
     role_str = enum_value(user.role)
 
@@ -715,7 +717,8 @@ async def logout_user(
                     if s.get("token_jti") == jti:
                         db.revoke_session(s["session_id"], current_user.user_id)
         except Exception:
-            pass
+            # Security-relevant: the session may not have been revoked on logout.
+            logging.getLogger("jobcopilot.auth").warning("Session revocation on logout failed for %s", current_user.user_id, exc_info=True)
 
     security_logger.log_event(
         "auth.logout",
