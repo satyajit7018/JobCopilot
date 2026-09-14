@@ -79,3 +79,33 @@ async def test_discovery_cycle_multi_tenant_isolation():
             assert res_b.status_code == 200
             jobs_b = res_b.json()["jobs"]
             assert len(jobs_b) == 0
+
+
+@pytest.mark.asyncio
+async def test_discovery_run_is_rate_limited():
+    """The expensive /discovery/run endpoint is throttled (30/min per user) to cap cost."""
+    user = f"usr_disc_rl_{uuid.uuid4().hex[:6]}"
+    db.create_user(User(user_id=user, email=f"{user}@test.com", password_hash="test", role=UserRole.PRO))
+    db.save_profile(
+        CandidateProfile(id=user, user_id=user, full_name="RL", email=f"{user}@test.com",
+                         phone="+1-555-0000", location="Remote"),
+        user_id=user,
+    )
+    token = create_jwt_token(
+        {"sub": user, "email": f"{user}@test.com", "role": "PRO", "type": "access"},
+        timedelta(minutes=15),
+    )
+
+    # No-op the actual discovery work so the throttle is what we're measuring.
+    with patch.object(discovery_orchestrator, "run_discovery_cycle", new_callable=AsyncMock) as run_cycle:
+        run_cycle.return_value = {"total_sourced": 0, "matched_and_saved": 0}
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            headers = {"Authorization": f"Bearer {token}"}
+            statuses = [
+                (await ac.post("/api/discovery/run", headers=headers)).status_code
+                for _ in range(35)
+            ]
+    # Within a single minute the user's isolated bucket must hit the 30/min cap.
+    assert 429 in statuses
+    assert statuses.count(200) <= 30

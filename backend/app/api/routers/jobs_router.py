@@ -7,10 +7,10 @@ direct call logging, held job inspection, and referral/nudge outreach generation
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, limiter
 from app.api.ws_gateway import ws_manager
 from app.core.cover_letter import CoverLetterGenerator
 from app.core.database import db
@@ -101,12 +101,18 @@ async def update_job_status(
 
 
 @router.post("/jobs/{job_id}/tailor")
+@limiter.limit("30/minute")
 async def generate_tailored_assets(
+    request: Request,
     job_id: str,
     profile_id: Optional[str] = None,
     current_user: User = Depends(get_current_user)
 ):
-    """Compiles a tailored PDF resume, cover letter, and outreach package for a job."""
+    """Compiles a tailored PDF resume, cover letter, and outreach package for a job.
+
+    Rate-limited (per user/IP): each call runs LLM resume tailoring + cover-letter
+    + outreach generation, so this caps runaway AI cost from a single account.
+    """
     profile = db.get_profile(user_id=current_user.user_id, profile_id=profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found.")
