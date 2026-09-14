@@ -6,6 +6,7 @@ and OS Keychain / Headless Fallback Integration.
 
 import base64
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -27,6 +28,8 @@ try:
     HAS_ARGON2 = True
 except ImportError:
     HAS_ARGON2 = False
+
+logger = logging.getLogger("jobcopilot.credential_vault")
 
 
 # =============================================================================
@@ -72,7 +75,7 @@ class LocalKMSProvider(KMSProvider):
                     self._keys = data.get("keys", {})
                     self._current_version = data.get("current_version", "v1")
             except Exception:
-                pass
+                logger.debug("Keystore file unreadable; falling back to other key sources", exc_info=True)
 
         # 2. Check environment variable for initial seed
         env_key = os.getenv("JOBCOPILOT_MASTER_KEY")
@@ -86,7 +89,7 @@ class LocalKMSProvider(KMSProvider):
                 if stored_key:
                     self._keys["v1"] = stored_key
             except Exception:
-                pass
+                logger.debug("OS keyring lookup for master key failed; falling back", exc_info=True)
 
         # 4. If still empty, initialize v1 key
         if not self._keys:
@@ -108,9 +111,9 @@ class LocalKMSProvider(KMSProvider):
             try:
                 os.chmod(self.KEYSTORE_FILE, 0o600)
             except Exception:
-                pass
+                logger.warning("Could not restrict keystore file permissions to 0600", exc_info=True)
         except Exception:
-            pass
+            logger.warning("Failed to persist keystore file; keys not saved to disk", exc_info=True)
 
     def get_key(self, version: Optional[str] = None) -> Tuple[str, str]:
         ver = version or self._current_version
@@ -141,7 +144,7 @@ class LocalKMSProvider(KMSProvider):
                 keyring.set_password(self.KEYRING_SERVICE, next_ver, generated_key)
                 keyring.set_password("JobCopilot", "master_key", generated_key)
             except Exception:
-                pass
+                logger.warning("Could not store rotated master key in OS keyring", exc_info=True)
         return next_ver, generated_key
 
     def list_versions(self) -> List[str]:
@@ -203,7 +206,7 @@ class CredentialVault:
                     type=Type.ID
                 )
             except Exception:
-                pass
+                logger.warning("Argon2id key derivation failed; falling back to PBKDF2", exc_info=True)
 
         if not derived:
             kdf = PBKDF2HMAC(
