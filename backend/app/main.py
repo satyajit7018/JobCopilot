@@ -4,6 +4,7 @@ FastAPI Server with WebSockets, SQLite WAL, Static File Hosting, and Cryptograph
 """
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -12,7 +13,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -46,9 +47,37 @@ app = FastAPI(
     version="1.0.0"
 )
 
+logger = logging.getLogger("jobcopilot.metrics")
+
 # Prometheus Metrics Definitions
 HTTP_REQUESTS_TOTAL = Counter("jobcopilot_http_requests_total", "Total HTTP requests", ["method", "endpoint", "status"])
 HTTP_REQUEST_DURATION = Histogram("jobcopilot_http_request_duration_seconds", "HTTP request latency in seconds", ["endpoint"])
+# Gauges referenced by monitoring/prometheus_alerts.yml (JobCopilotCircuitBreakerOpen,
+# JobCopilotDlqBuildup) — populated at scrape time from live app state below.
+CIRCUIT_BREAKER_STATE = Gauge(
+    "jobcopilot_circuit_breaker_state",
+    "Circuit breaker state (1 = active). One series per breaker per state label.",
+    ["circuit_name", "state"],
+)
+DLQ_TASKS_COUNT = Gauge("jobcopilot_dlq_tasks_count", "Number of tasks currently in the dead-letter queue")
+
+
+def _refresh_observability_gauges() -> None:
+    """Sync the scrape-time gauges to current app state (best-effort, never raises)."""
+    try:
+        from app.core.circuit_breaker import CircuitState, get_all_circuit_statuses
+        all_states = [s.value.lower() for s in CircuitState]
+        for name, status in get_all_circuit_statuses().items():
+            current = str(status.get("state", "")).lower()
+            for st in all_states:
+                CIRCUIT_BREAKER_STATE.labels(circuit_name=name, state=st).set(1 if st == current else 0)
+    except Exception:
+        logger.debug("Circuit breaker gauge refresh skipped", exc_info=True)
+    try:
+        from app.tasks.celery_app import local_task_runner
+        DLQ_TASKS_COUNT.set(len(local_task_runner.get_dlq_tasks()))
+    except Exception:
+        logger.debug("DLQ gauge refresh skipped", exc_info=True)
 
 # Wire Slowapi Limiter
 app.state.limiter = limiter
@@ -88,6 +117,7 @@ app.add_middleware(
 @app.get("/metrics", tags=["Observability"])
 async def metrics_endpoint():
     """Prometheus application telemetry scrape target."""
+    _refresh_observability_gauges()
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 

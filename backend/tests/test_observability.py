@@ -35,6 +35,28 @@ async def test_prometheus_metrics_endpoint():
 
 
 @pytest.mark.asyncio
+async def test_metrics_expose_alert_referenced_gauges():
+    """/metrics must export the gauges the Prometheus alerts query, or those alerts are dead.
+
+    Covers jobcopilot_circuit_breaker_state (JobCopilotCircuitBreakerOpen) and
+    jobcopilot_dlq_tasks_count (JobCopilotDlqBuildup), and asserts an OPEN breaker
+    surfaces as state="open" == 1 exactly as the alert expression matches.
+    """
+    from app.core.circuit_breaker import CircuitState, ats_api_breaker
+
+    ats_api_breaker._transition_to(CircuitState.OPEN)
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            text = (await ac.get("/metrics")).text
+        assert "jobcopilot_dlq_tasks_count" in text
+        assert 'jobcopilot_circuit_breaker_state{circuit_name="ats_api",state="open"} 1.0' in text
+        assert 'jobcopilot_circuit_breaker_state{circuit_name="ats_api",state="closed"} 0.0' in text
+    finally:
+        ats_api_breaker._transition_to(CircuitState.CLOSED)
+
+
+@pytest.mark.asyncio
 async def test_request_tracing_correlation_id():
     """Asserts X-Request-ID is injected onto all responses."""
     transport = ASGITransport(app=app)
