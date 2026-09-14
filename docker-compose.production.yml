@@ -1,6 +1,42 @@
+# JobCopilot — production-like stack (Postgres, Redis, Celery, hardened defaults).
+#
+# Secrets are injected from the environment, never committed. Copy
+# `.env.production.example` to `.env.production` and fill in real values, then:
+#
+#     docker compose --env-file .env.production -f docker-compose.production.yml up -d --build
+#
+# See docs/DEPLOY_RUNBOOK.md for the full build -> deploy -> smoke sequence.
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jobcopilot_postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-jobcopilot}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_DB=${POSTGRES_DB:-jobcopilot}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jobcopilot} -d ${POSTGRES_DB:-jobcopilot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: jobcopilot_redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     build:
       context: ./backend
@@ -8,18 +44,32 @@ services:
     container_name: jobcopilot_api
     restart: always
     environment:
-      - DB_MODE=sqlite
+      - ENV=production
+      - DEBUG=false
+      - DB_MODE=postgres
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-jobcopilot}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jobcopilot}
       - JOBCOPILOT_DATA_DIR=/data
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_BACKEND=local
       - USE_CELERY=true
-      - JWT_SECRET=production_super_secret_key_change_in_env
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required (>=32 chars)}
+      - JOBCOPILOT_MASTER_KEY=${JOBCOPILOT_MASTER_KEY:?JOBCOPILOT_MASTER_KEY is required}
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:-}
     volumes:
       - jobcopilot_data:/data
     depends_on:
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   celery_worker:
     build:
@@ -29,25 +79,25 @@ services:
     restart: always
     command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "-Q", "priority.high,priority.normal,priority.low"]
     environment:
-      - DB_MODE=sqlite
+      - ENV=production
+      - DEBUG=false
+      - DB_MODE=postgres
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-jobcopilot}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jobcopilot}
       - JOBCOPILOT_DATA_DIR=/data
       - REDIS_URL=redis://redis:6379/0
       - STORAGE_BACKEND=local
       - USE_CELERY=true
+      - JWT_SECRET=${JWT_SECRET}
+      - JOBCOPILOT_MASTER_KEY=${JOBCOPILOT_MASTER_KEY}
     volumes:
       - jobcopilot_data:/data
     depends_on:
-      - redis
-      - api
-
-  redis:
-    image: redis:7-alpine
-    container_name: jobcopilot_redis
-    restart: always
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
 
   frontend:
     build:
@@ -62,4 +112,5 @@ services:
 
 volumes:
   jobcopilot_data:
+  postgres_data:
   redis_data:
