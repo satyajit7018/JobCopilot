@@ -1,8 +1,9 @@
 {
   "sources": {
     "js/error-reporter.js": "32f9ea72c161fd16013a307a2871f39413e0ed054139d0634b77a44d774619e9",
-    "js/app.js": "5c16c3e70dd6e09c6a0ec60e776d4bbfcdec13f225fc115d9d7a6a5000a4b5d7",
+    "js/app.js": "40f5911dd97559687e334edb9b1360d10cedcc6af75b050098f2a093dfb007a6",
     "js/modules/command-palette.js": "81a727d2d5e49cf62501a3448700d9aa1953ced58cc16b8fbac5a59af41691e2",
-    "js/modules/interview-studio.js": "d26a09ac446723b42826abc425aa9369c10acb1724ccf5cba37b9a12ec87fb37"
+    "js/modules/interview-studio.js": "d26a09ac446723b42826abc425aa9369c10acb1724ccf5cba37b9a12ec87fb37",
+    "js/modules/knowledge-vault.js": "b69e41838043492c8f0b9bec9056cbd1361e82c5b6703e067e2019f37416a95e"
   }
 }
