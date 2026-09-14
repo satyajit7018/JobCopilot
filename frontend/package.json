@@ -1,0 +1,12 @@
+{
+  "name": "jobcopilot-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JobCopilot frontend build pipeline",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

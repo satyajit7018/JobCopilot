@@ -1,0 +1,7 @@
+{
+  "sources": {
+    "js/error-reporter.js": "32f9ea72c161fd16013a307a2871f39413e0ed054139d0634b77a44d774619e9",
+    "js/app.js": "d65eb119accac816492dedde22a82a35d6d516bc66a759efa75dfc4862250bdd",
+    "js/modules/command-palette.js": "81a727d2d5e49cf62501a3448700d9aa1953ced58cc16b8fbac5a59af41691e2"
+  }
+}
