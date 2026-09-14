@@ -2334,11 +2334,10 @@
 
   <!-- Google Identity Services — real "Sign in with Google" (returns an id_token). -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <!-- Client error reporter — loaded before app.js so it captures early failures too. -->
-  <script src="/js/error-reporter.js"></script>
-  <script src="/js/app.js"></script>
-  <!-- Feature modules extracted from app.js (P1-6). Classic scripts, loaded after
-       app.js so they share its global scope. -->
-  <script src="/js/modules/command-palette.js"></script>
+  <!-- App JS bundle (error-reporter + app.js + feature modules, minified + content-hashed).
+       Managed by frontend/build.js — run `cd frontend && npm run build` after editing sources. -->
+  <!-- BUILD:JS -->
+  <script src="/js/app.bundle.272f4b7bd016.js"></script>
+  <!-- /BUILD:JS -->
 </body>
 </html>

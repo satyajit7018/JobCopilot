@@ -92,6 +92,19 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/e2e/package-lock.json
 
+      - name: Build Frontend Bundle & Verify Freshness
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          # The bundle bytes can differ across OSes (esbuild), so we only enforce
+          # the deterministic source-hash manifest: if a source was edited without
+          # rebuilding, the rebuilt manifest won't match the committed one.
+          if ! git diff --exit-code -- js/build-manifest.json; then
+            echo "::error::Frontend bundle is stale. Run 'cd frontend && npm run build' and commit the result."
+            exit 1
+          fi
+
       - name: Install E2E Dependencies
         working-directory: frontend/e2e
         run: npm ci
