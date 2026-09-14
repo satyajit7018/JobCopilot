@@ -28,6 +28,8 @@ const SOURCES = [
   'js/modules/interview-studio.js',
   'js/modules/knowledge-vault.js',
   'js/modules/negotiation.js',
+  'js/modules/inbound-email.js',
+  'js/modules/reverse-interview.js',
 ];
 
 async function main() {

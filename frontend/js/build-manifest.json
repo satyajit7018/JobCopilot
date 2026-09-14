@@ -1,10 +1,12 @@
 {
   "sources": {
     "js/error-reporter.js": "32f9ea72c161fd16013a307a2871f39413e0ed054139d0634b77a44d774619e9",
-    "js/app.js": "803fa7e8062ad4fe414f84e01d122f7f6adcfb6c11159c8e1bca99cc4a2a32f0",
+    "js/app.js": "7f685fb5f8c029c7219d2ac685ffaac5712b1962657452a28b7608cc5b8930b4",
     "js/modules/command-palette.js": "81a727d2d5e49cf62501a3448700d9aa1953ced58cc16b8fbac5a59af41691e2",
     "js/modules/interview-studio.js": "d26a09ac446723b42826abc425aa9369c10acb1724ccf5cba37b9a12ec87fb37",
     "js/modules/knowledge-vault.js": "b69e41838043492c8f0b9bec9056cbd1361e82c5b6703e067e2019f37416a95e",
-    "js/modules/negotiation.js": "6533ee43a042ee894b6ff8e9c559817c247f2e31f0bc00d13dccaa5132e61ea0"
+    "js/modules/negotiation.js": "6533ee43a042ee894b6ff8e9c559817c247f2e31f0bc00d13dccaa5132e61ea0",
+    "js/modules/inbound-email.js": "ddc46c2f02c10b9694531385cc5314074a44cb222d5490efb344f3b2ab74bea2",
+    "js/modules/reverse-interview.js": "a98fa0d99cdcbbe06257ce934b38a2040c18c4cdd2e5badc0cc5fc5ba5833397"
   }
 }
