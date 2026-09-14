@@ -114,17 +114,61 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_fail_closed(self) -> "Settings":
-        """Enforces critical secrets in production (fail-closed architecture)."""
+        """Fail-closed secret/config validation for production.
+
+        Generalizes the JWT/master-key checks into a single config-aware audit:
+        each secret is required only when the active configuration actually uses
+        it (S3 creds only when storing to S3, a cloud LLM key only when that
+        provider is selected, etc.), and every problem is reported at once so a
+        misconfigured deploy fails immediately with a complete list.
+        """
         _KNOWN_BAD_JWT_SECRET = "jobcopilot-super-secret-saas-jwt-signing-key-32b"
-        if self.ENV.lower() == "production":
-            if not self.JWT_SECRET or self.JWT_SECRET == _KNOWN_BAD_JWT_SECRET or len(self.JWT_SECRET) < 32:
-                raise ValueError(
-                    "FATAL: In production, JWT_SECRET must be set to a cryptographically secure string of at least 32 characters."
-                )
-            if not self.JOBCOPILOT_MASTER_KEY:
-                raise ValueError(
-                    "FATAL: In production, JOBCOPILOT_MASTER_KEY environment variable is required for AES credential vault."
-                )
+        if self.ENV.lower() != "production":
+            return self
+
+        errors: list[str] = []
+
+        # --- Always required ---
+        if not self.JWT_SECRET or self.JWT_SECRET == _KNOWN_BAD_JWT_SECRET or len(self.JWT_SECRET) < 32:
+            errors.append(
+                "JWT_SECRET must be a cryptographically secure string of at least 32 characters "
+                "(and not the shipped placeholder)."
+            )
+        if not self.JOBCOPILOT_MASTER_KEY:
+            errors.append("JOBCOPILOT_MASTER_KEY is required for the AES credential vault.")
+
+        # Users cannot sign in without a Google client id (the only production
+        # login path — the dev email/demo path is disabled in prod).
+        if not self.GOOGLE_OAUTH_CLIENT_ID:
+            errors.append("GOOGLE_OAUTH_CLIENT_ID is required — it is the only production sign-in path.")
+
+        # --- Conditionally required, by active configuration ---
+        if self.DB_MODE.lower() == "postgres" and not (self.DATABASE_URL or "").startswith("postgres"):
+            errors.append("DB_MODE=postgres requires a postgres:// DATABASE_URL.")
+
+        if self.STORAGE_BACKEND.lower() in ("s3", "r2"):
+            for name in ("S3_BUCKET_NAME", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"):
+                if not getattr(self, name):
+                    errors.append(f"{name} is required when STORAGE_BACKEND={self.STORAGE_BACKEND}.")
+
+        provider = self.DEFAULT_LLM_PROVIDER.lower()
+        if provider == "openai" and not self.OPENAI_API_KEY:
+            errors.append("OPENAI_API_KEY is required when DEFAULT_LLM_PROVIDER=openai.")
+        if provider == "anthropic" and not self.ANTHROPIC_API_KEY:
+            errors.append("ANTHROPIC_API_KEY is required when DEFAULT_LLM_PROVIDER=anthropic.")
+
+        if self.USE_CELERY and "localhost" in self.REDIS_URL:
+            errors.append("USE_CELERY=true requires a non-localhost REDIS_URL in production.")
+
+        # Stripe: only enforced once billing is wired (a secret key is present),
+        # in which case the webhook secret must accompany it.
+        if self.STRIPE_SECRET_KEY and not self.STRIPE_WEBHOOK_SECRET:
+            errors.append("STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set.")
+
+        if errors:
+            raise ValueError(
+                "FATAL: production configuration is incomplete:\n  - " + "\n  - ".join(errors)
+            )
         return self
 
     @property
