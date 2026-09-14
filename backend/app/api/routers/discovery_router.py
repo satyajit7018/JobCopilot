@@ -5,9 +5,9 @@ Handles autonomous multi-source job discovery triggers and live status querying.
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, limiter
 from app.api.ws_gateway import ws_manager
 from app.core.database import db
 from app.core.models import User
@@ -17,11 +17,18 @@ router = APIRouter(tags=["discovery"])
 
 
 @router.post("/discovery/run")
+@limiter.limit("30/minute")
 async def run_discovery(
+    request: Request,
     profile_id: Optional[str] = None,
     current_user: User = Depends(get_current_user)
 ):
-    """Triggers an async 0-day job discovery cycle across ATS APIs and VC boards."""
+    """Triggers an async 0-day job discovery cycle across ATS APIs and VC boards.
+
+    Rate-limited (per user/IP): discovery fans out to many external ATS/VC feeds,
+    so this caps abuse and runaway cost. Deeper per-tier daily quotas live in the
+    RateLimiter singleton.
+    """
     profile = db.get_profile(user_id=current_user.user_id, profile_id=profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Candidate profile not found.")
