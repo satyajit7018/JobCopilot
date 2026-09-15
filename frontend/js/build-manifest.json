@@ -1,7 +1,7 @@
 {
   "sources": {
     "js/error-reporter.js": "32f9ea72c161fd16013a307a2871f39413e0ed054139d0634b77a44d774619e9",
-    "js/app.js": "c6cf00c4ccb93f769d545883b85817804ef4e81804f9ca124ec381cf50d17c7a",
+    "js/app.js": "adb77aa24f121af3e88df3540b0f675b88dc97d139bb8845ccf030bd1f051079",
     "js/modules/command-palette.js": "81a727d2d5e49cf62501a3448700d9aa1953ced58cc16b8fbac5a59af41691e2",
     "js/modules/interview-studio.js": "d26a09ac446723b42826abc425aa9369c10acb1724ccf5cba37b9a12ec87fb37",
     "js/modules/knowledge-vault.js": "b69e41838043492c8f0b9bec9056cbd1361e82c5b6703e067e2019f37416a95e",
@@ -11,6 +11,7 @@
     "js/modules/pipeline-actions.js": "509c641cab1efa648eaa69f132bba7c2ed9e37884f854d8cc8056759f8fdceb1",
     "js/modules/pwa-install.js": "5b75f522a1fb075904604e69e847fe2697467d8a4b4cd287d228a533b526f9bc",
     "js/modules/funnel-analytics.js": "73654731f7a77dc724a00e8bb52baaceae26acabdb068cb3cdf2810947674754",
-    "js/modules/portal-onboarding.js": "ce88790590b121c4ad6f44bfafff1306f2a989a0abc95375f71736cfe1548e48"
+    "js/modules/portal-onboarding.js": "ce88790590b121c4ad6f44bfafff1306f2a989a0abc95375f71736cfe1548e48",
+    "js/modules/saas-admin.js": "47c279a97feba5112c257db11fafd6c9e11ba6a53e45b358c68a8acef6d073c5"
   }
 }

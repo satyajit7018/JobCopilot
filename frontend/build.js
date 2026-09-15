@@ -34,6 +34,7 @@ const SOURCES = [
   'js/modules/pwa-install.js',
   'js/modules/funnel-analytics.js',
   'js/modules/portal-onboarding.js',
+  'js/modules/saas-admin.js',
 ];
 
 async function main() {
