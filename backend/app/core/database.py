@@ -2014,6 +2014,16 @@ class DatabaseManager(DatabaseAdapter):
                     cursor.execute("DELETE FROM user_daily_usage WHERE user_id = ?", (user_id,))
                     cursor.execute("DELETE FROM memberships WHERE user_id = ?", (user_id,))
                     cursor.execute("DELETE FROM organizations WHERE owner_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM job_checkpoints WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM revoked_tokens WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM idempotency_keys WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM mfa_credentials WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM analytics_events WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM ab_assignments WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM ab_experiments WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM conversion_signals WHERE user_id = ?", (user_id,))
+                    # Retained under GDPR Art. 17(3): audit logs + consent records kept for legal compliance / proof.
                     conn.commit()
 
                     try:

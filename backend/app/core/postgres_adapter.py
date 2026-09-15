@@ -1472,6 +1472,11 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
         }
 
     def hard_delete_user_account(self, user_id: str) -> bool:
+        import shutil
+        from pathlib import Path
+
+        from app.core.config import settings
+
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
@@ -1483,10 +1488,30 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 cursor.execute("DELETE FROM hitl_events WHERE user_id = %s", (user_id,))
                 cursor.execute("DELETE FROM emails WHERE user_id = %s", (user_id,))
                 cursor.execute("DELETE FROM outreach_records WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM user_daily_usage WHERE user_id = %s", (user_id,))
                 cursor.execute("DELETE FROM memberships WHERE user_id = %s", (user_id,))
                 cursor.execute("DELETE FROM organizations WHERE owner_id = %s", (user_id,))
+                cursor.execute("DELETE FROM job_checkpoints WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM revoked_tokens WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM idempotency_keys WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM mfa_credentials WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM user_sessions WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM analytics_events WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM ab_assignments WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM ab_experiments WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM conversion_signals WHERE user_id = %s", (user_id,))
+                # Retained under GDPR Art. 17(3): audit logs + consent records kept for legal compliance / proof.
                 conn.commit()
-                return True
+
+            try:
+                user_storage = Path(settings.BASE_DIR) / "storage" / "users" / user_id
+                if user_storage.exists() and user_storage.is_dir():
+                    shutil.rmtree(user_storage, ignore_errors=True)
+            except Exception:
+                logger.warning("postgres_adapter: failed to delete user storage directory during hard delete", exc_info=True)
+                pass
+
+            return True
         except Exception:
             logger.exception("postgres_adapter DB operation failed")
             conn.rollback()
