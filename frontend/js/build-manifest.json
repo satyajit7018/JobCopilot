@@ -1,7 +1,7 @@
 {
   "sources": {
     "js/error-reporter.js": "32f9ea72c161fd16013a307a2871f39413e0ed054139d0634b77a44d774619e9",
-    "js/app.js": "c6a48a338f135a2605a3684f63f11b4945b9dafa1f16440804d6f00c542f1598",
+    "js/app.js": "8f0ca1a237deb6fa38f6ae41b158139e246027a9f4c345371c633c661830afe4",
     "js/modules/command-palette.js": "81a727d2d5e49cf62501a3448700d9aa1953ced58cc16b8fbac5a59af41691e2",
     "js/modules/interview-studio.js": "d26a09ac446723b42826abc425aa9369c10acb1724ccf5cba37b9a12ec87fb37",
     "js/modules/knowledge-vault.js": "b69e41838043492c8f0b9bec9056cbd1361e82c5b6703e067e2019f37416a95e",
@@ -13,6 +13,7 @@
     "js/modules/funnel-analytics.js": "73654731f7a77dc724a00e8bb52baaceae26acabdb068cb3cdf2810947674754",
     "js/modules/portal-onboarding.js": "ce88790590b121c4ad6f44bfafff1306f2a989a0abc95375f71736cfe1548e48",
     "js/modules/saas-admin.js": "47c279a97feba5112c257db11fafd6c9e11ba6a53e45b358c68a8acef6d073c5",
-    "js/modules/resume-ingestion.js": "b6ec5422ba1d491b87c1678e7392a806727c2e2c59a6364d39fc198d42a5138d"
+    "js/modules/resume-ingestion.js": "b6ec5422ba1d491b87c1678e7392a806727c2e2c59a6364d39fc198d42a5138d",
+    "js/modules/outreach.js": "c71424c318b952b7c8d3a9790d63a74a1478442587ff8fa1e1cf655a3f35fc52"
   }
 }

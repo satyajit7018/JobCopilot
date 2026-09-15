@@ -36,6 +36,7 @@ const SOURCES = [
   'js/modules/portal-onboarding.js',
   'js/modules/saas-admin.js',
   'js/modules/resume-ingestion.js',
+  'js/modules/outreach.js',
 ];
 
 async function main() {
