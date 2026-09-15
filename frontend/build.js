@@ -32,6 +32,7 @@ const SOURCES = [
   'js/modules/reverse-interview.js',
   'js/modules/pipeline-actions.js',
   'js/modules/pwa-install.js',
+  'js/modules/funnel-analytics.js',
 ];
 
 async function main() {

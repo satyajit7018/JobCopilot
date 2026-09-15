@@ -1,7 +1,7 @@
 {
   "sources": {
     "js/error-reporter.js": "32f9ea72c161fd16013a307a2871f39413e0ed054139d0634b77a44d774619e9",
-    "js/app.js": "499406e9cff2af97078d9774ecb3989b08142e6d0cc897b601b4c00fb7806aa0",
+    "js/app.js": "dc30deb3996fc8e24d8be5a2f379f17ce5afefc6a719513d94189e1aceb18ac8",
     "js/modules/command-palette.js": "81a727d2d5e49cf62501a3448700d9aa1953ced58cc16b8fbac5a59af41691e2",
     "js/modules/interview-studio.js": "d26a09ac446723b42826abc425aa9369c10acb1724ccf5cba37b9a12ec87fb37",
     "js/modules/knowledge-vault.js": "b69e41838043492c8f0b9bec9056cbd1361e82c5b6703e067e2019f37416a95e",
@@ -9,6 +9,7 @@
     "js/modules/inbound-email.js": "ddc46c2f02c10b9694531385cc5314074a44cb222d5490efb344f3b2ab74bea2",
     "js/modules/reverse-interview.js": "a98fa0d99cdcbbe06257ce934b38a2040c18c4cdd2e5badc0cc5fc5ba5833397",
     "js/modules/pipeline-actions.js": "509c641cab1efa648eaa69f132bba7c2ed9e37884f854d8cc8056759f8fdceb1",
-    "js/modules/pwa-install.js": "5b75f522a1fb075904604e69e847fe2697467d8a4b4cd287d228a533b526f9bc"
+    "js/modules/pwa-install.js": "5b75f522a1fb075904604e69e847fe2697467d8a4b4cd287d228a533b526f9bc",
+    "js/modules/funnel-analytics.js": "73654731f7a77dc724a00e8bb52baaceae26acabdb068cb3cdf2810947674754"
   }
 }
