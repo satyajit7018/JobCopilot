@@ -176,6 +176,7 @@ class CacheManager:
             try:
                 await redis_conn.delete(full_key)
             except Exception:
+                logger.warning("cache: redis delete failed, continuing with in-memory delete", exc_info=True)
                 pass
 
         return await self._in_memory.delete(full_key)
@@ -195,6 +196,7 @@ class CacheManager:
                 if keys:
                     await redis_conn.delete(*keys)
             except Exception:
+                logger.warning("cache: redis namespace invalidation failed, continuing with in-memory", exc_info=True)
                 pass
 
         return await self._in_memory.delete_prefix(prefix)

@@ -4,17 +4,20 @@ Handles Stripe subscription checkout sessions, customer portal redirection,
 plan limits, and webhook-driven subscription provisioning.
 """
 
+import logging
 import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app.api.auth import get_current_user, enum_value
+from app.api.auth import enum_value, get_current_user
 from app.core.circuit_breaker import CircuitOpenError, stripe_api_breaker
 from app.core.config import settings
 from app.core.database import db
 from app.core.models import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["billing"])
 
@@ -203,6 +206,7 @@ async def sync_subscription_tier(current_user: User = Depends(get_current_user))
             rate_limiter.set_user_tier(user_id, st_tier)
             db.update_user_role(user_id, active_tier)
         except Exception:
+            logger.warning("billing_router: stripe sync failed, falling back to current database role", exc_info=True)
             pass  # Fallback to current database role if Stripe customer lookup fails or circuit is open
 
     return {

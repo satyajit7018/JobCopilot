@@ -980,6 +980,7 @@ class DatabaseManager(DatabaseAdapter):
                             )
                             migrated += 1
                     except Exception:
+                        logger.warning("database: failed to migrate unencrypted profile", exc_info=True)
                         pass
                 conn.commit()
         return migrated
@@ -2020,6 +2021,7 @@ class DatabaseManager(DatabaseAdapter):
                         if user_storage.exists() and user_storage.is_dir():
                             shutil.rmtree(user_storage, ignore_errors=True)
                     except Exception:
+                        logger.warning("database: failed to delete user storage directory during hard delete", exc_info=True)
                         pass
 
                     return True

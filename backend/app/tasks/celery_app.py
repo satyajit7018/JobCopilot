@@ -102,6 +102,7 @@ class LocalTaskRunner:
                         **payload
                     }, user_id=target_user)
                 except Exception:
+                    logger.debug("celery_app: failed to broadcast task progress over websocket", exc_info=True)
                     pass
 
         async def _run_with_retries():

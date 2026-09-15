@@ -108,6 +108,7 @@ class AnalyticsWarehouse:
                         days = max(0, (end_dt - app_dt).total_seconds() / 86400.0)
                         cohort["durations"].append(days)
                 except Exception:
+                    logger.debug("analytics_warehouse: failed to parse application/interview dates for duration cohort", exc_info=True)
                     pass
 
         result = []
@@ -215,6 +216,7 @@ class AnalyticsWarehouse:
                     if diff_days >= 0:
                         response_latencies.append(diff_days)
             except Exception:
+                logger.debug("analytics_warehouse: failed to parse date for response latency calculation", exc_info=True)
                 pass
 
         def _median(vals: List[float]) -> Optional[float]:

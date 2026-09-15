@@ -9,9 +9,12 @@ Tiers:
 - ELITE: Unlimited applies,   residential proxy rotation, priority queue ($79/mo)
 """
 
+import logging
 import time
 from enum import Enum
 from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -68,6 +71,7 @@ class RateLimiter:
                 self.user_subscriptions[user_id] = tier
                 return tier
             except ValueError:
+                logger.debug("rate_limiter: unknown role value for tier parsing, defaulting to FREE", exc_info=True)
                 pass
         return SubscriptionTier.FREE
 
@@ -92,6 +96,7 @@ class RateLimiter:
                     )
                     conn.commit()
             except Exception:
+                logger.warning("rate_limiter: failed to sync user tier to database", exc_info=True)
                 pass
 
     def get_remaining_applies(self, user_id: str) -> int:

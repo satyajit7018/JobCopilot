@@ -4,10 +4,13 @@ Provides unified storage abstraction for Resumes and Submission Confirmation Scr
 supporting Local FileSystem, AWS S3, and Cloudflare R2 (zero egress fees).
 """
 
+import logging
 import os
 import time
 from pathlib import Path
 from typing import Optional, Union
+
+logger = logging.getLogger(__name__)
 
 
 class ObjectStorageAdapter:
@@ -45,6 +48,7 @@ class ObjectStorageAdapter:
                 client.put_object(Bucket=self.s3_bucket, Key=key, Body=content)
                 return f"s3://{self.s3_bucket}/{key}"
             except Exception:
+                logger.warning("object_storage: S3/R2 upload failed, falling back to local storage", exc_info=True)
                 pass
 
         # Local storage fallback
@@ -91,6 +95,7 @@ class ObjectStorageAdapter:
                     ExpiresIn=expires_in
                 )
             except Exception:
+                logger.warning("object_storage: S3/R2 presigned URL generation failed, falling back to local endpoint", exc_info=True)
                 pass
 
         # Local pseudo pre-signed link

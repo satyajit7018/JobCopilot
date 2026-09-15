@@ -39,6 +39,7 @@ if settings.SENTRY_DSN:
             environment=settings.ENV
         )
     except Exception:
+        # intentional: logging here would recurse/fail
         pass
 
 app = FastAPI(

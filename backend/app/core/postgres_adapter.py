@@ -660,6 +660,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                             )
                             migrated += 1
                     except Exception:
+                        logger.warning("postgres_adapter: failed to migrate unencrypted profile", exc_info=True)
                         pass
                 conn.commit()
             return migrated
