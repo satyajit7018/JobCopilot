@@ -31,6 +31,7 @@ const SOURCES = [
   'js/modules/inbound-email.js',
   'js/modules/reverse-interview.js',
   'js/modules/pipeline-actions.js',
+  'js/modules/pwa-install.js',
 ];
 
 async function main() {
