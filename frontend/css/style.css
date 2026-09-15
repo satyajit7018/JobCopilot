@@ -798,7 +798,23 @@ code, pre, .font-mono {
   gap: 1.25rem;
   overflow-x: auto;
   padding-bottom: 1.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-indigo) transparent;
 }
+
+.kanban-board::-webkit-scrollbar {
+  height: 8px;
+}
+
+.kanban-board::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kanban-board::-webkit-scrollbar-thumb {
+  background: var(--accent-indigo);
+  border-radius: 4px;
+}
+
 
 .kanban-col {
   background: rgba(10, 15, 28, 0.6);
@@ -2070,6 +2086,16 @@ code, pre, .font-mono {
 
   .mobile-bottom-nav {
     display: flex !important;
+  }
+
+  .toast-container {
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px) + 12px);
+    left: 12px;
+    right: 12px;
+  }
+
+  .toast-container .toast {
+    width: 100%;
   }
 
   .cockpit-content {
