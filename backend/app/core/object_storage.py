@@ -101,6 +101,51 @@ class ObjectStorageAdapter:
         # Local pseudo pre-signed link
         return f"/api/storage/download?user_id={user_id}&file={filename}&exp={int(time.time()) + expires_in}"
 
+    def purge_user(self, user_id: str) -> bool:
+        """GDPR Art. 17: permanently delete ALL objects for one user (prefix users/<user_id>/)."""
+        if not user_id or not isinstance(user_id, str) or not user_id.strip():
+            logger.warning("object_storage: cannot purge empty or invalid user_id")
+            return False
+
+        clean_user_id = user_id.strip()
+        prefix = f"users/{clean_user_id}/"
+
+        if self.backend in ["s3", "r2"] and self.s3_access_key:
+            try:
+                import boto3  # type: ignore
+                client = boto3.client(
+                    "s3",
+                    endpoint_url=self.s3_endpoint_url,
+                    aws_access_key_id=self.s3_access_key,
+                    aws_secret_access_key=self.s3_secret_key,
+                    region_name=self.s3_region
+                )
+                paginator = client.get_paginator("list_objects_v2")
+                for page in paginator.paginate(Bucket=self.s3_bucket, Prefix=prefix):
+                    contents = page.get("Contents", [])
+                    if contents:
+                        delete_batch = [{"Key": obj["Key"]} for obj in contents]
+                        for i in range(0, len(delete_batch), 1000):
+                            client.delete_objects(
+                                Bucket=self.s3_bucket,
+                                Delete={"Objects": delete_batch[i:i + 1000]}
+                            )
+            except Exception:
+                logger.warning("object_storage: S3/R2 object purge failed", exc_info=True)
+                return False
+
+        # Local cleanup (always, regardless of backend, so local fallback files are also removed)
+        try:
+            import shutil
+            target = self.local_base_dir / "users" / clean_user_id
+            if target.exists() and target.is_dir():
+                shutil.rmtree(target, ignore_errors=True)
+        except Exception:
+            logger.warning("object_storage: local storage directory purge failed", exc_info=True)
+            return False
+
+        return True
+
 
 # Global Singleton
 storage = ObjectStorageAdapter()
