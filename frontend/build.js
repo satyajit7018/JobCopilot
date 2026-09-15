@@ -30,6 +30,7 @@ const SOURCES = [
   'js/modules/negotiation.js',
   'js/modules/inbound-email.js',
   'js/modules/reverse-interview.js',
+  'js/modules/pipeline-actions.js',
 ];
 
 async function main() {
