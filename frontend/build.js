@@ -33,6 +33,7 @@ const SOURCES = [
   'js/modules/pipeline-actions.js',
   'js/modules/pwa-install.js',
   'js/modules/funnel-analytics.js',
+  'js/modules/portal-onboarding.js',
 ];
 
 async function main() {
