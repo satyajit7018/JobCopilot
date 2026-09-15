@@ -124,3 +124,61 @@ jobs:
           name: playwright-report
           path: frontend/e2e/playwright-report/
           retention-days: 14
+
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: jobcopilot
+          POSTGRES_PASSWORD: jobcopilot
+          POSTGRES_DB: jobcopilot_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jobcopilot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Assert exactly one migration head
+        working-directory: backend
+        run: |
+          COUNT=$(alembic heads | grep -c '(head)')
+          echo "Alembic heads found: $COUNT"
+          alembic heads
+          if [ "$COUNT" -ne 1 ]; then
+            echo "::error::Expected exactly one Alembic head, found $COUNT (branch collision?)"
+            exit 1
+          fi
+
+      - name: Apply migrations from scratch (upgrade head)
+        working-directory: backend
+        env:
+          DB_MODE: postgres
+          DATABASE_URL: postgresql://jobcopilot:jobcopilot@localhost:5432/jobcopilot_test
+        run: alembic upgrade head
+
+      - name: Round-trip downgrade to base and back
+        working-directory: backend
+        env:
+          DB_MODE: postgres
+          DATABASE_URL: postgresql://jobcopilot:jobcopilot@localhost:5432/jobcopilot_test
+        run: |
+          alembic downgrade base
+          alembic upgrade head
