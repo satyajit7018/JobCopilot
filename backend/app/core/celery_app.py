@@ -83,6 +83,7 @@ class TaskManager:
                     "result": res.result if res.state == "SUCCESS" else None
                 }
         except Exception:
+            logger.debug("celery_app: failed checking celery AsyncResult, falling back to in-memory", exc_info=True)
             pass
 
         # 2. Check In-Memory fallback

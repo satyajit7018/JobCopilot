@@ -5,6 +5,7 @@ are encountered, blocks gracefully, saves answers to the Knowledge Vault, and re
 """
 
 import asyncio
+import logging
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -12,6 +13,8 @@ from typing import List, Optional
 from app.core.database import db
 from app.core.models import HITLEvent
 from app.core.vector_vault import vault
+
+logger = logging.getLogger(__name__)
 
 
 class HITLAgent:
@@ -60,6 +63,7 @@ class HITLAgent:
                     "event": event.dict()
                 })
             except Exception:
+                logger.debug("hitl_agent: failed to broadcast HITL_REQUIRED event over websocket", exc_info=True)
                 pass
 
         return event

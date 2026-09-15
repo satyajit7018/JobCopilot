@@ -8,10 +8,13 @@ import base64
 import hashlib
 import hmac
 import secrets
+import logging
 import struct
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 try:
     import pyotp
@@ -83,6 +86,7 @@ class MFAEngine:
                 if totp.verify(clean_code, valid_window=valid_window):
                     return True
             except Exception:
+                logger.debug("mfa: pyotp TOTP verification raised exception, falling back to manual HMAC", exc_info=True)
                 pass
 
         # Verification via fallback window

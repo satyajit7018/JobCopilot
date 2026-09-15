@@ -4,11 +4,15 @@ Provides complete per-tenant data portability export (GDPR Article 20)
 and permanent cryptographic account erasure (GDPR Article 17).
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.auth import get_current_user, verify_password
 from app.core.database import db
 from app.core.models import AccountExportResponse, DeleteAccountRequest, User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/account", tags=["account"])
 
@@ -69,6 +73,7 @@ async def delete_user_account(
             for sub in subscriptions.auto_paging_iter():
                 stripe.Subscription.delete(sub.id)
     except Exception:
+        logger.warning("account_router: failed to cancel stripe subscriptions during account deletion", exc_info=True)
         pass  # Non-blocking if Stripe is not configured or in test mode
 
     # 2. Hard erase database records and storage files

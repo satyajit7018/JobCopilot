@@ -4,10 +4,13 @@ Robustly extracts structured candidate profiles from PDF, DOCX, and raw text
 with section segmentation, date parsing, and categorized skill taxonomy.
 """
 
-import re
 import asyncio
+import logging
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 try:
     from pypdf import PdfReader  # type: ignore
@@ -100,6 +103,7 @@ class ResumeParser:
                         with open(path, encoding="utf-8", errors="ignore") as f:
                             return f.read()
             except Exception:
+                logger.debug("resume_parser: failed reading resume file path, treating as raw text", exc_info=True)
                 pass
         return source_path_or_text
 
@@ -579,6 +583,7 @@ Return a strictly valid JSON object with the following schema:
                     raw_resume_text=text
                 )
         except Exception:
+            logger.warning("resume_parser: structured parsing failed, falling back to basic profile", exc_info=True)
             pass
 
         return fallback_profile

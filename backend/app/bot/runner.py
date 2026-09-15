@@ -5,6 +5,7 @@ checkpoint recovery, and HITL resolution for target job postings.
 """
 
 import asyncio
+import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -28,6 +29,8 @@ from app.core.database import db
 from app.core.models import ApplicationStatus
 from app.core.outreach_generator import OutreachGenerator
 from app.core.resume_tailor import ResumeTailor
+
+logger = logging.getLogger(__name__)
 
 
 class AutonomousJobRunner:
@@ -64,6 +67,7 @@ class AutonomousJobRunner:
                 try:
                     await ws_broadcast_callback({"type": "BOT_LOG", "message": msg, "job_id": job_id})
                 except Exception:
+                    logger.debug("bot_runner: failed to broadcast bot log message over websocket", exc_info=True)
                     pass
 
         # 1. Idempotent Apply Ledger Gate
@@ -178,6 +182,7 @@ class AutonomousJobRunner:
                         try:
                             dom_content = (await page.content())[:2048]
                         except Exception:
+                            logger.debug("bot_runner: failed to capture DOM content for captcha challenge", exc_info=True)
                             pass
 
                         hitl_evt = await HITLAgent.request_human_input(
@@ -309,6 +314,7 @@ class AutonomousJobRunner:
                     try:
                         await browser.close()
                     except Exception:
+                        logger.debug("bot_runner: failed to close browser cleanly", exc_info=True)
                         pass
 
         apply_ledger.mark_failed(

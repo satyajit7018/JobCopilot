@@ -6,11 +6,14 @@ Chromium CSS Paged Media. Requires zero heavy LaTeX installations.
 
 import asyncio
 import html
+import logging
 import os
 from pathlib import Path
 from typing import List, Optional
 
 from app.core.models import CandidateProfile
+
+logger = logging.getLogger(__name__)
 
 
 class ResumeCompiler:
@@ -271,6 +274,7 @@ class ResumeCompiler:
                 await browser.close()
             return output_path
         except (ImportError, Exception):
+            logger.debug("resume_compiler: playwright PDF compilation failed, falling back to system chrome", exc_info=True)
             pass
 
         # 2. Fallback to System Chrome Binary
@@ -303,6 +307,7 @@ class ResumeCompiler:
             try:
                 os.remove(temp_html_path)
             except Exception:
+                logger.debug("resume_compiler: failed to remove temporary HTML file", exc_info=True)
                 pass
             if output_path.exists():
                 return output_path

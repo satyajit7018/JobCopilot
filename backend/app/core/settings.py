@@ -4,12 +4,15 @@ Pydantic BaseSettings providing strong type safety, environment variable parsing
 and fail-closed security validations in production environments.
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import List, Optional, Union
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -108,6 +111,7 @@ class Settings(BaseSettings):
                 try:
                     return json.loads(v)
                 except Exception:
+                    logger.debug("settings: failed to parse ALLOWED_ORIGINS as JSON, falling back to comma-separated", exc_info=True)
                     pass
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v

@@ -4,8 +4,11 @@ Generates high-frequency technical and STAR leadership questions based on real F
 Stripe, Meta, Netflix, and Uber interview loops, across Backend, Frontend, AI/ML, DevOps, Mobile, and PM roles.
 """
 
+import logging
 import re
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class InterviewStudioEngine:
@@ -509,6 +512,7 @@ class InterviewStudioEngine:
                     if "feedback" in llm_data:
                         base_eval["feedback"] = str(llm_data["feedback"])
                 except Exception:
+                    logger.debug("interview_studio: failed to parse structured JSON from LLM evaluation response", exc_info=True)
                     pass
             return base_eval
         except Exception:
