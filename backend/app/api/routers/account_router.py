@@ -84,6 +84,13 @@ async def delete_user_account(
             detail="Failed to delete account data."
         )
 
+    # GDPR Art. 17: also purge remote/local object storage (resumes, screenshots).
+    try:
+        from app.core.object_storage import storage
+        storage.purge_user(user_id)
+    except Exception:
+        logger.warning("account_router: object storage purge failed during account deletion", exc_info=True)
+
     return {
         "status": "success",
         "message": f"Account for {current_user.email} and all associated data permanently erased in compliance with GDPR Article 17."
