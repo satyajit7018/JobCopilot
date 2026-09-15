@@ -172,7 +172,12 @@ class DatabaseAdapter(ABC):
     def delete_checkpoint(self, job_id: str, user_id: str):
         pass
 
-    # Apply Ledger Methods (with safe base defaults)
+    # Apply Ledger Methods
+    @abstractmethod
+    def insert_ledger_if_absent(self, entry: Any, user_id: str) -> bool:
+        """Atomically inserts an apply ledger record if absent for (user_id, job_id)."""
+        pass
+
     def save_apply_ledger_entry(self, entry: Any, user_id: str) -> bool:
         return True
 

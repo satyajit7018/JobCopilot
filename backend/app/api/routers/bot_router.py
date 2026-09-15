@@ -7,12 +7,12 @@ and human-in-the-loop (HITL) novel question resolution.
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from app.api.auth import get_current_user
 from app.api.ws_gateway import ws_manager
-from app.bot.apply_ledger import apply_ledger
+from app.bot.apply_ledger import ApplyLedgerManager, apply_ledger
 from app.core.config import DEFAULT_SUBMISSION_MODE
 from app.core.database import db
 from app.core.models import ApplicationStatus, ApplyLedgerStatus, User
@@ -137,8 +137,8 @@ async def apply_to_job(
     # Check Idempotent Apply Ledger before executing
     _assert_can_apply(current_user.user_id, job_id)
 
-    from app.core.rate_limiter import rate_limiter
     from app.bot.runner import AutonomousJobRunner
+    from app.core.rate_limiter import rate_limiter
     runner = AutonomousJobRunner(mode=mode or DEFAULT_SUBMISSION_MODE)
     result = await runner.execute_application(
         job_id=job_id,
@@ -158,17 +158,43 @@ async def apply_to_job(
 async def apply_to_job_async(
     job_id: str,
     mode: Optional[str] = None,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     current_user: User = Depends(get_current_user)
 ):
     """
     Dispatches asynchronous application task to Celery/Redis background worker queue with idempotency checks.
     Returns HTTP 202 Accepted with a unique task_id for progress polling.
     """
-    # Check Idempotent Apply Ledger
-    _assert_can_apply(current_user.user_id, job_id)
-
-    from app.core.celery_app import TaskManager
+    # 1. Rate-limit check first
     from app.core.rate_limiter import rate_limiter
+    if not rate_limiter.can_apply(current_user.user_id):
+        raise HTTPException(
+            status_code=429,
+            detail="Daily application limit reached for your plan. Please upgrade to Pro or Elite to continue applying."
+        )
+
+    # 2. Look up the job to get its fingerprint (404 if not found)
+    job = db.get_job_by_id(job_id, user_id=current_user.user_id)
+    if not job:
+        existing_ledger = apply_ledger.get_ledger_for_job(current_user.user_id, job_id)
+        if existing_ledger and existing_ledger.status in (ApplyLedgerStatus.SUBMITTED, ApplyLedgerStatus.IN_PROGRESS):
+            if existing_ledger.status == ApplyLedgerStatus.SUBMITTED:
+                raise HTTPException(status_code=409, detail=f"Application already submitted on {existing_ledger.updated_at}.")
+            raise HTTPException(status_code=409, detail="Application is currently actively executing.")
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    # 3. Synchronous atomic acquire in apply_ledger before dispatching
+    acquired, entry, reason = ApplyLedgerManager.acquire_lock(
+        user_id=current_user.user_id,
+        job_id=job_id,
+        job_fingerprint=job.fingerprint,
+        idempotency_key=idempotency_key
+    )
+    if not acquired:
+        raise HTTPException(status_code=409, detail=reason)
+
+    # 4. Only then: dispatch task and record daily usage
+    from app.core.celery_app import TaskManager
 
     task_id = TaskManager.dispatch_apply_task(
         job_id=job_id,
