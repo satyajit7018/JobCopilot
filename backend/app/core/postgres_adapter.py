@@ -233,6 +233,13 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     created_at VARCHAR(64) NOT NULL,
                     updated_at VARCHAR(64) NOT NULL
                 );
+                DELETE FROM apply_ledger WHERE ledger_id IN (
+                    SELECT ledger_id FROM (
+                        SELECT ledger_id, ROW_NUMBER() OVER (PARTITION BY user_id, job_id ORDER BY updated_at DESC) AS rn
+                        FROM apply_ledger
+                    ) t WHERE t.rn > 1
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_apply_ledger_user_job ON apply_ledger(user_id, job_id);
                 CREATE INDEX IF NOT EXISTS idx_pg_apply_ledger_user_job ON apply_ledger(user_id, job_id);
                 CREATE INDEX IF NOT EXISTS idx_pg_apply_ledger_user_fingerprint ON apply_ledger(user_id, job_fingerprint);
 
@@ -1087,6 +1094,33 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 ))
                 conn.commit()
                 return True
+        finally:
+            self.release_connection(conn)
+
+    def insert_ledger_if_absent(self, entry: ApplyLedgerEntry, user_id: str) -> bool:
+        """Atomically inserts an apply ledger record if not already present for (user_id, job_id).
+        Returns True if row was inserted, False if a duplicate already exists.
+        """
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                INSERT INTO apply_ledger (
+                    ledger_id, user_id, job_id, job_fingerprint, status,
+                    attempt_count, max_retries, last_error_category, last_error_message,
+                    confirmation_id, screenshot_path, idempotency_key, created_at, updated_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (user_id, job_id) DO NOTHING
+                """, (
+                    entry.ledger_id, user_id, entry.job_id, entry.job_fingerprint,
+                    entry.status.value if hasattr(entry.status, "value") else str(entry.status),
+                    entry.attempt_count, entry.max_retries, entry.last_error_category,
+                    entry.last_error_message, entry.confirmation_id, entry.screenshot_path,
+                    entry.idempotency_key, entry.created_at, entry.updated_at
+                ))
+                inserted = cursor.rowcount == 1
+                conn.commit()
+                return inserted
         finally:
             self.release_connection(conn)
 

@@ -492,6 +492,16 @@ class DatabaseManager(DatabaseAdapter):
                     "screenshot_path": "TEXT",
                     "idempotency_key": "TEXT"
                 })
+                # Deduplicate existing rows before creating unique index
+                cursor.execute("""
+                DELETE FROM apply_ledger WHERE ledger_id IN (
+                    SELECT ledger_id FROM (
+                        SELECT ledger_id, ROW_NUMBER() OVER (PARTITION BY user_id, job_id ORDER BY updated_at DESC) AS rn
+                        FROM apply_ledger
+                    ) t WHERE t.rn > 1
+                );
+                """)
+                cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_apply_ledger_user_job ON apply_ledger(user_id, job_id);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_apply_ledger_user_job ON apply_ledger(user_id, job_id);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_apply_ledger_user_fingerprint ON apply_ledger(user_id, job_fingerprint);")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_apply_ledger_status ON apply_ledger(status);")
@@ -1364,6 +1374,38 @@ class DatabaseManager(DatabaseAdapter):
                 ))
                 conn.commit()
                 return True
+
+    def insert_ledger_if_absent(self, entry: ApplyLedgerEntry, user_id: str) -> bool:
+        """Atomically inserts an apply ledger record if not already present for (user_id, job_id).
+        Returns True if row was inserted, False if a duplicate already exists.
+        """
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                INSERT OR IGNORE INTO apply_ledger (
+                    ledger_id, user_id, job_id, job_fingerprint, status,
+                    attempt_count, max_retries, last_error_category, last_error_message,
+                    confirmation_id, screenshot_path, idempotency_key, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    entry.ledger_id,
+                    user_id,
+                    entry.job_id,
+                    entry.job_fingerprint,
+                    entry.status.value if hasattr(entry.status, "value") else str(entry.status),
+                    entry.attempt_count,
+                    entry.max_retries,
+                    entry.last_error_category,
+                    entry.last_error_message,
+                    entry.confirmation_id,
+                    entry.screenshot_path,
+                    entry.idempotency_key,
+                    entry.created_at,
+                    entry.updated_at
+                ))
+                conn.commit()
+                return cursor.rowcount == 1
 
     def _row_to_apply_ledger(self, r: sqlite3.Row) -> ApplyLedgerEntry:
         keys = r.keys()

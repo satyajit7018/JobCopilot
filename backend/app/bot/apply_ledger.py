@@ -69,8 +69,12 @@ class ApplyLedgerManager:
             created_at=now_str,
             updated_at=now_str
         )
-        db.save_apply_ledger_entry(entry, user_id=user_id)
-        return True, entry, "Application lock successfully acquired."
+        if db.insert_ledger_if_absent(entry, user_id=user_id):
+            return True, entry, "Application lock successfully acquired."
+
+        # A concurrent request already inserted; re-read and return conflict
+        existing_or_none = db.get_ledger_for_job(job_id, user_id=user_id) or db.get_active_ledger_by_fingerprint(job_fingerprint, user_id=user_id)
+        return False, existing_or_none, "Application is currently actively executing."
 
     @classmethod
     def mark_in_progress(cls, ledger_id: str, user_id: str) -> bool:
