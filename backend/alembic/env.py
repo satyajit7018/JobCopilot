@@ -23,7 +23,7 @@ def get_url():
         return cfg_url
     if settings.DATABASE_URL and settings.DATABASE_URL.startswith("postgres"):
         return settings.DATABASE_URL
-    return f"sqlite:///{settings.DATA_DIR}/jobcopilot.db"
+    return f"sqlite:///{settings.db_path}"
 
 
 def run_migrations_offline() -> None:
