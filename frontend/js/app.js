@@ -562,6 +562,10 @@ window.initGoogleSignIn = async function() {
     if (res.ok) cfg = await res.json();
   } catch (_) { /* offline / dev — fall back to demo path */ }
 
+  if (cfg.demo_enabled === true) {
+    document.getElementById('demo-mode-banner')?.removeAttribute('hidden');
+  }
+
   const demoBtn = document.getElementById('btn-login-demo');
   const emailBtn = document.getElementById('btn-login-google');
   const emailForm = document.getElementById('login-form');
