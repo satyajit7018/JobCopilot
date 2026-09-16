@@ -1,5 +1,5 @@
 # JobCopilot Backend Production Image (Hardened Non-Root)
-FROM python:3.9-slim-bullseye
+FROM python:3.11-slim-bookworm
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
