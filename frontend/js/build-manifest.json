@@ -1,7 +1,7 @@
 {
   "sources": {
     "js/error-reporter.js": "32f9ea72c161fd16013a307a2871f39413e0ed054139d0634b77a44d774619e9",
-    "js/app.js": "32d5254fa58d55e1e198cd320edb7cd2d7ec12467d3ade5279b713ecbd76c401",
+    "js/app.js": "ae3314ff2ca54552e58452dc8f2b417e3c93610ce576eb6b40b05b1a114e7e93",
     "js/modules/command-palette.js": "81a727d2d5e49cf62501a3448700d9aa1953ced58cc16b8fbac5a59af41691e2",
     "js/modules/interview-studio.js": "d26a09ac446723b42826abc425aa9369c10acb1724ccf5cba37b9a12ec87fb37",
     "js/modules/knowledge-vault.js": "b69e41838043492c8f0b9bec9056cbd1361e82c5b6703e067e2019f37416a95e",

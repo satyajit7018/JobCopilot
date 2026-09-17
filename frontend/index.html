@@ -231,6 +231,8 @@
     <main class="cockpit-content" id="main-content" tabindex="-1">
 
       <!-- Executive Deck Board HUD (Step 11: Applied, Responses, Accepted, Rejected, Converted %) -->
+      <!-- Sentinel: when it scrolls out of view the HUD collapses to a slim sticky strip. -->
+      <div id="hud-sentinel" aria-hidden="true"></div>
       <section class="telemetry-hud" id="global-telemetry-hud">
         <div class="telemetry-card cyan">
           <div class="telemetry-header">
@@ -239,6 +241,7 @@
           </div>
           <div class="telemetry-val-group">
             <span class="telemetry-val" id="stat-total-applied" style="color: var(--accent-cyan);">0</span>
+            <span class="tstat-short">Applied</span>
             <span class="telemetry-badge" id="stat-applied-submode">Dry Run</span>
           </div>
         </div>
@@ -250,6 +253,7 @@
           </div>
           <div class="telemetry-val-group">
             <span class="telemetry-val" id="stat-recruiter-responses" style="color: #a5b4fc;">0</span>
+            <span class="tstat-short">Responses</span>
             <span class="telemetry-badge">Inbound Radar</span>
           </div>
         </div>
@@ -261,6 +265,7 @@
           </div>
           <div class="telemetry-val-group">
             <span class="telemetry-val" id="stat-interviews" style="color: var(--accent-emerald);">0</span>
+            <span class="tstat-short">Offers</span>
             <span class="telemetry-badge">Scheduled</span>
           </div>
         </div>
@@ -272,6 +277,7 @@
           </div>
           <div class="telemetry-val-group">
             <span class="telemetry-val" id="stat-rejections" style="color: #f87171;">0</span>
+            <span class="tstat-short">Rejected</span>
             <span class="telemetry-badge">Auto-Classified</span>
           </div>
         </div>
@@ -283,6 +289,7 @@
           </div>
           <div class="telemetry-val-group">
             <span class="telemetry-val" id="stat-response-rate" style="color: var(--accent-amber);">0.0%</span>
+            <span class="tstat-short">Conv. Rate</span>
             <span class="telemetry-badge">Industry ~2.8%</span>
           </div>
         </div>
@@ -2341,7 +2348,7 @@
   <!-- App JS bundle (error-reporter + app.js + feature modules, minified + content-hashed).
        Managed by frontend/build.js — run `cd frontend && npm run build` after editing sources. -->
   <!-- BUILD:JS -->
-  <script src="/js/app.bundle.43a98925f5c2.js"></script>
+  <script src="/js/app.bundle.2302369677ec.js"></script>
   <!-- /BUILD:JS -->
 </body>
 </html>

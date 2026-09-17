@@ -1853,6 +1853,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch (_) {}
 
+  // Collapse the telemetry HUD into a slim, pinned strip once it scrolls up to the
+  // topbar, so the pipeline gets more vertical room while the stats stay glanceable.
+  const hudSentinel = document.getElementById('hud-sentinel');
+  const telemetryHud = document.getElementById('global-telemetry-hud');
+  if (hudSentinel && telemetryHud) {
+    const syncHudCondensed = () => {
+      // Condense once the HUD's natural top has scrolled up to the sticky topbar (68px).
+      telemetryHud.classList.toggle('is-condensed', hudSentinel.getBoundingClientRect().top <= 68);
+    };
+    // capture:true so scrolls from the window OR any inner scroll container are caught.
+    window.addEventListener('scroll', syncHudCondensed, { passive: true, capture: true });
+    window.addEventListener('resize', syncHudCondensed, { passive: true });
+    syncHudCondensed();
+  }
+
   const token = localStorage.getItem('jobcopilot_access_token');
   const portalsConfigured = localStorage.getItem('jobcopilot_portals_configured') === 'true';
 
