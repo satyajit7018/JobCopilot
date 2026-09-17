@@ -459,6 +459,56 @@ code, pre, .font-mono {
   grid-template-columns: repeat(5, minmax(180px, 1fr));
   gap: 1.25rem;
   margin-bottom: 2rem;
+  position: sticky;
+  top: 68px; /* sits directly below the 68px sticky topbar */
+  z-index: 30;
+  background: var(--bg-deep);
+  padding-top: 10px;
+  transition: gap 0.18s ease, padding 0.18s ease;
+}
+
+/* Condensed strip: the 5 cards collapse into a slim pinned row once the
+   sentinel scrolls out of view (toggled by app.js), giving the pipeline room. */
+.tstat-short { display: none; }
+.telemetry-hud.is-condensed {
+  grid-template-columns: repeat(5, max-content) !important;
+  justify-content: start;
+  gap: 0.75rem;
+  padding: 6px 0 8px;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.75);
+}
+.telemetry-hud.is-condensed::-webkit-scrollbar { display: none; }
+.telemetry-hud.is-condensed .telemetry-card {
+  padding: 5px 12px !important;
+  min-height: 0 !important;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+.telemetry-hud.is-condensed .telemetry-card::before { display: none !important; }
+.telemetry-hud.is-condensed .telemetry-header,
+.telemetry-hud.is-condensed .telemetry-badge { display: none !important; }
+.telemetry-hud.is-condensed .telemetry-val-group {
+  margin: 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.telemetry-hud.is-condensed .telemetry-val { font-size: 16px !important; }
+.telemetry-hud.is-condensed .tstat-short {
+  display: inline;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .telemetry-card {
