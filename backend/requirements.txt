@@ -5,7 +5,7 @@ pydantic==2.13.5
 pydantic-settings==2.15.0
 python-multipart==0.0.31
 websockets==17.1
-pypdf==6.18.0
+pypdf==6.19.0
 python-docx==1.2.0
 cryptography==50.0.1
 requests==2.34.2
