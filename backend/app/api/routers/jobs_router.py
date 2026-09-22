@@ -227,7 +227,7 @@ async def log_direct_recruiter_call(
         "status": payload.status,
         "notes": payload.call_notes,
         "meeting_link": payload.meeting_link
-    })
+    }, user_id=current_user.user_id)
 
     return {
         "status": "success",

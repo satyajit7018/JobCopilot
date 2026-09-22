@@ -111,7 +111,7 @@ class TestSaaSPhase2:
         assert len(ws_user_b.messages) == 0
 
         # Broadcast to all
-        await gateway.broadcast({"type": "SYSTEM_ANNOUNCEMENT", "text": "Platform Maintenance in 10m"})
+        await gateway.broadcast_system({"type": "SYSTEM_ANNOUNCEMENT", "text": "Platform Maintenance in 10m"})
         assert len(ws_user_a.messages) == 2
         assert len(ws_user_b.messages) == 1
 

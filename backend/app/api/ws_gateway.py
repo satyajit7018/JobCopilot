@@ -44,11 +44,18 @@ class MultiTenantWebSocketGateway:
                 self.disconnect(ws, user_id)
 
     async def broadcast(self, message: Dict[str, Any], user_id: Optional[str] = None):
-        """Broadcasts global message to all connected clients, or routes to specific tenant if user_id is provided."""
-        if user_id:
-            await self.send_to_user(user_id, message)
-            return
+        """Routes a message to one tenant's sockets. user_id is mandatory.
 
+        Fail-closed: a call without user_id used to fan out to every connected
+        user, which leaked private data across tenants. It now refuses to send.
+        Use broadcast_system() for deliberate platform-wide announcements.
+        """
+        if not user_id:
+            raise ValueError("ws broadcast requires user_id; use broadcast_system() for global announcements")
+        await self.send_to_user(user_id, message)
+
+    async def broadcast_system(self, message: Dict[str, Any]):
+        """Deliberate platform-wide announcement. Never pass tenant data here."""
         payload = json.dumps(message)
         for ws in list(self.broadcast_sockets):
             try:

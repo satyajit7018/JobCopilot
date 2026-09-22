@@ -107,7 +107,7 @@ async def trigger_interview_invitation_notification(
         "meeting_url": payload.meeting_url,
         "dossier": dossier,
         "suggested_questions": questions
-    })
+    }, user_id=current_user.user_id)
 
     return {
         "status": "success",
