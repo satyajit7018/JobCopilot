@@ -7,22 +7,22 @@ import os
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.api.auth import (
+    client_ip,
+    complete_login,
     enum_value,
     get_current_user,
     hash_password,
-    issue_token_pair,
-    register_session,
+    limiter,
 )
 from app.api.auth import (
     router as core_auth_router,
 )
 from app.core.database import db
 from app.core.models import CandidateProfile, TokenResponse, User, UserRole
-from app.core.security_logger import security_logger
 
 router = APIRouter(tags=["auth"])
 router.include_router(core_auth_router)
@@ -63,33 +63,48 @@ async def public_auth_config():
 
 
 @router.post("/auth/google-sso", response_model=TokenResponse)
-async def google_sso_auth(payload: GoogleSSORequest):
-    """Authenticates candidate with Google ID token and issues signed JWT."""
+@limiter.limit("20/minute")
+async def google_sso_auth(request: Request, payload: GoogleSSORequest):
+    """Authenticates with a Google ID token, then applies the same MFA gate as password login.
+
+    Audit P0-4 hardening:
+      * the audience (client id) check can never be skipped,
+      * Google must assert email_verified,
+      * the email comes only from the verified token, never the request body,
+      * the tokenless demo path is gated on settings (not os.environ) and is off in production,
+      * deactivated accounts are refused, and MFA is enforced via complete_login().
+    """
     from google.auth.transport import requests as google_requests
     from google.oauth2 import id_token
 
-    google_client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
-    email = payload.email
+    from app.core.settings import settings
+
     full_name = payload.full_name or "Google User"
 
     if payload.id_token:
+        google_client_id = settings.GOOGLE_OAUTH_CLIENT_ID or os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+        if not google_client_id:
+            raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
         try:
-            id_info = id_token.verify_oauth2_token(
-                payload.id_token,
-                google_requests.Request(),
-                google_client_id
-            )
-            if id_info.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
-                raise HTTPException(status_code=401, detail="Invalid token issuer.")
-            email = id_info.get("email", email)
-            full_name = id_info.get("name", full_name)
-        except ValueError as e:
-            raise HTTPException(status_code=401, detail=f"Google token verification failed: {str(e)}")
-    elif os.getenv("ENV", "").lower() == "production":
-        raise HTTPException(status_code=401, detail="Google ID token required in production.")
+            id_info = id_token.verify_oauth2_token(payload.id_token, google_requests.Request(), google_client_id)
+        except ValueError:
+            raise HTTPException(status_code=401, detail="Google token verification failed.")
+        if id_info.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
+            raise HTTPException(status_code=401, detail="Invalid token issuer.")
+        if id_info.get("email_verified") is not True:
+            raise HTTPException(status_code=401, detail="Google account email is not verified.")
+        email = id_info.get("email")
+        if not email:
+            raise HTTPException(status_code=400, detail="Google token did not include an email address.")
+        full_name = id_info.get("name", full_name)
+    else:
+        if settings.is_production:
+            raise HTTPException(status_code=401, detail="Google ID token required in production.")
+        email = payload.email  # local development demo path only
 
     if not email:
         raise HTTPException(status_code=400, detail="Missing verified email address.")
+    email = email.lower().strip()
 
     user = db.get_user_by_email(email)
     if not user:
@@ -103,10 +118,10 @@ async def google_sso_auth(payload: GoogleSSORequest):
             is_active=True
         )
         db.create_user(user)
-    else:
-        user_id = user.user_id
+    elif not user.is_active:
+        raise HTTPException(status_code=403, detail="User account is deactivated.")
+    user_id = user.user_id
 
-    # Create default candidate profile if absent
     profile = db.get_profile(user_id=user_id)
     if not profile:
         profile = CandidateProfile(
@@ -114,28 +129,12 @@ async def google_sso_auth(payload: GoogleSSORequest):
             user_id=user_id,
             full_name=full_name,
             email=email,
-            phone="+1-000-000-0000",
+            phone="",
             location="Remote"
         )
         db.save_profile(profile, user_id=user_id)
 
-    role_str = enum_value(user.role)
-    access_token, refresh_token = issue_token_pair(user, role_str)
-
-    register_session(user, access_token, "127.0.0.1", "Google SSO Client")
-    security_logger.log_event(
-        "auth.login.google_sso",
-        user_id=user.user_id,
-        details={"provider": "google"}
-    )
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user_id=user.user_id,
-        email=user.email,
-        role=role_str
-    )
+    return complete_login(user, client_ip(request), request.headers.get("User-Agent"), "auth.login.google_sso")
 
 
 @router.get("/auth/status")

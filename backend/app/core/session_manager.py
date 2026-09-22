@@ -58,10 +58,11 @@ class SessionManager:
         user_id: str,
         token_jti: str,
         ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None
+        user_agent: Optional[str] = None,
+        session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Creates a new active session record upon successful authentication."""
-        session_id = f"sess_{uuid.uuid4().hex[:16]}"
+        session_id = session_id or f"sess_{uuid.uuid4().hex[:16]}"
         device_name = parse_device_name(user_agent)
         now_str = datetime.now().isoformat()
 
