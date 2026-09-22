@@ -4,7 +4,7 @@ Handles synchronous and asynchronous stealth bot applications, background worker
 and human-in-the-loop (HITL) novel question resolution.
 """
 
-from datetime import datetime
+import functools
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from app.api.auth import get_current_user
 from app.api.ws_gateway import ws_manager
 from app.bot.apply_ledger import ApplyLedgerManager, apply_ledger
+from app.core.celery_app import TaskManager
 from app.core.config import DEFAULT_SUBMISSION_MODE
 from app.core.database import db
 from app.core.models import ApplicationStatus, ApplyLedgerStatus, User
@@ -31,6 +32,26 @@ class ResolveHeldApplicationRequest(BaseModel):
     event_id: str
     user_answer: str
     save_to_vault: bool = True
+
+
+VALID_SUBMISSION_MODES = ("DRY_RUN", "LIVE")
+
+
+def _resolve_submission_mode(mode: Optional[str], user_id: str) -> str:
+    """Validates the requested mode (audit P1-2).
+
+    Only the exact values DRY_RUN and LIVE are accepted. Previously any other string,
+    including "dry_run", fell through to a live submission. LIVE additionally requires the
+    user's explicit autonomous_submission consent.
+    """
+    resolved = mode if mode is not None else DEFAULT_SUBMISSION_MODE
+    if resolved not in VALID_SUBMISSION_MODES:
+        raise HTTPException(status_code=422, detail=f"Invalid mode '{mode}'. Use one of: {', '.join(VALID_SUBMISSION_MODES)}.")
+    if resolved == "LIVE":
+        consent = db.get_user_consents(user_id).get("autonomous_submission")
+        if not consent or not consent.consented:
+            raise HTTPException(status_code=403, detail="Live submission requires your explicit consent (autonomous_submission).")
+    return resolved
 
 
 def _assert_can_apply(user_id: str, job_id: str) -> None:
@@ -83,7 +104,7 @@ async def resolve_hitl(
         "type": "HITL_RESOLVED",
         "event_id": payload.event_id,
         "user_answer": payload.user_answer
-    })
+    }, user_id=current_user.user_id)
 
     return {"status": "success", "message": "HITL event resolved and indexed permanently."}
 
@@ -105,10 +126,19 @@ async def resolve_held_application(
         entry.user_id = current_user.user_id
         db.save_vault_entry(entry, user_id=current_user.user_id)
 
+    # Audit P1-4: this used to mark the job SUBMITTED without running anything.
+    # Now the answer is recorded and the real application is re-queued.
     job = db.get_job_by_id(evt.job_id, user_id=current_user.user_id)
-    if job:
-        job.status = ApplicationStatus.SUBMITTED
-        job.applied_at = datetime.now().isoformat()
+    ledger = apply_ledger.get_ledger_for_job(current_user.user_id, job.job_id) if job else None
+    task_id = None
+    if job and ledger and db.transition_ledger_status(ledger.ledger_id, current_user.user_id,
+                                              [ApplyLedgerStatus.HITL_PAUSED.value], ApplyLedgerStatus.INITIATED.value):
+        wants_live = str(getattr(job, "submission_mode", "") or "") == "LIVE"
+        consent = db.get_user_consents(current_user.user_id).get("autonomous_submission")
+        mode = "LIVE" if wants_live and consent and consent.consented else "DRY_RUN"
+        task_id = TaskManager.dispatch_apply_task(job_id=job.job_id, user_id=current_user.user_id,
+                                                  submission_mode=mode, ledger_id=ledger.ledger_id)
+        job.status = ApplicationStatus.QUEUED
         db.save_job(job, user_id=current_user.user_id)
 
     await ws_manager.broadcast({
@@ -116,12 +146,15 @@ async def resolve_held_application(
         "job_id": evt.job_id,
         "company": evt.company,
         "role": evt.role_title,
-        "status": "SUBMITTED"
-    })
+        "status": "QUEUED" if task_id else "ANSWER_SAVED",
+        "task_id": task_id
+    }, user_id=current_user.user_id)
 
     return {
         "status": "success",
-        "message": f"Held application for {evt.company} resumed and submitted successfully!",
+        "message": (f"Answer saved. Application for {evt.company} re-queued." if task_id
+                    else f"Answer saved for {evt.company}. No paused application to resume."),
+        "task_id": task_id,
         "vault_saved": payload.save_to_vault
     }
 
@@ -139,12 +172,12 @@ async def apply_to_job(
 
     from app.bot.runner import AutonomousJobRunner
     from app.core.rate_limiter import rate_limiter
-    runner = AutonomousJobRunner(mode=mode or DEFAULT_SUBMISSION_MODE)
+    runner = AutonomousJobRunner(mode=_resolve_submission_mode(mode, current_user.user_id))
     result = await runner.execute_application(
         job_id=job_id,
         profile_id=profile_id or current_user.user_id,
         user_id=current_user.user_id,
-        ws_broadcast_callback=ws_manager.broadcast
+        ws_broadcast_callback=functools.partial(ws_manager.broadcast, user_id=current_user.user_id)
     )
     if result.get("status") == "conflict":
         raise HTTPException(status_code=409, detail=result.get("message", "Application blocked by idempotency ledger."))
@@ -165,6 +198,8 @@ async def apply_to_job_async(
     Dispatches asynchronous application task to Celery/Redis background worker queue with idempotency checks.
     Returns HTTP 202 Accepted with a unique task_id for progress polling.
     """
+    resolved_mode = _resolve_submission_mode(mode, current_user.user_id)
+
     # 1. Rate-limit check first
     from app.core.rate_limiter import rate_limiter
     if not rate_limiter.can_apply(current_user.user_id):
@@ -194,12 +229,12 @@ async def apply_to_job_async(
         raise HTTPException(status_code=409, detail=reason)
 
     # 4. Only then: dispatch task and record daily usage
-    from app.core.celery_app import TaskManager
 
     task_id = TaskManager.dispatch_apply_task(
         job_id=job_id,
         user_id=current_user.user_id,
-        submission_mode=mode or DEFAULT_SUBMISSION_MODE
+        submission_mode=resolved_mode,
+        ledger_id=entry.ledger_id
     )
 
     rate_limiter.record_apply(current_user.user_id)

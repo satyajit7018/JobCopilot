@@ -44,12 +44,36 @@ class AutonomousJobRunner:
         self.evidence_dir = DATA_DIR / "hitl_evidence"
         self.evidence_dir.mkdir(parents=True, exist_ok=True)
 
+    CONFIRMATION_PHRASES = (
+        "thank you for applying", "thanks for applying", "application submitted",
+        "application has been submitted", "application has been received", "we have received your application",
+        "we've received your application", "application received", "successfully submitted",
+    )
+
+    async def _detect_submission_confirmation(self, page, url_before: str, timeout_s: float = 10.0) -> bool:
+        """Looks for positive evidence the ATS accepted the application.
+
+        Evidence = a known confirmation phrase in the page text. A URL change alone is
+        not enough (validation errors can also navigate). Returns False when unsure.
+        """
+        deadline = asyncio.get_event_loop().time() + timeout_s
+        while asyncio.get_event_loop().time() < deadline:
+            try:
+                text = (await page.inner_text("body")).lower()
+            except Exception:
+                text = ""
+            if any(p in text for p in self.CONFIRMATION_PHRASES):
+                return True
+            await asyncio.sleep(0.5)
+        return False
+
     async def execute_application(
         self,
         job_id: str,
         profile_id: Optional[str] = None,
         user_id: str = "",
-        ws_broadcast_callback = None
+        ws_broadcast_callback = None,
+        ledger_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Runs full autonomous application workflow for a specific job with idempotency protection and backoff."""
         profile = db.get_profile(user_id=user_id, profile_id=profile_id)
@@ -70,25 +94,35 @@ class AutonomousJobRunner:
                     logger.debug("bot_runner: failed to broadcast bot log message over websocket", exc_info=True)
                     pass
 
-        # 1. Idempotent Apply Ledger Gate
-        acquired, ledger_entry, reason = apply_ledger.acquire_lock(
-            user_id=target_user,
-            job_id=job.job_id,
-            job_fingerprint=job.fingerprint,
-            max_retries=self.max_retries
-        )
-        if not acquired:
-            await log(f"🛑 Idempotency Lock Rejected: {reason}")
-            return {
-                "status": "conflict",
-                "message": reason,
-                "job_id": job.job_id,
-                "ledger_id": ledger_entry.ledger_id if ledger_entry else None,
-                "ledger_status": (ledger_entry.status.value if hasattr(ledger_entry.status, "value") else str(ledger_entry.status)) if ledger_entry else None
-            }
+        # 1. Idempotent Apply Ledger Gate.
+        #    The async API path acquires the lock before queueing and passes ledger_id here,
+        #    so the runner adopts that lock rather than re-acquiring (which always conflicted).
+        if ledger_id:
+            ledger_entry = db.get_apply_ledger_entry(ledger_id, user_id=target_user)
+            if not ledger_entry or ledger_entry.job_id != job.job_id:
+                return {"status": "conflict", "message": "Ledger entry does not match this job.", "job_id": job.job_id}
+        else:
+            acquired, ledger_entry, reason = apply_ledger.acquire_lock(
+                user_id=target_user,
+                job_id=job.job_id,
+                job_fingerprint=job.fingerprint,
+                max_retries=self.max_retries
+            )
+            if not acquired:
+                await log(f"🛑 Idempotency Lock Rejected: {reason}")
+                return {
+                    "status": "conflict",
+                    "message": reason,
+                    "job_id": job.job_id,
+                    "ledger_id": ledger_entry.ledger_id if ledger_entry else None,
+                    "ledger_status": (ledger_entry.status.value if hasattr(ledger_entry.status, "value") else str(ledger_entry.status)) if ledger_entry else None
+                }
+            ledger_id = ledger_entry.ledger_id
 
-        ledger_id = ledger_entry.ledger_id
-        apply_ledger.mark_in_progress(ledger_id, user_id=target_user)
+        # Atomic INITIATED -> IN_PROGRESS: if two workers get the same message, only one proceeds.
+        if not apply_ledger.mark_in_progress(ledger_id, user_id=target_user):
+            await log("🛑 Another worker already started this application.")
+            return {"status": "conflict", "message": "Application is already running.", "job_id": job.job_id, "ledger_id": ledger_id}
 
         await log(f"🚀 Starting autonomous application for {job.company} — {job.title} (Ledger ID: {ledger_id})")
 
@@ -119,25 +153,16 @@ class AutonomousJobRunner:
 
         # 4. Handle Offline / Non-Playwright Environments
         if not HAS_PLAYWRIGHT or async_playwright is None:
-            await log("⚠️ Playwright not installed in environment — executing simulated stealth dry-run...")
-            screenshot_file = self.screenshots_dir / f"filled_{job.job_id}.png"
-            if not screenshot_file.exists():
-                screenshot_file.touch()
-            now_str = datetime.now().isoformat()
-            job.status = ApplicationStatus.SUBMITTED
-            job.submission_mode = self.mode
-            job.applied_at = now_str
-            job.confirmation_screenshot_path = str(screenshot_file)
-            db.save_job(job, user_id=target_user)
-
-            apply_ledger.mark_submitted(
-                ledger_id=ledger_id,
-                user_id=target_user,
-                confirmation_id=job.application_id or f"SIM-{job.job_id[:6].upper()}",
-                screenshot_path=str(screenshot_file)
-            )
-
-            await log(f"🛡️ {self.mode} Mode: Form filled and verified! Application recorded for {job.company}.")
+            # Audit P1-3: this branch used to mark the job SUBMITTED with a fake SIM- id,
+            # even in LIVE mode. Without a browser nothing can be submitted, so say so.
+            if self.mode == "LIVE":
+                apply_ledger.mark_failed(ledger_id, target_user, "BROWSER_UNAVAILABLE",
+                                         "Browser automation is not available on this server.")
+                await log("⛔ Browser automation unavailable: application NOT submitted.")
+                return {"status": "error", "message": "Browser automation is not available; nothing was submitted.",
+                        "job_id": job.job_id, "ledger_id": ledger_id, "mode": self.mode, "submitted": False}
+            apply_ledger.release_after_dry_run(ledger_id, target_user)
+            await log(f"🧪 Dry run prepared materials for {job.company}. Nothing was submitted.")
             return {
                 "status": "success",
                 "job_id": job.job_id,
@@ -145,7 +170,8 @@ class AutonomousJobRunner:
                 "company": job.company,
                 "title": job.title,
                 "mode": self.mode,
-                "screenshot": str(screenshot_file),
+                "submitted": False,
+                "simulated": True,
                 "tailored_resume_path": pdf_path,
                 "cover_letter": cover_letter,
                 "outreach": outreach_pkg
@@ -242,32 +268,46 @@ class AutonomousJobRunner:
                         screenshot_path=str(screenshot_file)
                     )
 
-                    # 7. Handle Submission Mode
+                    # 7. Handle Submission Mode (audit P1-3: only a confirmed submission is SUBMITTED)
                     now_str = datetime.now().isoformat()
-                    if self.mode == "DRY_RUN":
-                        await log(f"🛡️ DRY_RUN Mode: Form filled and verified! Screenshot saved to {screenshot_file.name}")
-                        job.status = ApplicationStatus.SUBMITTED
-                        job.submission_mode = "DRY_RUN"
-                        job.applied_at = now_str
-                        db.save_job(job, user_id=target_user)
+                    submitted = False
+                    if self.mode != "LIVE":
+                        await log(f"🧪 DRY_RUN: form filled, NOT submitted. Screenshot saved to {screenshot_file.name}")
+                        apply_ledger.release_after_dry_run(ledger_id, target_user)
                     else:
                         await log("Submitting application...")
                         submit_btn = await page.query_selector("button[type='submit'], input[type='submit'], button:has-text('Submit')")
-                        if submit_btn:
-                            await submit_btn.click()
-                            await asyncio.sleep(2.0)
+                        if not submit_btn:
+                            apply_ledger.mark_failed(ledger_id, target_user, "SUBMIT_BUTTON_NOT_FOUND",
+                                                     "Could not find the form's submit button; nothing was sent.")
+                            await log("⛔ Submit button not found: application NOT submitted.")
+                            return {"status": "error", "message": "Submit button not found; nothing was submitted.",
+                                    "job_id": job.job_id, "ledger_id": ledger_id, "mode": self.mode, "submitted": False}
+                        url_before = page.url
+                        await submit_btn.click()
+                        confirmed = await self._detect_submission_confirmation(page, url_before)
+                        if not confirmed:
+                            # We clicked, so it MAY have gone through. Never mark FAILED here (a retry could
+                            # double-apply). Hold for the human to check their email/portal.
+                            job.status = ApplicationStatus.NEEDS_REVIEW
+                            job.submission_mode = "LIVE"
+                            db.save_job(job, user_id=target_user)
+                            apply_ledger.mark_hitl_paused(ledger_id, target_user)
+                            await log("⚠️ Clicked submit but could not confirm it went through. Please check your email or the job portal.")
+                            return {"status": "needs_review", "message": "Submission could not be confirmed; please verify manually.",
+                                    "job_id": job.job_id, "ledger_id": ledger_id, "mode": self.mode, "submitted": None}
+                        submitted = True
                         job.status = ApplicationStatus.SUBMITTED
                         job.submission_mode = "LIVE"
                         job.applied_at = now_str
                         db.save_job(job, user_id=target_user)
                         CheckpointManager.clear(job.job_id)
-
-                    apply_ledger.mark_submitted(
-                        ledger_id=ledger_id,
-                        user_id=target_user,
-                        confirmation_id=job.application_id or f"CONF-{job.job_id[:6].upper()}",
-                        screenshot_path=str(screenshot_file)
-                    )
+                        apply_ledger.mark_submitted(
+                            ledger_id=ledger_id,
+                            user_id=target_user,
+                            confirmation_id=job.application_id or "",   # never invent a confirmation id
+                            screenshot_path=str(screenshot_file)
+                        )
 
                     return {
                         "status": "success",
@@ -276,6 +316,7 @@ class AutonomousJobRunner:
                         "company": job.company,
                         "title": job.title,
                         "mode": self.mode,
+                        "submitted": submitted,
                         "filled_fields_count": len(filled_data),
                         "screenshot": str(screenshot_file),
                         "tailored_pdf": str(pdf_path),

@@ -41,6 +41,10 @@ try:
                 task_max_retries=3,
                 task_acks_late=True,
                 task_reject_on_worker_lost=True,
+                # The worker is started with `-A app.tasks.celery_app`; without this include the
+                # apply task module is never imported and every apply job is rejected as
+                # an unregistered task (found while verifying audit P1-1).
+                include=["app.tasks.apply_task"],
             )
         except ImportError:
             logger.warning("Celery package is not installed. Falling back to in-memory async task runner.")

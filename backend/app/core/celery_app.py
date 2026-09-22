@@ -4,7 +4,6 @@ Powered by Celery and Redis with automatic in-memory task fallback for local dev
 """
 
 import logging
-import uuid
 from typing import Any, Dict, Optional
 
 from celery import Celery
@@ -29,7 +28,7 @@ celery_app.conf.update(
     task_time_limit=300,
     worker_concurrency=4,
     task_routes={
-        "jobcopilot.apply_to_job": {"queue": "priority.normal"},
+        "jobcopilot.normal.run_apply_job": {"queue": "priority.normal"},
         "jobcopilot.dlq.*": {"queue": "dead_letter"},
     },
     task_default_retry_delay=5,
@@ -47,53 +46,47 @@ class TaskManager:
     """Manages asynchronous job applications, candidate discovery, and task polling with DLQ resilience."""
 
     @classmethod
-    def dispatch_apply_task(cls, job_id: str, user_id: str, submission_mode: str = "DRY_RUN") -> str:
-        """Dispatches an autonomous job application task returning a unique task_id."""
-        task_id = f"task_{uuid.uuid4().hex[:12]}"
+    def dispatch_apply_task(cls, job_id: str, user_id: str, submission_mode: str = "DRY_RUN",
+                            ledger_id: Optional[str] = None) -> str:
+        """Queues a real application run and returns its task id.
 
-        # Record initial task state
-        _IN_MEMORY_TASKS[task_id] = {
-            "task_id": task_id,
-            "status": "STARTED",
-            "user_id": user_id,
-            "job_id": job_id,
-            "submission_mode": submission_mode,
-            "progress_percent": 25,
-            "message": "Initializing browser automation session and ATS form loader..."
-        }
-
-        # In production with Celery worker: task_apply_to_job.apply_async(args=[job_id, user_id, submission_mode], task_id=task_id)
-        # In local/test environments, update task state to simulated completion
-        _IN_MEMORY_TASKS[task_id]["progress_percent"] = 100
-        _IN_MEMORY_TASKS[task_id]["status"] = "SUCCESS"
-        _IN_MEMORY_TASKS[task_id]["message"] = f"Application successfully submitted in {submission_mode} mode."
-
+        Audit P1-1: this used to mark the task SUCCESS without running anything.
+        Status now comes only from the task that actually executes.
+        """
+        from app.tasks.apply_task import enqueue_apply_job
+        task_id = enqueue_apply_job(user_id=user_id, job_id=job_id, submission_mode=submission_mode, ledger_id=ledger_id)
+        # Ownership record so status lookups are tenant-scoped on every backend.
+        _IN_MEMORY_TASKS[task_id] = {"task_id": task_id, "user_id": user_id, "job_id": job_id,
+                                     "submission_mode": submission_mode, "status": "QUEUED"}
         return task_id
 
     @classmethod
     def get_task_status(cls, task_id: str, user_id: str = "") -> Optional[Dict[str, Any]]:
-        """Retrieves task progress and status with tenant isolation validation."""
-        # 1. Check Celery AsyncResult if configured
-        try:
-            res = celery_app.AsyncResult(task_id)
-            if res and res.state in ["PENDING", "STARTED", "SUCCESS", "FAILURE"]:
-                return {
-                    "task_id": task_id,
-                    "status": res.state,
-                    "result": res.result if res.state == "SUCCESS" else None
-                }
-        except Exception:
-            logger.debug("celery_app: failed checking celery AsyncResult, falling back to in-memory", exc_info=True)
-            pass
+        """Returns task progress for its owner only. Unknown or foreign task ids return None."""
+        owner = (_IN_MEMORY_TASKS.get(task_id) or {}).get("user_id")
+        if not owner or (user_id and owner != user_id):
+            return None  # audit P1-14: never answer for a task we cannot attribute to the caller
 
-        # 2. Check In-Memory fallback
-        if task_id in _IN_MEMORY_TASKS:
-            task_info = _IN_MEMORY_TASKS[task_id]
-            if user_id and task_info.get("user_id") and task_info.get("user_id") != user_id:
-                return None  # Tenant isolation: do not leak cross-tenant task info
-            return task_info
+        from app.tasks.celery_app import USE_CELERY, local_task_runner
+        from app.tasks.celery_app import celery_app as tasks_celery_app
+        if USE_CELERY and tasks_celery_app is not None:
+            res = tasks_celery_app.AsyncResult(task_id)
+            state = res.state
+            result = res.result if state == "SUCCESS" else None
+        else:
+            local = local_task_runner.get_task_status(task_id, user_id=owner) or {}
+            state = local.get("status", "QUEUED")
+            result = local.get("result")
+            if local.get("error") and state in ("DLQ", "FAILURE"):
+                result = {"status": "error", "message": local.get("error")}
 
-        return None
+        # A finished task only counts as success if the runner itself reported success.
+        if state in ("SUCCESS", "COMPLETED"):
+            ok = isinstance(result, dict) and result.get("status") == "success"
+            state = "SUCCESS" if ok else "FAILED"
+        progress = {"QUEUED": 10, "PENDING": 10, "STARTED": 50, "RUNNING": 50, "RETRYING": 50}.get(state, 100)
+        return {"task_id": task_id, "job_id": _IN_MEMORY_TASKS[task_id]["job_id"], "status": state,
+                "progress_percent": progress, "result": result}
 
     @classmethod
     def get_dlq_tasks(cls, user_id: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
@@ -114,13 +107,5 @@ class TaskManager:
         return True
 
 
-@celery_app.task(name="jobcopilot.apply_to_job")
-def task_apply_to_job(job_id: str, user_id: str, submission_mode: str = "DRY_RUN") -> Dict[str, Any]:
-    """Asynchronous worker task to execute stealth browser application."""
-    logger.info(f"Worker executing application for job_id={job_id} on behalf of user_id={user_id}")
-    return {
-        "status": "COMPLETED",
-        "job_id": job_id,
-        "user_id": user_id,
-        "submission_mode": submission_mode
-    }
+# The former 'jobcopilot.apply_to_job' stub (returned COMPLETED without running anything) was removed
+# in the audit fix for P1-1. The real worker task is app.tasks.apply_task.run_apply_job_celery.
