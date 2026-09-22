@@ -19,7 +19,7 @@ stripe==15.6.0
 google-auth==2.58.0
 slowapi==0.1.10
 alembic==1.16.5
-psycopg2-binary==2.9.12
+psycopg2-binary==2.9.13
 redis==7.0.1
 celery==5.6.3
 sentry-sdk[fastapi]==2.69.2
