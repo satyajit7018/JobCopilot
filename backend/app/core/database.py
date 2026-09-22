@@ -203,6 +203,8 @@ class DatabaseManager(DatabaseAdapter):
                 )
                 """)
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
+                self._ensure_columns(conn, "users", {"stripe_customer_id": "TEXT"})
+                cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_stripe_customer ON users(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;")
 
                 # 2. Profiles Table
                 cursor.execute("""
@@ -788,6 +790,29 @@ class DatabaseManager(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
 
+    def set_stripe_customer_id(self, user_id: str, customer_id: str) -> bool:
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE users SET stripe_customer_id = ?, updated_at = ? WHERE user_id = ?",
+                               (customer_id, datetime.now().isoformat(), user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+
+    def get_user_id_by_stripe_customer(self, customer_id: str) -> Optional[str]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM users WHERE stripe_customer_id = ?", (customer_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    def get_stripe_customer_id(self, user_id: str) -> Optional[str]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT stripe_customer_id FROM users WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
     def update_user_password(self, user_id: str, new_password_hash: str) -> bool:
         """Updates user password hash (e.g. during Argon2id migration)."""
         with self._lock:
@@ -1345,6 +1370,25 @@ class DatabaseManager(DatabaseAdapter):
     # =========================================================================
     # Apply Ledger Operations (Multi-Tenant)
     # =========================================================================
+    def transition_ledger_status(self, ledger_id: str, user_id: str, from_statuses: List[str],
+                                 to_status: str, increment_attempt: bool = False,
+                                 older_than_iso: Optional[str] = None) -> bool:
+        """Atomic compare-and-set (single UPDATE ... WHERE status IN (...))."""
+        placeholders = ",".join("?" for _ in from_statuses)
+        sql = (f"UPDATE apply_ledger SET status = ?, updated_at = ?"
+               f"{', attempt_count = attempt_count + 1' if increment_attempt else ''} "
+               f"WHERE ledger_id = ? AND user_id = ? AND status IN ({placeholders})")
+        params: List[Any] = [to_status, datetime.now().isoformat(), ledger_id, user_id, *from_statuses]
+        if older_than_iso:
+            sql += " AND updated_at < ?"
+            params.append(older_than_iso)
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(sql, params)
+                conn.commit()
+                return cursor.rowcount == 1
+
     def save_apply_ledger_entry(self, entry: ApplyLedgerEntry, user_id: str) -> bool:
         """Saves or updates an idempotent apply ledger record."""
         with self._lock:

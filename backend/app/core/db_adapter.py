@@ -105,6 +105,19 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    def set_stripe_customer_id(self, user_id: str, customer_id: str) -> bool:
+        """Links a user to their Stripe customer (cus_...). Audit P1-6/P1-7."""
+        pass
+
+    @abstractmethod
+    def get_user_id_by_stripe_customer(self, customer_id: str) -> Optional[str]:
+        pass
+
+    @abstractmethod
+    def get_stripe_customer_id(self, user_id: str) -> Optional[str]:
+        pass
+
+    @abstractmethod
     def update_user_password(self, user_id: str, new_password_hash: str) -> bool:
         pass
 
@@ -178,6 +191,18 @@ class DatabaseAdapter(ABC):
         """Atomically inserts an apply ledger record if absent for (user_id, job_id)."""
         pass
 
+    @abstractmethod
+    def transition_ledger_status(self, ledger_id: str, user_id: str, from_statuses: List[str],
+                                 to_status: str, increment_attempt: bool = False,
+                                 older_than_iso: Optional[str] = None) -> bool:
+        """Atomic compare-and-set on apply_ledger.status. True only for the single winner.
+
+        Audit P0-4 (race): replaces read-then-write transitions so two concurrent
+        workers can never both move the same entry forward.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def save_apply_ledger_entry(self, entry: Any, user_id: str) -> bool:
         return True
 

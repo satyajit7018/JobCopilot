@@ -83,6 +83,8 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                     updated_at VARCHAR(64) NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_pg_users_email ON users(email);
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(64);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_pg_users_stripe_customer ON users(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
 
                 CREATE TABLE IF NOT EXISTS profiles (
                     id VARCHAR(64) PRIMARY KEY,
@@ -469,6 +471,37 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 )
                 conn.commit()
                 return cursor.rowcount > 0
+        finally:
+            self.release_connection(conn)
+
+    def set_stripe_customer_id(self, user_id: str, customer_id: str) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("UPDATE users SET stripe_customer_id = %s, updated_at = %s WHERE user_id = %s",
+                               (customer_id, datetime.now().isoformat(), user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        finally:
+            self.release_connection(conn)
+
+    def get_user_id_by_stripe_customer(self, customer_id: str) -> Optional[str]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT user_id FROM users WHERE stripe_customer_id = %s", (customer_id,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+        finally:
+            self.release_connection(conn)
+
+    def get_stripe_customer_id(self, user_id: str) -> Optional[str]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT stripe_customer_id FROM users WHERE user_id = %s", (user_id,))
+                row = cursor.fetchone()
+                return row[0] if row else None
         finally:
             self.release_connection(conn)
 
@@ -1067,6 +1100,26 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
     # =========================================================================
     # Apply Ledger Operations (PostgreSQL Multi-Tenant)
     # =========================================================================
+    def transition_ledger_status(self, ledger_id: str, user_id: str, from_statuses: List[str],
+                                 to_status: str, increment_attempt: bool = False,
+                                 older_than_iso: Optional[str] = None) -> bool:
+        """Atomic compare-and-set; Postgres row lock guarantees a single winner."""
+        sql = ("UPDATE apply_ledger SET status = %s, updated_at = %s"
+               + (", attempt_count = attempt_count + 1" if increment_attempt else "")
+               + " WHERE ledger_id = %s AND user_id = %s AND status = ANY(%s)")
+        params: List[Any] = [to_status, datetime.now().isoformat(), ledger_id, user_id, list(from_statuses)]
+        if older_than_iso:
+            sql += " AND updated_at < %s"
+            params.append(older_than_iso)
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(sql, params)
+                conn.commit()
+                return cursor.rowcount == 1
+        finally:
+            self.release_connection(conn)
+
     def save_apply_ledger_entry(self, entry: ApplyLedgerEntry, user_id: str) -> bool:
         conn = self.get_connection()
         try:
