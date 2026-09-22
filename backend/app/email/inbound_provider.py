@@ -25,7 +25,9 @@ class InboundEmailProvider:
         """Verifies HMAC-SHA256 signature if secret is configured in production."""
         secret = settings.INBOUND_EMAIL_WEBHOOK_SECRET
         if not secret:
-            return True  # Open in development if unconfigured
+            # Fail closed. Unsigned delivery is only possible with an explicit local-dev
+            # opt-in, and never in production.
+            return bool(settings.INBOUND_EMAIL_ALLOW_UNSIGNED) and not settings.is_production
 
         if not signature_header:
             return False
@@ -62,7 +64,7 @@ class InboundEmailProvider:
             subject = raw_payload.get("subject", "")
             body_text = raw_payload.get("body_text") or raw_payload.get("body", "")
             body_html = raw_payload.get("body_html", "")
-            user_id = raw_payload.get("user_id") or cls.extract_tenant_user_id(recipient)
+            user_id = cls.extract_tenant_user_id(recipient)
             return {
                 "sender": sender,
                 "recipient": recipient,
