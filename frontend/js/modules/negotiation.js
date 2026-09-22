@@ -62,7 +62,7 @@ window.runMultiOfferComparison = async function() {
           `).join('')}
         </div>
         <div style="font-size: 12.5px; color: #a7f3d0; background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: var(--radius-sm);">
-          💡 <strong>Negotiation Strategy:</strong> ${data.strategic_recommendation}
+          💡 <strong>Negotiation Strategy:</strong> ${escapeHTML(data.strategic_recommendation)}
         </div>
       </div>
     `;

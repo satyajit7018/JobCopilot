@@ -408,7 +408,7 @@ function renderEvaluationResults(ev, q) {
       const isHit = matched.includes(c) || matched.some(m => m.toLowerCase().includes(c.toLowerCase().split(' ')[0]));
       return `
         <span class="${isHit ? 'concept-badge-hit' : 'concept-badge-miss'}">
-          ${isHit ? '✅' : '⚠️'} ${c}
+          ${isHit ? '✅' : '⚠️'} ${escapeHTML(c)}
         </span>
       `;
     }).join('');
@@ -420,8 +420,8 @@ function renderEvaluationResults(ev, q) {
 
   if (boothEvalContainer) {
     boothEvalContainer.innerHTML = `
-      <div style="font-size: 18px; font-weight: 800; color: var(--accent-emerald); margin-bottom: 4px;">Score: ${score}/100 • ${ev.hire_verdict || 'Strong Hire'}</div>
-      <div style="font-size: 12px; color: #cbd5e1; line-height: 1.4;">${ev.feedback || 'Outstanding technical depth.'}</div>
+      <div style="font-size: 18px; font-weight: 800; color: var(--accent-emerald); margin-bottom: 4px;">Score: ${score}/100 • ${escapeHTML(ev.hire_verdict || 'Strong Hire')}</div>
+      <div style="font-size: 12px; color: #cbd5e1; line-height: 1.4;">${escapeHTML(ev.feedback || 'Outstanding technical depth.')}</div>
     `;
   }
 }
@@ -446,7 +446,7 @@ window.loadInterviewQuestions = async function() {
       container.innerHTML = `
         <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: var(--radius-md); padding: 1.25rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <div style="font-size: 16px; font-weight: 700; color: var(--text-primary);">${d.company} — ${d.role}</div>
+            <div style="font-size: 16px; font-weight: 700; color: var(--text-primary);">${escapeHTML(d.company)} — ${escapeHTML(d.role)}</div>
             <span class="hud-pill" style="color: var(--accent-emerald);">Architecture Synthesis</span>
           </div>
 
@@ -459,7 +459,7 @@ window.loadInterviewQuestions = async function() {
 
           <div style="margin-bottom: 12px;">
             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;">Engineering Focus</div>
-            <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.4;">${d.engineering_focus}</div>
+            <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.4;">${escapeHTML(d.engineering_focus)}</div>
           </div>
 
           <div>

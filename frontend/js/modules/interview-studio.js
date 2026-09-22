@@ -240,7 +240,7 @@ function populateMockQuestionsDropdown() {
   const dropdown = document.getElementById('mock-question-dropdown');
   if (!dropdown) return;
   dropdown.innerHTML = activeQuestionsList.map((q, idx) => `
-    <option value="${q.id}">[${q.company_tag || q.role_track || q.category}] ${q.question.substring(0, 75)}...</option>
+    <option value="${escapeHTML(q.id)}">[${escapeHTML(q.company_tag || q.role_track || q.category)}] ${escapeHTML(q.question.substring(0, 75))}...</option>
   `).join('');
   if (activeQuestionsList[currentMockIndex]) {
     dropdown.value = activeQuestionsList[currentMockIndex].id;
@@ -580,7 +580,7 @@ window.syncBoothQuestion = function() {
 
   if (conceptsContainer && q.key_concepts) {
     conceptsContainer.innerHTML = q.key_concepts.map(c => `
-      <span class="hud-pill" style="font-size: 11px; padding: 3px 8px; color: var(--accent-cyan);">${c}</span>
+      <span class="hud-pill" style="font-size: 11px; padding: 3px 8px; color: var(--accent-cyan);">${escapeHTML(c)}</span>
     `).join('');
   }
 };
