@@ -3,8 +3,9 @@
 **The Autonomous Career Operating System & Distributed Multi-Tenant SaaS Platform.**
 
 [![CI/CD Pipeline](https://github.com/satyajit7018/JobCopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/satyajit7018/JobCopilot/actions/workflows/ci.yml)
-[![Tests Passing](https://img.shields.io/badge/tests-90%2B%20passed-brightgreen.svg)](https://github.com/satyajit7018/JobCopilot)
+[![Tests Passing](https://img.shields.io/badge/tests-274%20passed-brightgreen.svg)](https://github.com/satyajit7018/JobCopilot)
 [![Security Audited](https://img.shields.io/badge/security-PII%20Encrypted%20%7C%20CSP%20%7C%20Argon2id-blue.svg)](https://github.com/satyajit7018/JobCopilot)
+[![Audit Fixes](https://img.shields.io/badge/audit%20exploits-21%2F21%20fixed-success.svg)](https://github.com/satyajit7018/JobCopilot/blob/main/backend/tests/security/verify_audit_fixes.py)
 [![Stress Audit](https://img.shields.io/badge/stress--audit-30%2F30%20(100%25)-blueviolet.svg)](https://github.com/satyajit7018/JobCopilot)
 [![Docker Ready](https://img.shields.io/badge/docker-compose%20ready-0db7ed.svg)](https://github.com/satyajit7018/JobCopilot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -139,10 +140,11 @@ flowchart TD
 ## ☁️ Distributed Multi-Tenant SaaS Features
 
 ### 1. Multi-Tenant Security & Defense-in-Depth
-- **Argon2id + JWT Security**: Modern password hashing with cryptographic salt and JWT access/refresh token rotation with single-use revocation.
-- **Transparent PII Encryption at Rest**: Sensitive candidate fields (phone, compensation expectations, current employer, location) are encrypted with AES-256-GCM.
+- **Argon2id + Session-Bound JWTs**: Modern password hashing with cryptographic salt. Access and refresh tokens share a session id (`sid`), so logout, password reset, and "log out everywhere" revoke refresh tokens too — no orphaned long-lived tokens.
+- **Transparent PII Encryption at Rest**: Sensitive candidate fields (phone, compensation expectations, current employer, location) are encrypted with AES-256-GCM. The KEK salt is derived from the master key so replicas can decrypt each other's data.
 - **Security Headers & CSP Middleware**: Full Content Security Policy, HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and slowapi brute-force lockout.
-- **Strict Tenant Data Isolation**: All database queries enforce `WHERE user_id = ?` to guarantee zero cross-tenant data leakage.
+- **Strict Tenant Data Isolation**: All database queries enforce `WHERE user_id = ?` to guarantee zero cross-tenant data leakage. Real-time WebSocket broadcasts require a `user_id` and never fan out to every socket.
+- **GDPR Article 17 Right-to-Erasure**: `hard_delete_user_account()` purges every user-scoped table (both SQLite and PostgreSQL adapters at parity) plus S3/R2 and local object storage; `security_audit_logs` and `user_consents` are intentionally retained under Art. 17(3).
 
 ### 2. Distributed Cloud Architecture & Providers
 - **Provider-Agnostic LLM Engine (`llm_client.py`)**: Seamless support for OpenAI, Anthropic Claude, and 100% offline rule-based deterministic fallback.
@@ -157,11 +159,73 @@ flowchart TD
   - **`FREE`**: 5 applies/day, standard feeds.
   - **`PRO` ($29/mo)**: 30 applies/day, 0-day priority feeds, triple-threat outreach.
   - **`ELITE` ($79/mo)**: Unlimited applies, residential proxy rotation, priority queue routing.
-- **Stripe Billing Integration**: Real Stripe Checkout Session creation (`POST /api/billing/checkout`), Customer Portal sessions (`POST /api/billing/portal`), and webhook lifecycle listener (`POST /api/billing/webhook`).
+- **Stripe Billing Integration**: Real Stripe Checkout Session creation (`POST /api/billing/checkout`), Customer Portal sessions (`POST /api/billing/portal`), and webhook lifecycle listener (`POST /api/billing/webhook`). Webhooks resolve users by stored Stripe customer id, derive tier from price id + status, validate redirect URLs, and never overwrite an `ADMIN` role.
+
+---
+
+## 🛡️ September 2026 Security Audit — Hardened
+
+A full security audit was applied and verified; all 21 audited exploits are closed. Highlights:
+
+- **Fail-closed inbound email**: the webhook rejects unsigned requests, routes mail only by the verified recipient subaddress, and production refuses to boot without `INBOUND_EMAIL_WEBHOOK_SECRET`.
+- **Google SSO hardening**: requires `email_verified`, takes the email only from the verified token, and goes through the same MFA gate as password login (no SSO bypass).
+- **Stored XSS closed**: toasts and terminal logs build DOM nodes via `textContent`; remaining server/LLM-sourced strings are escaped.
+- **Idempotent, honest apply flow**: async apply runs the real bot and reports its true result; a unique `apply_ledger(user_id, job_id)` index + atomic compare-and-set (`transition_ledger_status`) makes concurrent/retried applies race-free; nothing is marked `SUBMITTED` without a detected confirmation, and `LIVE` mode requires explicit consent.
+- **Locked-down ops endpoints**: `/metrics` requires `METRICS_TOKEN` (404 in production without one) and `/health` no longer leaks exception text; org invites cannot escalate to `OWNER`.
+- **Regression harness**: `backend/tests/security/verify_audit_fixes.py` re-runs all 21 exploits and exits non-zero if any reopen.
+
+### Engineering Rigor
+- **Single DB contract**: `db_adapter.py` defines a `DatabaseAdapter` ABC; the SQLite (`database.py`) and PostgreSQL (`postgres_adapter.py`) implementations are held at parity by `tests/test_db_adapter_parity.py`.
+- **Linear Alembic migrations** (`001 → 005`) with a dedicated CI job that spins up real Postgres 16, asserts a single head, and runs an upgrade + downgrade round-trip.
+- **Concatenate-then-minify frontend build** (`frontend/build.js`, esbuild): content-hashed bundle + a source-hash freshness manifest that CI enforces, so a stale bundle fails the build.
+- **Demo Mode boundary**: sample-data seeding is gated out of production; the UI shows a Demo Mode banner only when `/auth/public-config` reports `demo_enabled`.
 
 ---
 
 ## 🧪 Testing & Verification
+
+> The suite targets **Python 3.11**. Set `PYTHONPATH=backend` so `app` imports resolve.
+
+```bash
+# Full automated suite (274 tests) in parallel
+PYTHONPATH=backend pytest backend/tests -n auto -q
+
+# Re-run all 21 security-audit exploits (must end with "0 open issue(s)")
+cd backend && PYTHONPATH=. python tests/security/verify_audit_fixes.py
+
+# Static analysis gate (matches CI)
+bandit -r backend/app -ll
+
+# Rebuild the frontend bundle after any JS edit (CI fails on a stale bundle)
+cd frontend && npm ci && npm run build
+
+# Frontend end-to-end + accessibility (axe-core, fails on serious/critical WCAG issues)
+cd frontend/e2e && npm ci && npx playwright install --with-deps chromium && npx playwright test
+
+# 30-loop deep subsystem stress audit
+backend/venv/bin/python backend/stress_test_30_deep_loops.py
+```
+
+**CI (`.github/workflows/ci.yml`)** runs three jobs on every push/PR: `test` (pytest coverage gate + Bandit/Semgrep SAST), `e2e` (bundle-freshness check + Playwright + axe-core a11y), and `migrations` (Postgres 16 upgrade/downgrade round-trip).
+
+---
+
+## 🚀 Production Deployment
+
+Before opening the app to real traffic, set these and run migrations:
+
+```bash
+# Required secrets (the app fails closed without the email secret)
+export INBOUND_EMAIL_WEBHOOK_SECRET=...    # app refuses to start in prod without it
+export METRICS_TOKEN=...                    # Prometheus must send it as a Bearer token
+export STRIPE_PRO_PRICE_ID=price_...        # real Stripe price ids
+export STRIPE_ELITE_PRICE_ID=price_...
+
+# Apply the schema (adds users.stripe_customer_id, etc.)
+cd backend && alembic upgrade head
+```
+
+See [`.env.production.example`](.env.production.example) for the full configuration surface. Note: after deploying the session-bound-token change, **all users must sign in once more**.
 
 ```bash
 # Run full automated test suite
