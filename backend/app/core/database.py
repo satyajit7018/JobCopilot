@@ -1375,7 +1375,7 @@ class DatabaseManager(DatabaseAdapter):
                                  older_than_iso: Optional[str] = None) -> bool:
         """Atomic compare-and-set (single UPDATE ... WHERE status IN (...))."""
         placeholders = ",".join("?" for _ in from_statuses)
-        sql = (f"UPDATE apply_ledger SET status = ?, updated_at = ?"
+        sql = (f"UPDATE apply_ledger SET status = ?, updated_at = ?"  # nosec B608 - fully parameterized; only a constant SET fragment and ?-placeholders are interpolated
                f"{', attempt_count = attempt_count + 1' if increment_attempt else ''} "
                f"WHERE ledger_id = ? AND user_id = ? AND status IN ({placeholders})")
         params: List[Any] = [to_status, datetime.now().isoformat(), ledger_id, user_id, *from_statuses]

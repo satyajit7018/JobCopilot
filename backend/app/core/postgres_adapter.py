@@ -1104,7 +1104,7 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                                  to_status: str, increment_attempt: bool = False,
                                  older_than_iso: Optional[str] = None) -> bool:
         """Atomic compare-and-set; Postgres row lock guarantees a single winner."""
-        sql = ("UPDATE apply_ledger SET status = %s, updated_at = %s"
+        sql = ("UPDATE apply_ledger SET status = %s, updated_at = %s"  # nosec B608 - fully parameterized; only a constant SET fragment is interpolated
                + (", attempt_count = attempt_count + 1" if increment_attempt else "")
                + " WHERE ledger_id = %s AND user_id = %s AND status = ANY(%s)")
         params: List[Any] = [to_status, datetime.now().isoformat(), ledger_id, user_id, list(from_statuses)]
