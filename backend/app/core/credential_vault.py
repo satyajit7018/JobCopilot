@@ -171,25 +171,57 @@ class CredentialVault:
         self._init_salt()
 
     def _init_salt(self):
-        """Initializes or loads a unique 32-byte cryptographic salt."""
-        if not self.salt_path.exists():
-            salt = os.urandom(32)
-            with open(self.salt_path, "wb") as f:
-                f.write(salt)
-            self.salt = salt
-        else:
-            with open(self.salt_path, "rb") as f:
-                self.salt = f.read()
+        """Loads the legacy per-instance salt if one exists. Never creates a new one.
+
+        Audit P0-5: the KEK salt used to be random per instance, so replicas sharing a
+        master key could not decrypt each other's data. New encryption uses a salt
+        derived from the master key (_shared_salt). The legacy file is kept only so
+        data written before this fix can still be decrypted, then re-encrypted.
+        """
+        self.legacy_salt: Optional[bytes] = None
+        try:
+            if self.salt_path.exists():
+                with open(self.salt_path, "rb") as f:
+                    self.legacy_salt = f.read() or None
+        except OSError:
+            logger.warning("Could not read legacy vault salt; legacy ciphertexts will not decrypt", exc_info=True)
+        # Back-compat attribute for any external reader; not used for new encryption.
+        self.salt = self.legacy_salt
+
+    @staticmethod
+    def _shared_salt(master_password: str) -> bytes:
+        """Deterministic per-master-key salt, identical on every instance."""
+        import hashlib
+        return hashlib.sha256(b"jobcopilot/vault-kek-salt/v2|" + master_password.encode("utf-8")).digest()
+
+    def _candidate_keys(self, master_password: str) -> List[bytes]:
+        """KEKs to try when decrypting: the shared-salt key first, then the legacy one."""
+        keys = [self._derive_key(master_password)]
+        if self.legacy_salt:
+            keys.append(self._derive_key(master_password, salt=self.legacy_salt))
+        return keys
+
+    def _decrypt_with_candidates(self, master_password: str, nonce: bytes, ciphertext: bytes) -> bytes:
+        from cryptography.exceptions import InvalidTag
+        last: Optional[Exception] = None
+        for key in self._candidate_keys(master_password):
+            try:
+                return AESGCM(key).decrypt(nonce, ciphertext, None)
+            except InvalidTag as e:
+                last = e
+        raise last or InvalidTag()
 
     def get_or_create_master_key(self) -> str:
         """Retrieves active master key from KMS provider."""
         _, key = self.kms.get_key()
         return key
 
-    def _derive_key(self, master_password: str) -> bytes:
+    def _derive_key(self, master_password: str, salt: Optional[bytes] = None) -> bytes:
         """Derives a 256-bit key using Argon2id (or PBKDF2 as fallback) with memory caching."""
-        if master_password in self._key_cache:
-            return self._key_cache[master_password]
+        salt = salt or self._shared_salt(master_password)
+        cache_key = master_password + "|" + salt.hex()
+        if cache_key in self._key_cache:
+            return self._key_cache[cache_key]
 
         password_bytes = master_password.encode('utf-8')
         derived: Optional[bytes] = None
@@ -198,7 +230,7 @@ class CredentialVault:
             try:
                 derived = hash_secret_raw(
                     secret=password_bytes,
-                    salt=self.salt,
+                    salt=salt,
                     time_cost=3,
                     memory_cost=65536,
                     parallelism=4,
@@ -212,12 +244,12 @@ class CredentialVault:
             kdf = PBKDF2HMAC(
                 algorithm=hashes.SHA256(),
                 length=32,
-                salt=self.salt,
+                salt=salt,
                 iterations=100000,
             )
             derived = kdf.derive(password_bytes)
 
-        self._key_cache[master_password] = derived
+        self._key_cache[cache_key] = derived
         return derived
 
     # =========================================================================
@@ -267,13 +299,11 @@ class CredentialVault:
         _, ver, wrapped_dek_b64, dek_nonce_b64, data_nonce_b64, data_ciphertext_b64 = parts
 
         _, master_key = self.kms.get_key(ver)
-        kek = self._derive_key(master_key)
 
-        # 1. Unwrap DEK
-        aes_kek = AESGCM(kek)
+        # 1. Unwrap DEK (shared-salt KEK first, legacy per-instance KEK as fallback)
         dek_nonce = base64.b64decode(dek_nonce_b64)
         wrapped_dek = base64.b64decode(wrapped_dek_b64)
-        dek = aes_kek.decrypt(dek_nonce, wrapped_dek, None)
+        dek = self._decrypt_with_candidates(master_key, dek_nonce, wrapped_dek)
 
         # 2. Decrypt data ciphertext
         aes_data = AESGCM(dek)
@@ -346,11 +376,9 @@ class CredentialVault:
     def decrypt_data(self, payload: Dict[str, str], master_password: Optional[str] = None) -> Any:
         """Decrypts an AES-256-GCM payload."""
         pwd = master_password or self.get_or_create_master_key()
-        key = self._derive_key(pwd)
-        aesgcm = AESGCM(key)
         nonce = base64.b64decode(payload["nonce"])
         ciphertext = base64.b64decode(payload["ciphertext"])
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+        plaintext = self._decrypt_with_candidates(pwd, nonce, ciphertext)
         return json.loads(plaintext.decode('utf-8'))
 
     # =========================================================================
