@@ -139,9 +139,14 @@ async def update_organization_settings(
 ):
     """Updates organization name or plan tier (requires OWNER or ADMIN)."""
     membership = await require_org_admin(org_id, current_user)
-    _get_org_or_404(org_id)
+    org = _get_org_or_404(org_id)
 
-    success = db.update_organization(org_id, name=payload.name, plan_tier=payload.plan_tier)
+    # Plan tier is set by billing, not by org admins (they could otherwise self-upgrade).
+    current_tier = enum_value(getattr(org, "plan_tier", None)) if getattr(org, "plan_tier", None) else None
+    if payload.plan_tier is not None and enum_value(payload.plan_tier) != current_tier:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Plan tier can only be changed through billing.")
+
+    success = db.update_organization(org_id, name=payload.name, plan_tier=None)
     if not success:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update organization.")
 
@@ -176,8 +181,17 @@ async def invite_organization_member(
     payload: InviteMemberRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """Invites a user to the organization by email (requires OWNER or ADMIN)."""
-    _ = await require_org_admin(org_id, current_user)
+    """Invites a user to the organization by email (requires OWNER or ADMIN).
+
+    Audit P1-15: an ADMIN could previously invite someone as OWNER. Invites can never
+    create an OWNER (use the owner-only role update), and only an OWNER may invite an ADMIN.
+    """
+    inviter = await require_org_admin(org_id, current_user)
+    requested_role = enum_value(payload.role)
+    if requested_role == "OWNER":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owners cannot be created by invitation.")
+    if requested_role == "ADMIN" and enum_value(inviter.role) != "OWNER":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the organization owner can invite admins.")
 
     clean_email = payload.email.lower().strip()
     target_user = db.get_user_by_email(clean_email)
