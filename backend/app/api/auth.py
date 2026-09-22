@@ -254,23 +254,44 @@ def get_token_jti(auth: Optional[HTTPAuthorizationCredentials]) -> Optional[str]
     return None
 
 
-def issue_token_pair(user: User, role_str: str) -> Tuple[str, str]:
-    """Issues a matched access+refresh JWT token pair for the given user."""
+def issue_token_pair(user: User, role_str: str, sid: str) -> Tuple[str, str]:
+    """Issues an access+refresh pair bound to one session (sid).
+
+    Both tokens carry the same sid. Revoking the session kills both, which is
+    what makes logout, "log out everywhere" and password reset effective
+    against refresh tokens (audit P1-10 / P1-11).
+    """
     access = create_jwt_token(
-        {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access"},
+        {"sub": user.user_id, "email": user.email, "role": role_str, "type": "access", "sid": sid},
         timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     refresh = create_jwt_token(
-        {"sub": user.user_id, "type": "refresh"},
+        {"sub": user.user_id, "type": "refresh", "sid": sid},
         timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     )
     return access, refresh
 
 
-def register_session(user: User, access_token: str, ip: str, ua: Optional[str]) -> None:
-    """Registers a new active session keyed by the access token's jti."""
-    jti = decode_jwt_token(access_token).get("jti", "")
-    session_manager.create_session(user_id=user.user_id, token_jti=jti, ip_address=ip, user_agent=ua)
+def start_session(user: User, role_str: str, ip: Optional[str], ua: Optional[str]) -> Tuple[str, str]:
+    """Creates a session record and returns a token pair bound to it."""
+    sid = f"sess_{uuid.uuid4().hex[:16]}"
+    access, refresh = issue_token_pair(user, role_str, sid)
+    jti = decode_jwt_token(access).get("jti", "")
+    session_manager.create_session(user_id=user.user_id, token_jti=jti, ip_address=ip, user_agent=ua, session_id=sid)
+    return access, refresh
+
+
+def session_is_active(payload: Dict[str, Any]) -> bool:
+    """True when the token's session exists, belongs to its subject, and is not revoked.
+
+    Tokens without a sid (admin impersonation, or tokens minted before this fix)
+    are treated as active for access tokens only; refresh requires a live sid.
+    """
+    sid = payload.get("sid")
+    if not sid:
+        return payload.get("type") != "refresh"
+    record = db.get_session(sid)
+    return bool(record) and record.get("user_id") == payload.get("sub") and bool(record.get("is_active"))
 
 
 # =========================================================================
@@ -289,6 +310,8 @@ async def get_current_user_optional(
             if payload.get("type") == "access":
                 jti = payload.get("jti")
                 if jti and db.is_token_revoked(jti):
+                    return None
+                if not session_is_active(payload):
                     return None
                 user_id = payload.get("sub")
                 if user_id:
@@ -354,6 +377,9 @@ async def get_current_user(
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+
+    if not session_is_active(payload):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session has been revoked.")
 
     user = db.get_user_by_id(user_id)
     if not user or not user.is_active:
@@ -470,7 +496,7 @@ async def register_user(request: Request, req: UserRegisterRequest):
     )
     mailer.send_verification_email(clean_email, verify_token)
 
-    access_token, refresh_token = issue_token_pair(new_user, "FREE")
+    access_token, refresh_token = start_session(new_user, "FREE", client_ip(request), request.headers.get("User-Agent"))
 
     return TokenResponse(
         access_token=access_token,
@@ -567,10 +593,7 @@ async def login_user(request: Request, req: UserLoginRequest):
         )
 
     # Direct login when MFA is disabled
-    access_token, refresh_token = issue_token_pair(user, role_str)
-
-    # Register active session
-    register_session(user, access_token, ip_addr, user_agent)
+    access_token, refresh_token = start_session(user, role_str, ip_addr, user_agent)
 
     security_logger.log_event(
         "auth.login.success",
@@ -586,6 +609,30 @@ async def login_user(request: Request, req: UserLoginRequest):
         email=user.email,
         role=role_str
     )
+
+
+def complete_login(user: User, ip_addr: str, user_agent: str, event_name: str) -> TokenResponse:
+    """Single exit point for every successful primary authentication (password or SSO).
+
+    Enforces the MFA gate so no login path can skip it, then issues tokens and
+    registers the session. Audit fix P0-4: SSO previously bypassed MFA.
+    """
+    role_str = enum_value(user.role)
+    mfa_cred = db.get_mfa_credentials(user.user_id)
+    if mfa_cred and mfa_cred.get("is_enabled"):
+        mfa_token = create_jwt_token(
+            {"sub": user.user_id, "email": user.email, "role": role_str, "type": "mfa_challenge"},
+            timedelta(minutes=5)
+        )
+        security_logger.log_event("auth.mfa.challenge_issued", user_id=user.user_id,
+                                  ip_address=ip_addr, user_agent=user_agent)
+        return TokenResponse(access_token="", refresh_token="", user_id=user.user_id, email=user.email,
+                             role=role_str, mfa_required=True, mfa_token=mfa_token)
+
+    access_token, refresh_token = start_session(user, role_str, ip_addr, user_agent)
+    security_logger.log_event(event_name, user_id=user.user_id, ip_address=ip_addr, user_agent=user_agent)
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token, user_id=user.user_id,
+                         email=user.email, role=role_str)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -605,6 +652,9 @@ async def refresh_token(request: Request, payload: RefreshTokenRequest):
     if old_jti and db.is_token_revoked(old_jti):
         raise HTTPException(status_code=401, detail="Refresh token has been revoked or already used.")
 
+    if not session_is_active(token_payload):
+        raise HTTPException(status_code=401, detail="Session has been revoked. Please sign in again.")
+
     user = db.get_user_by_id(user_id)
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or inactive.")
@@ -618,7 +668,7 @@ async def refresh_token(request: Request, payload: RefreshTokenRequest):
     db.prune_revoked_tokens()
 
     role_str = enum_value(user.role)
-    new_access_token, new_refresh_token = issue_token_pair(user, role_str)
+    new_access_token, new_refresh_token = issue_token_pair(user, role_str, token_payload["sid"])
 
     return TokenResponse(
         access_token=new_access_token,
@@ -694,6 +744,9 @@ async def reset_password(request: Request, req: ResetPasswordRequest):
     if jti:
         db.revoke_token(jti, user.user_id, str(payload.get("exp", "")))
 
+    # A password reset must end every existing session (audit P1-11).
+    session_manager.revoke_all_sessions(user.user_id)
+
     return {"status": "success", "message": "Password reset successfully. You can now log in."}
 
 
@@ -711,11 +764,10 @@ async def logout_user(
             if jti:
                 exp_str = str(payload.get("exp", ""))
                 db.revoke_token(jti, current_user.user_id, exp_str)
-                # Find and revoke corresponding user session
-                sessions = db.list_user_sessions(current_user.user_id, active_only=True)
-                for s in sessions:
-                    if s.get("token_jti") == jti:
-                        db.revoke_session(s["session_id"], current_user.user_id)
+            # Revoking the session invalidates the paired refresh token too.
+            sid = payload.get("sid")
+            if sid:
+                db.revoke_session(sid, current_user.user_id)
         except Exception:
             # Security-relevant: the session may not have been revoked on logout.
             logging.getLogger("jobcopilot.auth").warning("Session revocation on logout failed for %s", current_user.user_id, exc_info=True)
@@ -862,10 +914,7 @@ async def complete_mfa_login(request: Request, req: MFALoginChallengeRequest):
             raise HTTPException(status_code=401, detail="Invalid TOTP code or backup recovery code.")
 
     role_str = enum_value(user.role)
-    access_token, refresh_token = issue_token_pair(user, role_str)
-
-    # Register active session
-    register_session(user, access_token, ip_addr, user_agent)
+    access_token, refresh_token = start_session(user, role_str, ip_addr, user_agent)
 
     security_logger.log_event(
         "auth.login.success",

@@ -4,14 +4,15 @@ Validates task dispatching, 202 Accepted response format, progress polling, and 
 """
 
 import uuid
-import pytest
 from datetime import timedelta
-from httpx import AsyncClient, ASGITransport
 
-from app.main import app
-from app.core.database import db
-from app.core.models import User, UserRole, JobListing, ApplicationStatus
+import pytest
+from httpx import ASGITransport, AsyncClient
+
 from app.api.auth import create_jwt_token
+from app.core.database import db
+from app.core.models import ApplicationStatus, JobListing, User, UserRole
+from app.main import app
 
 
 @pytest.fixture
@@ -25,8 +26,17 @@ def test_user_headers():
 
 
 @pytest.mark.asyncio
-async def test_async_apply_and_poll_status(test_user_headers):
+async def test_async_apply_and_poll_status(test_user_headers, monkeypatch):
+    """Audit P1-1: status reflects the real run. A dry run succeeds but reports submitted=False."""
+    import asyncio
+
+    import app.bot.runner as runner_mod
+    from app.core.models import CandidateProfile
+    monkeypatch.setattr(runner_mod, "HAS_PLAYWRIGHT", False)
     user_id, headers = test_user_headers
+    if not db.get_profile(user_id=user_id):
+        db.save_profile(CandidateProfile(id=user_id, user_id=user_id, full_name="T", email="t@t.test",
+                                         phone="1", location="Remote"), user_id=user_id)
     job_id = f"job_async_{uuid.uuid4().hex[:6]}"
     job = JobListing(
         job_id=job_id,
@@ -43,7 +53,7 @@ async def test_async_apply_and_poll_status(test_user_headers):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:
         # 1. Dispatch 202 Accepted Task
-        res = await ac.post(f"/api/jobs/apply-async/{job_id}", json={"mode": "DRY_RUN"})
+        res = await ac.post(f"/api/jobs/apply-async/{job_id}?mode=DRY_RUN")
         assert res.status_code == 202
         data = res.json()
         assert data["status"] == "ACCEPTED"
@@ -52,11 +62,16 @@ async def test_async_apply_and_poll_status(test_user_headers):
 
         task_id = data["task_id"]
 
-        # 2. Poll Task Status
-        poll_res = await ac.get(f"/api/tasks/{task_id}")
-        assert poll_res.status_code == 200
-        poll_data = poll_res.json()
+        # 2. Poll until the real run finishes
+        for _ in range(100):
+            poll_res = await ac.get(f"/api/tasks/{task_id}")
+            assert poll_res.status_code == 200
+            poll_data = poll_res.json()
+            if poll_data["task"]["status"] not in ("QUEUED", "PENDING", "STARTED", "RUNNING"):
+                break
+            await asyncio.sleep(0.05)
         assert poll_data["status"] == "success"
         assert poll_data["task"]["task_id"] == task_id
-        assert poll_data["task"]["status"] in ["STARTED", "SUCCESS"]
-        assert poll_data["task"]["progress_percent"] >= 25
+        assert poll_data["task"]["status"] == "SUCCESS", poll_data
+        assert poll_data["task"]["progress_percent"] == 100
+        assert poll_data["task"]["result"]["submitted"] is False   # a dry run never submits

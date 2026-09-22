@@ -62,11 +62,11 @@ window.analyzeInterviewerSleuth = async function() {
     container.innerHTML = `
       <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-md); padding: 1.25rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-weight: 700; font-size: 14px; color: #ffffff;">${recon.interviewer_name} (${recon.interviewer_role})</span>
-          <span class="recon-chip">👤 ${recon.inferred_persona}</span>
+          <span style="font-weight: 700; font-size: 14px; color: #ffffff;">${escapeHTML(recon.interviewer_name)} (${escapeHTML(recon.interviewer_role)})</span>
+          <span class="recon-chip">👤 ${escapeHTML(recon.inferred_persona)}</span>
         </div>
         <div style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 10px;">
-          <strong>Core Assessment Focus:</strong> ${recon.core_focus}
+          <strong>Core Assessment Focus:</strong> ${escapeHTML(recon.core_focus)}
         </div>
         <div style="margin-bottom: 12px;">
           <strong style="font-size: 12px; color: #a5b4fc;">Tactical Preparation Tips:</strong>
@@ -75,7 +75,7 @@ window.analyzeInterviewerSleuth = async function() {
           </ul>
         </div>
         <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
-          <strong style="font-size: 12px; color: var(--accent-emerald);">🏢 ${comp} Engineering Initiatives:</strong>
+          <strong style="font-size: 12px; color: var(--accent-emerald);">🏢 ${escapeHTML(comp)} Engineering Initiatives:</strong>
           <ul style="margin: 4px 0 0 16px; padding: 0; font-size: 12px; color: #94a3b8; line-height: 1.4;">
             ${(intel.recent_initiatives || []).map(i => `<li>${i}</li>`).join('')}
           </ul>

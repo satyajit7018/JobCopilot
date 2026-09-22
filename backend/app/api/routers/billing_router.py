@@ -32,6 +32,51 @@ class CustomerPortalRequest(BaseModel):
     return_url: Optional[str] = None
 
 
+def _safe_redirect(url: Optional[str], default: str) -> str:
+    """Only allow redirects back to our own origins (audit P1-8: open redirect after checkout)."""
+    from urllib.parse import urlparse
+    if not url:
+        return default
+    allowed = settings.ALLOWED_ORIGINS if isinstance(settings.ALLOWED_ORIGINS, list) else [settings.ALLOWED_ORIGINS]
+    parsed = urlparse(url)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    if parsed.scheme in ("http", "https") and origin in [o.rstrip("/") for o in allowed]:
+        return url
+    raise HTTPException(status_code=400, detail="Redirect URL must point back to this application.")
+
+
+def _apply_billing_tier(user_id: str, tier_value: str) -> str:
+    """Persists a billing tier without ever touching an ADMIN's role (audit P1-5).
+
+    Role and billing tier currently share users.role. Until they are split into
+    separate columns, admins keep ADMIN and billing events only affect non-admins.
+    """
+    from app.core.rate_limiter import SubscriptionTier, rate_limiter
+    user = db.get_user_by_id(user_id)
+    if not user:
+        return "UNKNOWN_USER"
+    if enum_value(user.role) == "ADMIN":
+        logger.info("billing: tier change %s ignored for ADMIN user %s", tier_value, user_id)
+        return "ADMIN"
+    tier = {"ELITE": SubscriptionTier.ELITE, "PRO": SubscriptionTier.PRO}.get(tier_value, SubscriptionTier.FREE)
+    rate_limiter.set_user_tier(user_id, tier)
+    db.update_user_role(user_id, tier.value)
+    return tier.value
+
+
+def _tier_from_subscription(sub: dict) -> str:
+    """Derives the tier from the authoritative price id and status, never from metadata."""
+    if sub.get("status") not in ("active", "trialing"):
+        return "FREE"
+    items = (sub.get("items") or {}).get("data") or []
+    price_id = ((items[0] if items else {}).get("price") or {}).get("id")
+    if price_id and price_id == settings.STRIPE_ELITE_PRICE_ID:
+        return "ELITE"
+    if price_id and price_id == settings.STRIPE_PRO_PRICE_ID:
+        return "PRO"
+    return "FREE"
+
+
 async def _call_stripe_via_breaker(func, unavailable_detail: str, error_detail_prefix: str):
     """
     Invokes a Stripe API callable through the shared circuit breaker, translating
@@ -47,12 +92,18 @@ async def _call_stripe_via_breaker(func, unavailable_detail: str, error_detail_p
 
 @router.post("/billing/webhook")
 async def stripe_webhook_handler(request: Request):
-    """Receives Stripe subscription updates and adjusts tenant tier accordingly (Fail-Closed)."""
+    """Receives Stripe events and adjusts the tenant tier (fail-closed on signature).
+
+    Audit fixes:
+      P0-6  construct_event returns a stripe.Event; convert with to_dict() before .get().
+      P1-6  subscription events carry no checkout-session metadata, so users are resolved
+            through the stored Stripe customer id first.
+      P1-5  ADMIN roles are never overwritten by billing (see _apply_billing_tier).
+      P1-9  subscription tier comes from price id + status, not metadata.
+    """
     import stripe
 
-    from app.core.rate_limiter import SubscriptionTier, rate_limiter
-
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    webhook_secret = settings.STRIPE_WEBHOOK_SECRET or os.getenv("STRIPE_WEBHOOK_SECRET")
     if not webhook_secret:
         raise HTTPException(status_code=503, detail="Billing webhook not configured")
 
@@ -63,29 +114,36 @@ async def stripe_webhook_handler(request: Request):
 
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-    except (ValueError, stripe.SignatureVerificationError) as e:
-        raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
+    except (ValueError, stripe.SignatureVerificationError):
+        raise HTTPException(status_code=400, detail="Invalid signature")
 
+    event = event.to_dict() if hasattr(event, "to_dict") else dict(event)
     event_type = event.get("type", "")
-    data_object = event.get("data", {}).get("object", {})
-    user_id = data_object.get("metadata", {}).get("user_id")
-    tier_str = data_object.get("metadata", {}).get("tier", "PRO").upper()
+    obj = (event.get("data") or {}).get("object") or {}
+    metadata = obj.get("metadata") or {}
+    customer_id = obj.get("customer")
 
+    if event_type == "checkout.session.completed":
+        user_id = metadata.get("user_id") or obj.get("client_reference_id")
+        if not user_id:
+            return {"status": "ignored", "reason": "No user reference on checkout session"}
+        if customer_id:
+            db.set_stripe_customer_id(user_id, customer_id)
+        tier = "ELITE" if str(metadata.get("tier", "")).upper() == "ELITE" else "PRO"
+        return {"status": "success", "user_id": user_id, "active_tier": _apply_billing_tier(user_id, tier)}
+
+    user_id = (db.get_user_id_by_stripe_customer(customer_id) if customer_id else None) or metadata.get("user_id")
     if not user_id:
-        return {"status": "ignored", "reason": "No user_id in metadata"}
+        return {"status": "ignored", "reason": "Unknown Stripe customer"}
 
-    if event_type in ["checkout.session.completed", "customer.subscription.created", "customer.subscription.updated"]:
-        tier = SubscriptionTier.ELITE if tier_str == "ELITE" else SubscriptionTier.PRO
-        rate_limiter.set_user_tier(user_id, tier)
-        db.update_user_role(user_id, tier.value)
-        return {"status": "success", "user_id": user_id, "active_tier": tier.value}
-    elif event_type in ["customer.subscription.deleted"]:
-        rate_limiter.set_user_tier(user_id, SubscriptionTier.FREE)
-        db.update_user_role(user_id, "FREE")
-        return {"status": "success", "user_id": user_id, "active_tier": SubscriptionTier.FREE.value}
-    elif event_type in ["invoice.payment_failed"]:
-        # Dunning handling: record failed invoice and flag account without immediately terminating service
-        return {"status": "warning", "event": "payment_failed", "user_id": user_id, "action": "dunning_grace_period_active"}
+    if event_type in ("customer.subscription.created", "customer.subscription.updated"):
+        return {"status": "success", "user_id": user_id,
+                "active_tier": _apply_billing_tier(user_id, _tier_from_subscription(obj))}
+    if event_type == "customer.subscription.deleted":
+        return {"status": "success", "user_id": user_id, "active_tier": _apply_billing_tier(user_id, "FREE")}
+    if event_type == "invoice.payment_failed":
+        logger.warning("billing: payment failed for user %s (grace period; Stripe dunning will follow up)", user_id)
+        return {"status": "warning", "event": "payment_failed", "user_id": user_id}
 
     return {"status": "ignored", "event_type": event_type}
 
@@ -114,8 +172,9 @@ async def create_checkout_session(
         import stripe
         stripe.api_key = settings.STRIPE_SECRET_KEY
         price_id = settings.STRIPE_PRO_PRICE_ID if requested_tier == "PRO" else settings.STRIPE_ELITE_PRICE_ID
-        success_url = payload.success_url or f"http://localhost:{settings.FRONTEND_PORT}/#billing-success?session_id={{CHECKOUT_SESSION_ID}}"
-        cancel_url = payload.cancel_url or f"http://localhost:{settings.FRONTEND_PORT}/#billing"
+        success_url = _safe_redirect(payload.success_url, f"http://localhost:{settings.FRONTEND_PORT}/#billing-success?session_id={{CHECKOUT_SESSION_ID}}")
+        cancel_url = _safe_redirect(payload.cancel_url, f"http://localhost:{settings.FRONTEND_PORT}/#billing")
+        existing_customer = db.get_stripe_customer_id(current_user.user_id)
 
         def _create_session():
             return stripe.checkout.Session.create(
@@ -125,8 +184,10 @@ async def create_checkout_session(
                 success_url=success_url,
                 cancel_url=cancel_url,
                 client_reference_id=current_user.user_id,
-                customer_email=current_user.email,
-                metadata={"user_id": current_user.user_id, "tier": requested_tier}
+                **({"customer": existing_customer} if existing_customer else {"customer_email": current_user.email}),
+                metadata={"user_id": current_user.user_id, "tier": requested_tier},
+                # Stripe only copies subscription_data.metadata onto the Subscription (audit P1-6).
+                subscription_data={"metadata": {"user_id": current_user.user_id, "tier": requested_tier}},
             )
 
         session = await _call_stripe_via_breaker(_create_session, "Billing service unavailable", "Stripe API error")
@@ -151,13 +212,16 @@ async def create_customer_portal_session(
     current_user: User = Depends(get_current_user)
 ):
     """Creates a Stripe Billing Customer Portal session for user subscription management."""
-    return_url = payload.return_url or f"http://localhost:{settings.FRONTEND_PORT}/#billing"
+    return_url = _safe_redirect(payload.return_url, f"http://localhost:{settings.FRONTEND_PORT}/#billing")
     if settings.STRIPE_SECRET_KEY:
         import stripe
         stripe.api_key = settings.STRIPE_SECRET_KEY
+        customer_id = db.get_stripe_customer_id(current_user.user_id)
+        if not customer_id:
+            raise HTTPException(status_code=400, detail="No billing account yet. Subscribe first.")
         def _create_portal():
             return stripe.billing_portal.Session.create(
-                customer=current_user.user_id,
+                customer=customer_id,
                 return_url=return_url
             )
 
@@ -178,7 +242,6 @@ async def sync_subscription_tier(current_user: User = Depends(get_current_user))
     Synchronizes user tier with Stripe as the single source of truth.
     Pulls latest subscription status and updates local database and rate limiter.
     """
-    from app.core.rate_limiter import SubscriptionTier, rate_limiter
     user_id = current_user.user_id
     active_tier = enum_value(current_user.role)
 
@@ -186,8 +249,12 @@ async def sync_subscription_tier(current_user: User = Depends(get_current_user))
         import stripe
         stripe.api_key = settings.STRIPE_SECRET_KEY
         try:
+            customer_id = db.get_stripe_customer_id(user_id)
+            if not customer_id:
+                return {"status": "success", "user_id": user_id, "synchronized_tier": active_tier}
+
             def _get_subs():
-                return stripe.Subscription.list(customer=user_id, status="active", limit=1)
+                return stripe.Subscription.list(customer=customer_id, status="active", limit=1)
 
             subs = await stripe_api_breaker.call(_get_subs)
             if subs and subs.data:
@@ -202,9 +269,7 @@ async def sync_subscription_tier(current_user: User = Depends(get_current_user))
             else:
                 active_tier = "FREE"
 
-            st_tier = SubscriptionTier.ELITE if active_tier == "ELITE" else (SubscriptionTier.PRO if active_tier == "PRO" else SubscriptionTier.FREE)
-            rate_limiter.set_user_tier(user_id, st_tier)
-            db.update_user_role(user_id, active_tier)
+            active_tier = _apply_billing_tier(user_id, active_tier)
         except Exception:
             logger.warning("billing_router: stripe sync failed, falling back to current database role", exc_info=True)
             pass  # Fallback to current database role if Stripe customer lookup fails or circuit is open

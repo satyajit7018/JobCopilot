@@ -156,7 +156,8 @@ async def test_public_auth_config_shape():
 @pytest.mark.asyncio
 async def test_google_sso_rejects_bare_email_in_production(monkeypatch):
     """With ENV=production, a bare-email SSO POST (no id_token) must 401."""
-    monkeypatch.setenv("ENV", "production")
+    from app.core.settings import settings
+    monkeypatch.setattr(settings, "ENV", "production")
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         res = await ac.post("/api/auth/google-sso", json={"email": "someone@gmail.com"})

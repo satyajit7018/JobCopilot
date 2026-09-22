@@ -15,6 +15,7 @@ BASE_PROD = dict(
     JWT_SECRET="x" * 40,
     JOBCOPILOT_MASTER_KEY="master-key-value",
     GOOGLE_OAUTH_CLIENT_ID="123.apps.googleusercontent.com",
+    INBOUND_EMAIL_WEBHOOK_SECRET="whsec_inbound_test_secret",
 )
 
 
@@ -83,3 +84,9 @@ def test_all_errors_reported_together():
     assert "JOBCOPILOT_MASTER_KEY" in msg
     assert "GOOGLE_OAUTH_CLIENT_ID" in msg
     assert "ANTHROPIC_API_KEY" in msg
+
+
+def test_production_requires_inbound_email_webhook_secret():
+    """Audit P0-3: the inbound email webhook is public, so production must have its signing secret."""
+    with pytest.raises(ValueError, match="INBOUND_EMAIL_WEBHOOK_SECRET"):
+        _make(INBOUND_EMAIL_WEBHOOK_SECRET=None)

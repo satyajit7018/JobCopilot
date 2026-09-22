@@ -68,10 +68,12 @@ async def delete_user_account(
         if settings.STRIPE_SECRET_KEY:
             import stripe
             stripe.api_key = settings.STRIPE_SECRET_KEY
-            # List subscriptions for this customer and cancel them
-            subscriptions = stripe.Subscription.list(customer=user_id, limit=5)
-            for sub in subscriptions.auto_paging_iter():
-                stripe.Subscription.delete(sub.id)
+            # Cancel using the real Stripe customer id (the app user id is not a Stripe customer).
+            customer_id = db.get_stripe_customer_id(user_id)
+            if customer_id:
+                subscriptions = stripe.Subscription.list(customer=customer_id, limit=5)
+                for sub in subscriptions.auto_paging_iter():
+                    stripe.Subscription.delete(sub.id)
     except Exception:
         logger.warning("account_router: failed to cancel stripe subscriptions during account deletion", exc_info=True)
         pass  # Non-blocking if Stripe is not configured or in test mode

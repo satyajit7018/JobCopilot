@@ -92,8 +92,13 @@ class TestAuditFixes:
         assert res["status"] in ["success", "completed"]
         updated_job = db.get_job_by_id(job.job_id, user_id=self.user_id)
         assert updated_job is not None
-        assert updated_job.status == ApplicationStatus.SUBMITTED
-        assert updated_job.applied_at is not None
+        # Audit P1-3: a DRY_RUN fills the form but never submits, so it must not
+        # mark the job SUBMITTED or stamp applied_at (only a confirmed LIVE
+        # submission does). The run still completing proves there was no datetime
+        # NameError, which is what this test guards.
+        assert updated_job.status != ApplicationStatus.SUBMITTED
+        assert updated_job.applied_at is None
+        assert res.get("submitted") is False
 
     @pytest.mark.asyncio
     async def test_storage_download_endpoint_success(self):

@@ -220,8 +220,16 @@ def test_apply_ledger_retry_and_exhaustion(test_user):
 
 
 @pytest.mark.asyncio
-async def test_bot_runner_idempotent_execution(test_user):
-    """Verifies that AutonomousJobRunner records success in ledger and blocks duplicate calls."""
+async def test_bot_runner_idempotent_execution(test_user, monkeypatch):
+    """Dry runs never count as submissions; a confirmed submission blocks any repeat.
+
+    Audit P1-3: this test used to assert that a DRY_RUN left the ledger SUBMITTED,
+    which would have blocked the user's real application later. Runs without a
+    browser so it is deterministic in every environment.
+    """
+    import app.bot.runner as runner_mod
+    monkeypatch.setattr(runner_mod, "HAS_PLAYWRIGHT", False)
+
     uid = test_user["user"].user_id
     job = JobListing(
         job_id=f"job_run_{uuid.uuid4().hex[:6]}",
@@ -238,25 +246,27 @@ async def test_bot_runner_idempotent_execution(test_user):
     db.save_job(job, user_id=uid)
 
     runner = AutonomousJobRunner(mode="DRY_RUN")
-    result = await runner.execute_application(
-        job_id=job.job_id,
-        profile_id=uid,
-        user_id=uid
-    )
+
+    # 1. A dry run succeeds, submits nothing, and releases its lock.
+    result = await runner.execute_application(job_id=job.job_id, profile_id=uid, user_id=uid)
     assert result["status"] == "success"
+    assert result["submitted"] is False
     assert "ledger_id" in result
-
-    # Verify ledger entry
     ledger = apply_ledger.get_ledger_for_job(uid, job.job_id)
-    assert ledger is not None
-    assert ledger.status == ApplyLedgerStatus.SUBMITTED
+    assert ledger.status == ApplyLedgerStatus.CANCELLED
+    assert db.get_job_by_id(job.job_id, user_id=uid).status != ApplicationStatus.SUBMITTED
 
-    # Second execution attempt should be blocked by idempotency ledger
-    result_dup = await runner.execute_application(
-        job_id=job.job_id,
-        profile_id=uid,
-        user_id=uid
-    )
+    # 2. A second dry run is allowed, because nothing was submitted.
+    again = await runner.execute_application(job_id=job.job_id, profile_id=uid, user_id=uid)
+    assert again["status"] == "success"
+
+    # 3. Once a real submission is confirmed, every further attempt is blocked.
+    acquired, entry, _ = apply_ledger.acquire_lock(user_id=uid, job_id=job.job_id, job_fingerprint=job.fingerprint)
+    assert acquired
+    assert apply_ledger.mark_in_progress(entry.ledger_id, uid)
+    apply_ledger.mark_submitted(ledger_id=entry.ledger_id, user_id=uid, confirmation_id="GH-12345", screenshot_path="")
+
+    result_dup = await runner.execute_application(job_id=job.job_id, profile_id=uid, user_id=uid)
     assert result_dup["status"] == "conflict"
     assert "already submitted" in result_dup["message"].lower()
 

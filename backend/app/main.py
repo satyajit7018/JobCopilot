@@ -115,9 +115,21 @@ app.add_middleware(
 )
 
 # Observability Endpoints
-@app.get("/metrics", tags=["Observability"])
-async def metrics_endpoint():
-    """Prometheus application telemetry scrape target."""
+@app.get("/metrics", tags=["Observability"], include_in_schema=False)
+async def metrics_endpoint(request: Request):
+    """Prometheus scrape target. Audit P1-12: no longer public.
+
+    Requires `Authorization: Bearer <METRICS_TOKEN>`. With no token configured it is
+    open only outside production, and returns 404 in production.
+    """
+    import hmac as _hmac
+    expected = settings.METRICS_TOKEN
+    if expected:
+        supplied = request.headers.get("Authorization", "")
+        if not _hmac.compare_digest(supplied.encode(), f"Bearer {expected}".encode()):
+            return Response(status_code=401)
+    elif settings.is_production:
+        return Response(status_code=404)
     _refresh_observability_gauges()
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
@@ -130,8 +142,10 @@ async def health_check():
     try:
         db_adapter = get_db()
         _ = db_adapter.get_user_by_email("healthcheck@jobcopilot.local")
-    except Exception as e:
-        db_status = f"unhealthy: {str(e)}"
+    except Exception:
+        # Audit P1-13: never echo exception text to an unauthenticated caller.
+        logger.exception("health check: database probe failed")
+        db_status = "unhealthy"
 
     is_overall_healthy = db_status == "healthy"
     status_code = 200 if is_overall_healthy else 503
@@ -195,7 +209,7 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
     Requires unrevoked, valid JWT Bearer access token passed via query parameter (?token=...).
     Closes with 4001 (Unauthorized) if token is missing, invalid, or revoked.
     """
-    from app.api.auth import decode_jwt_token
+    from app.api.auth import decode_jwt_token, session_is_active
     from app.core.database import db
 
     if not token:
@@ -216,6 +230,10 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
         user_id = payload.get("sub")
         if not user_id:
             await websocket.close(code=4001, reason="Invalid token subject.")
+            return
+
+        if not session_is_active(payload):
+            await websocket.close(code=4001, reason="Session has been revoked.")
             return
     except Exception:
         await websocket.close(code=4001, reason="Invalid authentication token.")

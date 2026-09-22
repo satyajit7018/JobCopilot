@@ -320,7 +320,13 @@ function showToast(message, type = 'info', action = null) {
   if (type === 'error') icon = '✕';
   if (type === 'info') icon = 'ℹ';
 
-  toast.innerHTML = `<span style="font-weight: 700;">${icon}</span><span>${message}</span>`;
+  // Built with textContent: message often carries server/AI/third-party text.
+  const iconSpan = document.createElement('span');
+  iconSpan.style.fontWeight = '700';
+  iconSpan.textContent = icon;
+  const msgSpan = document.createElement('span');
+  msgSpan.textContent = message == null ? '' : String(message);
+  toast.append(iconSpan, msgSpan);
   if (action && action.label) {
     const btn = document.createElement('button');
     btn.className = 'toast-action-btn';
@@ -428,11 +434,16 @@ function appendTerminalLog(module, text, isError = false, isSuccess = false) {
   if (isError) textClass = 'log-critical';
   if (isSuccess) textClass = 'log-success';
 
-  div.innerHTML = `
-    <span class="log-ts">[${now}]</span>
-    <span class="log-mod">[${module.toUpperCase()}]</span>
-    <span class="${textClass}">${text}</span>
-  `;
+  const tsSpan = document.createElement('span');
+  tsSpan.className = 'log-ts';
+  tsSpan.textContent = `[${now}]`;
+  const modSpan = document.createElement('span');
+  modSpan.className = 'log-mod';
+  modSpan.textContent = `[${String(module || 'BOT').toUpperCase()}]`;
+  const textSpan = document.createElement('span');
+  if (textClass) textSpan.className = textClass;
+  textSpan.textContent = text == null ? '' : String(text);   // bot logs include scraped company/title text
+  div.append(tsSpan, ' ', modSpan, ' ', textSpan);
   els.botLogsContainer.appendChild(div);
   els.botLogsContainer.scrollTop = els.botLogsContainer.scrollHeight;
 }
@@ -459,7 +470,27 @@ window.triggerGoogleSSO = async function(opts = {}) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    const data = await res.json();
+    let data = await res.json();
+
+    // MFA step (audit P0-4): the server no longer lets SSO skip a user's second factor.
+    if (data.mfa_required && data.mfa_token) {
+      const code = window.prompt('Enter the 6-digit code from your authenticator app (or a backup code):');
+      if (!code) {
+        showToast('Sign-in cancelled: an MFA code is required.', 'error');
+        return;
+      }
+      const mfaRes = await fetch(`${API_BASE}/auth/mfa/login-challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mfa_token: data.mfa_token, code: code.trim() })
+      });
+      data = await mfaRes.json();
+      if (!mfaRes.ok) {
+        showToast(data.detail || 'Invalid MFA code.', 'error');
+        return;
+      }
+    }
+
     if (data.access_token) {
       localStorage.setItem('jobcopilot_access_token', data.access_token);
       if (data.refresh_token) {

@@ -4,22 +4,20 @@ Tests Tiered Rate Limiting, Stripe Billing Webhooks, Quota Enforcement, and Sche
 """
 
 import sys
-import os
 import uuid
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 import pytest
-from httpx import AsyncClient, ASGITransport
-from app.main import app
-from app.core.rate_limiter import rate_limiter, SubscriptionTier
-from app.core.migrations import migration_runner
-from app.core.models import JobListing, ApplicationStatus
-from app.core.database import db
+from httpx import ASGITransport, AsyncClient
+
 from app.api.auth import create_jwt_token
+from app.core.migrations import migration_runner
+from app.core.rate_limiter import SubscriptionTier, rate_limiter
+from app.main import app
 
 
 class TestSaaSPhase3:
@@ -77,48 +75,44 @@ class TestSaaSPhase3:
             assert data["tier"] == "PRO"
             assert data["amount_usd"] == 29
 
-            # 3. Receive Stripe webhook: subscription created (upgrade to PRO)
-            created_event = {
-                "type": "customer.subscription.created",
-                "data": {
-                    "object": {
-                        "metadata": {
-                            "user_id": user_id,
-                            "tier": "PRO"
-                        }
-                    }
-                }
-            }
-            with patch("stripe.Webhook.construct_event", return_value=created_event):
-                hook_res = await ac.post(
-                    "/api/billing/webhook",
-                    json=created_event,
-                    headers={"Stripe-Signature": "t=123,v1=test_sig"}
-                )
-                assert hook_res.status_code == 200
-                assert hook_res.json()["active_tier"] == "PRO"
-                assert rate_limiter.get_user_tier(user_id) == SubscriptionTier.PRO
+            # 3. Webhooks, shaped like real Stripe payloads and delivered as real stripe.Event
+            #    objects (not dicts) so the construct_event -> to_dict path is exercised (audit P0-6).
+            import stripe
 
-            # 4. Receive Stripe webhook: subscription cancelled (downgrade to FREE)
-            cancel_event = {
-                "type": "customer.subscription.deleted",
-                "data": {
-                    "object": {
-                        "metadata": {
-                            "user_id": user_id
-                        }
-                    }
-                }
-            }
-            with patch("stripe.Webhook.construct_event", return_value=cancel_event):
-                cancel_res = await ac.post(
-                    "/api/billing/webhook",
-                    json=cancel_event,
-                    headers={"Stripe-Signature": "t=123,v1=test_sig"}
-                )
-                assert cancel_res.status_code == 200
-                assert cancel_res.json()["active_tier"] == "FREE"
-                assert rate_limiter.get_user_tier(user_id) == SubscriptionTier.FREE
+            from app.core.database import db
+            from app.core.models import User, UserRole
+            from app.core.settings import settings as app_settings
+            db.create_user(User(user_id=user_id, email=f"{user_id}@billing.test", password_hash="x", role=UserRole.FREE))
+            customer_id = f"cus_{uuid.uuid4().hex[:10]}"
+
+            def as_event(d):
+                return stripe.Event.construct_from(d, "sk_test")
+
+            async def deliver(ev):
+                with patch("stripe.Webhook.construct_event", return_value=as_event(ev)):
+                    return await ac.post("/api/billing/webhook", json=ev, headers={"Stripe-Signature": "t=123,v1=test_sig"})
+
+            completed = {"id": "evt_c", "object": "event", "type": "checkout.session.completed", "data": {"object": {
+                "id": "cs_1", "object": "checkout.session", "customer": customer_id, "client_reference_id": user_id,
+                "metadata": {"user_id": user_id, "tier": "PRO"}}}}
+            res = await deliver(completed)
+            assert res.status_code == 200 and res.json()["active_tier"] == "PRO"
+            assert db.get_user_id_by_stripe_customer(customer_id) == user_id
+            assert rate_limiter.get_user_tier(user_id) == SubscriptionTier.PRO
+
+            # Upgrade via subscription.updated: tier comes from the price id, and no metadata is needed.
+            updated = {"id": "evt_u", "object": "event", "type": "customer.subscription.updated", "data": {"object": {
+                "id": "sub_1", "object": "subscription", "customer": customer_id, "status": "active", "metadata": {},
+                "items": {"data": [{"price": {"id": app_settings.STRIPE_ELITE_PRICE_ID}}]}}}}
+            res = await deliver(updated)
+            assert res.status_code == 200 and res.json()["active_tier"] == "ELITE"
+
+            # 4. Cancellation: real Subscription objects carry no checkout metadata (audit P1-6).
+            deleted = {"id": "evt_d", "object": "event", "type": "customer.subscription.deleted", "data": {"object": {
+                "id": "sub_1", "object": "subscription", "customer": customer_id, "status": "canceled", "metadata": {}}}}
+            res = await deliver(deleted)
+            assert res.status_code == 200 and res.json()["active_tier"] == "FREE"
+            assert rate_limiter.get_user_tier(user_id) == SubscriptionTier.FREE
 
     def test_schema_migrations_runner(self):
         """Verifies atomic schema migration execution."""

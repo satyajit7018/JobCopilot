@@ -4,6 +4,7 @@ Handles webhook ingestion, inbound recruiter email parsing, communications histo
 and automated follow-up drafts.
 """
 
+import functools
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -64,7 +65,7 @@ async def receive_inbound_email_webhook(request: Request):
         body_html=parsed["body_html"],
         body_text=parsed["body_text"],
         user_id=tenant_user_id,
-        ws_broadcast_callback=ws_manager.broadcast
+        ws_broadcast_callback=functools.partial(ws_manager.broadcast, user_id=tenant_user_id)
     )
     return {"status": "success", "user_id": tenant_user_id, "result": result}
 
@@ -83,7 +84,7 @@ async def receive_inbound_email(
         body_html=payload.body_html,
         body_text=payload.body_text,
         user_id=current_user.user_id,
-        ws_broadcast_callback=ws_manager.broadcast
+        ws_broadcast_callback=functools.partial(ws_manager.broadcast, user_id=current_user.user_id)
     )
     return result
 

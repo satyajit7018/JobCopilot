@@ -84,6 +84,10 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = "noreply@jobcopilot.app"
     SMTP_TLS: bool = True
     INBOUND_EMAIL_WEBHOOK_SECRET: Optional[str] = None
+    # Local development only: accept unsigned inbound-email webhooks. Ignored in production.
+    INBOUND_EMAIL_ALLOW_UNSIGNED: bool = False
+    # Bearer token Prometheus must send to scrape /metrics (audit P1-12).
+    METRICS_TOKEN: Optional[str] = None
 
     # LLM Providers (OpenAI & Anthropic)
     OPENAI_API_KEY: Optional[str] = None
@@ -143,6 +147,9 @@ class Settings(BaseSettings):
 
         # Users cannot sign in without a Google client id (the only production
         # login path — the dev email/demo path is disabled in prod).
+        if not self.INBOUND_EMAIL_WEBHOOK_SECRET:
+            errors.append("INBOUND_EMAIL_WEBHOOK_SECRET is required; the inbound email webhook is public.")
+
         if not self.GOOGLE_OAUTH_CLIENT_ID:
             errors.append("GOOGLE_OAUTH_CLIENT_ID is required — it is the only production sign-in path.")
 

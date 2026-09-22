@@ -610,6 +610,8 @@ class ConsentType(str, Enum):
     AI_DATA_USAGE = "ai_data_usage"
     TELEMETRY_ANALYTICS = "telemetry_analytics"
     MARKETING = "marketing"
+    # Explicit, unbundled opt-in to let the bot submit real applications (audit P1-2).
+    AUTONOMOUS_SUBMISSION = "autonomous_submission"
 
 
 class UserConsent(BaseModel):

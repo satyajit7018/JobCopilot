@@ -36,16 +36,17 @@ def test_linkedin_importer():
 
 
 def test_apply_task_sync_and_enqueue():
+    from unittest.mock import AsyncMock
     with patch("app.tasks.apply_task.AutonomousJobRunner") as MockRunner:
         mock_instance = MagicMock()
-        async def fake_apply(job_id):
-            return {"status": "SUCCESS", "job_id": job_id}
-        mock_instance.apply_to_job = fake_apply
+        mock_instance.execute_application = AsyncMock(return_value={"status": "success", "job_id": "job_123"})
         MockRunner.return_value = mock_instance
 
         res = run_apply_job_sync("user_test", "job_123", "DRY_RUN")
-        assert res["status"] == "SUCCESS"
+        assert res["status"] == "success"
         assert res["job_id"] == "job_123"
+        MockRunner.assert_called_once_with(mode="DRY_RUN")
+        assert mock_instance.execute_application.await_args.kwargs["job_id"] == "job_123"
 
         task_id = enqueue_apply_job("user_test", "job_123", "DRY_RUN")
         assert isinstance(task_id, str)
