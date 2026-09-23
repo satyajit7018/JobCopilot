@@ -54,7 +54,9 @@ services:
       - USE_CELERY=true
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required (>=32 chars)}
       - JOBCOPILOT_MASTER_KEY=${JOBCOPILOT_MASTER_KEY:?JOBCOPILOT_MASTER_KEY is required}
-      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:-}
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:?GOOGLE_OAUTH_CLIENT_ID is required (only prod sign-in path)}
+      - INBOUND_EMAIL_WEBHOOK_SECRET=${INBOUND_EMAIL_WEBHOOK_SECRET:?INBOUND_EMAIL_WEBHOOK_SECRET is required (inbound webhook is public)}
+      - METRICS_TOKEN=${METRICS_TOKEN:-}
     volumes:
       - jobcopilot_data:/data
     depends_on:
@@ -78,6 +80,14 @@ services:
     container_name: jobcopilot_worker
     restart: always
     command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "-Q", "priority.high,priority.normal,priority.low"]
+    # The worker is not an HTTP server, so the image's curl-:8000 healthcheck
+    # would always fail. Probe the Celery worker directly instead.
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.tasks.celery_app inspect ping -t 8 | grep -q pong"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     environment:
       - ENV=production
       - DEBUG=false
@@ -89,6 +99,10 @@ services:
       - USE_CELERY=true
       - JWT_SECRET=${JWT_SECRET}
       - JOBCOPILOT_MASTER_KEY=${JOBCOPILOT_MASTER_KEY}
+      # The worker loads the same Settings model, so it hits the same
+      # production fail-closed guard and needs these too.
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - INBOUND_EMAIL_WEBHOOK_SECRET=${INBOUND_EMAIL_WEBHOOK_SECRET}
     volumes:
       - jobcopilot_data:/data
     depends_on:
