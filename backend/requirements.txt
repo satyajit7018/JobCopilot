@@ -15,7 +15,7 @@ keyring==25.7.0
 playwright==1.63.0
 beautifulsoup4==4.15.0
 boto3==1.43.95
-stripe==15.6.0
+stripe==15.6.1
 google-auth==2.58.0
 slowapi==0.1.10
 alembic==1.16.5
