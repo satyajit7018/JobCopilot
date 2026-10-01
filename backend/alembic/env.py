@@ -22,6 +22,11 @@ def get_url():
     if cfg_url:
         return cfg_url
     if settings.DATABASE_URL and settings.DATABASE_URL.startswith("postgres"):
+        # Name the driver explicitly: the app uses psycopg2, and SQLAlchemy 2.1
+        # changed the default driver for bare postgresql:// URLs to psycopg 3.
+        scheme, rest = settings.DATABASE_URL.split("://", 1)
+        if "+" not in scheme:
+            return f"postgresql+psycopg2://{rest}"
         return settings.DATABASE_URL
     return f"sqlite:///{settings.db_path}"
 
