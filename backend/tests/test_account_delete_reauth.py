@@ -64,7 +64,7 @@ def test_wrong_password_is_rejected():
     user = _create_user()
     try:
         res = _delete(user, {"confirm_email": user.email, "password": "not-the-password"})
-        assert res.status_code == 401
+        assert res.status_code == 403
         assert db.get_user_by_id(user.user_id) is not None
     finally:
         db.hard_delete_user_account(user.user_id)
@@ -101,7 +101,7 @@ def test_totp_reauth_for_mfa_account():
     try:
         wrong = "000000" if mfa_engine.generate_current_totp(secret) != "000000" else "111111"
         res = _delete(user, {"confirm_email": user.email, "mfa_code": wrong})
-        assert res.status_code == 401
+        assert res.status_code == 403
         assert db.get_user_by_id(user.user_id) is not None
 
         code = mfa_engine.generate_current_totp(secret)
