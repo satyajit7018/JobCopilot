@@ -150,6 +150,12 @@ def test_mfa_setup_and_activation_workflow(client, test_user):
     cred_active = db.get_mfa_credentials(test_user.user_id)
     assert cred_active["is_enabled"] is True
 
+    # /auth/me reports it, and setup can't silently replace the active secret
+    assert client.get("/api/auth/me", headers=headers).json()["mfa_enabled"] is True
+    res_again = client.post("/api/auth/mfa/setup", headers=headers)
+    assert res_again.status_code == 409
+    assert db.get_mfa_credentials(test_user.user_id)["is_enabled"] is True
+
 
 def test_mfa_login_enforcement_gate_and_challenge(client, test_user):
     # Setup and activate MFA for user
@@ -295,6 +301,28 @@ def test_session_creation_listing_and_revocation(client, test_user):
     # Bulk revoke all other sessions
     bulk_res = client.delete("/api/auth/sessions", headers=headers)
     assert bulk_res.status_code == 200
+
+
+def test_current_session_survives_token_refresh(client, test_user):
+    """After a refresh the access token's jti no longer matches the stored one; sid must."""
+    login = client.post("/api/auth/login", json={"email": test_user.email, "password": "SecurePassword123!"})
+    assert login.status_code == 200
+    other = client.post("/api/auth/login", json={"email": test_user.email, "password": "SecurePassword123!"})
+    assert other.status_code == 200
+
+    refreshed = client.post("/api/auth/refresh", json={"refresh_token": login.json()["refresh_token"]})
+    assert refreshed.status_code == 200
+    headers = {"Authorization": f"Bearer {refreshed.json()['access_token']}"}
+    sid = decode_jwt_token(refreshed.json()["access_token"])["sid"]
+
+    sessions = client.get("/api/auth/sessions", headers=headers).json()["sessions"]
+    assert [s["session_id"] for s in sessions if s["is_current"]] == [sid]
+
+    # "Sign out all other devices" keeps this one and ends the other login.
+    assert client.delete("/api/auth/sessions", headers=headers).status_code == 200
+    assert client.get("/api/auth/me", headers=headers).status_code == 200
+    other_headers = {"Authorization": f"Bearer {other.json()['access_token']}"}
+    assert client.get("/api/auth/me", headers=other_headers).status_code == 401
 
 
 def test_session_revocation_invalidates_token(client, test_user):
