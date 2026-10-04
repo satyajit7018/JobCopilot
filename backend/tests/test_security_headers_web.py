@@ -1,85 +1,44 @@
 """
-JobCopilot - Android PWA & Mobile Static Architecture Tests
-Validates Web App Manifest compliance, Service Worker root scoping,
-Android icon asset integrity, and CSP headers.
+JobCopilot - Web Security Header Tests
+The API's SecurityHeadersMiddleware and the frontend's nginx snippet
+(frontend/security-headers.conf) must agree on the Content-Security-Policy.
+(The legacy UI's PWA manifest, service worker and icon checks were removed with that UI.)
 """
 
-import json
-import pytest
+import re
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
-
-def test_static_cache_control_headers(client: TestClient):
-    """App code must revalidate (no stale app.js); API responses are left untouched."""
-    # HTML shell + manifest: must revalidate so code/config changes propagate.
-    for path in ("/", "/manifest.json"):
-        res = client.get(path)
-        assert "no-cache" in res.headers.get("cache-control", ""), path
-    # API responses must not get the static no-cache header from this middleware.
-    api_res = client.get("/api/auth/public-config")
-    assert "no-cache" not in api_res.headers.get("cache-control", "").lower()
+NGINX_HEADERS = Path(__file__).resolve().parents[2] / "frontend" / "security-headers.conf"
 
 
-def test_pwa_manifest_endpoint(client: TestClient):
-    """Validates /manifest.json returns valid PWA config for Android installation."""
-    res = client.get("/manifest.json")
-    assert res.status_code == 200
-    assert "application/manifest+json" in res.headers.get("content-type", "")
-
-    data = res.json()
-    assert data["name"] == "JobCopilot — Universal Autonomous Job Hunting OS"
-    assert data["short_name"] == "JobCopilot"
-    assert data["display"] == "standalone"
-    assert data["start_url"] == "/?source=pwa"
-    assert data["theme_color"] == "#6366f1"
-    assert data["background_color"] == "#06080d"
-
-    # Verify icons exist and have required Android sizes
-    icons = data.get("icons", [])
-    assert len(icons) >= 4
-    sizes = [ic.get("sizes") for ic in icons]
-    assert "192x192" in sizes
-    assert "512x512" in sizes
-
-    purposes = [ic.get("purpose") for ic in icons]
-    assert "maskable" in purposes
-    assert "any" in purposes
+def _directive(csp: str, name: str) -> str:
+    return next(p.strip() for p in csp.split(";") if p.strip().startswith(name))
 
 
-def test_service_worker_endpoint(client: TestClient):
-    """Validates /sw.js returns Service Worker script with root scope permission."""
-    res = client.get("/sw.js")
-    assert res.status_code == 200
-    assert "javascript" in res.headers.get("content-type", "")
-    assert res.headers.get("service-worker-allowed") == "/"
-    assert "CACHE_NAME" in res.text
-    assert "STATIC_ASSETS" in res.text
-
-
-def test_android_icons_static_assets(client: TestClient):
-    """Validates Android app launcher icons are accessible and binary valid."""
-    for icon_name in ["icon-192.png", "icon-192-maskable.png", "icon-512.png", "icon-512-maskable.png"]:
-        res = client.get(f"/icons/{icon_name}")
-        assert res.status_code == 200
-        assert "image/png" in res.headers.get("content-type", "")
-        assert len(res.content) > 100
-
-    svg_res = client.get("/icons/icon.svg")
-    assert svg_res.status_code == 200
-    assert "<svg" in svg_res.text
-
-
-def test_csp_pwa_security_headers(client: TestClient):
-    """Validates CSP headers permit PWA manifest and worker execution."""
-    res = client.get("/")
-    assert res.status_code == 200
+def test_api_security_headers(client: TestClient):
+    """Every API response carries the CSP and hardening headers."""
+    res = client.get("/api/health")
     csp = res.headers.get("content-security-policy", "")
-    assert "manifest-src 'self'" in csp
     assert "worker-src 'self'" in csp
-    # script-src is 'self' plus the Google Identity Services origin (real Sign in
-    # with Google) — and nothing else.
-    script_directive = [p.strip() for p in csp.split(";") if p.strip().startswith("script-src")][0]
+    # script-src is 'self' plus Google Identity Services (Sign in with Google), and nothing else.
+    script_directive = _directive(csp, "script-src")
     assert script_directive == "script-src 'self' https://accounts.google.com"
-    # Enforce that script-src has dropped 'unsafe-inline' for structural XSS immunity
     assert "'unsafe-inline'" not in script_directive
+    assert res.headers.get("x-frame-options") == "DENY"
+    assert res.headers.get("x-content-type-options") == "nosniff"
     assert "microphone=(self)" in res.headers.get("permissions-policy", "")
+
+
+def test_frontend_csp_matches_api(client: TestClient):
+    """The page CSP served by nginx allows exactly the same scripts as the API's."""
+    conf = NGINX_HEADERS.read_text(encoding="utf-8")
+    match = re.search(r'add_header Content-Security-Policy "([^"]+)" always;', conf)
+    assert match, "frontend/security-headers.conf must set a Content-Security-Policy"
+    page_csp = match.group(1)
+
+    api_csp = client.get("/api/health").headers["content-security-policy"]
+    assert _directive(page_csp, "script-src") == _directive(api_csp, "script-src")
+    assert "frame-ancestors 'none'" in page_csp
+    assert "object-src 'none'" in page_csp

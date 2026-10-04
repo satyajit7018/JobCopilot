@@ -89,29 +89,8 @@ def _():
     """
 
 
-@check("P0-2b frontend HTML templates escape server data")
-def _():
-    """
-    import re, glob
-    os.chdir(os.path.join(os.getcwd(), "..", "frontend", "js"))
-    # Expressions reviewed by hand and confirmed static, numeric, pre-escaped, or constant-mapped.
-    # Anything NOT in this list that lands in an HTML template must go through escapeHTML().
-    REVIEWED_SAFE = set(['app.js|actionsHTML', 'app.js|avatar.bg', 'app.js|avatar.icon', 'app.js|circumference', 'app.js|colKey', 'app.js|company', 'app.js|glowColor', 'app.js|icon', 'app.js|jobId', 'app.js|location', 'app.js|nextBatch', 'app.js|platform', 'app.js|platformBadgeClass', 'app.js|radius', 'app.js|remaining', 'app.js|renderMatchGaugeSVG(matchPct)', 'app.js|renderStageProgressLine(job.status)', 'app.js|strokeColor', 'app.js|strokeDashoffset', 'app.js|title', 'modules/command-palette.js|it.icon', 'modules/command-palette.js|it.label', 'modules/inbound-email.js|badgeClass', 'modules/inbound-email.js|boxId', 'modules/negotiation.js|currVal', "modules/outreach.js|isHit ? 'concept-badge-hit' : 'concept-badge-miss'", "modules/outreach.js|isHit ? '✅' : '⚠️'", "modules/portal-onboarding.js|isConn ? 'connected' : ''", "modules/portal-onboarding.js|isConn ? 'connected' : 'ready'", "modules/portal-onboarding.js|isConn ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255, 255, 255, 0.04)'", "modules/portal-onboarding.js|isConn ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-subtle)'", "modules/portal-onboarding.js|isConn ? 'var(--accent-emerald)' : 'var(--text-muted)'", "modules/portal-onboarding.js|isConn ? '✓ Connected' : 'Ready to Connect'", 'modules/portal-onboarding.js|p.desc', 'modules/portal-onboarding.js|p.icon', 'modules/portal-onboarding.js|p.id', 'modules/portal-onboarding.js|p.name', "modules/saas-admin.js|!state.currentOrgId ? 'active' : ''", "modules/saas-admin.js|isSelected ? 'active' : ''", 'modules/saas-admin.js|roleBadgeClass', "modules/saas-admin.js|u.is_active ? 'Active' : 'Disabled'", "modules/saas-admin.js|u.is_active ? 'var(--accent-emerald)' : 'var(--accent-rose)'"])
-    NUMERIC = re.compile(r"(toFixed|Math\\.|\\.length\\b|Index\\b|\\bidx\\b|\\bi\\b|^\\s*(pct|score|scoreVal|percent|count|total|width|height|delay|n|num|now|textClass)\\s*$)")
-    bad = []
-    for f in ["app.js"] + sorted(glob.glob("modules/*.js")):
-        s = open(f).read()
-        for m in re.finditer(r"`((?:[^`\\\\]|\\\\.)*)`", s, re.S):
-            body = m.group(1)
-            if "<" not in body or "${" not in body:
-                continue
-            for e in re.findall(r"\\$\\{((?:[^{}]|\\{[^{}]*\\})*)\\}", body):
-                e = e.strip()
-                if "escapeHTML(" in e or NUMERIC.search(e) or (f + "|" + e) in REVIEWED_SAFE:
-                    continue
-                bad.append(f + ":" + str(s[:m.start()].count(chr(10)) + 1) + ":" + e)
-    result(not bad, bad)
-    """
+# P0-2b (legacy UI templates escaping server data) was retired with that UI: the React
+# app renders text through JSX, which escapes by default, and never uses innerHTML.
 
 
 @check("P0-3 unauthenticated inbound email webhook")

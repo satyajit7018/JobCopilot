@@ -20,7 +20,7 @@
   --color-line-strong: #d1d3d9;
   --color-ink: #14151a;
   --color-ink-2: #545866;
-  --color-ink-3: #8a8e9b;
+  --color-ink-3: #6b6f7c; /* ≥4.5:1 on surface, canvas and subtle (WCAG AA) */
 
   /* Accent: the only brand color */
   --color-accent: #4f46e5;
@@ -29,9 +29,9 @@
   --color-accent-ink: #3730a3;
 
   /* Status colors carry meaning only */
-  --color-ok: #15803d;
+  --color-ok: #13743a;
   --color-ok-soft: #e8f6ec;
-  --color-warn: #b45309;
+  --color-warn: #a34a07;
   --color-warn-soft: #fef3e2;
   --color-info: #1d4ed8;
   --color-info-soft: #e8effe;
@@ -65,6 +65,8 @@
 @layer base {
   html {
     color-scheme: light;
+    /* Keeps focused fields clear of the mobile tab bar and the floating save bar. */
+    scroll-padding-bottom: 8rem;
   }
   body {
     @apply bg-canvas text-sm text-ink antialiased;

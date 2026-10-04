@@ -1,0 +1,14 @@
+{
+  "name": "jobcopilot-e2e",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Playwright end-to-end suite: the built app against a real, throwaway backend",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.63.0"
+  }
+}

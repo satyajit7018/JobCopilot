@@ -11,8 +11,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, Response
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -250,36 +249,8 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
         ws_manager.disconnect(websocket, user_id=user_id)
 
 
-# Mount Static Frontend & PWA Routes
-frontend_dir = Path(__file__).resolve().parent.parent.parent / "frontend"
-if frontend_dir.exists():
-    app.mount("/css", StaticFiles(directory=str(frontend_dir / "css")), name="css")
-    app.mount("/js", StaticFiles(directory=str(frontend_dir / "js")), name="js")
-    icons_dir = frontend_dir / "icons"
-    if icons_dir.exists():
-        app.mount("/icons", StaticFiles(directory=str(icons_dir)), name="icons")
-
-    @app.get("/manifest.json")
-    async def serve_manifest():
-        manifest_file = frontend_dir / "manifest.json"
-        if manifest_file.exists():
-            return FileResponse(str(manifest_file), media_type="application/manifest+json")
-        return Response(status_code=404)
-
-    @app.get("/sw.js")
-    async def serve_service_worker():
-        sw_file = frontend_dir / "sw.js"
-        if sw_file.exists():
-            return FileResponse(
-                str(sw_file),
-                media_type="application/javascript",
-                headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"}
-            )
-        return Response(status_code=404)
-
-    @app.get("/")
-    async def serve_frontend():
-        return FileResponse(str(frontend_dir / "index.html"))
+# The UI is the React app in ../frontend, served by its own nginx image in production
+# and by Vite (proxying /api here) in development.
 
 # Mount Legal Documentation Routes
 docs_dir = Path(__file__).resolve().parent.parent.parent / "docs"

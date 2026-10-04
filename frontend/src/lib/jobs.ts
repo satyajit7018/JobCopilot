@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
+import { fromChosenSource, useSources } from "./profile";
 
 // Mirrors backend/app/core/models.py ApplicationStatus.
 export type ApplicationStatus =
@@ -105,4 +107,18 @@ export function relativeTime(iso: string | null | undefined, now: Date = new Dat
   const days = Math.round(hours / 24);
   if (days < 30) return `${days}d ago`;
   return then.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/**
+ * Jobs with new matches from turned-off sources removed. Tracked applications
+ * always stay, whatever site they came from.
+ */
+export function useVisibleJobs() {
+  const query = useJobs();
+  const sources = useSources();
+  const visible = useMemo(
+    () => query.data?.filter((j) => !isMatch(j) || fromChosenSource(j.platform, sources)),
+    [query.data, sources],
+  );
+  return { ...query, data: visible, hiddenMatches: (query.data?.length ?? 0) - (visible?.length ?? 0) };
 }

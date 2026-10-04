@@ -1,10 +1,12 @@
 import { useMemo, type ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, Navigate } from "react-router";
 import { ArrowRight, BriefcaseBusiness, CalendarClock, CircleAlert, MailQuestion, PartyPopper } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { Alert, Card, EmptyState, Spinner, buttonClass, cx } from "../components/ui";
 import { useAuth } from "../lib/auth";
-import { isMatch, scorePercent, useJobs, type Job } from "../lib/jobs";
+import { isMatch, scorePercent, useVisibleJobs, type Job } from "../lib/jobs";
+import { needsSetup as profileNeedsSetup, setupLater, useProfile } from "../lib/profile";
+import { SetupReminder } from "./SetupPage";
 
 const FOLLOW_UP_DAYS = 7;
 
@@ -32,7 +34,7 @@ export function buildTodos(jobs: Job[], now: Date = new Date()): Todo[] {
           dot: "bg-info",
           title: `Interview ${at.toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}`,
           detail: `${j.company} · ${j.title}`,
-          to: "/prep",
+          to: `/prep?job=${encodeURIComponent(j.job_id)}`,
           cta: "Prepare",
         });
       }
@@ -64,7 +66,7 @@ export function buildTodos(jobs: Job[], now: Date = new Date()): Todo[] {
       dot: "bg-warn",
       title: quiet.length === 1 ? `Follow up with ${quiet[0].company}` : `Follow up on ${quiet.length} applications`,
       detail: `No reply in ${FOLLOW_UP_DAYS}+ days`,
-      to: "/applications",
+      to: quiet.length === 1 ? `/applications/${encodeURIComponent(quiet[0].job_id)}` : "/applications",
       cta: "View",
     });
   }
@@ -92,7 +94,8 @@ function greeting(now: Date) {
 
 export function HomePage() {
   const { user } = useAuth();
-  const { data, isPending, error } = useJobs();
+  const { data, isPending, error } = useVisibleJobs();
+  const profile = useProfile();
   const now = useMemo(() => new Date(), []);
   const todos = useMemo(() => buildTodos(data ?? [], now), [data, now]);
   const firstName = user?.full_name?.trim().split(/\s+/)[0];
@@ -107,6 +110,10 @@ export function HomePage() {
     ];
   }, [data]);
 
+  // First run: no resume on file yet. Send the user to setup unless they postponed it.
+  const needsSetup = profile.isSuccess && profileNeedsSetup(profile.data);
+  if (needsSetup && !setupLater.get()) return <Navigate to="/setup" replace />;
+
   return (
     <>
       <PageHeader title={firstName ? `${greeting(now)}, ${firstName}` : greeting(now)} />
@@ -115,6 +122,9 @@ export function HomePage() {
           <Spinner />
         ) : error ? (
           <Alert>Couldn't load your dashboard: {error.message}</Alert>
+        ) : needsSetup ? (
+          // Without a resume there's nothing to show yet; an "all caught up" state would mislead.
+          <SetupReminder />
         ) : (
           <>
             <section aria-labelledby="today">

@@ -9,7 +9,6 @@ Validates:
 6. Configuration validation for `pyproject.toml` and `.pre-commit-config.yaml`
 """
 
-import os
 import json
 import yaml
 import tomli
@@ -84,30 +83,15 @@ def test_v1_openapi_schema_endpoint(client):
     assert any(p.startswith("/api/v1") for p in schema["paths"].keys())
 
 
-def test_generated_client_artifacts():
-    """Validates that generate_api_client.py creates valid specification and client files."""
+def test_generated_openapi_artifact():
+    """Validates the OpenAPI specification written by scripts/generate_api_client.py."""
     openapi_file = BASE_DIR / "docs" / "openapi_v1.json"
-    client_js = BASE_DIR / "frontend" / "js" / "api_client.js"
-    client_dts = BASE_DIR / "frontend" / "js" / "api_client.d.ts"
-
     assert openapi_file.exists(), "docs/openapi_v1.json was not generated"
-    assert client_js.exists(), "frontend/js/api_client.js was not generated"
-    assert client_dts.exists(), "frontend/js/api_client.d.ts was not generated"
 
-    # Verify openapi_v1.json content
     with open(openapi_file, "r", encoding="utf-8") as f:
         spec = json.load(f)
         assert spec["info"]["version"] == "1.0.0"
         assert len(spec["paths"]) > 0
-
-    # Verify api_client.js content
-    js_content = client_js.read_text(encoding="utf-8")
-    assert "class JobCopilotClient" in js_content
-    assert "/api/v1" in js_content
-
-    # Verify api_client.d.ts content
-    dts_content = client_dts.read_text(encoding="utf-8")
-    assert "export declare class JobCopilotClient" in dts_content
 
 
 def test_adr_records_integrity():

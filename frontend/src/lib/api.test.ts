@@ -29,6 +29,22 @@ describe("api()", () => {
     expect(authHeader(0)).toBe("Bearer a1");
   });
 
+  it("sends extra headers, and sends FormData as multipart without a JSON content type", async () => {
+    tokens.set({ access_token: "a1" });
+    fetchMock.mockImplementation(async () => json(200, {}));
+    await api("/jobs/apply-async/j1", { method: "POST", headers: { "Idempotency-Key": "k1" } });
+    const sent = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(sent["Idempotency-Key"]).toBe("k1");
+    expect(sent.Authorization).toBe("Bearer a1");
+
+    const form = new FormData();
+    form.append("raw_text", "resume");
+    await api("/upload-resume", { method: "POST", body: form });
+    const init = fetchMock.mock.calls[1][1]!;
+    expect(init.body).toBe(form);
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+  });
+
   it("refreshes once on 401 and retries with the new token", async () => {
     tokens.set({ access_token: "old", refresh_token: "r1" });
     fetchMock

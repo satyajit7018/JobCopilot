@@ -101,19 +101,22 @@ export interface RequestOptions {
   /** Send the bearer token and retry once after refreshing on 401. Default true. */
   auth?: boolean;
   signal?: AbortSignal;
+  headers?: Record<string, string>;
 }
 
 export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, auth = true, signal } = opts;
+  const { method = "GET", body, auth = true, signal, headers: extra } = opts;
 
+  // FormData goes out as multipart; the browser sets the boundary header itself.
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   const send = (token: string | null) => {
-    const headers: Record<string, string> = { Accept: "application/json" };
-    if (body !== undefined) headers["Content-Type"] = "application/json";
+    const headers: Record<string, string> = { Accept: "application/json", ...extra };
+    if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
     if (auth && token) headers.Authorization = `Bearer ${token}`;
     return fetch(`${API_BASE}${path}`, {
       method,
       headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
       signal,
     });
   };

@@ -1,12 +1,21 @@
 // Core components. Every screen is built from these; no one-off styling in pages.
 import { clsx } from "clsx";
-import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
-import { LoaderCircle } from "lucide-react";
+import {
+  forwardRef,
+  useId,
+  useState,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
+import { Check, Copy, LoaderCircle } from "lucide-react";
 import type { Tone } from "../lib/jobs";
 
 export { clsx as cx };
 
-type ButtonVariant = "primary" | "secondary" | "ghost";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg";
 
 const buttonBase =
@@ -15,6 +24,8 @@ const buttonVariants: Record<ButtonVariant, string> = {
   primary: "border-accent bg-accent text-white hover:bg-accent-hover hover:border-accent-hover",
   secondary: "border-line-strong bg-surface text-ink hover:bg-subtle",
   ghost: "border-transparent bg-transparent text-ink-2 hover:bg-subtle hover:text-ink",
+  // Only for the final step of an irreversible action.
+  danger: "border-danger bg-danger text-white hover:opacity-90",
 };
 const buttonSizes: Record<ButtonSize, string> = {
   sm: "h-8 px-2.5 text-sm",
@@ -100,25 +111,160 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field({ l
         id={inputId}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
-        className={clsx(
-          "h-10 w-full rounded-md border bg-surface px-3 text-sm text-ink placeholder:text-ink-3",
-          "focus:border-accent focus:outline-none focus:ring-3 focus:ring-accent-soft",
-          error ? "border-danger" : "border-line-strong",
-        )}
+        className={clsx(controlClass, "h-10", error ? "border-danger" : "border-line-strong")}
         {...rest}
       />
-      {error ? (
-        <p id={`${inputId}-error`} className="mt-1.5 text-xs text-danger">
-          {error}
-        </p>
-      ) : hint ? (
-        <p id={`${inputId}-hint`} className="mt-1.5 text-xs text-ink-3">
-          {hint}
-        </p>
-      ) : null}
+      <FieldNote id={inputId} hint={hint} error={error} />
     </div>
   );
 });
+
+const controlClass =
+  "w-full rounded-md border bg-surface px-3 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-3 focus:ring-accent-soft";
+
+function FieldNote({ id, hint, error }: { id?: string; hint?: string; error?: string | null }) {
+  if (error)
+    return (
+      <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
+        {error}
+      </p>
+    );
+  if (hint)
+    return (
+      <p id={`${id}-hint`} className="mt-1.5 text-xs text-ink-3">
+        {hint}
+      </p>
+    );
+  return null;
+}
+
+interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+  label: string;
+  hint?: string;
+  options: { value: string | number; label: string }[];
+}
+
+export function Select({ label, hint, options, id, className, ...rest }: SelectProps) {
+  const auto = useId();
+  const selectId = id ?? rest.name ?? auto;
+  return (
+    <div className={className}>
+      <label htmlFor={selectId} className="mb-1.5 block font-medium">
+        {label}
+      </label>
+      <select
+        id={selectId}
+        aria-describedby={hint ? `${selectId}-hint` : undefined}
+        className={clsx(controlClass, "h-10 border-line-strong")}
+        {...rest}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <FieldNote id={selectId} hint={hint} />
+    </div>
+  );
+}
+
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label: string;
+  hint?: string;
+}
+
+export function Textarea({ label, hint, id, className, rows = 4, ...rest }: TextareaProps) {
+  const auto = useId();
+  const areaId = id ?? rest.name ?? auto;
+  return (
+    <div className={className}>
+      <label htmlFor={areaId} className="mb-1.5 block font-medium">
+        {label}
+      </label>
+      <textarea
+        id={areaId}
+        rows={rows}
+        aria-describedby={hint ? `${areaId}-hint` : undefined}
+        className={clsx(controlClass, "border-line-strong py-2 leading-relaxed")}
+        {...rest}
+      />
+      <FieldNote id={areaId} hint={hint} />
+    </div>
+  );
+}
+
+/** Single-choice chips (a styled radio group). */
+export function ChoiceChips<T extends string>({
+  label,
+  hint,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  const name = useId();
+  return (
+    <fieldset>
+      <legend className="mb-1.5 font-medium">{label}</legend>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => {
+          const on = o.value === value;
+          return (
+            <label
+              key={o.value}
+              className={clsx(
+                "inline-flex h-8 cursor-pointer items-center gap-1 rounded-full border px-3 text-sm font-medium has-focus-visible:ring-3 has-focus-visible:ring-accent-soft",
+                on ? "border-accent bg-accent-soft text-accent-ink" : "border-line-strong bg-surface text-ink-2 hover:bg-subtle",
+              )}
+            >
+              <input type="radio" name={name} value={o.value} checked={on} onChange={() => onChange(o.value)} className="sr-only" />
+              {on && <Check className="size-3.5" aria-hidden />}
+              {o.label}
+            </label>
+          );
+        })}
+      </div>
+      {hint && <p className="mt-1.5 text-xs text-ink-3">{hint}</p>}
+    </fieldset>
+  );
+}
+
+/** A checkbox with a title and a supporting line, used for on/off settings. */
+export function CheckRow({
+  checked,
+  onChange,
+  title,
+  detail,
+  disabled,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  title: string;
+  detail?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <label
+      className={clsx(
+        "flex cursor-pointer items-start gap-3 rounded-md border px-3.5 py-3 has-focus-visible:ring-3 has-focus-visible:ring-accent-soft",
+        checked ? "border-accent bg-accent-soft/50" : "border-line bg-surface hover:bg-subtle",
+        disabled && "pointer-events-none opacity-60",
+      )}
+    >
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} disabled={disabled} className="mt-0.5 size-4 flex-none accent-accent" />
+      <span>
+        <span className="block font-medium">{title}</span>
+        {detail && <span className="block text-ink-2">{detail}</span>}
+      </span>
+    </label>
+  );
+}
 
 export function Spinner({ label = "Loading" }: { label?: string }) {
   return (
@@ -175,5 +321,25 @@ export function CompanyMark({ name, size = "md" }: { name: string; size?: "sm" |
     >
       {name.trim()[0]?.toUpperCase() ?? "?"}
     </div>
+  );
+}
+
+/** Copies text to the clipboard and confirms for two seconds. */
+export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard blocked: the text is still selectable on the page.
+    }
+  };
+  return (
+    <Button size="sm" variant="ghost" onClick={copy}>
+      {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+      <span aria-live="polite">{copied ? "Copied" : label}</span>
+    </Button>
   );
 }

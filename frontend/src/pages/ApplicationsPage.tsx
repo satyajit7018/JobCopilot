@@ -1,6 +1,7 @@
 import { Columns3 } from "lucide-react";
 import { Link } from "react-router";
 import { PageHeader } from "../components/AppShell";
+import { HeldQuestions } from "../components/HeldQuestions";
 import { Alert, Badge, Card, EmptyState, Spinner, buttonClass } from "../components/ui";
 import { BOARD_COLUMNS, STATUS_META, relativeTime, useJobs, type Job } from "../lib/jobs";
 
@@ -12,6 +13,7 @@ export function ApplicationsPage() {
     <>
       <PageHeader title="Applications" subtitle={data ? `${tracked.length} tracked` : undefined} />
       <div className="px-4 py-5 md:px-7 md:py-6">
+        <HeldQuestions />
         {isPending ? (
           <Spinner label="Loading applications" />
         ) : error ? (
@@ -61,8 +63,13 @@ function AppCard({ job }: { job: Job }) {
   const interview = job.status === "INTERVIEW" && job.interview_date ? new Date(job.interview_date) : null;
   const when = relativeTime(job.applied_at ?? job.created_at);
   return (
-    <Card className="p-3">
-      <h3 className="text-sm font-semibold">{job.title}</h3>
+    <Card className="relative p-3 hover:border-line-strong">
+      <h3 className="text-sm font-semibold">
+        {/* The link's ::after covers the card, so the whole card is clickable. */}
+        <Link to={`/applications/${encodeURIComponent(job.job_id)}`} className="after:absolute after:inset-0 after:rounded-lg">
+          {job.title}
+        </Link>
+      </h3>
       <p className="text-xs text-ink-2">
         {job.company}
         {when && <span className="text-ink-3"> · {when}</span>}

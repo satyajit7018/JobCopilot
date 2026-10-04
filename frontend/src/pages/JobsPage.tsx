@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { BriefcaseBusiness, Clock, ExternalLink, MapPin, Search, Wallet } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { Alert, Button, Card, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
-import { isMatch, matchSummary, relativeTime, scorePercent, scoreTone, useJobs, type Job } from "../lib/jobs";
+import { Link } from "react-router";
+import { isMatch, matchSummary, relativeTime, scorePercent, scoreTone, useVisibleJobs, type Job } from "../lib/jobs";
 
 type Sort = "match" | "newest";
 
@@ -11,7 +12,7 @@ function postedAt(job: Job) {
 }
 
 export function JobsPage() {
-  const { data, isPending, error, refetch } = useJobs();
+  const { data, isPending, error, refetch, hiddenMatches: hidden } = useVisibleJobs();
   const [sort, setSort] = useState<Sort>("match");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [query, setQuery] = useState("");
@@ -34,7 +35,24 @@ export function JobsPage() {
 
   return (
     <>
-      <PageHeader title="Jobs" subtitle={data ? `${matches.length} matches` : undefined} />
+      <PageHeader
+        title="Jobs"
+        subtitle={
+          data ? (
+            <>
+              {matches.length} matches
+              {hidden > 0 && (
+                <>
+                  {" · "}
+                  <Link to="/profile" className="text-accent hover:underline">
+                    {hidden} hidden by your job sources
+                  </Link>
+                </>
+              )}
+            </>
+          ) : undefined
+        }
+      />
       <div className="mx-auto max-w-5xl px-4 py-5 md:px-7 md:py-6">
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Chip on={sort === "match"} onClick={() => setSort("match")}>
@@ -119,7 +137,11 @@ function JobRow({ job }: { job: Job }) {
       <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
         <CompanyMark name={job.company} />
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">{job.title}</h2>
+          <h2 className="text-sm font-semibold">
+            <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className="hover:text-accent hover:underline">
+              {job.title}
+            </Link>
+          </h2>
           <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-ink-2">
             <span>{job.company}</span>
             {job.location && (
@@ -149,11 +171,14 @@ function JobRow({ job }: { job: Job }) {
           <span className={cx("block text-lg leading-none font-bold", toneText[tone])}>{pct}</span>
           <span className="text-xs tracking-wide text-ink-3 uppercase">match</span>
         </div>
-        <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass(pct >= 80 ? "primary" : "secondary")}>
-          View posting
-          <ExternalLink className="size-3.5" aria-hidden />
-          <span className="sr-only">(opens in a new tab)</span>
+        <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("ghost", "md", "max-md:hidden")} title="View posting">
+          <ExternalLink className="size-4" aria-hidden />
+          <span className="sr-only">View posting (opens in a new tab)</span>
         </a>
+        <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className={buttonClass(pct >= 80 ? "primary" : "secondary")}>
+          Review
+          <span className="sr-only"> {job.title} at {job.company}</span>
+        </Link>
       </div>
     </li>
   );

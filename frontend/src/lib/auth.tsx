@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, onUnauthorized, tokens, type TokenPair } from "./api";
+import { api, ApiError, onUnauthorized, tokens, type TokenPair } from "./api";
 
 export interface User {
   user_id: string;
@@ -9,6 +9,7 @@ export interface User {
   role: string;
   email_verified: boolean;
   created_at: string;
+  mfa_enabled?: boolean;
 }
 
 interface TokenResponse extends TokenPair {
@@ -28,7 +29,29 @@ export interface PublicConfig {
 /** A sign-in step either finishes or asks for a second factor. */
 export type SignInResult = { done: true } | { done: false; mfaToken: string };
 
-type Status = "loading" | "authenticated" | "anonymous";
+/** "unreachable": a session exists but the server couldn't confirm it (offline, 5xx). */
+type Status = "loading" | "authenticated" | "anonymous" | "unreachable";
+
+/**
+ * Confirms a stored session. Only an auth rejection ends it; network errors and
+ * 5xx are retried, then reported as "unreachable" so the user isn't signed out
+ * by a server restart or a dropped connection.
+ */
+export async function confirmSession(
+  fetchMe: () => Promise<void>,
+  { attempts = 3, delayMs = 600 }: { attempts?: number; delayMs?: number } = {},
+): Promise<"ok" | "rejected" | "unreachable"> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await fetchMe();
+      return "ok";
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) return "rejected";
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
+    }
+  }
+  return "unreachable";
+}
 
 interface AuthContextValue {
   status: Status;
@@ -38,6 +61,10 @@ interface AuthContextValue {
   google(payload: { id_token: string } | { email: string; full_name?: string }): Promise<SignInResult>;
   completeMfa(mfaToken: string, code: string): Promise<void>;
   logout(): Promise<void>;
+  /** Try confirming the session again after "unreachable". */
+  retry(): void;
+  /** Re-read the signed-in user (after changing 2FA, for example). */
+  refreshUser(): Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -60,11 +87,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus("authenticated");
   }, []);
 
+  const bootstrap = useCallback(async () => {
+    if (!tokens.access) return;
+    setStatus("loading");
+    const result = await confirmSession(loadMe);
+    if (result === "rejected") signOutLocally();
+    else if (result === "unreachable") setStatus("unreachable");
+  }, [loadMe, signOutLocally]);
+
   useEffect(() => {
     onUnauthorized(signOutLocally);
-    if (tokens.access) loadMe().catch(signOutLocally);
+    void bootstrap();
     return () => onUnauthorized(null);
-  }, [loadMe, signOutLocally]);
+  }, [bootstrap, signOutLocally]);
 
   const finish = useCallback(
     async (res: TokenResponse): Promise<SignInResult> => {
@@ -106,8 +141,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await api("/auth/logout", { method: "POST" }).catch(() => undefined);
         signOutLocally();
       },
+      retry: () => void bootstrap(),
+      refreshUser: loadMe,
     }),
-    [status, user, finish, signOutLocally],
+    [status, user, finish, signOutLocally, bootstrap, loadMe],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

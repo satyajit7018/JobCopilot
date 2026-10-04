@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 import { BriefcaseBusiness, Columns3, House, LogOut, Mic, Settings, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
 import { initials, useAuth } from "../lib/auth";
-import { isMatch, useJobs } from "../lib/jobs";
+import { isMatch, useVisibleJobs } from "../lib/jobs";
 import { cx } from "./ui";
 
 interface NavItem {
@@ -20,7 +20,7 @@ const NAV: NavItem[] = [
   { to: "/profile", label: "Profile", icon: UserRound, mobile: false },
 ];
 
-function Logo() {
+export function Logo() {
   return (
     <Link to="/" className="flex items-center gap-2 text-base font-bold">
       <img src="/favicon.svg" alt="" className="size-7" />
@@ -30,7 +30,7 @@ function Logo() {
 }
 
 export function AppShell() {
-  const { data: jobs } = useJobs();
+  const { data: jobs } = useVisibleJobs();
   const newMatches = jobs?.filter(isMatch).length ?? 0;
 
   return (
