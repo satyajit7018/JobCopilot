@@ -67,6 +67,39 @@ jobs:
         run: |
           PYTHONPATH=backend python backend/stress_test_30_deep_loops.py
 
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit Tests
+        run: npm test
+
+      - name: Production Build
+        run: npx vite build
+
+      # The production compose file builds this image, so prove it builds.
+      - name: Docker Image Build
+        run: docker build -t jobcopilot-frontend:ci .
+
   e2e:
     runs-on: ubuntu-latest
 
@@ -85,25 +118,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
-          cache-dependency-path: frontend/e2e/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            frontend/e2e/package-lock.json
 
-      - name: Build Frontend Bundle & Verify Freshness
+      # The suite builds the app and serves it with `vite preview`, so it needs the app's dependencies too.
+      - name: Install App Dependencies
         working-directory: frontend
-        run: |
-          npm ci
-          npm run build
-          # The bundle bytes can differ across OSes (esbuild), so we only enforce
-          # the deterministic source-hash manifest: if a source was edited without
-          # rebuilding, the rebuilt manifest won't match the committed one.
-          if ! git diff --exit-code -- js/build-manifest.json; then
-            echo "::error::Frontend bundle is stale. Run 'cd frontend && npm run build' and commit the result."
-            exit 1
-          fi
+        run: npm ci
 
       - name: Install E2E Dependencies
         working-directory: frontend/e2e
@@ -113,7 +140,7 @@ jobs:
         working-directory: frontend/e2e
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright E2E Suite (P0-1)
+      - name: Run Playwright E2E Suite
         working-directory: frontend/e2e
         run: npx playwright test
 

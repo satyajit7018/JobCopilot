@@ -182,6 +182,7 @@ class UserResponse(BaseModel):
     role: str
     email_verified: bool = False
     created_at: str
+    mfa_enabled: bool = False
 
 
 class VerifyEmailRequest(BaseModel):

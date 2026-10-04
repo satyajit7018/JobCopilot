@@ -1,32 +1,20 @@
 """
 JobCopilot - Phase P1 Epic D Test Suite
-Tests Frontend & UX Maturity:
-1. Strict CSP compliance & zero inline event handlers in index.html.
-2. WCAG 2.1 AA accessibility attributes on modals (role="dialog", aria-modal, aria-labelledby).
-3. Presence and structure of multi-tenant workspace switcher, impersonation banner, and offline alerts.
-4. Enterprise Admin Portal view, telemetry KPI structure, and data tables.
-5. GDPR self-service data export & erasure confirmation controls.
-6. PWA service worker v1.1 compliance, background sync, and push notification handlers.
-7. End-to-end API integration for all Epic C & D frontend endpoints.
+End-to-end API integration for the endpoints behind the admin, organization,
+billing and GDPR screens. (Checks on the legacy UI's HTML and service worker were
+removed with that UI; the React app is covered by frontend/e2e.)
 """
 
-import re
-import json
 import uuid
-import pytest
-from pathlib import Path
-from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
 from datetime import timedelta
 
 from app.main import app
 from app.core.database import db
-from app.core.models import User, UserRole, CandidateProfile, JobListing, ApplicationStatus
+from app.core.models import User, UserRole
 from app.api.auth import hash_password, create_jwt_token
 
 client = TestClient(app)
-
-FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
 
 
 def _create_test_user(email: str, role: UserRole = UserRole.FREE, full_name: str = "Test User") -> User:
@@ -58,140 +46,6 @@ def _auth_headers_for(user: User) -> dict:
         expires_delta=timedelta(minutes=60)
     )
     return {"Authorization": f"Bearer {token}"}
-
-
-def test_html_zero_inline_event_handlers():
-    """Verifies that index.html contains ZERO inline event handlers (onclick, onchange, etc.)."""
-    html_path = FRONTEND_DIR / "index.html"
-    assert html_path.exists(), "frontend/index.html must exist"
-
-    html_content = html_path.read_text(encoding="utf-8")
-    soup = BeautifulSoup(html_content, "html.parser")
-
-    inline_event_attrs = [
-        "onclick", "onchange", "onsubmit", "oninput", "onkeydown",
-        "onkeyup", "onkeypress", "onload", "onerror", "onmouseover"
-    ]
-
-    violating_elements = []
-    for tag in soup.find_all(True):
-        for attr in inline_event_attrs:
-            if tag.has_attr(attr):
-                violating_elements.append((tag.name, attr, tag.get(attr)))
-
-    assert len(violating_elements) == 0, f"Found inline event handlers violating strict CSP: {violating_elements}"
-
-
-def test_html_wcag_aria_modal_dialogs():
-    """Verifies that all interactive modals in index.html have WCAG 2.1 AA accessible attributes."""
-    html_path = FRONTEND_DIR / "index.html"
-    soup = BeautifulSoup(html_path.read_text(encoding="utf-8"), "html.parser")
-
-    expected_modals = [
-        "modal-held-applications",
-        "modal-log-call",
-        "hitl-modal",
-        "outreach-modal",
-        "interview-invite-modal",
-        "glass-booth-modal",
-        "modal-install-app",
-        "modal-create-org",
-        "modal-manage-org",
-        "modal-proration-preview",
-        "modal-gdpr-delete"
-    ]
-
-    for modal_id in expected_modals:
-        modal_el = soup.find(id=modal_id)
-        assert modal_el is not None, f"Expected modal element #{modal_id} not found in index.html"
-        assert modal_el.get("role") == "dialog", f"Modal #{modal_id} must have role='dialog'"
-        assert modal_el.get("aria-modal") == "true", f"Modal #{modal_id} must have aria-modal='true'"
-        assert modal_el.get("aria-labelledby") or modal_el.get("aria-label"), f"Modal #{modal_id} must have aria-labelledby or aria-label"
-
-
-def test_html_accessibility_announcer_and_banners():
-    """Verifies presence of screen-reader announcer, impersonation banner, and offline banner."""
-    html_path = FRONTEND_DIR / "index.html"
-    soup = BeautifulSoup(html_path.read_text(encoding="utf-8"), "html.parser")
-
-    # Screen-reader live region
-    sr_announcer = soup.find(id="sr-announcer")
-    assert sr_announcer is not None, "Missing #sr-announcer screen reader region"
-    assert sr_announcer.get("aria-live") == "polite"
-    assert "sr-only" in sr_announcer.get("class", [])
-
-    # Impersonation Alert Banner
-    imp_banner = soup.find(id="impersonation-banner")
-    assert imp_banner is not None, "Missing #impersonation-banner"
-    assert imp_banner.get("role") == "alert"
-
-    # Offline Banner
-    offline_banner = soup.find(id="offline-banner")
-    assert offline_banner is not None, "Missing #offline-banner"
-    assert offline_banner.get("role") == "status"
-
-    # Workspace Switcher
-    ws_container = soup.find(id="workspace-switcher-container")
-    assert ws_container is not None, "Missing #workspace-switcher-container"
-    ws_btn = soup.find(id="btn-workspace-switcher")
-    assert ws_btn is not None
-    assert ws_btn.get("aria-haspopup") == "true"
-
-
-def test_html_admin_portal_and_gdpr_sections():
-    """Verifies presence and accessibility of the Admin Portal view and GDPR controls."""
-    html_path = FRONTEND_DIR / "index.html"
-    soup = BeautifulSoup(html_path.read_text(encoding="utf-8"), "html.parser")
-
-    # Admin Portal section
-    admin_view = soup.find(id="view-admin")
-    assert admin_view is not None, "Missing #view-admin view panel"
-    assert admin_view.find(id="kpi-total-users") is not None
-    assert admin_view.find(id="kpi-total-jobs") is not None
-    assert admin_view.find(id="kpi-total-applications") is not None
-    assert admin_view.find(id="kpi-active-subs") is not None
-    assert admin_view.find(id="kpi-total-orgs") is not None
-
-    # Admin Sub-panels and Tables
-    assert admin_view.find(id="admin-users-tbody") is not None
-    assert admin_view.find(id="admin-orgs-tbody") is not None
-    assert admin_view.find(id="admin-logs-tbody") is not None
-
-    # Settings: GDPR Controls & Billing
-    settings_view = soup.find(id="view-settings")
-    assert settings_view is not None
-    assert settings_view.find(id="settings-billing-tier") is not None
-    assert settings_view.find(id="offline-queue-count") is not None
-
-
-def test_css_wcag_focus_visible_and_tokens():
-    """Verifies that style.css contains WCAG focus-visible styling and required design tokens."""
-    css_path = FRONTEND_DIR / "css" / "style.css"
-    assert css_path.exists()
-    css_content = css_path.read_text(encoding="utf-8")
-
-    assert ":focus-visible" in css_content, "style.css must define :focus-visible rules"
-    assert ".sr-only" in css_content, "style.css must define .sr-only utility"
-    assert ".impersonation-alert-banner" in css_content
-    assert ".offline-alert-banner" in css_content
-    assert ".workspace-dropdown" in css_content
-    assert ".admin-kpi-grid" in css_content
-
-
-def test_service_worker_v1_1_and_sync_handlers():
-    """Verifies the Service Worker is network-first for app code and keeps its handlers."""
-    sw_path = FRONTEND_DIR / "sw.js"
-    assert sw_path.exists()
-    sw_content = sw_path.read_text(encoding="utf-8")
-
-    assert "jobcopilot-pwa-v1.2" in sw_content, "sw.js cache version must be current"
-    # App code must NOT be precached cache-first (that caused stale app.js); the
-    # shell precache list no longer contains it and the strategy is network-first.
-    assert "'/js/app.js'" not in sw_content, "app.js must not be precached cache-first"
-    assert "NETWORK-FIRST" in sw_content
-    assert "sync" in sw_content, "sw.js must contain background sync handler"
-    assert "push" in sw_content, "sw.js must contain push notification handler"
-    assert "notificationclick" in sw_content
 
 
 def test_frontend_endpoints_integration():

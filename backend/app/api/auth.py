@@ -254,6 +254,16 @@ def get_token_jti(auth: Optional[HTTPAuthorizationCredentials]) -> Optional[str]
     return None
 
 
+def get_token_sid(auth: Optional[HTTPAuthorizationCredentials]) -> Optional[str]:
+    """Best-effort extraction of the 'sid' (session id) claim; None if missing/invalid."""
+    if auth and auth.credentials:
+        try:
+            return decode_jwt_token(auth.credentials).get("sid")
+        except Exception:
+            return None
+    return None
+
+
 def issue_token_pair(user: User, role_str: str, sid: str) -> Tuple[str, str]:
     """Issues an access+refresh pair bound to one session (sid).
 
@@ -791,7 +801,8 @@ async def get_my_profile(current_user: User = Depends(get_current_user)):
         full_name=current_user.full_name,
         role=role_str,
         email_verified=current_user.email_verified,
-        created_at=current_user.created_at
+        created_at=current_user.created_at,
+        mfa_enabled=bool((db.get_mfa_credentials(current_user.user_id) or {}).get("is_enabled")),
     )
 
 
@@ -801,6 +812,11 @@ async def get_my_profile(current_user: User = Depends(get_current_user)):
 @router.post("/mfa/setup", response_model=MFASetupResponse)
 async def setup_mfa(request: Request, current_user: User = Depends(get_current_user)):
     """Initiates TOTP enrollment, generates secret, QR provisioning URI, and backup recovery codes."""
+    # Re-running setup would replace an active secret with a pending one, which silently
+    # turns two-factor off. Disable it first (that endpoint re-verifies the user).
+    existing = db.get_mfa_credentials(current_user.user_id)
+    if existing and existing.get("is_enabled"):
+        raise HTTPException(status_code=409, detail="Two-factor authentication is already on. Turn it off first to set it up again.")
     secret = mfa_engine.generate_secret()
     provisioning_uri = mfa_engine.generate_provisioning_uri(secret, current_user.email)
     plain_backup_codes, hashed_storage = mfa_engine.generate_backup_codes(8)
@@ -977,7 +993,8 @@ async def list_active_sessions(
     """Lists all active device sessions for the authenticated candidate."""
     current_jti = get_token_jti(auth)
 
-    sessions = session_manager.list_active_sessions(current_user.user_id, current_jti=current_jti)
+    sessions = session_manager.list_active_sessions(current_user.user_id, current_jti=current_jti,
+                                                    current_sid=get_token_sid(auth))
     return SessionListResponse(sessions=sessions, total=len(sessions))
 
 
@@ -1011,7 +1028,8 @@ async def revoke_all_other_sessions(
     """Revokes all active sessions for the user except the current one."""
     current_jti = get_token_jti(auth)
 
-    revoked_count = session_manager.revoke_all_sessions(current_user.user_id, except_jti=current_jti)
+    revoked_count = session_manager.revoke_all_sessions(current_user.user_id, except_jti=current_jti,
+                                                        except_sid=get_token_sid(auth))
     security_logger.log_event(
         "auth.session.revoked_all",
         user_id=current_user.user_id,

@@ -43,3 +43,7 @@ tmp/
 .coverage
 .coverage.*
 *.db
+
+# Playwright output
+frontend/e2e/test-results/
+frontend/e2e/playwright-report/

@@ -18,8 +18,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 from app.core.resume_parser import ResumeParser
 from app.core.compensation import CompensationConverter
 from app.core.resume_compiler import ResumeCompiler
-from app.core.models import CandidateProfile, RecruiterPreferences
-from app.bot.adapters.greenhouse import GreenhouseAdapter
 
 
 def test_indian_and_international_phone_parsing():
@@ -66,25 +64,6 @@ def test_compensation_periodicity_and_multipliers():
     # 5. LPA range
     lpa_range = CompensationConverter.parse_to_base_inr("28 - 35 LPA")
     assert lpa_range == 3150000.0  # midpoint 31.5 LPA
-
-
-def test_frontend_switch_tab_view_mapping():
-    """Verifies that the frontend switchTab logic normalizes alias tabs properly."""
-    app_js_path = Path(__file__).parent.parent.parent / "frontend" / "js" / "app.js"
-    content = app_js_path.read_text(encoding="utf-8")
-
-    # Verify normalization aliases exist in app.js
-    assert "if (viewId === 'studio' || viewId === 'interview-studio') viewId = 'interview';" in content
-    assert "if (viewId === 'backups') viewId = 'settings';" in content
-    assert "if (viewId === 'accelerator') viewId = 'interview';" in content
-    assert "if (viewId === 'billing') viewId = 'settings';" in content
-
-    # Verify index.html does not contain dead view-interview-studio section ID
-    index_html_path = Path(__file__).parent.parent.parent / "frontend" / "index.html"
-    index_content = index_html_path.read_text(encoding="utf-8")
-    assert 'id="view-interview"' in index_content
-    assert 'id="view-interview-studio"' not in index_content
-    assert 'data-view="interview"' in index_content
 
 
 @pytest.mark.asyncio

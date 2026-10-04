@@ -84,13 +84,19 @@ class SessionManager:
     def list_active_sessions(
         cls,
         user_id: str,
-        current_jti: Optional[str] = None
+        current_jti: Optional[str] = None,
+        current_sid: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Lists active sessions for a user, highlighting the current session."""
+        """Lists active sessions for a user, highlighting the current session.
+
+        The stored token_jti belongs to the token issued at login, so after a refresh
+        only the session id (the token's sid claim) still identifies the caller.
+        """
         sessions = db.list_user_sessions(user_id, active_only=True)
         results = []
         for s in sessions:
-            is_current = bool(current_jti and s.get("token_jti") == current_jti)
+            is_current = bool((current_sid and s["session_id"] == current_sid)
+                              or (current_jti and s.get("token_jti") == current_jti))
             results.append({
                 "session_id": s["session_id"],
                 "device_name": s.get("device_name", "Unknown Device"),
@@ -119,9 +125,11 @@ class SessionManager:
         return db.revoke_session(session_id, user_id)
 
     @classmethod
-    def revoke_all_sessions(cls, user_id: str, except_jti: Optional[str] = None) -> int:
+    def revoke_all_sessions(cls, user_id: str, except_jti: Optional[str] = None,
+                            except_sid: Optional[str] = None) -> int:
         """
-        Revokes all active sessions for a user (optionally preserving the current active session).
+        Revokes all active sessions for a user (optionally preserving the current active session,
+        matched by session id, or by token jti for tokens issued without a sid).
         """
         active_sessions = db.list_user_sessions(user_id, active_only=True)
         revoked_count = 0
@@ -129,7 +137,7 @@ class SessionManager:
 
         for s in active_sessions:
             jti = s.get("token_jti")
-            if except_jti and jti == except_jti:
+            if (except_sid and s["session_id"] == except_sid) or (except_jti and jti == except_jti):
                 continue
             if jti:
                 db.revoke_token(jti, user_id, far_future_exp)

@@ -29,7 +29,7 @@ cd JobCopilot
 docker compose -f docker-compose.production.yml up -d
 ```
 
-👉 Open **[http://localhost](http://localhost)** (or `http://localhost:8000`) in your browser.
+👉 Open **[http://localhost](http://localhost)** in your browser. (The API itself is at `http://localhost:8000/api`.)
 
 ---
 
@@ -47,9 +47,12 @@ pip install -r backend/requirements.txt
 
 # 3. Start the FastAPI development server
 python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port 8000
+
+# 4. In a second terminal, start the web app (Node 22+); it proxies /api to :8000
+cd frontend && npm install && npm run dev
 ```
 
-👉 Open **[http://localhost:8000](http://localhost:8000)** in your browser.
+👉 Open **[http://localhost:5173](http://localhost:5173)** in your browser.
 
 ---
 
@@ -172,12 +175,12 @@ A full security audit was applied and verified; all 21 audited exploits are clos
 - **Stored XSS closed**: toasts and terminal logs build DOM nodes via `textContent`; remaining server/LLM-sourced strings are escaped.
 - **Idempotent, honest apply flow**: async apply runs the real bot and reports its true result; a unique `apply_ledger(user_id, job_id)` index + atomic compare-and-set (`transition_ledger_status`) makes concurrent/retried applies race-free; nothing is marked `SUBMITTED` without a detected confirmation, and `LIVE` mode requires explicit consent.
 - **Locked-down ops endpoints**: `/metrics` requires `METRICS_TOKEN` (404 in production without one) and `/health` no longer leaks exception text; org invites cannot escalate to `OWNER`.
-- **Regression harness**: `backend/tests/security/verify_audit_fixes.py` re-runs all 21 exploits and exits non-zero if any reopen.
+- **Regression harness**: `backend/tests/security/verify_audit_fixes.py` re-runs 20 of the exploits (the legacy-UI template check retired with that UI) and exits non-zero if any reopen.
 
 ### Engineering Rigor
 - **Single DB contract**: `db_adapter.py` defines a `DatabaseAdapter` ABC; the SQLite (`database.py`) and PostgreSQL (`postgres_adapter.py`) implementations are held at parity by `tests/test_db_adapter_parity.py`.
 - **Linear Alembic migrations** (`001 → 005`) with a dedicated CI job that spins up real Postgres 16, asserts a single head, and runs an upgrade + downgrade round-trip.
-- **Concatenate-then-minify frontend build** (`frontend/build.js`, esbuild): content-hashed bundle + a source-hash freshness manifest that CI enforces, so a stale bundle fails the build.
+- **Typed React frontend** (`frontend/`, Vite + TypeScript + Tailwind): design tokens in one file, typecheck + unit tests + production build + Docker image build in CI, and nginx serving it with a strict CSP that a backend test keeps in step with the API's.
 - **Demo Mode boundary**: sample-data seeding is gated out of production; the UI shows a Demo Mode banner only when `/auth/public-config` reports `demo_enabled`.
 
 ---
@@ -187,26 +190,26 @@ A full security audit was applied and verified; all 21 audited exploits are clos
 > The suite targets **Python 3.11**. Set `PYTHONPATH=backend` so `app` imports resolve.
 
 ```bash
-# Full automated suite (274 tests) in parallel
+# Full automated suite (265 tests) in parallel
 PYTHONPATH=backend pytest backend/tests -n auto -q
 
-# Re-run all 21 security-audit exploits (must end with "0 open issue(s)")
+# Re-run the security-audit exploits (must end with "0 open issue(s)")
 cd backend && PYTHONPATH=. python tests/security/verify_audit_fixes.py
 
 # Static analysis gate (matches CI)
 bandit -r backend/app -ll
 
-# Rebuild the frontend bundle after any JS edit (CI fails on a stale bundle)
-cd frontend && npm ci && npm run build
+# Frontend typecheck + unit tests
+cd frontend && npm ci && npm run typecheck && npm test
 
-# Frontend end-to-end + accessibility (axe-core, fails on serious/critical WCAG issues)
+# Frontend end-to-end + accessibility against the production build (axe-core, fails on serious/critical WCAG issues)
 cd frontend/e2e && npm ci && npx playwright install --with-deps chromium && npx playwright test
 
 # 30-loop deep subsystem stress audit
 backend/venv/bin/python backend/stress_test_30_deep_loops.py
 ```
 
-**CI (`.github/workflows/ci.yml`)** runs three jobs on every push/PR: `test` (pytest coverage gate + Bandit/Semgrep SAST), `e2e` (bundle-freshness check + Playwright + axe-core a11y), and `migrations` (Postgres 16 upgrade/downgrade round-trip).
+**CI (`.github/workflows/ci.yml`)** runs four jobs on every push/PR: `test` (pytest coverage gate + Bandit/Semgrep SAST), `frontend` (typecheck, unit tests, production build, Docker image), `e2e` (Playwright + axe-core a11y against the built app and a real backend), and `migrations` (Postgres 16 upgrade/downgrade round-trip).
 
 ---
 

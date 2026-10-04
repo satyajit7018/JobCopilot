@@ -1,0 +1,458 @@
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useParams } from "react-router";
+import { ArrowLeft, Check, CircleAlert, ExternalLink, FileText, MapPin, SearchX, ShieldCheck, Wallet } from "lucide-react";
+import { PageHeader } from "../components/AppShell";
+import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
+import {
+  newKey,
+  outcome,
+  taskPhase,
+  useApplyTask,
+  useLiveConsent,
+  useSetLiveConsent,
+  useStartApply,
+  useTailor,
+  type SubmissionMode,
+} from "../lib/apply";
+import { STATUS_META, isMatch, scorePercent, scoreTone, useJobs, type Job } from "../lib/jobs";
+import { noticeLabel, useProfile } from "../lib/profile";
+
+const DESCRIPTION_PREVIEW = 700;
+
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  const id = `sec-${title.toLowerCase().replace(/\W+/g, "-")}`;
+  return (
+    <section aria-labelledby={id}>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 id={id} className="text-base font-semibold">
+          {title}
+        </h2>
+        {action}
+      </div>
+      <Card className="p-4 sm:p-5">{children}</Card>
+    </section>
+  );
+}
+
+// The running task survives navigation within the tab, so leaving and coming back keeps progress.
+const taskStore = {
+  key: (jobId: string) => `jobcopilot_task_${jobId}`,
+  get(jobId: string) {
+    try {
+      return sessionStorage.getItem(this.key(jobId));
+    } catch {
+      return null;
+    }
+  },
+  set(jobId: string, taskId: string | null) {
+    try {
+      if (taskId) sessionStorage.setItem(this.key(jobId), taskId);
+      else sessionStorage.removeItem(this.key(jobId));
+    } catch {
+      // ignore
+    }
+  },
+};
+
+export function JobReviewPage() {
+  const { jobId = "" } = useParams();
+  const { data, isPending, error } = useJobs();
+  const job = data?.find((j) => j.job_id === jobId);
+
+  const back = (
+    <Link to="/jobs" className="inline-flex items-center gap-1 text-sm font-medium text-ink-2 hover:text-ink">
+      <ArrowLeft className="size-4" aria-hidden />
+      Jobs
+    </Link>
+  );
+
+  if (isPending) return <Spinner />;
+  if (error)
+    return (
+      <div className="px-4 py-5 md:px-7">
+        <Alert>Couldn't load this job: {error.message}</Alert>
+      </div>
+    );
+  if (!job)
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-8 md:px-7">
+        {back}
+        <Card className="mt-4">
+          <EmptyState icon={<SearchX className="size-5" />} title="This job isn't available" action={<Link to="/jobs" className={buttonClass("primary")}>Back to Jobs</Link>}>
+            It may have been removed or belongs to another account.
+          </EmptyState>
+        </Card>
+      </div>
+    );
+
+  return <Review job={job} back={back} />;
+}
+
+function Review({ job, back }: { job: Job; back: ReactNode }) {
+  const tailor = useTailor(job.job_id);
+  const [taskId, setTaskId] = useState<string | null>(() => taskStore.get(job.job_id));
+  const pct = scorePercent(job.match_score);
+
+  return (
+    <>
+      <PageHeader title="Review & apply" />
+      <div className="mx-auto max-w-6xl px-4 py-5 md:px-7 md:py-6">
+        <div className="mb-4">{back}</div>
+
+        <div className="mb-6 flex items-start gap-3 sm:gap-4">
+          <CompanyMark name={job.company} />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-semibold sm:text-xl">{job.title}</h1>
+            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-ink-2">
+              <span>{job.company}</span>
+              {job.location && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="size-3.5" aria-hidden />
+                  {job.location}
+                </span>
+              )}
+              {job.salary_range && (
+                <span className="flex items-center gap-1">
+                  <Wallet className="size-3.5" aria-hidden />
+                  {job.salary_range}
+                </span>
+              )}
+              <a href={job.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-medium text-accent sm:hidden">
+                View posting
+                <ExternalLink className="size-3.5" aria-hidden />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </div>
+          </div>
+          <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm", "max-sm:hidden")}>
+            View posting
+            <ExternalLink className="size-3.5" aria-hidden />
+            <span className="sr-only">(opens in a new tab)</span>
+          </a>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-6">
+            <Section title="Why it's a match">
+              <div className="flex gap-4">
+                <div className="w-14 flex-none text-center" aria-label={`${pct}% match`}>
+                  <span className={cx("block text-2xl leading-none font-bold", toneText[scoreTone(pct)])}>{pct}</span>
+                  <span className="text-xs tracking-wide text-ink-3 uppercase">match</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  {job.match_reasons.length ? (
+                    <ul className="flex flex-col gap-1.5">
+                      {job.match_reasons.map((r) => (
+                        <li key={r} className="flex gap-2">
+                          <Check className="mt-0.5 size-4 flex-none text-ok" aria-hidden />
+                          {r}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-ink-2">No details were recorded for this match.</p>
+                  )}
+                  {job.missing_skills.length > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-1.5 text-ink-2">Asked for, but not on your resume:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {job.missing_skills.map((s) => (
+                          <Badge key={s} tone="warn">
+                            {s}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Section>
+
+            <Materials job={job} tailor={tailor} />
+          </div>
+
+          {/* On phones the panel follows the materials; on desktop it's a sticky right column. */}
+          <div className="lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            {taskId ? (
+              <Progress
+                taskId={taskId}
+                onRetry={() => {
+                  taskStore.set(job.job_id, null);
+                  setTaskId(null);
+                }}
+              />
+            ) : (
+              <ApplyPanel
+                job={job}
+                prepared={tailor.isSuccess}
+                onStarted={(id) => {
+                  taskStore.set(job.job_id, id);
+                  setTaskId(id);
+                }}
+              />
+            )}
+          </div>
+
+          {job.description && (
+            <div className="min-w-0 lg:col-start-1">
+              <Description text={job.description} />
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Description({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const long = text.length > DESCRIPTION_PREVIEW;
+  const shown = open || !long ? text : `${text.slice(0, DESCRIPTION_PREVIEW).trimEnd()}…`;
+  return (
+    <Section title="About the role">
+      <p className="leading-relaxed whitespace-pre-line text-ink-2">{shown}</p>
+      {long && (
+        <button type="button" className="mt-2 text-sm font-medium text-accent hover:underline" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+          {open ? "Show less" : "Show the full description"}
+        </button>
+      )}
+    </Section>
+  );
+}
+
+function Materials({ job, tailor }: { job: Job; tailor: ReturnType<typeof useTailor> }) {
+  const profile = useProfile();
+  const p = profile.data;
+
+  return (
+    <>
+      <Section
+        title="Your application"
+        action={tailor.isSuccess && <CopyButton text={tailor.data.cover_letter} label="Copy letter" />}
+      >
+        {tailor.isSuccess ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 rounded-md bg-ok-soft px-3.5 py-2.5 font-medium text-ok">
+              <FileText className="size-4 flex-none" aria-hidden />
+              Resume tailored for {job.company}. It's attached when you apply.
+            </div>
+            <div>
+              <h3 className="mb-1.5 text-sm font-semibold">Cover letter</h3>
+              <div className="max-h-96 overflow-y-auto rounded-md border border-line bg-canvas px-4 py-3 leading-relaxed whitespace-pre-wrap">
+                {tailor.data.cover_letter}
+              </div>
+              <p className="mt-1.5 text-xs text-ink-3">The letter is written fresh for each application, so it may differ slightly when it's sent.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-ink-2">
+              We'll tailor your resume to this role and draft a cover letter, so you can read them before anything is sent.
+            </p>
+            {tailor.error && <Alert>Couldn't prepare your application: {tailor.error.message}</Alert>}
+            <Button variant="primary" loading={tailor.isPending} onClick={() => tailor.mutate()}>
+              {tailor.isPending ? "Preparing" : tailor.isError ? "Try again" : "Prepare my application"}
+            </Button>
+          </div>
+        )}
+      </Section>
+
+      {p && (
+        <Section
+          title="What we'll fill in"
+          action={
+            <Link to="/profile" className="text-sm font-medium text-accent hover:underline">
+              Edit in Profile
+            </Link>
+          }
+        >
+          <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+            {[
+              ["Name", p.full_name],
+              ["Email", p.email],
+              ["Phone", p.phone],
+              ["Location", p.location],
+              ["Expected salary", p.preferences.expected_ctc],
+              ["Can start", noticeLabel(p.preferences.notice_period_days)],
+              ["Work authorization", p.preferences.work_authorization],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-xs text-ink-3">{label}</dt>
+                <dd className="break-words">{value || <span className="text-ink-3">Not set</span>}</dd>
+              </div>
+            ))}
+          </dl>
+        </Section>
+      )}
+    </>
+  );
+}
+
+function ApplyPanel({ job, prepared, onStarted }: { job: Job; prepared: boolean; onStarted: (taskId: string) => void }) {
+  const consent = useLiveConsent();
+  const setConsent = useSetLiveConsent();
+  const start = useStartApply(job.job_id);
+  const [mode, setMode] = useState<SubmissionMode>("DRY_RUN");
+  const [reviewed, setReviewed] = useState(false);
+  // A new key per approval click; reused if the same click's request is retried.
+  const [key, setKey] = useState(newKey);
+
+  if (!isMatch(job)) {
+    const meta = STATUS_META[job.status];
+    return (
+      <Card className="p-5">
+        <h2 className="text-base font-semibold">Already in your applications</h2>
+        <p className="mt-1 mb-3 text-ink-2">This job is past the review step.</p>
+        <Badge tone={meta?.tone}>{meta?.label ?? job.status}</Badge>
+        <Link to="/applications" className={buttonClass("secondary", "md", "mt-4 w-full")}>
+          Go to Applications
+        </Link>
+      </Card>
+    );
+  }
+
+  const live = mode === "LIVE";
+  const hasConsent = consent.data === true;
+  const canApply = live ? prepared && reviewed && hasConsent : true;
+
+  const submit = () =>
+    start.mutate(
+      { mode, key },
+      {
+        onSuccess: ({ task_id }) => onStarted(task_id),
+        onError: () => setKey(newKey()),
+      },
+    );
+
+  return (
+    <Card className="flex flex-col gap-5 p-5">
+      <div>
+        <h2 className="text-base font-semibold">Apply</h2>
+        <p className="mt-0.5 text-ink-2">Nothing is sent until you approve it here.</p>
+      </div>
+
+      <ChoiceChips
+        label="How"
+        value={mode}
+        onChange={setMode}
+        options={[
+          { value: "DRY_RUN", label: "Practice run" },
+          { value: "LIVE", label: "Submit for real" },
+        ]}
+        hint={
+          live
+            ? "We fill in the employer's form and submit it for you."
+            : "We fill in the form to check everything works, then stop. Nothing is submitted."
+        }
+      />
+
+      {live && (
+        <div className="flex flex-col gap-2.5">
+          {!prepared && (
+            <Alert tone="warn">
+              <span className="inline-flex gap-1.5">
+                <CircleAlert className="mt-0.5 size-4 flex-none" aria-hidden />
+                Prepare your application first so you can read it.
+              </span>
+            </Alert>
+          )}
+          {consent.isPending ? null : (
+            <CheckRow
+              checked={hasConsent}
+              disabled={setConsent.isPending}
+              onChange={(on) => setConsent.mutate(on)}
+              title="Let JobCopilot submit applications for me"
+              detail="Applies to every real submission. Uncheck it any time to turn it off."
+            />
+          )}
+          {setConsent.error && <Alert>Couldn't save that: {setConsent.error.message}</Alert>}
+          <CheckRow
+            checked={reviewed}
+            disabled={!prepared}
+            onChange={setReviewed}
+            title="I've read the cover letter and my details"
+            detail="They're accurate and I want to apply to this job."
+          />
+        </div>
+      )}
+
+      {start.error && <Alert>{start.error.message}</Alert>}
+
+      <div className="flex flex-col gap-2">
+        {/* Until materials are prepared, "Prepare my application" is the screen's main action. */}
+        <Button variant={prepared ? "primary" : "secondary"} size="lg" loading={start.isPending} disabled={!canApply} onClick={submit}>
+          {live ? "Approve and submit" : "Start practice run"}
+        </Button>
+        <p className="flex gap-1.5 text-xs text-ink-3">
+          <ShieldCheck className="size-3.5 flex-none" aria-hidden />
+          We stop and ask you if the form has a question we can't answer or a security check.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
+function Progress({ taskId, onRetry }: { taskId: string; onRetry: () => void }) {
+  const task = useApplyTask(taskId);
+  const phase = taskPhase(task.data);
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (phase !== "running") return;
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [phase]);
+
+  if (task.error) {
+    return (
+      <Card className="flex flex-col gap-3 p-5">
+        <Alert>Lost track of this application: {task.error.message}</Alert>
+        <Link to="/applications" className={buttonClass("secondary")}>
+          Check Applications
+        </Link>
+      </Card>
+    );
+  }
+
+  if (phase === "running") {
+    const pctDone = task.data?.progress_percent ?? 10;
+    return (
+      <Card className="flex flex-col gap-3 p-5" aria-live="polite">
+        <h2 className="text-base font-semibold">Working on it…</h2>
+        <div className="h-2 overflow-hidden rounded-full bg-subtle" role="progressbar" aria-valuenow={pctDone} aria-valuemin={0} aria-valuemax={100}>
+          <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pctDone}%` }} />
+        </div>
+        <p className="text-ink-2">
+          {pctDone < 50 ? "Waiting for a free worker" : "Filling in the application"}
+          {elapsed > 0 && <span className="text-ink-3"> · {elapsed}s</span>}
+        </p>
+        <p className="text-xs text-ink-3">You can leave this page. It keeps going and shows up in Applications.</p>
+      </Card>
+    );
+  }
+
+  const o = outcome(task.data!);
+  return (
+    <Card className="flex flex-col gap-4 p-5" aria-live="polite">
+      <div>
+        <h2 className={cx("text-base font-semibold", toneText[o.tone])}>{o.title}</h2>
+        <p className="mt-1 text-ink-2">{o.detail}</p>
+      </div>
+      <div className="flex flex-col gap-2">
+        <Link to="/applications" className={buttonClass(phase === "succeeded" ? "primary" : "secondary")}>
+          Go to Applications
+        </Link>
+        {o.tone === "danger" && (
+          <Button variant="ghost" onClick={onRetry}>
+            Try again
+          </Button>
+        )}
+        {phase === "succeeded" && !task.data?.result?.submitted && (
+          <Button variant="ghost" onClick={onRetry}>
+            Back to apply options
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
