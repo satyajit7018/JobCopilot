@@ -6,11 +6,14 @@ and permanent cryptographic account erasure (GDPR Article 17).
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.api.auth import get_current_user, verify_password
+from app.api.auth import client_ip, get_current_user, limiter, verify_password
+from app.core.credential_vault import cred_vault
 from app.core.database import db
+from app.core.mfa import mfa_engine
 from app.core.models import AccountExportResponse, DeleteAccountRequest, User
+from app.core.security_logger import security_logger
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +38,57 @@ async def export_user_account_data(current_user: User = Depends(get_current_user
     )
 
 
+def _reauthenticate_for_deletion(payload: DeleteAccountRequest, user: User) -> None:
+    """Requires a fresh credential before erasure, so a stolen access token alone is not enough.
+
+    Accepted proofs, in order:
+      * ``password`` — verified against the stored hash.
+      * ``mfa_code`` — a current TOTP code, only when MFA is enabled on the account.
+
+    Google SSO accounts are created with a random, never-disclosed password hash and
+    the schema has no flag that tells them apart from password accounts, so the rule
+    is the same for everyone. An SSO-only user without MFA sets a password via
+    /auth/request-reset (which proves control of the mailbox) and then confirms with
+    it. A "recent login" (token ``iat``) check was rejected: /auth/refresh re-mints
+    access tokens with a fresh ``iat``, and a token stolen via XSS is fresh anyway.
+    """
+    if payload.password:
+        is_valid, _ = verify_password(payload.password, user.password_hash)
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect password confirmation."
+            )
+        return
+
+    if payload.mfa_code:
+        mfa_cred = db.get_mfa_credentials(user.user_id)
+        if not mfa_cred or not mfa_cred.get("is_enabled") or not mfa_cred.get("secret"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Two-factor authentication is not enabled; confirm with your password instead."
+            )
+        plain_secret = cred_vault.decrypt_field(mfa_cred["secret"])
+        if not mfa_engine.verify_totp(plain_secret, payload.mfa_code):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid verification code."
+            )
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            "Password confirmation is required to delete your account. If you sign in with Google "
+            "and have never set a password, use 'Forgot password' to set one first."
+        )
+    )
+
+
 @router.delete("", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
 async def delete_user_account(
+    request: Request,
     payload: DeleteAccountRequest,
     current_user: User = Depends(get_current_user)
 ):
@@ -44,6 +96,7 @@ async def delete_user_account(
     GDPR Article 17 (Right to Erasure / Hard Delete).
     Permanently erases all database records tied to the candidate, cancels active
     Stripe subscriptions, purges file uploads, and revokes credentials.
+    Requires the account email plus re-authentication (password, or TOTP when MFA is on).
     """
     clean_confirm = payload.confirm_email.lower().strip()
     if clean_confirm != current_user.email.lower().strip():
@@ -52,13 +105,18 @@ async def delete_user_account(
             detail="Confirmation email does not match the authenticated account email."
         )
 
-    # If user has a local password hash (not SSO random password), check password
-    if payload.password and current_user.password_hash:
-        if not verify_password(payload.password, current_user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect password confirmation."
+    try:
+        _reauthenticate_for_deletion(payload, current_user)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            security_logger.log_event(
+                "account.delete.reauth_failed",
+                user_id=current_user.user_id,
+                severity="WARNING",
+                ip_address=client_ip(request),
+                user_agent=request.headers.get("User-Agent")
             )
+        raise
 
     user_id = current_user.user_id
 

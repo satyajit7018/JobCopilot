@@ -487,7 +487,10 @@ class AccountExportResponse(BaseModel):
 
 class DeleteAccountRequest(BaseModel):
     confirm_email: str
+    # Re-authentication: the account password, or (when MFA is enabled) a current
+    # TOTP code. One of the two is required; see account_router.delete_user_account.
     password: Optional[str] = None
+    mfa_code: Optional[str] = None
 
 
 # --- Epic F: MFA & TOTP Models ---
