@@ -51,12 +51,15 @@ def _reauthenticate_for_deletion(payload: DeleteAccountRequest, user: User) -> N
     /auth/request-reset (which proves control of the mailbox) and then confirms with
     it. A "recent login" (token ``iat``) check was rejected: /auth/refresh re-mints
     access tokens with a fresh ``iat``, and a token stolen via XSS is fresh anyway.
+
+    A wrong password/code is 403, not 401: the session itself is valid, and the
+    frontend treats any 401 as an expired session (refresh, retry, then log out).
     """
     if payload.password:
         is_valid, _ = verify_password(payload.password, user.password_hash)
         if not is_valid:
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                status_code=status.HTTP_403_FORBIDDEN,
                 detail="Incorrect password confirmation."
             )
         return
@@ -71,7 +74,7 @@ def _reauthenticate_for_deletion(payload: DeleteAccountRequest, user: User) -> N
         plain_secret = cred_vault.decrypt_field(mfa_cred["secret"])
         if not mfa_engine.verify_totp(plain_secret, payload.mfa_code):
             raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
+                status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid verification code."
             )
         return
@@ -108,7 +111,7 @@ async def delete_user_account(
     try:
         _reauthenticate_for_deletion(payload, current_user)
     except HTTPException as exc:
-        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+        if exc.status_code == status.HTTP_403_FORBIDDEN:
             security_logger.log_event(
                 "account.delete.reauth_failed",
                 user_id=current_user.user_id,
