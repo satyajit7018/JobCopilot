@@ -38,7 +38,7 @@ class FollowUpEngine:
         if stage_days <= 8:
             # Stage 1: 7-Day Gentle Check-in
             s1 = f"Hi {first_name}, I hope your week is going well."
-            s2 = f"I am checking in regarding my application submitted last week for the {job.title} position at {job.company}."
+            s2 = f"I am checking in regarding my application{cls._submitted_when(job)} for the {job.title} position at {job.company}."
             s3 = "I remain very interested in contributing to your team's engineering roadmap and would welcome the chance to answer any preliminary questions."
         else:
             # Stage 2: 14-Day Value-Add Follow-up
@@ -56,6 +56,21 @@ class FollowUpEngine:
             "body": CoverLetterGenerator.sanitize_anti_ai(body),
             "stage_days": stage_days
         }
+
+    @staticmethod
+    def _submitted_when(job: JobListing, now: Optional[datetime] = None) -> str:
+        """' submitted last week' / ' submitted on 2 October', or '' when the date is unknown."""
+        if not job.applied_at:
+            return ""
+        try:
+            applied = datetime.fromisoformat(job.applied_at.replace("Z", "+00:00"))
+        except ValueError:
+            return ""
+        current = now or datetime.now(applied.tzinfo)
+        days = (current - applied).days
+        if 5 <= days <= 13:
+            return " submitted last week"
+        return f" submitted on {applied.day} {applied.strftime('%B')}"
 
     @classmethod
     def find_pending_followup_jobs(cls, user_id: str = "", days_threshold: int = 7) -> List[JobListing]:

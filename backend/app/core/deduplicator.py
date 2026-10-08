@@ -86,20 +86,31 @@ class JobDeduplicator:
             shingles = words
 
         counts = Counter(shingles)
-        v = [0] * 64
 
+        # Tally each shingle's weight per hash byte (8 updates per shingle),
+        # then expand bytes into the 64 per-bit vote totals once per document.
+        # Same result as voting bit by bit, without 64 Python steps per shingle.
+        byte_weights = [[0] * 256 for _ in range(8)]
+        total = 0
         for shingle, weight in counts.items():
-            h = int(hashlib.md5(shingle.encode('utf-8'), usedforsecurity=False).hexdigest()[:16], 16)
-            for i in range(64):
-                if (h >> i) & 1:
-                    v[i] += weight
-                else:
-                    v[i] -= weight
+            digest = hashlib.md5(shingle.encode('utf-8'), usedforsecurity=False).digest()
+            total += weight
+            for k in range(8):
+                byte_weights[k][digest[7 - k]] += weight
 
         fingerprint = 0
-        for i in range(64):
-            if v[i] > 0:
-                fingerprint |= (1 << i)
+        for k in range(8):
+            weights = byte_weights[k]
+            set_totals = [0] * 8
+            for value, weight in enumerate(weights):
+                if weight:
+                    for b in range(8):
+                        if (value >> b) & 1:
+                            set_totals[b] += weight
+            for b in range(8):
+                # votes for bit = set_total - (total - set_total)
+                if 2 * set_totals[b] > total:
+                    fingerprint |= 1 << (8 * k + b)
         return fingerprint
 
     @classmethod

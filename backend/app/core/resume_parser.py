@@ -170,6 +170,18 @@ class ResumeParser:
             "full_name": full_name
         }
 
+    _SKILL_PATTERNS: Dict[str, Tuple[str, "re.Pattern[str]"]] = {}
+
+    @classmethod
+    def _skill_pattern(cls, skill: str) -> Tuple[str, "re.Pattern[str]"]:
+        cached = cls._SKILL_PATTERNS.get(skill)
+        if cached is None:
+            needle = skill.lower()
+            # Word boundary match
+            cached = (needle, re.compile(r'(?<!\w)' + re.escape(needle) + r'(?!\w)'))
+            cls._SKILL_PATTERNS[skill] = cached
+        return cached
+
     @classmethod
     def categorize_skills(cls, text: str) -> Tuple[List[str], CategorizedSkills]:
         """Categorizes all matched technical skills into taxonomy buckets."""
@@ -181,9 +193,11 @@ class ResumeParser:
         for category, skills in cls.SKILL_TAXONOMY.items():
             bucket = []
             for skill in skills:
-                # Word boundary match
-                pattern = r'(?<!\w)' + re.escape(skill.lower()) + r'(?!\w)'
-                if re.search(pattern, text_lower):
+                needle, pattern = cls._skill_pattern(skill)
+                # Cheap substring test first: the word-boundary regex can only
+                # match if the skill text appears at all. Discovery scores
+                # thousands of job descriptions, so this matters.
+                if needle in text_lower and pattern.search(text_lower):
                     bucket.append(skill)
                     if skill not in seen:
                         seen.add(skill)

@@ -72,6 +72,31 @@ export function useSetStatus(jobId: string) {
   });
 }
 
+export function useSetInterviewDate(jobId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (interviewDate: string | null) =>
+      api(`/jobs/${encodeURIComponent(jobId)}/interview`, { method: "PATCH", body: { interview_date: interviewDate } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
+}
+
+/** ISO date-time -> the local "YYYY-MM-DDTHH:mm" a datetime-local input expects ("" if unset or invalid). */
+export function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** datetime-local value (local time) -> ISO string, or null if empty or invalid. */
+export function fromLocalInput(value: string): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 export function useFollowUpDraft(jobId: string) {
   return useMutation({
     mutationFn: (stageDays: number) =>

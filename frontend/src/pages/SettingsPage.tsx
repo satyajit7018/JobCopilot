@@ -420,7 +420,7 @@ function DataSection() {
             {method === "password" ? (
               <Field key="pw" label="Password" name="delete-password" type="password" autoComplete="current-password" value={secret} onChange={(e) => setSecret(e.target.value)} />
             ) : (
-              <Field key="code" label="Code from your authenticator app" name="delete-mfa-code" className="sm:w-40" inputMode="numeric" autoComplete="one-time-code" value={secret} onChange={(e) => setSecret(e.target.value)} />
+              <Field key="code" label="Authenticator code" name="delete-mfa-code" className="sm:w-40" inputMode="numeric" autoComplete="one-time-code" value={secret} onChange={(e) => setSecret(e.target.value)} />
             )}
             <button
               type="button"

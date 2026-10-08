@@ -76,6 +76,74 @@ class DiscoveryOrchestrator:
                     raw_leads.extend(res)
         return raw_leads
 
+    def _score_and_save(
+        self, raw_leads: List[Dict[str, Any]], profile: CandidateProfile, user_id: str
+    ) -> List[JobListing]:
+        """Scores raw leads against the profile and saves the matches (blocking)."""
+        saved_jobs: List[JobListing] = []
+        blacklist = [c.lower() for c in profile.preferences.company_blacklist]
+
+        for lead in raw_leads:
+            company = lead.get("company", "Company")
+            title = lead.get("title", "")
+            location = lead.get("location", "Remote")
+            url = lead.get("url", "")
+            desc = lead.get("description", "")
+            salary = lead.get("salary_range")
+
+            # Check employer blacklist for stealth mode
+            if any(b in company.lower() for b in blacklist if b):
+                continue
+
+            # Compute Deduplication Fingerprint
+            fingerprint = JobDeduplicator.generate_fingerprint(company, title, location, desc)
+            # Compute Multi-Factor Match Score
+            match_score, match_reasons, missing_skills = MatchScorer.compute_match_score(
+                profile=profile,
+                job_title=title,
+                job_description=desc,
+                job_location=location
+            )
+
+            # Filter by candidate match threshold
+            if match_score >= self.min_match_threshold:
+                # Compute Priority Score (0-100) with Indian tech hub boost
+                priority_score = PriorityRanker.calculate_priority_score(
+                    match_score=match_score,
+                    platform=lead.get("platform", "Direct"),
+                    company=company,
+                    freshness_days=1,
+                    salary_range=salary,
+                    candidate_expected_ctc=profile.preferences.expected_ctc,
+                    location=location
+                )
+
+                target_user = user_id or getattr(profile, "user_id", "")
+                job = JobListing(
+                    job_id=f"job_{uuid.uuid4().hex[:12]}",
+                    user_id=target_user,
+                    fingerprint=fingerprint,
+                    platform=lead.get("platform", "Direct"),
+                    company=company,
+                    title=title,
+                    location=location,
+                    url=url,
+                    description=desc[:1500],
+                    salary_range=salary,
+                    seniority_level=MatchScorer.infer_job_seniority(title, desc),
+                    match_score=match_score,
+                    priority_score=priority_score,
+                    match_reasons=match_reasons,
+                    missing_skills=missing_skills,
+                    status=ApplicationStatus.DISCOVERED
+                )
+
+                # Persist to Multi-Tenant DB
+                if db.save_job(job, user_id=target_user):
+                    saved_jobs.append(job)
+
+        return saved_jobs
+
     async def run_discovery_cycle(
         self,
         profile: Optional[CandidateProfile] = None,
@@ -98,68 +166,10 @@ class DiscoveryOrchestrator:
             raw_leads = await self._fetch_all_raw_leads(target_companies)
             self.total_discovered += len(raw_leads)
 
-            # 2. Deduplicate, Blacklist Check, Score & Save
-            saved_jobs: List[JobListing] = []
-            blacklist = [c.lower() for c in profile.preferences.company_blacklist]
-
-            for lead in raw_leads:
-                company = lead.get("company", "Company")
-                title = lead.get("title", "")
-                location = lead.get("location", "Remote")
-                url = lead.get("url", "")
-                desc = lead.get("description", "")
-                salary = lead.get("salary_range")
-
-                # Check employer blacklist for stealth mode
-                if any(b in company.lower() for b in blacklist if b):
-                    continue
-
-                # Compute Deduplication Fingerprint
-                fingerprint = JobDeduplicator.generate_fingerprint(company, title, location, desc)
-                # Compute Multi-Factor Match Score
-                match_score, match_reasons, missing_skills = MatchScorer.compute_match_score(
-                    profile=profile,
-                    job_title=title,
-                    job_description=desc,
-                    job_location=location
-                )
-
-                # Filter by candidate match threshold
-                if match_score >= self.min_match_threshold:
-                    # Compute Priority Score (0-100) with Indian tech hub boost
-                    priority_score = PriorityRanker.calculate_priority_score(
-                        match_score=match_score,
-                        platform=lead.get("platform", "Direct"),
-                        company=company,
-                        freshness_days=1,
-                        salary_range=salary,
-                        candidate_expected_ctc=profile.preferences.expected_ctc,
-                        location=location
-                    )
-
-                    target_user = user_id or getattr(profile, "user_id", "")
-                    job = JobListing(
-                        job_id=f"job_{uuid.uuid4().hex[:12]}",
-                        user_id=target_user,
-                        fingerprint=fingerprint,
-                        platform=lead.get("platform", "Direct"),
-                        company=company,
-                        title=title,
-                        location=location,
-                        url=url,
-                        description=desc[:1500],
-                        salary_range=salary,
-                        seniority_level=MatchScorer.infer_job_seniority(title, desc),
-                        match_score=match_score,
-                        priority_score=priority_score,
-                        match_reasons=match_reasons,
-                        missing_skills=missing_skills,
-                        status=ApplicationStatus.DISCOVERED
-                    )
-
-                    # Persist to Multi-Tenant DB
-                    if db.save_job(job, user_id=target_user):
-                        saved_jobs.append(job)
+            # 2. Deduplicate, blacklist-check, score & save. This is CPU-heavy
+            # (thousands of leads) and the DB calls are synchronous, so it runs
+            # in a worker thread to keep the event loop serving other requests.
+            saved_jobs = await asyncio.to_thread(self._score_and_save, raw_leads, profile, user_id)
 
             self.total_matched += len(saved_jobs)
 

@@ -13,7 +13,10 @@ import {
   useEmails,
   useEvaluateOffer,
   useFollowUpDraft,
+  fromLocalInput,
+  toLocalInput,
   useLedger,
+  useSetInterviewDate,
   useSetStatus,
   type Email,
 } from "../lib/application";
@@ -245,7 +248,58 @@ function StatusCard({ job }: { job: Job }) {
           Updated
         </p>
       )}
+      {job.status === "INTERVIEW" && <InterviewDate job={job} />}
     </Card>
+  );
+}
+
+function InterviewDate({ job }: { job: Job }) {
+  const setDate = useSetInterviewDate(job.job_id);
+  const current = toLocalInput(job.interview_date);
+  const [value, setValue] = useState(current);
+  const [saved, setSaved] = useState(false);
+  const save = (next: string | null) => {
+    setSaved(false);
+    setDate.mutate(next, { onSuccess: () => setSaved(true) });
+  };
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
+      <Field
+        label="Interview date"
+        name="interview-date"
+        type="datetime-local"
+        value={value}
+        onChange={(e) => {
+          setSaved(false);
+          setValue(e.target.value);
+        }}
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" loading={setDate.isPending} disabled={!value || value === current} onClick={() => save(fromLocalInput(value))}>
+          Save date
+        </Button>
+        {current && (
+          <Button
+            variant="ghost"
+            disabled={setDate.isPending}
+            onClick={() => {
+              setValue("");
+              save(null);
+            }}
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+      {setDate.error && <Alert>Couldn't save the date: {setDate.error.message}</Alert>}
+      {saved && !setDate.isPending && (
+        <p className="flex items-center gap-1.5 text-ok" role="status">
+          <Check className="size-4" aria-hidden />
+          {current ? "Date saved" : "Date cleared"}
+        </p>
+      )}
+    </div>
   );
 }
 
