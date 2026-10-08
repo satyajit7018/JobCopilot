@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 
 from app.api.auth import create_jwt_token
-from app.core.database import db
+from app.core.database import DatabaseManager, db
 from app.core.models import ApplicationStatus, CandidateProfile, JobListing, User, UserRole
 from app.email.followup import FollowUpEngine
 from app.main import app
@@ -113,13 +113,18 @@ def test_followup_wording_matches_the_application_date():
     assert "my application for the Engineer position at Acme" in body
 
 
-def test_admin_metric_counts_applied_jobs():
-    user, _ = _user_client()
-    try:
-        before = db.get_admin_system_metrics()["total_applications"]
-        _job(user.user_id, status=ApplicationStatus.DISCOVERED)
-        _job(user.user_id, status=ApplicationStatus.SUBMITTED)
-        _job(user.user_id, status=ApplicationStatus.INTERVIEW)
-        assert db.get_admin_system_metrics()["total_applications"] == before + 2
-    finally:
-        db.hard_delete_user_account(user.user_id)
+def test_admin_metric_counts_applied_jobs(tmp_path):
+    # Own database: the suite runs in parallel, so the shared one changes under us.
+    isolated = DatabaseManager(db_path=tmp_path / "metrics.db")
+    for status in (ApplicationStatus.DISCOVERED, ApplicationStatus.SUBMITTED, ApplicationStatus.INTERVIEW):
+        job = JobListing(
+            job_id=f"job_{uuid.uuid4().hex[:12]}",
+            fingerprint=uuid.uuid4().hex,
+            platform="Greenhouse",
+            company="Acme",
+            title="Backend Engineer",
+            url="https://example.com/jobs/1",
+            status=status,
+        )
+        isolated.save_job(job, user_id="usr_metrics")
+    assert isolated.get_admin_system_metrics()["total_applications"] == 2
