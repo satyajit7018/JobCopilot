@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTimeline, daysSince, parseLpa, type Email, type LedgerEntry } from "./application";
+import { buildTimeline, daysSince, fromLocalInput, parseLpa, toLocalInput, type Email, type LedgerEntry } from "./application";
 import type { Job } from "./jobs";
 
 const job = (over: Partial<Job> = {}): Job => ({
@@ -84,5 +84,20 @@ describe("parseLpa", () => {
     expect(parseLpa("28.5 LPA")).toBe(28.5);
     expect(parseLpa("1,20")).toBe(120);
     expect(parseLpa("lots")).toBeNull();
+  });
+});
+
+describe("interview date input", () => {
+  it("round-trips through the datetime-local format", () => {
+    const iso = fromLocalInput("2026-11-03T10:30");
+    expect(iso).not.toBeNull();
+    expect(toLocalInput(iso)).toBe("2026-11-03T10:30");
+  });
+
+  it("treats empty or invalid values as unset", () => {
+    expect(toLocalInput(null)).toBe("");
+    expect(toLocalInput("garbage")).toBe("");
+    expect(fromLocalInput("")).toBeNull();
+    expect(fromLocalInput("garbage")).toBeNull();
   });
 });

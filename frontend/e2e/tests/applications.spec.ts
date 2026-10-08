@@ -19,6 +19,18 @@ test.describe("Applications", () => {
 
     await page.getByLabel("Status").selectOption("INTERVIEW");
     await expect(page.getByText("Updated")).toBeVisible();
+
+    const nextYear = new Date().getFullYear() + 1;
+    await page.getByLabel("Interview date").fill(`${nextYear}-01-15T10:30`);
+    await page.getByRole("button", { name: "Save date" }).click();
+    await expect(page.getByText("Date saved")).toBeVisible();
+    await expect(page.getByText("Jan 15", { exact: false }).first()).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("Interview date")).toHaveValue(`${nextYear}-01-15T10:30`);
+    await page.getByRole("button", { name: "Clear" }).click();
+    await expect(page.getByText("Date cleared")).toBeVisible();
+    await expect(page.getByLabel("Interview date")).toHaveValue("");
+
     await page.goto("/applications");
     await expect(page.getByRole("region", { name: "Interviewing" }).getByText("Platform Engineer (Go)")).toBeVisible();
   });

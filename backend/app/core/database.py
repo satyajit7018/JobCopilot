@@ -2014,7 +2014,7 @@ class DatabaseManager(DatabaseAdapter):
                 SELECT
                     (SELECT COUNT(*) FROM users) AS total_users,
                     (SELECT COUNT(*) FROM jobs) AS total_jobs,
-                    (SELECT COUNT(*) FROM apply_ledger WHERE status = 'SUBMITTED') AS total_applications,
+                    (SELECT COUNT(*) FROM jobs WHERE status IN ('SUBMITTED', 'RESPONDED', 'INTERVIEW', 'OFFER', 'REJECTED')) AS total_applications,
                     (SELECT COUNT(*) FROM organizations) AS total_organizations
             """)
             metrics_row = cursor.fetchone()

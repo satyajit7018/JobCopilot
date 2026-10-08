@@ -5,6 +5,7 @@ direct call logging, held job inspection, and referral/nudge outreach generation
 """
 
 import uuid
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -57,6 +58,11 @@ class UpdateJobStatusRequest(BaseModel):
     status: str
 
 
+class UpdateInterviewDateRequest(BaseModel):
+    # ISO 8601 date-time, or null to clear it.
+    interview_date: Optional[str] = None
+
+
 @router.get("/jobs")
 async def get_jobs(
     status: Optional[str] = None,
@@ -97,6 +103,34 @@ async def update_job_status(
         "status": "success",
         "job_id": job.job_id,
         "new_status": new_status.value
+    }
+
+
+@router.patch("/jobs/{job_id}/interview")
+async def update_interview_date(
+    job_id: str,
+    payload: UpdateInterviewDateRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Sets (or clears) the interview date for a tracked application."""
+    interview_date = (payload.interview_date or "").strip() or None
+    if interview_date:
+        try:
+            datetime.fromisoformat(interview_date.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="interview_date must be an ISO 8601 date-time.")
+
+    job = db.get_job_by_id(job_id, user_id=current_user.user_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+
+    job.interview_date = interview_date
+    db.save_job(job, user_id=current_user.user_id)
+
+    return {
+        "status": "success",
+        "job_id": job.job_id,
+        "interview_date": interview_date
     }
 
 
