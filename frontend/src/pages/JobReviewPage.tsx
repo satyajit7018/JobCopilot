@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { ArrowLeft, Check, CircleAlert, ExternalLink, FileText, MapPin, SearchX, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowLeft, Bookmark, BookmarkCheck, Check, CircleAlert, ExternalLink, FileText, MapPin, SearchX, ShieldCheck, Wallet } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
 import {
@@ -14,7 +14,7 @@ import {
   useTailor,
   type SubmissionMode,
 } from "../lib/apply";
-import { BOARD_COLUMNS, STATUS_META, isMatch, scorePercent, scoreTone, useJobs, useSetMatchHidden, type Job } from "../lib/jobs";
+import { STATUS_META, isTracked, scorePercent, scoreTone, useJobs, useSetMatchHidden, useSetMatchSaved, type Job } from "../lib/jobs";
 import { useSetStatus } from "../lib/application";
 import { useIsPremium } from "../lib/billing";
 import { PremiumLock } from "../components/PremiumLock";
@@ -129,6 +129,7 @@ function Review({ job, back }: { job: Job; back: ReactNode }) {
               </a>
             </div>
           </div>
+          <SaveButton job={job} />
           <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm", "max-sm:hidden")}>
             View posting
             <ExternalLink className="size-3.5" aria-hidden />
@@ -312,7 +313,7 @@ function ApplyPanel({ job, prepared, onStarted }: { job: Job; prepared: boolean;
   // A new key per approval click; reused if the same click's request is retried.
   const [key, setKey] = useState(newKey);
 
-  if (!isMatch(job)) {
+  if (isTracked(job)) {
     const meta = STATUS_META[job.status];
     return (
       <Card className="p-5">
@@ -407,6 +408,18 @@ function ApplyPanel({ job, prepared, onStarted }: { job: Job; prepared: boolean;
   );
 }
 
+function SaveButton({ job }: { job: Job }) {
+  const save = useSetMatchSaved();
+  if (job.status !== "DISCOVERED" && job.status !== "SAVED") return null;
+  const saved = job.status === "SAVED";
+  return (
+    <Button size="sm" aria-pressed={saved} onClick={() => save.mutate({ jobId: job.job_id, saved: !saved })}>
+      {saved ? <BookmarkCheck className="size-3.5 text-accent" aria-hidden /> : <Bookmark className="size-3.5" aria-hidden />}
+      {saved ? "Saved" : "Save"}
+    </Button>
+  );
+}
+
 function HiddenNotice({ job }: { job: Job }) {
   const unhide = useSetMatchHidden();
   return (
@@ -422,7 +435,7 @@ function HiddenNotice({ job }: { job: Job }) {
 /** Free plan: apply on the employer's site, then track it here. */
 function ApplyYourself({ job }: { job: Job }) {
   const setStatus = useSetStatus(job.job_id);
-  const applied = BOARD_COLUMNS.some((c) => c.statuses.includes(job.status)) || setStatus.isSuccess;
+  const applied = isTracked(job) || setStatus.isSuccess;
 
   return (
     <div className="flex flex-col gap-4">

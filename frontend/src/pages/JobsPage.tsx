@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { BriefcaseBusiness, Clock, ExternalLink, EyeOff, MapPin, RefreshCw, Search, Wallet } from "lucide-react";
+import { Bookmark, BookmarkCheck, BriefcaseBusiness, Clock, ExternalLink, EyeOff, MapPin, RefreshCw, Search, Wallet } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { SearchProgress } from "../components/SearchProgress";
 import { Alert, Badge, Button, Card, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
@@ -17,6 +17,7 @@ import {
   useFindNewJobs,
   useLastVisit,
   useSetMatchHidden,
+  useSetMatchSaved,
   useVisibleJobs,
   type Job,
   type Region,
@@ -35,6 +36,7 @@ export function JobsPage() {
   const { data, isPending, error, refetch, hiddenMatches: hidden } = useVisibleJobs();
   const [sort, setSort] = useState<Sort>("match");
   const [remoteOnly, setRemoteOnly] = useState(false);
+  const [savedOnly, setSavedOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [region, setRegion] = useState<Region | "">("");
   const [minMatch, setMinMatch] = useState(0);
@@ -43,7 +45,7 @@ export function JobsPage() {
   const [hiddenJob, setHiddenJob] = useState<Job | null>(null);
   const findNew = useFindNewJobs();
   // Changing a filter or the sort starts again from the first page.
-  const filterKey = `${sort}|${remoteOnly}|${query}|${region}|${minMatch}`;
+  const filterKey = `${sort}|${remoteOnly}|${savedOnly}|${query}|${region}|${minMatch}`;
   const [page, setPage] = useState({ key: filterKey, limit: PAGE_SIZE });
   const limit = page.key === filterKey ? page.limit : PAGE_SIZE;
 
@@ -54,6 +56,7 @@ export function JobsPage() {
     const list = matches.filter(
       (j) =>
         (!remoteOnly || isRemote(j.location)) &&
+        (!savedOnly || j.status === "SAVED") &&
         (!region || jobRegions(j.location).includes(region)) &&
         scorePercent(j.match_score) >= minMatch &&
         (!q || `${j.title} ${j.company} ${j.location}`.toLowerCase().includes(q)),
@@ -63,7 +66,9 @@ export function JobsPage() {
         ? b.match_score - a.match_score
         : new Date(postedAt(b) ?? 0).getTime() - new Date(postedAt(a) ?? 0).getTime(),
     );
-  }, [matches, sort, remoteOnly, query, region, minMatch]);
+  }, [matches, sort, remoteOnly, savedOnly, query, region, minMatch]);
+  const savedCount = useMemo(() => matches.filter((j) => j.status === "SAVED").length, [matches]);
+  const save = useSetMatchSaved();
   const newCount = useMemo(() => matches.filter((j) => isNewSince(j, lastVisit)).length, [matches, lastVisit]);
 
   const hideJob = (job: Job) => {
@@ -102,6 +107,9 @@ export function JobsPage() {
           </Chip>
           <Chip on={remoteOnly} onClick={() => setRemoteOnly((v) => !v)}>
             Remote
+          </Chip>
+          <Chip on={savedOnly} onClick={() => setSavedOnly((v) => !v)}>
+            Saved{savedCount > 0 && ` (${savedCount})`}
           </Chip>
           <FilterSelect
             label="Location"
@@ -170,7 +178,7 @@ export function JobsPage() {
                 Once your profile is set up, new openings that fit you will show up here with a match score.
               </EmptyState>
             ) : (
-              <EmptyState icon={<Search className="size-5" />} title="Nothing matches these filters">
+              <EmptyState icon={<Search className="size-5" />} title={savedOnly && savedCount === 0 ? "No saved jobs yet" : "Nothing matches these filters"}>
                 Try clearing the search or loosening the filters.
               </EmptyState>
             )}
@@ -180,7 +188,13 @@ export function JobsPage() {
             <Card className="overflow-hidden">
               <ul>
                 {visible.slice(0, limit).map((job) => (
-                  <JobRow key={job.job_id} job={job} isNew={isNewSince(job, lastVisit)} onHide={() => hideJob(job)} />
+                  <JobRow
+                    key={job.job_id}
+                    job={job}
+                    isNew={isNewSince(job, lastVisit)}
+                    onHide={() => hideJob(job)}
+                    onToggleSave={() => save.mutate({ jobId: job.job_id, saved: job.status !== "SAVED" })}
+                  />
                 ))}
               </ul>
             </Card>
@@ -246,7 +260,8 @@ function FilterSelect({
   );
 }
 
-function JobRow({ job, isNew, onHide }: { job: Job; isNew: boolean; onHide: () => void }) {
+function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean; onHide: () => void; onToggleSave: () => void }) {
+  const saved = job.status === "SAVED";
   const pct = scorePercent(job.match_score);
   const tone = scoreTone(pct);
   const why = matchSummary(job);
@@ -292,6 +307,12 @@ function JobRow({ job, isNew, onHide }: { job: Job; isNew: boolean; onHide: () =
           <span className={cx("block text-lg leading-none font-bold", toneText[tone])}>{pct}</span>
           <span className="text-xs tracking-wide text-ink-3 uppercase">match</span>
         </div>
+        <button type="button" onClick={onToggleSave} aria-pressed={saved} className={buttonClass("ghost", "md")} title={saved ? "Saved" : "Save for later"}>
+          {saved ? <BookmarkCheck className="size-4 text-accent" aria-hidden /> : <Bookmark className="size-4" aria-hidden />}
+          <span className="sr-only">
+            {saved ? "Saved" : "Save"} {job.title} at {job.company}
+          </span>
+        </button>
         <button type="button" onClick={onHide} className={buttonClass("ghost", "md")} title="Not interested">
           <EyeOff className="size-4" aria-hidden />
           <span className="sr-only">Not interested in {job.title} at {job.company}</span>

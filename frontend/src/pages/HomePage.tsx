@@ -120,7 +120,7 @@ export function HomePage() {
   const counts = useMemo(() => {
     const jobs = data ?? [];
     return [
-      { label: "New matches", value: jobs.filter(isMatch).length, to: "/jobs" },
+      { label: "Matches", value: jobs.filter(isMatch).length, to: "/jobs" },
       { label: "Applied", value: jobs.filter((j) => ["SUBMITTED", "RESPONDED"].includes(j.status)).length, to: "/applications" },
       { label: "Interviewing", value: jobs.filter((j) => j.status === "INTERVIEW").length, to: "/applications" },
       { label: "Offers", value: jobs.filter((j) => j.status === "OFFER").length, to: "/applications" },

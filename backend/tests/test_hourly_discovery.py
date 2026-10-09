@@ -127,3 +127,24 @@ def test_recent_postings_are_reused(feeds):
     assert feeds["fetches"] == 1
     asyncio.run(orch.get_leads(0))
     assert feeds["fetches"] == 2
+
+
+def test_saved_jobs_are_left_alone_by_new_searches(feeds):
+    from app.core.models import ApplicationStatus
+
+    user = _user_with_profile()
+    tc = _client(user)
+    orch = DiscoveryOrchestrator(min_match_threshold=0.0)
+    try:
+        asyncio.run(orch.run_discovery_cycle(db.get_profile(user_id=user.user_id), user_id=user.user_id))
+        job = db.get_jobs(user_id=user.user_id)[0]
+        assert tc.patch(f"/api/jobs/{job.job_id}/status", json={"status": "SAVED"}).status_code == 200
+        from app.core.cache import cache_manager
+        asyncio.run(cache_manager.invalidate_namespace(user.user_id, "discovery_seen"))  # force a full re-check
+        asyncio.run(orch.run_discovery_cycle(db.get_profile(user_id=user.user_id), user_id=user.user_id))
+        after = db.get_job_by_id(job.job_id, user_id=user.user_id)
+        assert after.status == ApplicationStatus.SAVED
+        assert after.applied_at is None  # saving isn't applying
+        assert len(db.get_jobs(user_id=user.user_id)) == 2
+    finally:
+        db.hard_delete_user_account(user.user_id)
