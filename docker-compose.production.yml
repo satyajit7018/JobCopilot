@@ -59,6 +59,9 @@ services:
       - METRICS_TOKEN=${METRICS_TOKEN:-}
       # Email + password accounts need SMTP for confirmation/reset emails; Google-only until then.
       - PASSWORD_AUTH_ENABLED=${PASSWORD_AUTH_ENABLED:-false}
+      # Shown on the Privacy Policy, Terms and Help pages.
+      - OPERATOR_NAME=${OPERATOR_NAME:-Satyajit Nayak}
+      - SUPPORT_EMAIL=${SUPPORT_EMAIL:-scorpionsatyajit@gmail.com}
       # Premium payments (Razorpay). Leave empty to launch with Premium shown as "coming soon".
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}

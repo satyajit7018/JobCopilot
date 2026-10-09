@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useLocation } from "react-router";
+import { Link, Navigate, useLocation } from "react-router";
 import { Columns3, FileText, KeyRound, Target } from "lucide-react";
 import { useAuth, usePublicConfig, type SignInResult } from "../lib/auth";
 import { GoogleButton } from "../components/GoogleButton";
@@ -40,7 +40,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-dvh items-center justify-center px-4 py-10">
+    <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-10">
       <div className="grid w-full max-w-4xl items-center gap-10 md:grid-cols-[1fr_25rem]">
       <Pitch />
       <Card className="w-full p-6 sm:p-8">
@@ -119,6 +119,17 @@ export function LoginPage() {
         )}
       </Card>
       </div>
+      <p className="mt-10 text-center text-xs text-ink-3">
+        By continuing you agree to our{" "}
+        <Link to="/terms" className="underline hover:text-ink">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link to="/privacy" className="underline hover:text-ink">
+          Privacy Policy
+        </Link>
+        .
+      </p>
     </div>
   );
 }

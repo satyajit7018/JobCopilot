@@ -66,6 +66,9 @@ const router = createBrowserRouter([
     element: <Root />,
     children: [
       { path: "/login", element: <LoginPage /> },
+      // Public: readable without signing in (Google and Razorpay link to them).
+      { path: "/privacy", lazy: async () => ({ Component: (await loadPage(() => import("./pages/LegalPages"))).PrivacyPage }) },
+      { path: "/terms", lazy: async () => ({ Component: (await loadPage(() => import("./pages/LegalPages"))).TermsPage }) },
       {
         element: <RequireAuth />,
         children: [

@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     # OAuth & SSO
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
 
+    # Who runs the service: shown on the Privacy Policy, Terms and Help pages.
+    OPERATOR_NAME: str = "Satyajit Nayak"
+    SUPPORT_EMAIL: str = "scorpionsatyajit@gmail.com"
+
     # Email + password accounts (None = on outside production, off in production)
     PASSWORD_AUTH_ENABLED: Optional[bool] = None
 
