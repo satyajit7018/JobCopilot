@@ -5,6 +5,7 @@ multi-tenant query execution with fail-safe schema bootstrapping and PII encrypt
 """
 
 import json
+import uuid
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
@@ -396,6 +397,15 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 );
                 CREATE INDEX IF NOT EXISTS idx_pg_conv_signals_user_feat ON conversion_signals(user_id, feature_type, feature_key);
 
+                CREATE TABLE IF NOT EXISTS feedback (
+                    feedback_id VARCHAR(64) PRIMARY KEY,
+                    user_id VARCHAR(64) NOT NULL,
+                    message TEXT NOT NULL,
+                    page VARCHAR(255),
+                    created_at VARCHAR(64) NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_pg_feedback_created ON feedback(created_at);
+
                 -- Epic J: User Consents Audit Table
                 CREATE TABLE IF NOT EXISTS user_consents (
                     consent_id VARCHAR(64) PRIMARY KEY,
@@ -543,6 +553,31 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 cursor.execute("SELECT user_id FROM users WHERE razorpay_subscription_id = %s", (subscription_id,))
                 row = cursor.fetchone()
                 return row[0] if row else None
+        finally:
+            self.release_connection(conn)
+
+    def save_feedback(self, user_id: str, message: str, page: Optional[str] = None) -> str:
+        feedback_id = f"fb_{uuid.uuid4().hex[:12]}"
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("INSERT INTO feedback (feedback_id, user_id, message, page, created_at) VALUES (%s, %s, %s, %s, %s)",
+                               (feedback_id, user_id, message, page, datetime.now().isoformat()))
+                conn.commit()
+            return feedback_id
+        finally:
+            self.release_connection(conn)
+
+    def list_feedback(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT f.feedback_id, f.user_id, u.email, f.message, f.page, f.created_at
+                    FROM feedback f LEFT JOIN users u ON u.user_id = f.user_id
+                    ORDER BY f.created_at DESC LIMIT %s OFFSET %s""", (limit, offset))
+                cols = ["feedback_id", "user_id", "email", "message", "page", "created_at"]
+                return [dict(zip(cols, row)) for row in cursor.fetchall()]
         finally:
             self.release_connection(conn)
 
@@ -1628,16 +1663,14 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 cursor.execute("DELETE FROM ab_assignments WHERE user_id = %s", (user_id,))
                 cursor.execute("DELETE FROM ab_experiments WHERE user_id = %s", (user_id,))
                 cursor.execute("DELETE FROM conversion_signals WHERE user_id = %s", (user_id,))
+                cursor.execute("DELETE FROM feedback WHERE user_id = %s", (user_id,))
                 # Retained under GDPR Art. 17(3): audit logs + consent records kept for legal compliance / proof.
                 conn.commit()
 
             try:
-                user_storage = Path(settings.BASE_DIR) / "storage" / "users" / user_id
-                if user_storage.exists() and user_storage.is_dir():
-                    shutil.rmtree(user_storage, ignore_errors=True)
+                settings.purge_user_files(user_id)
             except Exception:
-                logger.warning("postgres_adapter: failed to delete user storage directory during hard delete", exc_info=True)
-                pass
+                logger.warning("postgres_adapter: failed to delete user files during hard delete", exc_info=True)
 
             return True
         except Exception:

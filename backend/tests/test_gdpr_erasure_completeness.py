@@ -46,6 +46,7 @@ def test_gdpr_hard_delete_completeness():
         "ab_assignments",
         "ab_experiments",
         "conversion_signals",
+        "feedback",
     ]
 
     # Tables retained under GDPR Art. 17(3) for legal/compliance proof
@@ -140,6 +141,11 @@ def test_gdpr_hard_delete_completeness():
         cursor.execute(
             "INSERT INTO conversion_signals (signal_id, user_id, feature_type, feature_key, updated_at) VALUES (?, ?, ?, ?, ?)",
             (f"sig_{u_suffix}", u_id, "ATS", "Greenhouse", now),
+        )
+
+        cursor.execute(
+            "INSERT INTO feedback (feedback_id, user_id, message, page, created_at) VALUES (?, ?, ?, ?, ?)",
+            (f"fb_{u_suffix}", u_id, "Love it", "/jobs", now),
         )
 
         # Seed User U in the 2 retained tables

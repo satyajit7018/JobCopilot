@@ -26,6 +26,9 @@ export interface PublicConfig {
   demo_enabled: boolean;
   /** Email + password accounts; off in production at launch. */
   password_auth_enabled?: boolean;
+  /** Who runs the service, for the legal and help pages. */
+  operator_name?: string;
+  support_email?: string;
 }
 
 /** Public sign-in settings from the server (cached for the session). */

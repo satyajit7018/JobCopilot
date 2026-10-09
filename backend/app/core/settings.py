@@ -6,6 +6,7 @@ and fail-closed security validations in production environments.
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -86,6 +87,10 @@ class Settings(BaseSettings):
 
     # OAuth & SSO
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
+
+    # Who runs the service: shown on the Privacy Policy, Terms and Help pages.
+    OPERATOR_NAME: str = "Satyajit Nayak"
+    SUPPORT_EMAIL: str = "scorpionsatyajit@gmail.com"
 
     # Email + password accounts (None = on outside production, off in production)
     PASSWORD_AUTH_ENABLED: Optional[bool] = None
@@ -230,6 +235,24 @@ class Settings(BaseSettings):
         p = self.app_dir / "profiles"
         p.mkdir(parents=True, exist_ok=True)
         return p
+
+    def user_files_dir(self, user_id: str, *parts: str) -> Path:
+        """<data>/users/<user_id>/...: every file that belongs to one user, so deleting
+        the account can remove them all (uploads, tailored resumes, screenshots)."""
+        safe = re.sub(r"[^A-Za-z0-9_-]", "_", user_id or "unknown")
+        p = self.app_dir.joinpath("users", safe, *parts)
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+
+    def purge_user_files(self, user_id: str) -> None:
+        """Deletes a user's files folder and any old-style resumes/<user_id>_* uploads."""
+        import shutil
+        safe = re.sub(r"[^A-Za-z0-9_-]", "_", user_id or "")
+        if not safe:
+            return
+        shutil.rmtree(self.app_dir / "users" / safe, ignore_errors=True)
+        for legacy in self.resumes_dir.glob(f"{safe}_*"):
+            legacy.unlink(missing_ok=True)
 
     @property
     def resumes_dir(self) -> Path:

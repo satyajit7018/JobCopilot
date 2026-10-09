@@ -35,7 +35,8 @@ if settings.SENTRY_DSN:
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
             traces_sample_rate=1.0 if settings.ENV != "production" else 0.1,
-            environment=settings.ENV
+            environment=settings.ENV,
+            send_default_pii=False,  # no request bodies, cookies or user IPs in reports
         )
     except Exception:
         # intentional: logging here would recurse/fail
@@ -183,6 +184,10 @@ async def report_client_error(request: Request):
         payload = {}
     if isinstance(payload, dict):
         info = {k: payload.get(k) for k in ("message", "source", "line", "col", "url", "stack", "userAgent")}
+        if isinstance(info.get("url"), str):
+            info["url"] = info["url"].split("?")[0][:500]  # query strings can carry tokens or ids
+        if isinstance(info.get("message"), str):
+            info["message"] = info["message"][:1000]
     else:
         info = {"message": str(payload)[:500]}
     request_id = getattr(request.state, "request_id", None)

@@ -57,8 +57,13 @@ services:
       - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:?GOOGLE_OAUTH_CLIENT_ID is required (only prod sign-in path)}
       - INBOUND_EMAIL_WEBHOOK_SECRET=${INBOUND_EMAIL_WEBHOOK_SECRET:?INBOUND_EMAIL_WEBHOOK_SECRET is required (inbound webhook is public)}
       - METRICS_TOKEN=${METRICS_TOKEN:-}
+      # Error reports (API and web app). Leave empty to turn off.
+      - SENTRY_DSN=${SENTRY_DSN:-}
       # Email + password accounts need SMTP for confirmation/reset emails; Google-only until then.
       - PASSWORD_AUTH_ENABLED=${PASSWORD_AUTH_ENABLED:-false}
+      # Shown on the Privacy Policy, Terms and Help pages.
+      - OPERATOR_NAME=${OPERATOR_NAME:-Satyajit Nayak}
+      - SUPPORT_EMAIL=${SUPPORT_EMAIL:-scorpionsatyajit@gmail.com}
       # Premium payments (Razorpay). Leave empty to launch with Premium shown as "coming soon".
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
@@ -113,6 +118,7 @@ services:
       # production fail-closed guard and needs these too.
       - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
       - INBOUND_EMAIL_WEBHOOK_SECRET=${INBOUND_EMAIL_WEBHOOK_SECRET}
+      - SENTRY_DSN=${SENTRY_DSN:-}
     volumes:
       - jobcopilot_data:/data
     depends_on:
@@ -121,6 +127,68 @@ services:
       redis:
         condition: service_healthy
       api:
+        condition: service_started
+
+  # Nightly database backup, kept 14 days in the db_backups volume. Copy them off
+  # the server too (docs/OPERATIONS.md): a backup on the same machine won't survive losing it.
+  db_backup:
+    image: postgres:16-alpine
+    container_name: jobcopilot_db_backup
+    restart: always
+    environment:
+      - PGHOST=postgres
+      - PGUSER=${POSTGRES_USER:-jobcopilot}
+      - PGPASSWORD=${POSTGRES_PASSWORD}
+      - PGDATABASE=${POSTGRES_DB:-jobcopilot}
+    volumes:
+      - db_backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -o pipefail
+        while true; do
+          file=/backups/jobcopilot-$$(date -u +%Y-%m-%dT%H%M).sql.gz
+          if pg_dump --no-owner --clean --if-exists | gzip > "$$file.tmp"; then
+            mv "$$file.tmp" "$$file" && echo "backup ok: $$file"
+          else
+            rm -f "$$file.tmp"; echo "backup FAILED" >&2
+          fi
+          find /backups -name 'jobcopilot-*.sql.gz' -mtime +14 -delete
+          sleep 86400
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Queues the hourly job search for every user (app/tasks/discovery_task.py).
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: jobcopilot_beat
+    restart: always
+    command: ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info", "--schedule", "/data/celerybeat-schedule"]
+    healthcheck:
+      disable: true
+    environment:
+      - ENV=production
+      - DEBUG=false
+      - DB_MODE=postgres
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-jobcopilot}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jobcopilot}
+      - JOBCOPILOT_DATA_DIR=/data
+      - REDIS_URL=redis://redis:6379/0
+      - USE_CELERY=true
+      - JWT_SECRET=${JWT_SECRET}
+      - JOBCOPILOT_MASTER_KEY=${JOBCOPILOT_MASTER_KEY}
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - INBOUND_EMAIL_WEBHOOK_SECRET=${INBOUND_EMAIL_WEBHOOK_SECRET}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    volumes:
+      - jobcopilot_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      celery_worker:
         condition: service_started
 
   frontend:
@@ -138,3 +206,4 @@ volumes:
   jobcopilot_data:
   postgres_data:
   redis_data:
+  db_backups:

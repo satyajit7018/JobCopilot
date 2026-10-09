@@ -133,6 +133,16 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    def save_feedback(self, user_id: str, message: str, page: Optional[str] = None) -> str:
+        """Stores feedback a user sent from the app; returns its id."""
+        pass
+
+    @abstractmethod
+    def list_feedback(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """Newest first, with the sender's email, for the admin page."""
+        pass
+
+    @abstractmethod
     def update_user_password(self, user_id: str, new_password_hash: str) -> bool:
         pass
 

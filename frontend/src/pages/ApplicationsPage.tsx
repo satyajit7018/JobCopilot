@@ -3,11 +3,11 @@ import { Link } from "react-router";
 import { PageHeader } from "../components/AppShell";
 import { HeldQuestions } from "../components/HeldQuestions";
 import { Alert, Badge, Card, EmptyState, Spinner, buttonClass } from "../components/ui";
-import { BOARD_COLUMNS, STATUS_META, relativeTime, useJobs, type Job } from "../lib/jobs";
+import { BOARD_COLUMNS, STATUS_META, isTracked, relativeTime, useJobs, type Job } from "../lib/jobs";
 
 export function ApplicationsPage() {
   const { data, isPending, error } = useJobs();
-  const tracked = (data ?? []).filter((j) => BOARD_COLUMNS.some((c) => c.statuses.includes(j.status)));
+  const tracked = (data ?? []).filter(isTracked);
   // Only columns with something in them; an empty "In progress" column is just noise.
   const columns = BOARD_COLUMNS.map((col) => ({ ...col, items: tracked.filter((j) => col.statuses.includes(j.status)) })).filter(
     (col) => col.items.length > 0,

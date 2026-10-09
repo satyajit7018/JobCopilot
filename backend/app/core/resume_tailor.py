@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.config import RESUMES_DIR
+from app.core.settings import settings
 from app.core.match_scorer import MatchScorer
 from app.core.models import CandidateProfile, Project
 from app.core.resume_compiler import ResumeCompiler
@@ -167,11 +167,12 @@ class ResumeTailor:
         # Generate unique content hash
         content_hash = hashlib.sha256(html_content.encode('utf-8')).hexdigest()
 
-        # Save to RESUMES_DIR
-        clean_comp = re.sub(r'\W+', '_', company_name.lower())
-        clean_title = re.sub(r'\W+', '_', job_title.lower())
-        out_filename = f"Resume_{clean_comp}_{clean_title}_{job_id[:6]}.pdf"
-        out_path = RESUMES_DIR / out_filename
+        # Saved in the user's own folder with the full job id: names used to be shared
+        # across users and could collide (job_id[:6] is "job_" + 2 random characters).
+        clean_comp = re.sub(r'\W+', '_', company_name.lower())[:40]
+        clean_title = re.sub(r'\W+', '_', job_title.lower())[:60]
+        out_filename = f"Resume_{clean_comp}_{clean_title}_{re.sub(r'[^A-Za-z0-9_-]', '_', job_id)}.pdf"
+        out_path = settings.user_files_dir(profile.user_id, "tailored") / out_filename
 
         # Compile PDF via Chromium
         await ResumeCompiler.compile_to_pdf(html_content, out_path)

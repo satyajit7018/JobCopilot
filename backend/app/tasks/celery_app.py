@@ -14,12 +14,22 @@ from typing import Any, Callable, Dict, Optional
 logger = logging.getLogger("jobcopilot.tasks")
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+# Errors in background jobs (hourly search, applying) go to Sentry too.
+if os.environ.get("SENTRY_DSN"):
+    try:
+        import sentry_sdk
+        sentry_sdk.init(dsn=os.environ["SENTRY_DSN"], environment=os.environ.get("ENV", "development"),
+                        traces_sample_rate=0.0, send_default_pii=False)
+    except Exception:
+        logger.warning("Sentry init failed in worker", exc_info=True)
 USE_CELERY = os.environ.get("USE_CELERY", "false").lower() in ["true", "1", "yes"]
 
 try:
     if USE_CELERY:
         try:
             from celery import Celery  # type: ignore
+            from celery.schedules import crontab  # type: ignore
             celery_app = Celery(
                 "jobcopilot",
                 broker=REDIS_URL,
@@ -44,7 +54,14 @@ try:
                 # The worker is started with `-A app.tasks.celery_app`; without this include the
                 # apply task module is never imported and every apply job is rejected as
                 # an unregistered task (found while verifying audit P1-1).
-                include=["app.tasks.apply_task"],
+                include=["app.tasks.apply_task", "app.tasks.discovery_task"],
+                # Celery beat (its own container) queues the hourly job search.
+                beat_schedule={
+                    "hourly-job-search": {
+                        "task": "jobcopilot.low.hourly_discovery",
+                        "schedule": crontab(minute=7),
+                    },
+                },
             )
         except ImportError:
             logger.warning("Celery package is not installed. Falling back to in-memory async task runner.")

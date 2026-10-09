@@ -4,6 +4,7 @@ Validates Naukri, Instahyre, Cuvette, Cutshort, and Hirist scrapers,
 query generators, LPA compensation parsing, and priority ranking.
 """
 
+import uuid
 import pytest
 from app.discovery.scrapers import PlatformScrapers
 from app.discovery.orchestrator import DiscoveryOrchestrator
@@ -100,7 +101,9 @@ def test_indian_job_priority_ranking():
 @pytest.mark.asyncio
 async def test_discovery_orchestrator_indian_jobs_ingestion():
     """Validates that the Discovery Orchestrator ingests and saves Indian tech leads."""
-    test_uid = "usr_india_test_99"
+    # Unique per run: searches skip postings a user already has, so reusing an id
+    # with jobs left from an earlier run would find nothing new.
+    test_uid = f"usr_india_test_{uuid.uuid4().hex[:8]}"
     profile = CandidateProfile(
         user_id=test_uid,
         full_name="Arjun Sharma",

@@ -39,7 +39,7 @@ export function PlansPage() {
               {!premium && <p className="mt-auto font-medium text-ink-2">Your current plan</p>}
             </Card>
 
-            <Card className="flex flex-col gap-4 border-accent p-6 ring-1 ring-accent">
+            <Card className="flex flex-col gap-4 border-accent p-6 ring-1 ring-accent max-md:order-first">
               <div>
                 <h2 className="flex items-center gap-2 text-base font-semibold">
                   <Sparkles className="size-4 text-accent" aria-hidden />
@@ -74,7 +74,13 @@ export function PlansPage() {
                     <Button variant="primary" loading={upgrade.isPending} onClick={() => upgrade.mutate(region)}>
                       Upgrade to Premium
                     </Button>
-                    <p className="text-xs text-ink-3">Secure payment by Razorpay. Renews monthly; cancel any time in Settings.</p>
+                    <p className="text-xs text-ink-3">
+                      Secure payment by Razorpay. Renews monthly; cancel any time in Settings. See the{" "}
+                      <Link to="/terms" className="underline hover:text-ink">
+                        Terms
+                      </Link>{" "}
+                      for refunds.
+                    </p>
                   </>
                 )}
               </div>

@@ -32,6 +32,7 @@ class ApplicationStatus(str, Enum):
     REJECTED = "REJECTED"
     OFFER = "OFFER"
     DISMISSED = "DISMISSED"  # "Not interested": hidden from matches, kept so searches don't bring it back
+    SAVED = "SAVED"  # "Save for later": still a match, bookmarked
 
 
 class ApplyLedgerStatus(str, Enum):

@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { Alert, Badge, Button, Card, Spinner } from "../components/ui";
 import { useAuth } from "../lib/auth";
+import { useAdminFeedback } from "../lib/support";
 import { relativeTime } from "../lib/jobs";
 import { PAGE_SIZE, ROLES, auditSummary, useAdminAudit, useAdminMetrics, useAdminUsers, useSetRole, type AdminUser, type Role } from "../lib/admin";
 
@@ -33,6 +34,7 @@ export function AdminPage() {
       <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-5 md:px-7 md:py-8">
         <Metrics />
         <Users currentUserId={user.user_id} />
+        <Feedback />
         <Audit />
       </div>
     </>
@@ -218,6 +220,41 @@ function Audit() {
                   {e.target_user_id && <span className="text-ink-3"> · {e.target_user_id}</span>}
                 </span>
                 <span className="text-xs text-ink-3">{relativeTime(e.created_at)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </Section>
+  );
+}
+
+function Feedback() {
+  const { data, isPending, error } = useAdminFeedback();
+  return (
+    <Section title="Feedback">
+      <Card className="p-4 sm:p-5">
+        {isPending ? (
+          <Spinner />
+        ) : error ? (
+          <Alert>Couldn't load feedback: {error.message}</Alert>
+        ) : data.length === 0 ? (
+          <p className="text-ink-2">No feedback yet.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-line">
+            {data.map((f) => (
+              <li key={f.feedback_id} className="py-3 first:pt-0 last:pb-0">
+                <p className="whitespace-pre-wrap">{f.message}</p>
+                <p className="mt-1 text-xs text-ink-3">
+                  {f.email ? (
+                    <a href={`mailto:${f.email}`} className="hover:underline">
+                      {f.email}
+                    </a>
+                  ) : (
+                    f.user_id
+                  )}
+                  {f.page && ` · on ${f.page}`} · {relativeTime(f.created_at)}
+                </p>
               </li>
             ))}
           </ul>

@@ -5,6 +5,7 @@ Atomic Transactions, Dynamic Multi-Tenant Migration, and User Isolation.
 """
 
 import json
+import uuid
 import logging
 import sqlite3
 import threading
@@ -692,6 +693,18 @@ class DatabaseManager(DatabaseAdapter):
                 """)
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_conv_signals_user_feat ON conversion_signals(user_id, feature_type, feature_key);")
 
+                # Feedback sent from the app (purged with the account).
+                cursor.execute("""
+                CREATE TABLE IF NOT EXISTS feedback (
+                    feedback_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    page TEXT,
+                    created_at TEXT NOT NULL
+                )
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at);")
+
                 # 23. User Consents Table (Epic J)
                 cursor.execute("""
                 CREATE TABLE IF NOT EXISTS user_consents (
@@ -847,6 +860,25 @@ class DatabaseManager(DatabaseAdapter):
             cursor.execute("SELECT user_id FROM users WHERE razorpay_subscription_id = ?", (subscription_id,))
             row = cursor.fetchone()
             return row[0] if row else None
+
+    def save_feedback(self, user_id: str, message: str, page: Optional[str] = None) -> str:
+        feedback_id = f"fb_{uuid.uuid4().hex[:12]}"
+        with self._lock:
+            with self.get_connection() as conn:
+                conn.execute("INSERT INTO feedback (feedback_id, user_id, message, page, created_at) VALUES (?, ?, ?, ?, ?)",
+                             (feedback_id, user_id, message, page, datetime.now().isoformat()))
+                conn.commit()
+        return feedback_id
+
+    def list_feedback(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT f.feedback_id, f.user_id, u.email, f.message, f.page, f.created_at
+                FROM feedback f LEFT JOIN users u ON u.user_id = f.user_id
+                ORDER BY f.created_at DESC LIMIT ? OFFSET ?""", (limit, offset))
+            cols = ["feedback_id", "user_id", "email", "message", "page", "created_at"]
+            return [dict(zip(cols, row)) for row in cursor.fetchall()]
 
     def update_user_password(self, user_id: str, new_password_hash: str) -> bool:
         """Updates user password hash (e.g. during Argon2id migration)."""
@@ -2148,16 +2180,14 @@ class DatabaseManager(DatabaseAdapter):
                     cursor.execute("DELETE FROM ab_assignments WHERE user_id = ?", (user_id,))
                     cursor.execute("DELETE FROM ab_experiments WHERE user_id = ?", (user_id,))
                     cursor.execute("DELETE FROM conversion_signals WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM feedback WHERE user_id = ?", (user_id,))
                     # Retained under GDPR Art. 17(3): audit logs + consent records kept for legal compliance / proof.
                     conn.commit()
 
                     try:
-                        user_storage = Path(settings.BASE_DIR) / "storage" / "users" / user_id
-                        if user_storage.exists() and user_storage.is_dir():
-                            shutil.rmtree(user_storage, ignore_errors=True)
+                        settings.purge_user_files(user_id)
                     except Exception:
-                        logger.warning("database: failed to delete user storage directory during hard delete", exc_info=True)
-                        pass
+                        logger.warning("database: failed to delete user files during hard delete", exc_info=True)
 
                     return True
                 except Exception:

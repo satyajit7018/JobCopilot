@@ -287,13 +287,12 @@ async def get_job_ledger(
     job_id: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Retrieves apply ledger entry for a specific job."""
+    """The automatic-apply record for a job, or ledger: null if JobCopilot never applied to it
+    (e.g. an application the user made and tracked themselves). That's a normal state, not an error."""
     entry = apply_ledger.get_ledger_for_job(user_id=current_user.user_id, job_id=job_id)
-    if not entry:
-        raise HTTPException(status_code=404, detail="No ledger record found for this job.")
     return {
         "status": "success",
-        "ledger": entry.dict()
+        "ledger": entry.dict() if entry else None
     }
 
 

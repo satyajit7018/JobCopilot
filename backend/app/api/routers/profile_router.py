@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.api.auth import get_current_user
-from app.core.config import RESUMES_DIR
+from app.core.settings import settings
 from app.core.database import db
 from app.core.models import CandidateProfile, Education, User, WorkExperience
 from app.core.questionnaire import QuestionnaireEngine
@@ -19,6 +19,12 @@ from app.core.resume_parser import ResumeParser
 from app.core.vector_vault import vault
 
 router = APIRouter(tags=["profile"])
+
+
+async def _profile_changed(user_id: str) -> None:
+    """A changed profile can match postings that were rejected before, so score them again."""
+    from app.core.cache import cache_manager
+    await cache_manager.invalidate_namespace(user_id, "discovery_seen")
 
 
 class BackgroundUpdateRequest(BaseModel):
@@ -51,7 +57,7 @@ async def upload_resume(
         if len(contents) > MAX_FILE_SIZE:
             raise HTTPException(status_code=413, detail="Resume file exceeds maximum allowed size (10MB).")
         safe_filename = Path(file.filename or "resume.pdf").name
-        file_path = RESUMES_DIR / f"{user_id}_{safe_filename}"
+        file_path = settings.user_files_dir(user_id, "resumes") / safe_filename
         with open(file_path, "wb") as buffer:
             buffer.write(contents)
         profile = await ResumeParser.parse_to_profile_async(str(file_path), profile_id=target_profile_id, user_id=user_id)
@@ -63,6 +69,7 @@ async def upload_resume(
     profile.id = target_profile_id
     profile.user_id = user_id
     db.save_profile(profile, user_id=user_id)
+    await _profile_changed(user_id)
     vault.seed_from_profile(profile)
 
     prefilled_data = QuestionnaireEngine.prefill_from_profile(profile)
@@ -106,6 +113,7 @@ async def update_background(payload: BackgroundUpdateRequest, current_user: User
     profile.education = [e for e in payload.education if (e.degree or "").strip() or (e.institution or "").strip()]
     profile.updated_at = datetime.now().isoformat()
     db.save_profile(profile, user_id=user_id)
+    await _profile_changed(user_id)
     return {"status": "success", "profile": profile.dict()}
 
 
@@ -147,6 +155,7 @@ async def submit_questionnaire(
     updated_profile.id = target_id
     updated_profile.user_id = user_id
     db.save_profile(updated_profile, user_id=user_id)
+    await _profile_changed(user_id)
     vault.seed_from_profile(updated_profile)
 
     return {

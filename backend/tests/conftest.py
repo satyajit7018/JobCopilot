@@ -54,6 +54,13 @@ def _create_authenticated_client(user_id: str, email: str, role: str = "PRO") ->
     return tc
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _shared_test_user():
+    """Many tests sign tokens for usr_test_tenant_a directly; make sure it exists
+    on every xdist worker, whatever order the tests run in."""
+    _create_authenticated_client("usr_test_tenant_a", "test_candidate_a@jobcopilot.test", "PRO")
+
+
 @pytest.fixture(scope="session")
 def auth_client() -> TestClient:
     """Pre-authenticated TestClient carrying valid Bearer JWT access token."""

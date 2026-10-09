@@ -3,6 +3,7 @@ JobCopilot - 0-Day Job Discovery Router
 Handles autonomous multi-source job discovery triggers and live status querying.
 """
 
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -14,6 +15,9 @@ from app.core.models import User
 from app.discovery.orchestrator import discovery_orchestrator
 
 router = APIRouter(tags=["discovery"])
+
+MANUAL_SEARCH_COOLDOWN_SECONDS = 15 * 60
+LEAD_REUSE_SECONDS = 60 * 60
 
 
 @router.post("/discovery/run")
@@ -33,9 +37,24 @@ async def run_discovery(
     if not profile:
         raise HTTPException(status_code=404, detail="Candidate profile not found.")
 
+    # New postings are checked for everyone every hour; a manual search is for "right now",
+    # so it's spaced out and reuses postings fetched in the last hour.
+    from app.core.cache import cache_manager
+    last = await cache_manager.get(current_user.user_id, "discovery_manual", "last_run")
+    now = time.time()
+    if last and now - float(last) < MANUAL_SEARCH_COOLDOWN_SECONDS:
+        wait = int((MANUAL_SEARCH_COOLDOWN_SECONDS - (now - float(last))) // 60) + 1
+        raise HTTPException(
+            status_code=429,
+            detail=f"You just searched. We also check for new jobs every hour; try again in {wait} min.",
+        )
+    await cache_manager.set(current_user.user_id, "discovery_manual", "last_run", now,
+                            ttl_seconds=MANUAL_SEARCH_COOLDOWN_SECONDS)
+
     await ws_manager.broadcast({"type": "BOT_LOG", "message": "Starting 0-day multi-source job discovery cycle..."}, user_id=current_user.user_id)
 
-    result = await discovery_orchestrator.run_discovery_cycle(profile, user_id=current_user.user_id)
+    result = await discovery_orchestrator.run_discovery_cycle(
+        profile, user_id=current_user.user_id, max_lead_age_seconds=LEAD_REUSE_SECONDS)
 
     await ws_manager.broadcast({
         "type": "DISCOVERY_COMPLETED",

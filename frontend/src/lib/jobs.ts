@@ -15,7 +15,8 @@ export type ApplicationStatus =
   | "INTERVIEW"
   | "REJECTED"
   | "OFFER"
-  | "DISMISSED";
+  | "DISMISSED"
+  | "SAVED";
 
 // Mirrors backend JobListing (fields the UI reads).
 export interface Job {
@@ -60,6 +61,7 @@ export const STATUS_META: Record<ApplicationStatus, { label: string; tone: Tone 
   OFFER: { label: "Offer", tone: "ok" },
   REJECTED: { label: "Closed", tone: "danger" },
   DISMISSED: { label: "Not interested", tone: "neutral" },
+  SAVED: { label: "Saved", tone: "accent" },
 };
 
 /** Applications board columns, in pipeline order. DISCOVERED jobs live on the Jobs page. */
@@ -71,8 +73,14 @@ export const BOARD_COLUMNS: { key: string; label: string; statuses: ApplicationS
   { key: "closed", label: "Closed", statuses: ["REJECTED"] },
 ];
 
+/** A job still on the Jobs page: a new match, or one saved for later. */
 export function isMatch(job: Job): boolean {
-  return job.status === "DISCOVERED";
+  return job.status === "DISCOVERED" || job.status === "SAVED";
+}
+
+/** On the Applications board (applied or further along). */
+export function isTracked(job: Job): boolean {
+  return BOARD_COLUMNS.some((c) => c.statuses.includes(job.status));
 }
 
 /** Backend stores 0–1; tolerate legacy rows already stored as 0–100. */
@@ -125,23 +133,39 @@ export function useVisibleJobs() {
   return { ...query, data: visible, hiddenMatches: (query.data?.length ?? 0) - (visible?.length ?? 0) };
 }
 
-/** "Not interested": hides a match for good (searches won't bring it back). Undo restores it. */
-export function useSetMatchHidden() {
+/** Moves a match between new, saved and hidden, updating the list right away. */
+function useSetMatchStatus() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ jobId, hidden }: { jobId: string; hidden: boolean }) =>
-      api(`/jobs/${encodeURIComponent(jobId)}/status`, { method: "PATCH", body: { status: hidden ? "DISMISSED" : "DISCOVERED" } }),
-    onMutate: async ({ jobId, hidden }) => {
+    mutationFn: ({ jobId, status }: { jobId: string; status: ApplicationStatus }) =>
+      api(`/jobs/${encodeURIComponent(jobId)}/status`, { method: "PATCH", body: { status } }),
+    onMutate: async ({ jobId, status }) => {
       await qc.cancelQueries({ queryKey: ["jobs"] });
       const before = qc.getQueryData<Job[]>(["jobs"]);
-      qc.setQueryData<Job[]>(["jobs"], (jobs) =>
-        jobs?.map((j) => (j.job_id === jobId ? { ...j, status: hidden ? "DISMISSED" : "DISCOVERED" } : j)),
-      );
+      qc.setQueryData<Job[]>(["jobs"], (jobs) => jobs?.map((j) => (j.job_id === jobId ? { ...j, status } : j)));
       return { before };
     },
     onError: (_e, _v, ctx) => ctx?.before && qc.setQueryData(["jobs"], ctx.before),
     onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
+}
+
+/** "Not interested": hides a match for good (searches won't bring it back). Undo restores it. */
+export function useSetMatchHidden() {
+  const m = useSetMatchStatus();
+  return {
+    ...m,
+    mutate: ({ jobId, hidden }: { jobId: string; hidden: boolean }) => m.mutate({ jobId, status: hidden ? "DISMISSED" : "DISCOVERED" }),
+  };
+}
+
+/** "Save for later": bookmarks a match. */
+export function useSetMatchSaved() {
+  const m = useSetMatchStatus();
+  return {
+    ...m,
+    mutate: ({ jobId, saved }: { jobId: string; saved: boolean }) => m.mutate({ jobId, status: saved ? "SAVED" : "DISCOVERED" }),
+  };
 }
 
 // --- Location filter -----------------------------------------------------------------
@@ -205,4 +229,23 @@ export function isNewSince(job: Job, since: number | null): boolean {
   if (since === null || !job.created_at) return false;
   const t = new Date(job.created_at).getTime();
   return Number.isFinite(t) && t > since;
+}
+
+/** When the user last left a page, without recording this visit (for counts elsewhere). */
+export function readLastVisit(page: string): number | null {
+  try {
+    const v = Number(localStorage.getItem(`jobcopilot_last_visit_${page}`));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** "Find new jobs": checks for postings now (we also check every hour automatically). */
+export function useFindNewJobs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ status?: string; message?: string; matched_and_saved?: number }>("/discovery/run", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
 }

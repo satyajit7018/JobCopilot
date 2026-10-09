@@ -18,6 +18,7 @@ from app.api.routers.jobs_router import router as jobs_router
 from app.api.routers.negotiation_router import router as negotiation_router
 from app.api.routers.org_router import router as org_router
 from app.api.routers.profile_router import router as profile_router
+from app.api.routers.support_router import router as support_router
 from app.api.routers.vault_router import router as vault_router
 
 all_routers = [
@@ -37,6 +38,7 @@ all_routers = [
     org_router,
     account_router,
     compliance_router,
+    support_router,
 ]
 
 __all__ = [
@@ -56,6 +58,7 @@ __all__ = [
     "org_router",
     "account_router",
     "compliance_router",
+    "support_router",
     "all_routers",
 ]
 

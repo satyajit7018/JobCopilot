@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router";
-import { BriefcaseBusiness, Columns3, House, LogOut, Mic, Settings, ShieldCheck, Sparkles, UserRound, type LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, CircleHelp, Columns3, House, LogOut, MessageSquare, Mic, Settings, ShieldCheck, Sparkles, UserRound, type LucideIcon } from "lucide-react";
 import { initials, useAuth } from "../lib/auth";
 import { useIsPremium } from "../lib/billing";
 import { isMatch, useVisibleJobs } from "../lib/jobs";
 import { cx } from "./ui";
+import { FeedbackDialog } from "./FeedbackDialog";
 
 interface NavItem {
   to: string;
@@ -148,10 +149,12 @@ function UserMenu({ placement, compact }: { placement: "up" | "down"; compact?: 
 
   const isAdmin = user?.role?.toUpperCase() === "ADMIN";
   const premium = useIsPremium();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const close = () => setOpen(false);
 
   return (
     <div ref={ref} className="relative">
+      <FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -187,6 +190,21 @@ function UserMenu({ placement, compact }: { placement: "up" | "down"; compact?: 
           <MenuLink to="/plans" icon={<Sparkles className="size-4" />} onClick={close}>
             {premium ? "Premium" : "Upgrade to Premium"}
           </MenuLink>
+          <MenuLink to="/help" icon={<CircleHelp className="size-4" />} onClick={close}>
+            Help
+          </MenuLink>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              close();
+              setFeedbackOpen(true);
+            }}
+            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-ink-2 hover:bg-subtle hover:text-ink"
+          >
+            <MessageSquare className="size-4" aria-hidden />
+            Send feedback
+          </button>
           {isAdmin && (
             <MenuLink to="/admin" icon={<ShieldCheck className="size-4" />} onClick={close}>
               Admin

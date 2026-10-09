@@ -1,7 +1,7 @@
 // One application: its apply attempts, recruiter emails, status changes,
 // follow-up drafts and offer tools.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError } from "./api";
+import { api } from "./api";
 import { useIsPremium } from "./billing";
 import { STATUS_META, type ApplicationStatus, type Job, type Tone } from "./jobs";
 
@@ -36,18 +36,11 @@ export const INTENT_META: Record<EmailIntent, { label: string; tone: Tone }> = {
   OTHER: { label: "Email", tone: "neutral" },
 };
 
-/** The apply record for a job, or null if the bot never ran it (404). */
+/** The apply record for a job, or null if JobCopilot never applied to it. */
 export function useLedger(jobId: string) {
   return useQuery({
     queryKey: ["ledger", jobId],
-    queryFn: async () => {
-      try {
-        return (await api<{ ledger: LedgerEntry }>(`/bot/ledger/${encodeURIComponent(jobId)}`)).ledger;
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 404) return null;
-        throw err;
-      }
-    },
+    queryFn: async () => (await api<{ ledger: LedgerEntry | null }>(`/bot/ledger/${encodeURIComponent(jobId)}`)).ledger,
   });
 }
 

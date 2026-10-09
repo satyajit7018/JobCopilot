@@ -45,6 +45,6 @@ test.describe("Applications", () => {
     await page.getByLabel("Base salary").fill("32");
     await page.getByRole("button", { name: "Check this offer" }).click();
     await expect(page.getByText("32 LPA", { exact: true })).toBeVisible();
-    await expect(page.getByLabel("What you'd like")).not.toHaveValue("");
+    await expect(page.getByLabel("What you'd like", { exact: true })).not.toHaveValue("");
   });
 });
