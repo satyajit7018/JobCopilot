@@ -31,6 +31,7 @@ class ApplicationStatus(str, Enum):
     INTERVIEW = "INTERVIEW"
     REJECTED = "REJECTED"
     OFFER = "OFFER"
+    DISMISSED = "DISMISSED"  # "Not interested": hidden from matches, kept so searches don't bring it back
 
 
 class ApplyLedgerStatus(str, Enum):

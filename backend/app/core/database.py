@@ -982,19 +982,23 @@ class DatabaseManager(DatabaseAdapter):
     def _decrypt_profile_dict(p_dict: Dict[str, Any]) -> Dict[str, Any]:
         if not p_dict.get("_pii_encrypted"):
             return p_dict
+
+        def readable(value: str) -> str:
+            # A field we can no longer decrypt (lost or rotated key) is shown as empty,
+            # never as the vault's "[ENCRYPTED]" marker, which a save would then store.
+            plain = cred_vault.decrypt_field(value)
+            return "" if plain == "[ENCRYPTED]" else plain
+
         decrypted = dict(p_dict)
         if decrypted.get("phone"):
-            decrypted["phone"] = cred_vault.decrypt_field(decrypted["phone"])
+            decrypted["phone"] = readable(decrypted["phone"])
         if decrypted.get("location"):
-            decrypted["location"] = cred_vault.decrypt_field(decrypted["location"])
+            decrypted["location"] = readable(decrypted["location"])
         if "preferences" in decrypted and isinstance(decrypted["preferences"], dict):
             prefs = dict(decrypted["preferences"])
-            if prefs.get("expected_ctc"):
-                prefs["expected_ctc"] = cred_vault.decrypt_field(prefs["expected_ctc"])
-            if prefs.get("current_employer"):
-                prefs["current_employer"] = cred_vault.decrypt_field(prefs["current_employer"])
-            if prefs.get("why_looking_for_role"):
-                prefs["why_looking_for_role"] = cred_vault.decrypt_field(prefs["why_looking_for_role"])
+            for key in ("expected_ctc", "current_employer", "why_looking_for_role"):
+                if prefs.get(key):
+                    prefs[key] = readable(prefs[key])
             decrypted["preferences"] = prefs
         decrypted.pop("_pii_encrypted", None)
         return decrypted
