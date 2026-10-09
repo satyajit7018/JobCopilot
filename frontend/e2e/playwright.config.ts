@@ -3,7 +3,7 @@ import { API_URL, APP_PORT, APP_URL } from "./helpers/env";
 
 export default defineConfig({
   testDir: "./tests",
-  timeout: 45_000,
+  timeout: 90_000, // room for signIn to wait out the sign-in rate limit
   expect: { timeout: 8_000 },
   fullyParallel: false,
   workers: 1,

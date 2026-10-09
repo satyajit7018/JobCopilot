@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { Bookmark, BookmarkCheck, BriefcaseBusiness, Clock, ExternalLink, EyeOff, MapPin, RefreshCw, Search, Wallet } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { SearchProgress } from "../components/SearchProgress";
-import { Alert, Badge, Button, Card, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
-import { Link } from "react-router";
+import { Alert, Badge, Button, Card, Chip, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
+import { Link, useSearchParams } from "react-router";
 import {
+  HIDE_REASONS,
   REGION_LABELS,
   isMatch,
   isNewSince,
@@ -15,7 +16,9 @@ import {
   scorePercent,
   scoreTone,
   useFindNewJobs,
+  useHideReason,
   useLastVisit,
+  useRemoveSkipRule,
   useSetMatchHidden,
   useSetMatchSaved,
   useVisibleJobs,
@@ -34,20 +37,36 @@ function postedAt(job: Job) {
 
 export function JobsPage() {
   const { data, isPending, error, refetch, hiddenMatches: hidden } = useVisibleJobs();
-  const [sort, setSort] = useState<Sort>("match");
-  const [remoteOnly, setRemoteOnly] = useState(false);
-  const [savedOnly, setSavedOnly] = useState(false);
-  const [query, setQuery] = useState("");
-  const [region, setRegion] = useState<Region | "">("");
-  const [minMatch, setMinMatch] = useState(0);
+  // Filters live in the address, so coming back from a job keeps them (and the link can be shared).
+  const [params, setParams] = useSearchParams();
+  const setParam = (key: string, value: string | boolean | number, fallback: string | boolean | number) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value === fallback) next.delete(key);
+        else next.set(key, String(value));
+        if (key !== "n") next.delete("n");
+        return next;
+      },
+      { replace: true, preventScrollReset: true },
+    );
+  const sort: Sort = params.get("sort") === "newest" ? "newest" : "match";
+  const remoteOnly = params.get("remote") === "true";
+  const savedOnly = params.get("saved") === "true";
+  const query = params.get("q") ?? "";
+  const region = (params.get("region") ?? "") as Region | "";
+  const minMatch = Number(params.get("min")) || 0;
+  const limit = Math.max(PAGE_SIZE, Number(params.get("n")) || PAGE_SIZE);
+  const setSort = (v: Sort) => setParam("sort", v, "match");
+  const setRemoteOnly = (v: boolean) => setParam("remote", v, false);
+  const setSavedOnly = (v: boolean) => setParam("saved", v, false);
+  const setQuery = (v: string) => setParam("q", v, "");
+  const setRegion = (v: Region | "") => setParam("region", v, "");
+  const setMinMatch = (v: number) => setParam("min", v, 0);
   const lastVisit = useLastVisit("jobs");
   const hide = useSetMatchHidden();
   const [hiddenJob, setHiddenJob] = useState<Job | null>(null);
   const findNew = useFindNewJobs();
-  // Changing a filter or the sort starts again from the first page.
-  const filterKey = `${sort}|${remoteOnly}|${savedOnly}|${query}|${region}|${minMatch}`;
-  const [page, setPage] = useState({ key: filterKey, limit: PAGE_SIZE });
-  const limit = page.key === filterKey ? page.limit : PAGE_SIZE;
 
   const matches = useMemo(() => (data ?? []).filter(isMatch), [data]);
 
@@ -112,10 +131,10 @@ export function JobsPage() {
           <Chip on={sort === "newest"} onClick={() => setSort("newest")}>
             Newest
           </Chip>
-          <Chip on={remoteOnly} onClick={() => setRemoteOnly((v) => !v)}>
+          <Chip on={remoteOnly} onClick={() => setRemoteOnly(!remoteOnly)}>
             Remote
           </Chip>
-          <Chip on={savedOnly} onClick={() => setSavedOnly((v) => !v)}>
+          <Chip on={savedOnly} onClick={() => setSavedOnly(!savedOnly)}>
             Saved{savedCount > 0 && ` (${savedCount})`}
           </Chip>
           <FilterSelect
@@ -150,22 +169,14 @@ export function JobsPage() {
 
         <FindNewJobsStatus search={findNew} />
         {hiddenJob && (
-          <div className="mb-3 flex items-center gap-3 rounded-md border border-line bg-surface px-4 py-2.5" role="status">
-            <EyeOff className="size-4 flex-none text-ink-3" aria-hidden />
-            <p className="min-w-0 flex-1 truncate">
-              Hid <span className="font-medium">{hiddenJob.title}</span>. It won't come back in new searches.
-            </p>
-            <button
-              type="button"
-              className="font-medium text-accent hover:underline"
-              onClick={() => {
-                hide.mutate({ jobId: hiddenJob.job_id, hidden: false });
-                setHiddenJob(null);
-              }}
-            >
-              Undo
-            </button>
-          </div>
+          <HiddenNotice
+            key={hiddenJob.job_id}
+            job={hiddenJob}
+            onUndo={() => {
+              hide.mutate({ jobId: hiddenJob.job_id, hidden: false });
+              setHiddenJob(null);
+            }}
+          />
         )}
         {hide.error && (
           <div className="mb-3">
@@ -211,7 +222,7 @@ export function JobsPage() {
                 Showing {Math.min(limit, visible.length)} of {visible.length}
               </p>
               {limit < visible.length && (
-                <Button onClick={() => setPage({ key: filterKey, limit: limit + PAGE_SIZE })}>
+                <Button onClick={() => setParam("n", limit + PAGE_SIZE, PAGE_SIZE)}>
                   Show {Math.min(PAGE_SIZE, visible.length - limit)} more
                 </Button>
               )}
@@ -220,22 +231,6 @@ export function JobsPage() {
         )}
       </div>
     </>
-  );
-}
-
-function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onClick}
-      className={cx(
-        "h-8 rounded-full border px-3 font-medium",
-        on ? "border-accent bg-accent-soft text-accent-ink" : "border-line bg-surface text-ink-2 hover:bg-subtle",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -311,7 +306,7 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
         </div>
       </div>
       <div className="flex items-center gap-4 pl-13 sm:pl-0">
-        <div className="w-14 text-center" aria-label={`${pct}% match`}>
+        <div className="w-14 text-center" aria-label={`${pct}% match`} title="Resume match, not your chance of an interview">
           <span className={cx("block text-lg leading-none font-bold", toneText[tone])}>{pct}</span>
           <span className="text-xs tracking-wide text-ink-3 uppercase">match</span>
         </div>
@@ -335,6 +330,65 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
         </Link>
       </div>
     </li>
+  );
+}
+
+/** After "Not interested": undo, and an optional reason that tunes new searches. */
+function HiddenNotice({ job, onUndo }: { job: Job; onUndo: () => void }) {
+  const why = useHideReason();
+  const removeRule = useRemoveSkipRule();
+  const answered = why.isSuccess;
+  const rule = why.data?.rule ?? null;
+  return (
+    <div className="mb-3 rounded-md border border-line bg-surface px-4 py-2.5" role="status">
+      <div className="flex items-center gap-3">
+        <EyeOff className="size-4 flex-none text-ink-3" aria-hidden />
+        <p className="min-w-0 flex-1 truncate">
+          Hid <span className="font-medium">{job.title}</span>. It won't come back in new searches.
+        </p>
+        <button
+          type="button"
+          className="font-medium text-accent hover:underline"
+          onClick={() => {
+            if (rule) removeRule.mutate(rule.id);
+            onUndo();
+          }}
+        >
+          Undo
+        </button>
+      </div>
+      {answered ? (
+        <p className="mt-1.5 pl-7 text-ink-2">
+          {rule ? (
+            <>
+              Got it. New searches will skip {rule.label.charAt(0).toLowerCase() + rule.label.slice(1)}. You can change this in{" "}
+              <Link to="/profile" className="text-accent hover:underline">
+                Profile
+              </Link>
+              .
+            </>
+          ) : (
+            (why.data?.note ?? "Thanks, noted.")
+          )}
+        </p>
+      ) : (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-7" role="group" aria-label="Why not? (optional)">
+          <span className="mr-1 text-ink-3">Why not?</span>
+          {HIDE_REASONS.map((r) => (
+            <button
+              key={r.value}
+              type="button"
+              disabled={why.isPending}
+              onClick={() => why.mutate({ jobId: job.job_id, reason: r.value })}
+              className="h-7 rounded-full border border-line px-2.5 text-xs font-medium text-ink-2 hover:bg-subtle disabled:opacity-60"
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {why.error && <p className="mt-1.5 pl-7 text-danger">Couldn't save that: {why.error.message}</p>}
+    </div>
   );
 }
 

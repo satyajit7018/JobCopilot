@@ -5,9 +5,21 @@ import { api } from "./api";
 
 export type SubmissionMode = "DRY_RUN" | "LIVE";
 
+export type ResumeWording = "ai" | "original";
+
+/** One experience bullet the AI reworded for this job, next to the user's own words. */
+export interface ResumeChange {
+  role: string;
+  company: string;
+  before: string;
+  after: string;
+}
+
 export interface TailorResult {
   cover_letter: string;
   pdf_hash: string;
+  resume_wording: ResumeWording;
+  resume_changes: ResumeChange[];
 }
 
 export interface ApplyResult {
@@ -42,6 +54,14 @@ export interface HeldQuestion {
 export function useTailor(jobId: string) {
   return useMutation({
     mutationFn: () => api<TailorResult>(`/jobs/${encodeURIComponent(jobId)}/tailor`, { method: "POST" }),
+  });
+}
+
+/** Picks the AI wording or the user's own for this job's resume; applying uses the pick. */
+export function useSetResumeWording(jobId: string) {
+  return useMutation({
+    mutationFn: (choice: ResumeWording) =>
+      api(`/jobs/${encodeURIComponent(jobId)}/resume-wording`, { method: "PUT", body: { choice } }).then(() => choice),
   });
 }
 

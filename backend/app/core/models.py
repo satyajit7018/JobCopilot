@@ -116,6 +116,8 @@ class RecruiterPreferences(BaseModel):
     company_blacklist: List[str] = Field(default_factory=list)
     company_whitelist: List[str] = Field(default_factory=list)
     current_employer: Optional[str] = None  # Used for stealth mode employer blacklisting
+    # "Not interested because..." rules new searches follow (see core/match_feedback.py).
+    skip_rules: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class ResumeVariant(BaseModel):

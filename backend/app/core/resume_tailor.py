@@ -97,7 +97,8 @@ class ResumeTailor:
         profile: CandidateProfile,
         job_title: str,
         job_description: str,
-        company_name: str = "Target Company"
+        company_name: str = "Target Company",
+        wording: Optional[Dict[str, Any]] = None,
     ) -> Tuple[CandidateProfile, List[str]]:
         """
         AI-powered profile tailoring: uses LLM to optimize work experience bullets
@@ -111,6 +112,12 @@ class ResumeTailor:
 
         if not tailored.experience or not matched_skills:
             return tailored, matched_skills
+
+        # The user already saw this job's wording: send exactly that (or their own words).
+        if wording:
+            if wording.get("choice") == "original":
+                return tailored, matched_skills
+            return cls._apply_wording(tailored, wording), matched_skills
 
         # 2. LLM-optimized bullet refinement
         async def _llm_refine():
@@ -156,12 +163,21 @@ class ResumeTailor:
         Generates and compiles a bespoke, tailored PDF resume for a specific job application.
         Returns (pdf_path, content_hash, tailored_profile).
         """
+        wording = cls.current_wording(profile, job_id, job_title, job_description)
         tailored_profile, matched_skills = await cls.tailor_profile_for_job_async(
             profile=profile,
             job_title=job_title,
             job_description=job_description,
-            company_name=company_name
+            company_name=company_name,
+            wording=wording,
         )
+        if wording is None and tailored_profile.experience:
+            # First time for this job: keep the AI wording so what's sent is what was shown.
+            cls.save_wording(profile.user_id, job_id, {
+                "choice": "ai",
+                "source": cls._source_hash(cls.tailor_profile_for_job(profile, job_title, job_description)[0]),
+                "experience": [exp.highlights for exp in tailored_profile.experience],
+            })
         html_content = ResumeCompiler.generate_resume_html(tailored_profile, tailored_skills=matched_skills[:6])
 
         # Generate unique content hash
@@ -178,3 +194,65 @@ class ResumeTailor:
         await ResumeCompiler.compile_to_pdf(html_content, out_path)
 
         return out_path, content_hash, tailored_profile
+
+    # --- Reviewable AI wording -------------------------------------------------------------
+    # The AI rewords a few experience bullets per job. The user sees each change next to
+    # their own words and picks one; both the preview and the real application use that pick.
+
+    @staticmethod
+    def _wording_path(user_id: str, job_id: str) -> Path:
+        safe = re.sub(r"[^A-Za-z0-9_-]", "_", job_id)
+        return settings.user_files_dir(user_id, "tailored") / f"{safe}.wording.json"
+
+    @classmethod
+    def load_wording(cls, user_id: str, job_id: str) -> Optional[Dict[str, Any]]:
+        import json
+        path = cls._wording_path(user_id, job_id)
+        try:
+            return json.loads(path.read_text()) if path.exists() else None
+        except (OSError, ValueError):
+            return None
+
+    @classmethod
+    def save_wording(cls, user_id: str, job_id: str, wording: Dict[str, Any]) -> None:
+        import json
+        cls._wording_path(user_id, job_id).write_text(json.dumps(wording))
+
+    @staticmethod
+    def _source_hash(mine: CandidateProfile) -> str:
+        """Identifies the user's own bullets, so wording made from an older resume is never used."""
+        return hashlib.sha256(repr([exp.highlights for exp in mine.experience]).encode()).hexdigest()[:16]
+
+    @classmethod
+    def current_wording(cls, profile: CandidateProfile, job_id: str, job_title: str,
+                        job_description: str) -> Optional[Dict[str, Any]]:
+        """The saved wording for this job, if it was made from the resume as it is now."""
+        wording = cls.load_wording(profile.user_id, job_id)
+        if not wording:
+            return None
+        mine, _ = cls.tailor_profile_for_job(profile, job_title, job_description)
+        return wording if wording.get("source") == cls._source_hash(mine) else None
+
+    @staticmethod
+    def _apply_wording(tailored: CandidateProfile, wording: Dict[str, Any]) -> CandidateProfile:
+        saved = wording.get("experience") or []
+        for exp, highlights in zip(tailored.experience, saved):
+            # Only if the role still has the same number of bullets (the resume may have changed since).
+            if isinstance(highlights, list) and len(highlights) == len(exp.highlights):
+                exp.highlights = list(highlights)
+        return tailored
+
+    @classmethod
+    def wording_changes(cls, profile: CandidateProfile, job_title: str, job_description: str,
+                        wording: Optional[Dict[str, Any]]) -> List[Dict[str, str]]:
+        """Each reworded bullet next to the user's own wording."""
+        if not wording:
+            return []
+        mine, _ = cls.tailor_profile_for_job(profile, job_title, job_description)
+        ai = cls._apply_wording(copy.deepcopy(mine), {**wording, "choice": "ai"})
+        changes = []
+        for exp_mine, exp_ai in zip(mine.experience, ai.experience):
+            for before, after in zip(exp_mine.highlights, exp_ai.highlights):
+                if before.strip() != after.strip():
+                    changes.append({"role": exp_mine.title, "company": exp_mine.company, "before": before, "after": after})
+        return changes

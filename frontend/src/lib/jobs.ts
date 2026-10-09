@@ -159,6 +159,48 @@ export function useSetMatchHidden() {
   };
 }
 
+// --- "Not interested because..." ------------------------------------------------------
+
+export type HideReason = "seniority" | "location" | "field" | "salary" | "company" | "other";
+
+export const HIDE_REASONS: { value: HideReason; label: string }[] = [
+  { value: "seniority", label: "Wrong level" },
+  { value: "location", label: "Too far away" },
+  { value: "salary", label: "Pay too low" },
+  { value: "field", label: "Not my field" },
+  { value: "company", label: "Not this company" },
+  { value: "other", label: "Something else" },
+];
+
+/** Something new searches skip because of a reason the user gave. */
+export interface SkipRule {
+  id: string;
+  kind: string;
+  label: string;
+}
+
+export function useSkipRules() {
+  return useQuery({ queryKey: ["skip-rules"], queryFn: () => api<{ rules: SkipRule[] }>("/match-preferences").then((r) => r.rules) });
+}
+
+/** Tells us why a hidden job wasn't right; returns the rule it created, or why it made none. */
+export function useHideReason() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, reason }: { jobId: string; reason: HideReason }) =>
+      api<{ rule: SkipRule | null; note: string | null }>(`/jobs/${encodeURIComponent(jobId)}/not-interested`, { method: "POST", body: { reason } }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["skip-rules"] }),
+  });
+}
+
+export function useRemoveSkipRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleId: string) => api(`/match-preferences/${encodeURIComponent(ruleId)}`, { method: "DELETE" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["skip-rules"] }),
+  });
+}
+
 /** "Save for later": bookmarks a match. */
 export function useSetMatchSaved() {
   const m = useSetMatchStatus();

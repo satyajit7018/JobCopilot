@@ -68,6 +68,10 @@ async def upload_resume(
 
     profile.id = target_profile_id
     profile.user_id = user_id
+    # A new resume replaces what we read, not what the user told us to skip.
+    previous = db.get_profile(user_id=user_id)
+    if previous:
+        profile.preferences.skip_rules = previous.preferences.skip_rules
     db.save_profile(profile, user_id=user_id)
     await _profile_changed(user_id)
     vault.seed_from_profile(profile)
