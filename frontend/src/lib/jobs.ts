@@ -206,3 +206,22 @@ export function isNewSince(job: Job, since: number | null): boolean {
   const t = new Date(job.created_at).getTime();
   return Number.isFinite(t) && t > since;
 }
+
+/** When the user last left a page, without recording this visit (for counts elsewhere). */
+export function readLastVisit(page: string): number | null {
+  try {
+    const v = Number(localStorage.getItem(`jobcopilot_last_visit_${page}`));
+    return Number.isFinite(v) && v > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** "Find new jobs": checks for postings now (we also check every hour automatically). */
+export function useFindNewJobs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ status?: string; message?: string; matched_and_saved?: number }>("/discovery/run", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
+}

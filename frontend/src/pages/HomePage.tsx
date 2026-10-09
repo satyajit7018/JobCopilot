@@ -4,7 +4,7 @@ import { ArrowRight, BriefcaseBusiness, CalendarClock, CircleAlert, MailQuestion
 import { PageHeader } from "../components/AppShell";
 import { Alert, Card, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
 import { useAuth } from "../lib/auth";
-import { isMatch, matchSummary, scorePercent, scoreTone, useVisibleJobs, type Job } from "../lib/jobs";
+import { isMatch, isNewSince, matchSummary, readLastVisit, scorePercent, scoreTone, useVisibleJobs, type Job } from "../lib/jobs";
 import { needsSetup as profileNeedsSetup, setupLater, useProfile } from "../lib/profile";
 import { SetupReminder } from "./SetupPage";
 
@@ -68,6 +68,23 @@ export function buildTodos(jobs: Job[], now: Date = new Date()): Todo[] {
       detail: `No reply in ${FOLLOW_UP_DAYS}+ days`,
       to: quiet.length === 1 ? `/applications/${encodeURIComponent(quiet[0].job_id)}` : "/applications",
       cta: "View",
+    });
+  }
+
+  const since = readLastVisit("jobs");
+  const fresh = since === null ? [] : jobs.filter((j) => isMatch(j) && isNewSince(j, since));
+  if (fresh.length) {
+    todos.push({
+      key: "new",
+      icon: <BriefcaseBusiness className="size-4" />,
+      dot: "bg-accent",
+      title: fresh.length === 1 ? "1 new match since your last visit" : `${fresh.length} new matches since your last visit`,
+      detail: fresh
+        .slice(0, 2)
+        .map((j) => j.company)
+        .join(", "),
+      to: "/jobs",
+      cta: "See new",
     });
   }
 

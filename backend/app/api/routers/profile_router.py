@@ -21,6 +21,12 @@ from app.core.vector_vault import vault
 router = APIRouter(tags=["profile"])
 
 
+async def _profile_changed(user_id: str) -> None:
+    """A changed profile can match postings that were rejected before, so score them again."""
+    from app.core.cache import cache_manager
+    await cache_manager.invalidate_namespace(user_id, "discovery_seen")
+
+
 class BackgroundUpdateRequest(BaseModel):
     """Corrections to what was read from the resume."""
     profile_id: Optional[str] = None
@@ -63,6 +69,7 @@ async def upload_resume(
     profile.id = target_profile_id
     profile.user_id = user_id
     db.save_profile(profile, user_id=user_id)
+    await _profile_changed(user_id)
     vault.seed_from_profile(profile)
 
     prefilled_data = QuestionnaireEngine.prefill_from_profile(profile)
@@ -106,6 +113,7 @@ async def update_background(payload: BackgroundUpdateRequest, current_user: User
     profile.education = [e for e in payload.education if (e.degree or "").strip() or (e.institution or "").strip()]
     profile.updated_at = datetime.now().isoformat()
     db.save_profile(profile, user_id=user_id)
+    await _profile_changed(user_id)
     return {"status": "success", "profile": profile.dict()}
 
 
@@ -147,6 +155,7 @@ async def submit_questionnaire(
     updated_profile.id = target_id
     updated_profile.user_id = user_id
     db.save_profile(updated_profile, user_id=user_id)
+    await _profile_changed(user_id)
     vault.seed_from_profile(updated_profile)
 
     return {

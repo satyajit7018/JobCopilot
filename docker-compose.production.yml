@@ -123,6 +123,36 @@ services:
       api:
         condition: service_started
 
+  # Queues the hourly job search for every user (app/tasks/discovery_task.py).
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: jobcopilot_beat
+    restart: always
+    command: ["celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info", "--schedule", "/data/celerybeat-schedule"]
+    healthcheck:
+      disable: true
+    environment:
+      - ENV=production
+      - DEBUG=false
+      - DB_MODE=postgres
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-jobcopilot}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jobcopilot}
+      - JOBCOPILOT_DATA_DIR=/data
+      - REDIS_URL=redis://redis:6379/0
+      - USE_CELERY=true
+      - JWT_SECRET=${JWT_SECRET}
+      - JOBCOPILOT_MASTER_KEY=${JOBCOPILOT_MASTER_KEY}
+      - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - INBOUND_EMAIL_WEBHOOK_SECRET=${INBOUND_EMAIL_WEBHOOK_SECRET}
+    volumes:
+      - jobcopilot_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      celery_worker:
+        condition: service_started
+
   frontend:
     build:
       context: ./frontend

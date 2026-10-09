@@ -20,6 +20,7 @@ try:
     if USE_CELERY:
         try:
             from celery import Celery  # type: ignore
+            from celery.schedules import crontab  # type: ignore
             celery_app = Celery(
                 "jobcopilot",
                 broker=REDIS_URL,
@@ -44,7 +45,14 @@ try:
                 # The worker is started with `-A app.tasks.celery_app`; without this include the
                 # apply task module is never imported and every apply job is rejected as
                 # an unregistered task (found while verifying audit P1-1).
-                include=["app.tasks.apply_task"],
+                include=["app.tasks.apply_task", "app.tasks.discovery_task"],
+                # Celery beat (its own container) queues the hourly job search.
+                beat_schedule={
+                    "hourly-job-search": {
+                        "task": "jobcopilot.low.hourly_discovery",
+                        "schedule": crontab(minute=7),
+                    },
+                },
             )
         except ImportError:
             logger.warning("Celery package is not installed. Falling back to in-memory async task runner.")

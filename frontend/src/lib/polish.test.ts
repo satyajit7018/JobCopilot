@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isNewSince, isRemote, jobRegions, type Job } from "./jobs";
 import { splitSkills } from "./profile";
-import { searchStage } from "../pages/SetupPage";
+import { searchStage } from "../components/SearchProgress";
 
 const job = (over: Partial<Job> = {}): Job =>
   ({ job_id: "j", company: "Acme", title: "Engineer", location: "", created_at: null, status: "DISCOVERED", ...over }) as Job;

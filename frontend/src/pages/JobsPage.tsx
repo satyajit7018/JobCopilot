@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { BriefcaseBusiness, Clock, ExternalLink, EyeOff, MapPin, Search, Wallet } from "lucide-react";
+import { BriefcaseBusiness, Clock, ExternalLink, EyeOff, MapPin, RefreshCw, Search, Wallet } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
+import { SearchProgress } from "../components/SearchProgress";
 import { Alert, Badge, Button, Card, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
 import { Link } from "react-router";
 import {
@@ -13,6 +14,7 @@ import {
   relativeTime,
   scorePercent,
   scoreTone,
+  useFindNewJobs,
   useLastVisit,
   useSetMatchHidden,
   useVisibleJobs,
@@ -39,6 +41,7 @@ export function JobsPage() {
   const lastVisit = useLastVisit("jobs");
   const hide = useSetMatchHidden();
   const [hiddenJob, setHiddenJob] = useState<Job | null>(null);
+  const findNew = useFindNewJobs();
   // Changing a filter or the sort starts again from the first page.
   const filterKey = `${sort}|${remoteOnly}|${query}|${region}|${minMatch}`;
   const [page, setPage] = useState({ key: filterKey, limit: PAGE_SIZE });
@@ -129,6 +132,7 @@ export function JobsPage() {
           </label>
         </div>
 
+        <FindNewJobs search={findNew} />
         {hiddenJob && (
           <div className="mb-3 flex items-center gap-3 rounded-md border border-line bg-surface px-4 py-2.5" role="status">
             <EyeOff className="size-4 flex-none text-ink-3" aria-hidden />
@@ -302,5 +306,27 @@ function JobRow({ job, isNew, onHide }: { job: Job; isNew: boolean; onHide: () =
         </Link>
       </div>
     </li>
+  );
+}
+
+function FindNewJobs({ search }: { search: ReturnType<typeof useFindNewJobs> }) {
+  const found = search.data?.matched_and_saved ?? 0;
+  return (
+    <div className="mb-4 flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <Button loading={search.isPending} onClick={() => search.mutate()}>
+          <RefreshCw className="size-4" aria-hidden />
+          Find new jobs
+        </Button>
+        <p className="text-ink-3">We also check for new jobs every hour.</p>
+      </div>
+      {search.isPending && <SearchProgress />}
+      {search.isSuccess && (
+        <p className="text-ink-2" role="status">
+          {found > 0 ? `Found ${found} new ${found === 1 ? "match" : "matches"}. They're marked New.` : "No new matches since the last check."}
+        </p>
+      )}
+      {search.error && <Alert tone="warn">{search.error.message}</Alert>}
+    </div>
   );
 }
