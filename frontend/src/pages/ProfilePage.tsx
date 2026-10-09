@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "react-router";
 import { Check, FileText } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { PreferenceFields, ResumeDrop, SourceFields } from "../components/profile";
+import { BackgroundEditor, PreferenceFields, ResumeDrop, SourceFields } from "../components/profile";
 import { Alert, Badge, Button, Card, Field, Spinner, Textarea } from "../components/ui";
 import { relativeTime } from "../lib/jobs";
 import {
@@ -78,6 +78,7 @@ export function ProfilePage() {
 
 function ResumeSection({ profile, onReplaced }: { profile: Profile; onReplaced: () => void }) {
   const [replacing, setReplacing] = useState(false);
+  const [editing, setEditing] = useState(false);
   const upload = useUploadResume();
   const save = useSaveAnswers();
 
@@ -97,7 +98,7 @@ function ResumeSection({ profile, onReplaced }: { profile: Profile; onReplaced: 
 
   const extra = profile.skills.length - SKILLS_SHOWN;
   return (
-    <Section title="Resume" description="What we read from your resume. It's used to match and tailor applications.">
+    <Section title="Resume" description="What we read from your resume. It's used to match jobs and fill in applications, so fix anything we got wrong.">
       {replacing ? (
         <>
           <ResumeDrop compact busy={upload.isPending || save.isPending} error={upload.error?.message ?? save.error?.message} onSubmit={replace} />
@@ -107,6 +108,8 @@ function ResumeSection({ profile, onReplaced }: { profile: Profile; onReplaced: 
             </Button>
           </div>
         </>
+      ) : editing ? (
+        <BackgroundEditor profile={profile} submitLabel="Save changes" onSaved={() => setEditing(false)} onCancel={() => setEditing(false)} />
       ) : (
         <div className="flex flex-col gap-5">
           <div className="flex items-start gap-3">
@@ -117,9 +120,14 @@ function ResumeSection({ profile, onReplaced }: { profile: Profile; onReplaced: 
               <p className="font-semibold">{profile.full_name}</p>
               <p className="text-ink-2">{[profile.location, profile.email].filter(Boolean).join(" · ")}</p>
             </div>
-            <Button size="sm" onClick={() => setReplacing(true)}>
-              Replace
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setReplacing(true)}>
+                Replace
+              </Button>
+            </div>
           </div>
 
           {profile.summary && <p className="text-ink-2">{profile.summary}</p>}

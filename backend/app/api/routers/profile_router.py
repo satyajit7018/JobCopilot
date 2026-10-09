@@ -3,21 +3,30 @@ JobCopilot - Candidate Profile & Questionnaire Router
 Handles resume uploading/parsing, candidate profile management, and recruiter questionnaire configuration.
 """
 
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.api.auth import get_current_user
 from app.core.config import RESUMES_DIR
 from app.core.database import db
-from app.core.models import CandidateProfile, User
+from app.core.models import CandidateProfile, Education, User, WorkExperience
 from app.core.questionnaire import QuestionnaireEngine
 from app.core.resume_parser import ResumeParser
 from app.core.vector_vault import vault
 
 router = APIRouter(tags=["profile"])
+
+
+class BackgroundUpdateRequest(BaseModel):
+    """Corrections to what was read from the resume."""
+    profile_id: Optional[str] = None
+    skills: List[str] = Field(default_factory=list, max_length=80)
+    experience: List[WorkExperience] = Field(default_factory=list, max_length=25)
+    education: List[Education] = Field(default_factory=list, max_length=10)
 
 
 class QuestionnaireSubmitRequest(BaseModel):
@@ -76,6 +85,27 @@ async def get_profile(
     profile = db.get_profile(user_id=current_user.user_id, profile_id=profile_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Candidate profile not found. Please upload a resume.")
+    return {"status": "success", "profile": profile.dict()}
+
+
+@router.put("/profile/background")
+async def update_background(payload: BackgroundUpdateRequest, current_user: User = Depends(get_current_user)):
+    """Saves the user's corrections to skills, work history and education."""
+    user_id = current_user.user_id
+    profile = db.get_profile(user_id=user_id, profile_id=payload.profile_id or user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Upload your resume first.")
+
+    skills: List[str] = []
+    for skill in payload.skills:
+        clean = " ".join(skill.split())[:60]
+        if clean and clean.lower() not in {s.lower() for s in skills}:
+            skills.append(clean)
+    profile.skills = skills
+    profile.experience = [x for x in payload.experience if (x.title or "").strip() or (x.company or "").strip()]
+    profile.education = [e for e in payload.education if (e.degree or "").strip() or (e.institution or "").strip()]
+    profile.updated_at = datetime.now().isoformat()
+    db.save_profile(profile, user_id=user_id)
     return {"status": "success", "profile": profile.dict()}
 
 

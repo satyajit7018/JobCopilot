@@ -127,6 +127,31 @@ export function useSaveAnswers() {
   });
 }
 
+export interface Background {
+  skills: string[];
+  experience: Experience[];
+  education: Education[];
+}
+
+/** Saves corrections to what was read from the resume. */
+export function useSaveBackground() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (background: Background) => api<{ profile: Profile }>("/profile/background", { method: "PUT", body: background }),
+    onSuccess: ({ profile }) => {
+      qc.setQueryData(["profile"], profile);
+    },
+  });
+}
+
+/** Splits "Python, Go; FastAPI" into separate skills. */
+export function splitSkills(text: string): string[] {
+  return text
+    .split(/[,;\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 export const RESUME_TYPES = ".pdf,.docx,.doc,.txt";
 export const MAX_RESUME_BYTES = 10 * 1024 * 1024;
 
