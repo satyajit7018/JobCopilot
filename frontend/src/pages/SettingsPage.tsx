@@ -1,22 +1,20 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router";
+import { Link } from "react-router";
 import QRCode from "qrcode";
-import { Check, Download, Laptop, ShieldCheck, ShieldOff, TriangleAlert } from "lucide-react";
+import { Check, Download, Laptop, ShieldCheck, ShieldOff, Sparkles, TriangleAlert } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CopyButton, Field, Spinner } from "../components/ui";
+import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CopyButton, Field, Spinner, buttonClass } from "../components/ui";
 import { GoogleButton } from "../components/GoogleButton";
 import { useLiveConsent, useSetLiveConsent } from "../lib/apply";
 import { useAuth, usePublicConfig } from "../lib/auth";
+import { subscriptionIsLive, useBillingPlan, useCancelPremium, useIsPremium } from "../lib/billing";
 import { relativeTime } from "../lib/jobs";
 import {
   eventLabel,
-  useBillingPortal,
-  useCheckout,
   useConfirmMfa,
   useDeleteAccount,
   useDisableMfa,
   useExportData,
-  usePlan,
   useRevokeSession,
   useSecurityActivity,
   useSessions,
@@ -37,17 +35,14 @@ function Section({ title, description, children, tone }: { title: string; descri
   );
 }
 
-const TIER_LABEL: Record<string, string> = { FREE: "Free", PRO: "Pro", ELITE: "Elite", ADMIN: "Admin" };
-
 export function SettingsPage() {
-  const [params] = useSearchParams();
+  const premium = useIsPremium();
   return (
     <>
       <PageHeader title="Settings" />
       <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-5 md:px-7 md:py-8">
-        {params.get("billing") === "success" && <Alert tone="ok">Thanks! Your plan is being updated. It can take a minute to show here.</Alert>}
         <PlanSection />
-        <AutomationSection />
+        {premium && <AutomationSection />}
         <TwoStepSection />
         <DevicesSection />
         <ActivitySection />
@@ -57,49 +52,67 @@ export function SettingsPage() {
   );
 }
 
+function formatDay(iso: string | null | undefined) {
+  return iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }) : null;
+}
+
 function PlanSection() {
-  const plan = usePlan();
-  const checkout = useCheckout();
-  const portal = useBillingPortal();
-  const p = plan.data;
-  const free = p?.tier === "FREE";
-  const error = checkout.error ?? portal.error;
+  const { user } = useAuth();
+  const premium = useIsPremium();
+  const plan = useBillingPlan();
+  const cancel = useCancelPremium();
+  const [confirming, setConfirming] = useState(false);
+  const sub = plan.data?.subscription;
+  const live = subscriptionIsLive(sub);
+  const until = formatDay(sub?.current_end);
 
   return (
     <Section title="Plan">
       {plan.isPending ? (
         <Spinner />
-      ) : !p ? (
-        <Alert>Couldn't load your plan: {plan.error?.message ?? "no data"}</Alert>
+      ) : !premium ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1">
+            <p className="text-lg font-semibold">Free</p>
+            <p className="text-ink-2">Job matches and tracking. Premium adds tailored applications, automatic applying, inbox tracking and interview prep.</p>
+          </div>
+          <Link to="/plans" className={buttonClass("primary")}>
+            <Sparkles className="size-4" aria-hidden />
+            See Premium
+          </Link>
+        </div>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-lg font-semibold">{TIER_LABEL[p.tier] ?? p.tier}</span>
-            {p.price_usd_monthly > 0 && <span className="text-ink-2">${p.price_usd_monthly}/month</span>}
-          </div>
-          <p className="text-ink-2">
-            {p.daily_limit === "Unlimited"
-              ? `Unlimited applications. ${p.applied_today} sent today.`
-              : `${p.applied_today} of ${p.daily_limit} applications used today. Resets daily.`}
+        <div className="flex flex-col gap-3">
+          <p className="flex items-center gap-2 text-lg font-semibold">
+            <Sparkles className="size-4 text-accent" aria-hidden />
+            Premium
           </p>
-          {error && <Alert tone="warn">{error.message}</Alert>}
-          <div className="flex flex-wrap gap-2">
-            {free ? (
-              <>
-                <Button variant="primary" loading={checkout.isPending && checkout.variables === "PRO"} onClick={() => checkout.mutate("PRO")}>
-                  Upgrade to Pro
+          {user?.role === "ADMIN" && !live ? (
+            <p className="text-ink-2">Included with your admin account.</p>
+          ) : sub?.status === "cancelling" ? (
+            <p className="text-ink-2">Cancelled. You keep Premium{until ? ` until ${until}` : " until the end of this month"}, then move to Free.</p>
+          ) : sub?.status === "pending" ? (
+            <Alert tone="warn">Your last payment didn't go through. Razorpay will retry; update your card from the link in their email.</Alert>
+          ) : (
+            <p className="text-ink-2">{until ? `Renews on ${until}.` : "Renews monthly."} Payments are handled by Razorpay.</p>
+          )}
+          {cancel.error && <Alert>{cancel.error.message}</Alert>}
+          {live && sub?.status !== "cancelling" &&
+            (confirming ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="w-full text-ink-2">Cancel Premium? You'll keep it until the end of the month you've paid for.</p>
+                <Button variant="danger" loading={cancel.isPending} onClick={() => cancel.mutate(undefined, { onSuccess: () => setConfirming(false) })}>
+                  Cancel Premium
                 </Button>
-                <Button loading={checkout.isPending && checkout.variables === "ELITE"} onClick={() => checkout.mutate("ELITE")}>
-                  Upgrade to Elite
+                <Button variant="ghost" onClick={() => setConfirming(false)}>
+                  Keep it
                 </Button>
-              </>
+              </div>
             ) : (
-              <Button loading={portal.isPending} onClick={() => portal.mutate()}>
-                Manage billing
+              <Button className="self-start" onClick={() => setConfirming(true)}>
+                Cancel Premium…
               </Button>
-            )}
-          </div>
-          {free && <p className="text-xs text-ink-3">You'll pay on Stripe's secure page. Cancel any time.</p>}
+            ))}
         </div>
       )}
     </Section>

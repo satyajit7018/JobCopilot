@@ -2,6 +2,7 @@
 // follow-up drafts and offer tools.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./api";
+import { useIsPremium } from "./billing";
 import { STATUS_META, type ApplicationStatus, type Job, type Tone } from "./jobs";
 
 export interface LedgerEntry {
@@ -50,10 +51,12 @@ export function useLedger(jobId: string) {
   });
 }
 
+/** Recruiter emails we picked up. Inbox tracking is Premium, so Free accounts simply have none. */
 export function useEmails() {
+  const premium = useIsPremium();
   return useQuery({
-    queryKey: ["emails"],
-    queryFn: async () => (await api<{ messages: Email[] }>("/email/messages")).messages,
+    queryKey: ["emails", premium],
+    queryFn: async () => (premium ? (await api<{ messages: Email[] }>("/email/messages")).messages : []),
   });
 }
 

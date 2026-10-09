@@ -59,6 +59,14 @@ services:
       - METRICS_TOKEN=${METRICS_TOKEN:-}
       # Email + password accounts need SMTP for confirmation/reset emails; Google-only until then.
       - PASSWORD_AUTH_ENABLED=${PASSWORD_AUTH_ENABLED:-false}
+      # Premium payments (Razorpay). Leave empty to launch with Premium shown as "coming soon".
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
+      - RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET:-}
+      - RAZORPAY_PLAN_ID_INR=${RAZORPAY_PLAN_ID_INR:-}
+      - RAZORPAY_PLAN_ID_USD=${RAZORPAY_PLAN_ID_USD:-}
+      - PREMIUM_PRICE_INR=${PREMIUM_PRICE_INR:-199}
+      - PREMIUM_PRICE_USD=${PREMIUM_PRICE_USD:-5}
     volumes:
       - jobcopilot_data:/data
     depends_on:

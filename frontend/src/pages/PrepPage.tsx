@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { CalendarClock, Check, Mic } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
+import { PremiumLock } from "../components/PremiumLock";
+import { useIsPremium } from "../lib/billing";
 import { Alert, Badge, Button, Card, CopyButton, Field, Select, Spinner, Textarea, cx } from "../components/ui";
 import { useJobs, type Job } from "../lib/jobs";
 import {
@@ -51,6 +53,25 @@ function interviewLabel(j: Job) {
 }
 
 export function PrepPage() {
+  const premium = useIsPremium();
+  return premium ? <PrepTools /> : <PrepLocked />;
+}
+
+function PrepLocked() {
+  return (
+    <>
+      <PageHeader title="Prep" />
+      <div className="mx-auto max-w-3xl px-4 py-5 md:px-7 md:py-8">
+        <PremiumLock title="Get ready for every interview">
+          Likely questions for each role, practice answers with feedback, and questions to ask them. Your upcoming interviews show
+          here with everything you need.
+        </PremiumLock>
+      </div>
+    </>
+  );
+}
+
+function PrepTools() {
   const [params, setParams] = useSearchParams();
   const { data: jobs, isPending: jobsPending } = useJobs();
   const interviews = useMemo(

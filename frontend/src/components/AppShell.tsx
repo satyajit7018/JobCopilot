@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router";
-import { BriefcaseBusiness, Columns3, House, LogOut, Mic, Settings, ShieldCheck, UserRound, type LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, Columns3, House, LogOut, Mic, Settings, ShieldCheck, Sparkles, UserRound, type LucideIcon } from "lucide-react";
 import { initials, useAuth } from "../lib/auth";
+import { useIsPremium } from "../lib/billing";
 import { isMatch, useVisibleJobs } from "../lib/jobs";
 import { cx } from "./ui";
 
@@ -124,6 +125,7 @@ function UserMenu({ placement, compact }: { placement: "up" | "down"; compact?: 
   }, [open]);
 
   const isAdmin = user?.role?.toUpperCase() === "ADMIN";
+  const premium = useIsPremium();
   const close = () => setOpen(false);
 
   return (
@@ -159,6 +161,9 @@ function UserMenu({ placement, compact }: { placement: "up" | "down"; compact?: 
           </MenuLink>
           <MenuLink to="/settings" icon={<Settings className="size-4" />} onClick={close}>
             Settings
+          </MenuLink>
+          <MenuLink to="/plans" icon={<Sparkles className="size-4" />} onClick={close}>
+            {premium ? "Premium" : "Upgrade to Premium"}
           </MenuLink>
           {isAdmin && (
             <MenuLink to="/admin" icon={<ShieldCheck className="size-4" />} onClick={close}>

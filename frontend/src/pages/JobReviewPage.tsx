@@ -15,6 +15,9 @@ import {
   type SubmissionMode,
 } from "../lib/apply";
 import { STATUS_META, isMatch, scorePercent, scoreTone, useJobs, type Job } from "../lib/jobs";
+import { useSetStatus } from "../lib/application";
+import { useIsPremium } from "../lib/billing";
+import { PremiumLock } from "../components/PremiumLock";
 import { noticeLabel, useProfile } from "../lib/profile";
 
 const DESCRIPTION_PREVIEW = 700;
@@ -90,6 +93,7 @@ export function JobReviewPage() {
 
 function Review({ job, back }: { job: Job; back: ReactNode }) {
   const tailor = useTailor(job.job_id);
+  const premium = useIsPremium();
   const [taskId, setTaskId] = useState<string | null>(() => taskStore.get(job.job_id));
   const pct = scorePercent(job.match_score);
 
@@ -168,12 +172,22 @@ function Review({ job, back }: { job: Job; back: ReactNode }) {
               </div>
             </Section>
 
-            <Materials job={job} tailor={tailor} />
+            {premium ? (
+              <Materials job={job} tailor={tailor} />
+            ) : (
+              <Section title="Your application">
+                <PremiumLock title="Get your resume and cover letter written for this job">
+                  JobCopilot tailors your resume to the role and drafts a cover letter, so you can read both before anything is sent.
+                </PremiumLock>
+              </Section>
+            )}
           </div>
 
           {/* On phones the panel follows the materials; on desktop it's a sticky right column. */}
           <div className="lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-            {taskId ? (
+            {!premium ? (
+              <ApplyYourself job={job} />
+            ) : taskId ? (
               <Progress
                 taskId={taskId}
                 onRetry={() => {
@@ -389,6 +403,47 @@ function ApplyPanel({ job, prepared, onStarted }: { job: Job; prepared: boolean;
         </p>
       </div>
     </Card>
+  );
+}
+
+/** Free plan: apply on the employer's site, then track it here. */
+function ApplyYourself({ job }: { job: Job }) {
+  const setStatus = useSetStatus(job.job_id);
+  const applied = job.status !== "DISCOVERED" || setStatus.isSuccess;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="flex flex-col gap-3 p-5">
+        <h2 className="text-base font-semibold">Apply</h2>
+        {applied ? (
+          <>
+            <p className="flex items-center gap-1.5 font-medium text-ok" role="status">
+              <Check className="size-4" aria-hidden />
+              Added to your applications
+            </p>
+            <Link to={`/applications/${encodeURIComponent(job.job_id)}`} className={buttonClass("secondary")}>
+              Open in Applications
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="text-ink-2">Apply on {job.company}'s site, then come back and mark it applied so we can track it for you.</p>
+            <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("primary")}>
+              Open the application
+              <ExternalLink className="size-3.5" aria-hidden />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+            {setStatus.error && <Alert>Couldn't save: {setStatus.error.message}</Alert>}
+            <Button loading={setStatus.isPending} onClick={() => setStatus.mutate("SUBMITTED")}>
+              I've applied
+            </Button>
+          </>
+        )}
+      </Card>
+      <PremiumLock title="Let JobCopilot apply for you">
+        With Premium, JobCopilot fills in and submits the application. You approve each one first.
+      </PremiumLock>
+    </div>
   );
 }
 

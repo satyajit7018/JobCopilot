@@ -80,6 +80,7 @@ const router = createBrowserRouter([
               // Less-visited pages load on demand to keep the first download small.
               { path: "prep", lazy: async () => ({ Component: (await import("./pages/PrepPage")).PrepPage }) },
               { path: "profile", element: <ProfilePage /> },
+              { path: "plans", lazy: async () => ({ Component: (await import("./pages/PlansPage")).PlansPage }) },
               { path: "settings", lazy: async () => ({ Component: (await import("./pages/SettingsPage")).SettingsPage }) },
               { path: "admin", lazy: async () => ({ Component: (await import("./pages/AdminPage")).AdminPage }) },
               { path: "*", element: <Navigate to="/" replace /> },

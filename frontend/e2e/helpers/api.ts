@@ -1,6 +1,9 @@
-// Puts the app into a known state through the real API (no database pokes).
+// Puts the app into a known state through the real API (plus one database poke: there's
+// no API for granting Premium without a payment).
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
-import { API_URL } from "./env";
+import { API_URL, BACKEND_DIR, PID_FILE, python } from "./env";
 
 const API = `${API_URL}/api`;
 
@@ -8,6 +11,7 @@ export interface Session {
   access_token: string;
   refresh_token: string;
   email: string;
+  user_id: string;
 }
 
 let counter = 0;
@@ -72,4 +76,13 @@ export async function useSession(page: Page, s: Pick<Session, "access_token" | "
     localStorage.setItem("jobcopilot_access_token", access);
     localStorage.setItem("jobcopilot_refresh_token", refresh);
   }, [s.access_token, s.refresh_token]);
+}
+
+/** Puts the account on Premium, as a paid Razorpay subscription would. */
+export function makePremium(s: Session) {
+  const { dataDir } = JSON.parse(readFileSync(PID_FILE, "utf8")) as { dataDir: string };
+  execFileSync(python(), ["-c", "import sys; from app.core.database import db; db.update_user_role(sys.argv[1], 'PRO')", s.user_id], {
+    cwd: BACKEND_DIR,
+    env: { ...process.env, JOBCOPILOT_DATA_DIR: dataDir, ENV: "development" },
+  });
 }
