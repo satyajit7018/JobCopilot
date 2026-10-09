@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import QRCode from "qrcode";
-import { Download, Laptop, ShieldCheck, ShieldOff, TriangleAlert } from "lucide-react";
+import { Check, Download, Laptop, ShieldCheck, ShieldOff, TriangleAlert } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Badge, Button, Card, CheckRow, CopyButton, Field, Spinner } from "../components/ui";
+import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CopyButton, Field, Spinner } from "../components/ui";
+import { GoogleButton } from "../components/GoogleButton";
 import { useLiveConsent, useSetLiveConsent } from "../lib/apply";
-import { useAuth } from "../lib/auth";
+import { useAuth, usePublicConfig } from "../lib/auth";
 import { relativeTime } from "../lib/jobs";
 import {
   eventLabel,
@@ -364,16 +365,29 @@ function ActivitySection() {
   );
 }
 
+type DeleteProof = "google" | "password" | "code";
+
 function DataSection() {
   const { user, logout } = useAuth();
+  const { data: config } = usePublicConfig();
   const exportData = useExportData();
   const del = useDeleteAccount();
   const [deleting, setDeleting] = useState(false);
   const [email, setEmail] = useState("");
-  // Google sign-in accounts have no password they know, so a code from the app works too.
-  const [method, setMethod] = useState<"password" | "code">("password");
+  const googleOn = !!config?.google_client_id;
+  const passwordOn = config?.password_auth_enabled !== false;
+  // Google sign-in accounts have no password they know: they confirm with Google or a 2FA code.
+  const proofs: { value: DeleteProof; label: string }[] = [
+    ...(googleOn ? [{ value: "google" as const, label: "Google" }] : []),
+    ...(passwordOn ? [{ value: "password" as const, label: "Password" }] : []),
+    { value: "code", label: "Authenticator code" },
+  ];
+  const [chosen, setChosen] = useState<DeleteProof | null>(null);
+  const method = chosen && proofs.some((p) => p.value === chosen) ? chosen : proofs[0].value;
   const [secret, setSecret] = useState("");
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
   const emailMatches = email.trim().toLowerCase() === (user?.email ?? "").toLowerCase();
+  const ready = emailMatches && (method === "google" ? !!googleToken : !!secret.trim());
 
   return (
     <>
@@ -403,8 +417,9 @@ function DataSection() {
             className="flex flex-col gap-4"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!emailMatches || !secret.trim()) return;
-              const proof = method === "password" ? { password: secret } : { mfa_code: secret.replace(/\s/g, "") };
+              if (!ready) return;
+              const proof =
+                method === "google" ? { google_id_token: googleToken ?? "" } : method === "password" ? { password: secret } : { mfa_code: secret.replace(/\s/g, "") };
               del.mutate({ confirm_email: email.trim(), ...proof }, { onSuccess: () => void logout() });
             }}
           >
@@ -417,25 +432,38 @@ function DataSection() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            {method === "password" ? (
+            {proofs.length > 1 && (
+              <ChoiceChips
+                label="Confirm it's you with"
+                value={method}
+                options={proofs}
+                onChange={(v) => {
+                  setChosen(v);
+                  setSecret("");
+                  setGoogleToken(null);
+                  del.reset();
+                }}
+              />
+            )}
+            {method === "google" && config?.google_client_id ? (
+              googleToken ? (
+                <p className="flex items-center gap-1.5 text-ok" role="status">
+                  <Check className="size-4" aria-hidden />
+                  Confirmed with Google
+                </p>
+              ) : (
+                <div className="sm:w-80">
+                  <GoogleButton clientId={config.google_client_id} text="signin_with" onCredential={setGoogleToken} />
+                </div>
+              )
+            ) : method === "password" ? (
               <Field key="pw" label="Password" name="delete-password" type="password" autoComplete="current-password" value={secret} onChange={(e) => setSecret(e.target.value)} />
             ) : (
               <Field key="code" label="Authenticator code" name="delete-mfa-code" className="sm:w-40" inputMode="numeric" autoComplete="one-time-code" value={secret} onChange={(e) => setSecret(e.target.value)} />
             )}
-            <button
-              type="button"
-              className="self-start text-sm font-medium text-accent hover:underline"
-              onClick={() => {
-                setMethod((m) => (m === "password" ? "code" : "password"));
-                setSecret("");
-                del.reset();
-              }}
-            >
-              {method === "password" ? "Signed in with Google? Use a code from your app instead" : "Use your password instead"}
-            </button>
             {del.error && <Alert>{del.error.message}</Alert>}
             <div className="flex gap-2">
-              <Button type="submit" variant="danger" loading={del.isPending} disabled={!emailMatches || !secret.trim()}>
+              <Button type="submit" variant="danger" loading={del.isPending} disabled={!ready}>
                 Delete my account
               </Button>
               <Button variant="ghost" onClick={() => setDeleting(false)} disabled={del.isPending}>

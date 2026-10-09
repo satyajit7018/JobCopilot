@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError, onUnauthorized, tokens, type TokenPair } from "./api";
 
 export interface User {
@@ -24,6 +24,17 @@ export interface PublicConfig {
   google_client_id: string;
   is_production: boolean;
   demo_enabled: boolean;
+  /** Email + password accounts; off in production at launch. */
+  password_auth_enabled?: boolean;
+}
+
+/** Public sign-in settings from the server (cached for the session). */
+export function usePublicConfig() {
+  return useQuery({
+    queryKey: ["public-config"],
+    queryFn: () => api<PublicConfig>("/auth/public-config", { auth: false }),
+    staleTime: Infinity,
+  });
 }
 
 /** A sign-in step either finishes or asks for a second factor. */

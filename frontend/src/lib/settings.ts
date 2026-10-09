@@ -152,6 +152,6 @@ export function useExportData() {
 
 export function useDeleteAccount() {
   return useMutation({
-    mutationFn: (input: { confirm_email: string; password?: string; mfa_code?: string }) => api("/account", { method: "DELETE", body: input }),
+    mutationFn: (input: { confirm_email: string; password?: string; mfa_code?: string; google_id_token?: string }) => api("/account", { method: "DELETE", body: input }),
   });
 }

@@ -76,6 +76,9 @@ class Settings(BaseSettings):
     # OAuth & SSO
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
 
+    # Email + password accounts (None = on outside production, off in production)
+    PASSWORD_AUTH_ENABLED: Optional[bool] = None
+
     # SMTP / Inbound Email
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 587
@@ -181,6 +184,14 @@ class Settings(BaseSettings):
                 "FATAL: production configuration is incomplete:\n  - " + "\n  - ".join(errors)
             )
         return self
+
+    @property
+    def password_auth_enabled(self) -> bool:
+        """Email + password sign-up and sign-in. Off in production unless PASSWORD_AUTH_ENABLED=true,
+        because confirmation and reset emails need an SMTP sender configured."""
+        if self.PASSWORD_AUTH_ENABLED is not None:
+            return self.PASSWORD_AUTH_ENABLED
+        return not self.is_production
 
     @property
     def is_production(self) -> bool:

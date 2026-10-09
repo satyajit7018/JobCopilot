@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Navigate, useLocation } from "react-router";
-import { useQuery } from "@tanstack/react-query";
 import { KeyRound } from "lucide-react";
-import { api } from "../lib/api";
-import { useAuth, type PublicConfig, type SignInResult } from "../lib/auth";
+import { useAuth, usePublicConfig, type SignInResult } from "../lib/auth";
+import { GoogleButton } from "../components/GoogleButton";
 import { Alert, Button, Card, Field } from "../components/ui";
 
 const PASSWORD_MIN = 12; // backend settings.PASSWORD_MIN_LENGTH
@@ -18,11 +17,9 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const { data: config } = useQuery({
-    queryKey: ["public-config"],
-    queryFn: () => api<PublicConfig>("/auth/public-config", { auth: false }),
-    staleTime: Infinity,
-  });
+  const { data: config } = usePublicConfig();
+  // Production launches Google-only; older backends don't send the flag.
+  const passwordOn = config?.password_auth_enabled !== false;
 
   if (auth.status === "authenticated") {
     const from = (location.state as { from?: string } | null)?.from ?? "/";
@@ -53,40 +50,71 @@ export function LoginPage() {
           <MfaStep busy={busy} error={error} onSubmit={(code) => run(() => auth.completeMfa(mfaToken, code))} onBack={() => setMfaToken(null)} />
         ) : (
           <>
-            <h1 className="text-xl font-semibold">{mode === "signin" ? "Welcome back" : "Create your account"}</h1>
-            <p className="mt-1 text-ink-2">
-              {mode === "signin" ? "Sign in to see your matches and applications." : "Find better-fit jobs and apply with a tailored resume."}
-            </p>
+            {passwordOn ? (
+              <>
+                <h1 className="text-xl font-semibold">{mode === "signin" ? "Welcome back" : "Create your account"}</h1>
+                <p className="mt-1 text-ink-2">
+                  {mode === "signin" ? "Sign in to see your matches and applications." : "Find better-fit jobs and apply with a tailored resume."}
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-xl font-semibold">Welcome to JobCopilot</h1>
+                <p className="mt-1 text-ink-2">Sign in or create your account with Google. Find better-fit jobs and apply with a tailored resume.</p>
+              </>
+            )}
 
             {config?.google_client_id && (
               <>
                 <div className="mt-6">
-                  <GoogleButton clientId={config.google_client_id} onCredential={(id_token) => run(() => auth.google({ id_token }))} />
+                  <GoogleButton
+                    clientId={config.google_client_id}
+                    onCredential={(id_token) => run(() => auth.google({ id_token }))}
+                    unavailable={
+                      passwordOn
+                        ? "Google sign-in is unavailable right now. Use your email and password instead."
+                        : "Google sign-in is unavailable right now. Check your connection and refresh the page."
+                    }
+                  />
                 </div>
-                <Divider />
+                {passwordOn && <Divider />}
               </>
             )}
+            {!passwordOn && error && (
+              <div className="mt-4">
+                <Alert>{error}</Alert>
+              </div>
+            )}
+            {!passwordOn && config && !config.google_client_id && (
+              <div className="mt-6">
+                <Alert tone="warn">Sign-in isn't set up on this server yet.</Alert>
+              </div>
+            )}
 
-            <CredentialsForm
-              mode={mode}
-              busy={busy}
-              error={error}
-              onSubmit={(v) => run(() => (mode === "signin" ? auth.login(v.email, v.password) : auth.register(v.name, v.email, v.password)))}
-            />
+            {passwordOn && (
+              <>
+                <CredentialsForm
+                  mode={mode}
+                  busy={busy}
+                  error={error}
+                  onSubmit={(v) => run(() => (mode === "signin" ? auth.login(v.email, v.password) : auth.register(v.name, v.email, v.password)))}
+                />
 
-            <p className="mt-6 text-center text-ink-2">
-              {mode === "signin" ? "New to JobCopilot? " : "Already have an account? "}
-              <button
-                type="button"
-                className="font-medium text-accent hover:text-accent-hover"
-                onClick={() => {
-                  setMode(mode === "signin" ? "register" : "signin");
-                  setError(null);
-                }}
-              >
-                {mode === "signin" ? "Create an account" : "Sign in"}
-              </button>
-            </p>
+                <p className="mt-6 text-center text-ink-2">
+                  {mode === "signin" ? "New to JobCopilot? " : "Already have an account? "}
+                  <button
+                    type="button"
+                    className="font-medium text-accent hover:text-accent-hover"
+                    onClick={() => {
+                      setMode(mode === "signin" ? "register" : "signin");
+                      setError(null);
+                    }}
+                  >
+                    {mode === "signin" ? "Create an account" : "Sign in"}
+                  </button>
+                </p>
+              </>
+            )}
 
             {config?.demo_enabled && <DemoSignIn busy={busy} onSubmit={(email) => run(() => auth.google({ email }))} />}
           </>
@@ -220,57 +248,4 @@ function DemoSignIn({ busy, onSubmit }: { busy: boolean; onSubmit: (email: strin
       </form>
     </details>
   );
-}
-
-// ---- Google Identity Services --------------------------------------------------------------
-
-interface GoogleId {
-  initialize(cfg: { client_id: string; callback: (r: { credential: string }) => void }): void;
-  renderButton(el: HTMLElement, opts: Record<string, unknown>): void;
-}
-declare global {
-  interface Window {
-    google?: { accounts: { id: GoogleId } };
-  }
-}
-
-let gisLoader: Promise<void> | null = null;
-function loadGis(): Promise<void> {
-  gisLoader ??= new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://accounts.google.com/gsi/client";
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => {
-      gisLoader = null;
-      reject(new Error("Google sign-in failed to load"));
-    };
-    document.head.appendChild(s);
-  });
-  return gisLoader;
-}
-
-function GoogleButton({ clientId, onCredential }: { clientId: string; onCredential: (idToken: string) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const cb = useRef(onCredential);
-  cb.current = onCredential;
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadGis()
-      .then(() => {
-        const gid = window.google?.accounts.id;
-        if (cancelled || !gid || !ref.current) return;
-        gid.initialize({ client_id: clientId, callback: (r) => cb.current(r.credential) });
-        gid.renderButton(ref.current, { theme: "outline", size: "large", text: "continue_with", width: ref.current.offsetWidth || 320 });
-      })
-      .catch(() => !cancelled && setFailed(true));
-    return () => {
-      cancelled = true;
-    };
-  }, [clientId]);
-
-  if (failed) return <Alert tone="warn">Google sign-in is unavailable right now. Use your email and password instead.</Alert>;
-  return <div ref={ref} className="flex min-h-11 justify-center" />;
 }

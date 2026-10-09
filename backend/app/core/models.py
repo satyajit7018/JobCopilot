@@ -492,6 +492,8 @@ class DeleteAccountRequest(BaseModel):
     # TOTP code. One of the two is required; see account_router.delete_user_account.
     password: Optional[str] = None
     mfa_code: Optional[str] = None
+    # Or a fresh Google ID token for the same account (Google-only accounts).
+    google_id_token: Optional[str] = None
 
 
 # --- Epic F: MFA & TOTP Models ---

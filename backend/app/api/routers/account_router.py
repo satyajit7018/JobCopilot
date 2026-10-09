@@ -5,10 +5,11 @@ and permanent cryptographic account erasure (GDPR Article 17).
 """
 
 import logging
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from app.api.auth import client_ip, get_current_user, limiter, verify_password
+from app.api.auth import client_ip, get_current_user, limiter, verify_google_id_token, verify_password
 from app.core.credential_vault import cred_vault
 from app.core.database import db
 from app.core.mfa import mfa_engine
@@ -38,18 +39,22 @@ async def export_user_account_data(current_user: User = Depends(get_current_user
     )
 
 
+# A Google ID token is valid for an hour; deletion wants a sign-in from just now.
+GOOGLE_REAUTH_MAX_AGE_SECONDS = 300
+
+
 def _reauthenticate_for_deletion(payload: DeleteAccountRequest, user: User) -> None:
     """Requires a fresh credential before erasure, so a stolen access token alone is not enough.
 
     Accepted proofs, in order:
       * ``password`` — verified against the stored hash.
       * ``mfa_code`` — a current TOTP code, only when MFA is enabled on the account.
+      * ``google_id_token`` — a Google sign-in completed in the last few minutes, for
+        the same verified email. Google SSO accounts have a random, never-disclosed
+        password, and production has no password reset email, so this is how a
+        Google-only user without MFA proves it's them.
 
-    Google SSO accounts are created with a random, never-disclosed password hash and
-    the schema has no flag that tells them apart from password accounts, so the rule
-    is the same for everyone. An SSO-only user without MFA sets a password via
-    /auth/request-reset (which proves control of the mailbox) and then confirms with
-    it. A "recent login" (token ``iat``) check was rejected: /auth/refresh re-mints
+    A "recent login" check on our own access token was rejected: /auth/refresh re-mints
     access tokens with a fresh ``iat``, and a token stolen via XSS is fresh anyway.
 
     A wrong password/code is 403, not 401: the session itself is valid, and the
@@ -79,12 +84,29 @@ def _reauthenticate_for_deletion(payload: DeleteAccountRequest, user: User) -> N
             )
         return
 
+    if payload.google_id_token:
+        try:
+            id_info = verify_google_id_token(payload.google_id_token)
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Google confirmation failed.")
+            raise
+        if id_info["email"].lower().strip() != user.email.lower().strip():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="That Google account isn't the one signed in here."
+            )
+        issued_at = int(id_info.get("iat") or 0)
+        if time.time() - issued_at > GOOGLE_REAUTH_MAX_AGE_SECONDS:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Google confirmation expired. Confirm with Google again."
+            )
+        return
+
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=(
-            "Password confirmation is required to delete your account. If you sign in with Google "
-            "and have never set a password, use 'Forgot password' to set one first."
-        )
+        detail="Confirm it's you with your password, a two-factor code, or Google to delete your account."
     )
 
 
