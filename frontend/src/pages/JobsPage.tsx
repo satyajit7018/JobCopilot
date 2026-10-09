@@ -7,6 +7,9 @@ import { isMatch, matchSummary, relativeTime, scorePercent, scoreTone, useVisibl
 
 type Sort = "match" | "newest";
 
+/** How many jobs to show at once; the rest sit behind "Show more". */
+const PAGE_SIZE = 20;
+
 function postedAt(job: Job) {
   return job.posted_date ?? job.created_at;
 }
@@ -16,6 +19,10 @@ export function JobsPage() {
   const [sort, setSort] = useState<Sort>("match");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [query, setQuery] = useState("");
+  // Changing a filter or the sort starts again from the first page.
+  const filterKey = `${sort}|${remoteOnly}|${query}`;
+  const [page, setPage] = useState({ key: filterKey, limit: PAGE_SIZE });
+  const limit = page.key === filterKey ? page.limit : PAGE_SIZE;
 
   const matches = useMemo(() => (data ?? []).filter(isMatch), [data]);
 
@@ -97,13 +104,25 @@ export function JobsPage() {
             )}
           </Card>
         ) : (
-          <Card className="overflow-hidden">
-            <ul>
-              {visible.map((job) => (
-                <JobRow key={job.job_id} job={job} />
-              ))}
-            </ul>
-          </Card>
+          <>
+            <Card className="overflow-hidden">
+              <ul>
+                {visible.slice(0, limit).map((job) => (
+                  <JobRow key={job.job_id} job={job} />
+                ))}
+              </ul>
+            </Card>
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <p className="text-ink-3" aria-live="polite">
+                Showing {Math.min(limit, visible.length)} of {visible.length}
+              </p>
+              {limit < visible.length && (
+                <Button onClick={() => setPage({ key: filterKey, limit: limit + PAGE_SIZE })}>
+                  Show {Math.min(PAGE_SIZE, visible.length - limit)} more
+                </Button>
+              )}
+            </div>
+          </>
         )}
       </div>
     </>
