@@ -169,7 +169,17 @@ class MatchScorer:
         """Broad regions a location string mentions (word matches, so 'us' never hits 'Australia')."""
         if not text:
             return set()
+        text = text.lower()
         return {name for name, pattern in cls.REGIONS.items() if pattern.search(text)}
+
+    @classmethod
+    def _onsite_abroad(cls, profile: CandidateProfile, job_location: str) -> bool:
+        """An office-based job in a different country from the candidate's."""
+        loc = (job_location or "").lower()
+        if re.search(r"\bremote\b", loc):
+            return False
+        job_regions, cand_regions = cls._regions(loc), cls._regions(profile.location or "")
+        return bool(job_regions and cand_regions and not (job_regions & cand_regions))
 
     @classmethod
     def _location_fit(cls, profile: CandidateProfile, job_location: str) -> Tuple[float, Optional[str]]:
@@ -322,6 +332,9 @@ class MatchScorer:
             total_score = min(total_score, 0.75)
         if is_non_tech:
             total_score = min(total_score, 0.20)
+        if is_tech and cls._onsite_abroad(profile, job_location):
+            # Visas and relocation make these long shots, however good the fit.
+            total_score = min(total_score, 0.70)
         if not has_resume_data or not profile.skills:
             # Cap provisional uncalibrated profiles so they do not claim false high confidence
             total_score = min(total_score, 0.35)

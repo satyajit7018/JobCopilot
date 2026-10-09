@@ -83,3 +83,9 @@ def test_location_is_not_free_points():
 def test_remote_only_candidate_is_not_matched_to_far_offices():
     p = _profile(remote="Remote", relocate=False)
     assert score(p, "Backend Engineer", location="Remote") - score(p, "Backend Engineer", location="Berlin, Germany") >= 0.12
+
+
+def test_onsite_job_in_another_country_is_capped():
+    p = _profile()
+    assert score(p, "Senior Backend Engineer", location="San Francisco, CA") <= 0.70
+    assert score(p, "Senior Backend Engineer", location="Remote") > 0.70
