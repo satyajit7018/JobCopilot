@@ -15,6 +15,7 @@ import httpx
 
 from app.core.database import db
 from app.core.deduplicator import JobDeduplicator
+from app.core import match_feedback
 from app.core.match_scorer import MatchScorer
 from app.core.models import ApplicationStatus, CandidateProfile, JobListing
 from app.core.priority_ranker import PriorityRanker
@@ -128,6 +129,7 @@ class DiscoveryOrchestrator:
         """Scores raw leads against the profile and saves the matches (blocking)."""
         saved_jobs: List[JobListing] = []
         blacklist = [c.lower() for c in profile.preferences.company_blacklist]
+        skip_rules = profile.preferences.skip_rules
         target_user = user_id or getattr(profile, "user_id", "")
         # Jobs already in the user's list, by fingerprint. A posting found again must not
         # overwrite them: an application or a "Not interested" stays as the user left it.
@@ -143,6 +145,9 @@ class DiscoveryOrchestrator:
 
             # Check employer blacklist for stealth mode
             if any(b in company.lower() for b in blacklist if b):
+                continue
+            # Skip what the user said they don't want ("Not interested because...").
+            if skip_rules and match_feedback.skips(skip_rules, title, location, company, salary):
                 continue
 
             fingerprint = lead.get("_fp") or JobDeduplicator.generate_fingerprint(company, title, location, desc)

@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from app.api.auth import get_current_user, limiter
 from app.api.ws_gateway import ws_manager
 from app.core.cover_letter import CoverLetterGenerator
+from app.core import match_feedback
 from app.core.database import db
 from app.core.plans import require_premium
 from app.core.models import ApplicationStatus, CandidateProfile, JobListing, User
@@ -113,6 +114,55 @@ async def update_job_status(
     }
 
 
+class NotInterestedRequest(BaseModel):
+    reason: str
+
+
+@router.post("/jobs/{job_id}/not-interested")
+async def not_interested(job_id: str, payload: NotInterestedRequest, current_user: User = Depends(get_current_user)):
+    """Hides a match and, when the reason says something reusable, skips similar jobs in new searches."""
+    reason = payload.reason.strip().lower()
+    if reason not in match_feedback.REASONS:
+        raise HTTPException(status_code=400, detail=f"reason must be one of {list(match_feedback.REASONS)}")
+    job = db.get_job_by_id(job_id, user_id=current_user.user_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    if job.status in (ApplicationStatus.DISCOVERED, ApplicationStatus.SAVED):
+        job.status = ApplicationStatus.DISMISSED
+        db.save_job(job, user_id=current_user.user_id)
+
+    rule = match_feedback.rule_for(reason, job)
+    profile = db.get_profile(user_id=current_user.user_id)
+    if rule and profile:
+        rules = profile.preferences.skip_rules
+        if not any(r.get("id") == rule["id"] for r in rules):
+            rules.append(rule)
+            db.save_profile(profile, user_id=current_user.user_id)
+    else:
+        rule = None
+    note = None if rule else match_feedback.no_rule_note(reason)
+    return {"status": "success", "job_id": job_id, "rule": rule, "note": note}
+
+
+@router.get("/match-preferences")
+async def list_skip_rules(current_user: User = Depends(get_current_user)):
+    """What new searches skip because of the user's "Not interested" reasons."""
+    profile = db.get_profile(user_id=current_user.user_id)
+    return {"rules": profile.preferences.skip_rules if profile else []}
+
+
+@router.delete("/match-preferences/{rule_id}")
+async def delete_skip_rule(rule_id: str, current_user: User = Depends(get_current_user)):
+    """Stops skipping jobs for one rule. Jobs it skipped can come back in the next search."""
+    profile = db.get_profile(user_id=current_user.user_id)
+    if not profile or not any(r.get("id") == rule_id for r in profile.preferences.skip_rules):
+        raise HTTPException(status_code=404, detail="Rule not found.")
+    profile.preferences.skip_rules = [r for r in profile.preferences.skip_rules if r.get("id") != rule_id]
+    # Skipped postings are never marked seen, so the next search scores them again.
+    db.save_profile(profile, user_id=current_user.user_id)
+    return {"status": "success", "rules": profile.preferences.skip_rules}
+
+
 @router.patch("/jobs/{job_id}/interview")
 async def update_interview_date(
     job_id: str,
@@ -184,16 +234,36 @@ async def generate_tailored_assets(
         job_title=job.title
     )
 
+    wording = ResumeTailor.current_wording(profile, job.job_id, job.title, job.description)
     return {
         "status": "success",
         "job_id": job.job_id,
         "company": job.company,
         "title": job.title,
+        "resume_wording": (wording or {}).get("choice", "ai"),
+        "resume_changes": ResumeTailor.wording_changes(profile, job.title, job.description, wording),
         "tailored_pdf_path": str(pdf_path),
         "pdf_hash": content_hash,
         "cover_letter": cover_letter,
         "outreach": outreach_pkg
     }
+
+
+class ResumeWordingRequest(BaseModel):
+    choice: str
+
+
+@router.put("/jobs/{job_id}/resume-wording")
+async def set_resume_wording(job_id: str, payload: ResumeWordingRequest, current_user: User = Depends(get_current_user)):
+    """Picks the AI wording or the user's own for this job's resume. Applying uses this pick."""
+    if payload.choice not in ("ai", "original"):
+        raise HTTPException(status_code=400, detail="choice must be 'ai' or 'original'.")
+    wording = ResumeTailor.load_wording(current_user.user_id, job_id)
+    if not wording:
+        raise HTTPException(status_code=404, detail="Prepare this application first.")
+    wording["choice"] = payload.choice
+    ResumeTailor.save_wording(current_user.user_id, job_id, wording)
+    return {"status": "success", "resume_wording": payload.choice}
 
 
 @router.post("/resumes/tailor-multi")

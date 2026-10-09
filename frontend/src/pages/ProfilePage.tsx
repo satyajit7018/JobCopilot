@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "react-router";
-import { Check, FileText } from "lucide-react";
+import { Check, FileText, X } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { BackgroundEditor, PreferenceFields, ResumeDrop, SourceFields } from "../components/profile";
 import { Alert, Badge, Button, Card, Field, Spinner, Textarea } from "../components/ui";
-import { relativeTime } from "../lib/jobs";
+import { relativeTime, useRemoveSkipRule, useSkipRules } from "../lib/jobs";
 import {
   answersFromProfile,
   needsSetup,
@@ -71,6 +71,7 @@ export function ProfilePage() {
         <Section title="Job sources" description="Matches from sites you turn off are hidden from Jobs.">
           <SourcesEditor />
         </Section>
+        <SkipRulesSection />
       </div>
     </>
   );
@@ -308,4 +309,31 @@ function DetailsForm({ profile }: { profile: Profile }) {
 
 function SourcesEditor() {
   return <SourceFields value={useSources()} onChange={saveSources} />;
+}
+
+/** What new searches skip, from the reasons given for "Not interested". Hidden until there's something. */
+function SkipRulesSection() {
+  const rules = useSkipRules();
+  const remove = useRemoveSkipRule();
+  if (!rules.data?.length) return null;
+  return (
+    <Section title="Skipped in new searches" description="From the reasons you gave for hiding jobs. Remove one to see those jobs again.">
+      <ul className="flex flex-col divide-y divide-line">
+        {rules.data.map((r) => (
+          <li key={r.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
+            <span className="flex-1">{r.label}</span>
+            <Button size="sm" variant="ghost" loading={remove.isPending && remove.variables === r.id} onClick={() => remove.mutate(r.id)}>
+              <X className="size-3.5" aria-hidden />
+              Remove<span className="sr-only"> {r.label}</span>
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {remove.error && (
+        <div className="mt-3">
+          <Alert>Couldn't remove that: {remove.error.message}</Alert>
+        </div>
+      )}
+    </Section>
+  );
 }

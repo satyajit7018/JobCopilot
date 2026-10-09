@@ -1,6 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation } from "react-router";
+import { createBrowserRouter, Navigate, Outlet, RouterProvider, ScrollRestoration, useLocation } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiError } from "./lib/api";
 import { loadPage, setReloadTarget } from "./lib/chunks";
@@ -58,6 +58,8 @@ function RequireAuth() {
 function Root() {
   return (
     <AuthProvider>
+      {/* New pages open at the top; Back returns to where you were. */}
+      <ScrollRestoration />
       <Outlet />
     </AuthProvider>
   );

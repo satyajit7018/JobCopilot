@@ -343,3 +343,20 @@ export function CopyButton({ text, label = "Copy" }: { text: string; label?: str
     </Button>
   );
 }
+
+/** A round on/off filter button. */
+export function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      className={clsx(
+        "h-8 rounded-full border px-3 font-medium",
+        on ? "border-accent bg-accent-soft text-accent-ink" : "border-line bg-surface text-ink-2 hover:bg-subtle",
+      )}
+    >
+      {children}
+    </button>
+  );
+}

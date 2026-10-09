@@ -1,6 +1,6 @@
 // Profile building blocks shared by the setup flow and the Profile page.
 import { useRef, useState, type DragEvent } from "react";
-import { FileText, Plus, Upload, X } from "lucide-react";
+import { FileText, Lock, Plus, Upload, X } from "lucide-react";
 import { Alert, Button, CheckRow, ChoiceChips, Field, Select, Textarea, cx } from "./ui";
 import {
   NOTICE_PERIODS,
@@ -127,6 +127,15 @@ export function ResumeDrop({
       <button type="button" className="self-center text-sm font-medium text-accent hover:underline" onClick={() => setPasting(true)} disabled={busy}>
         No file handy? Paste the text instead
       </button>
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-ink-3">
+        <Lock className="size-3.5 flex-none" aria-hidden />
+        <span>
+          Only you can see your resume. We use it to match and apply for you, and you can delete it anytime.{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+            Privacy
+          </a>
+        </span>
+      </p>
     </div>
   );
 }

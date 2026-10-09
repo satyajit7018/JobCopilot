@@ -11,7 +11,10 @@ import {
   useLiveConsent,
   useSetLiveConsent,
   useStartApply,
+  useSetResumeWording,
   useTailor,
+  type ResumeChange,
+  type ResumeWording,
   type SubmissionMode,
 } from "../lib/apply";
 import { STATUS_META, isTracked, scorePercent, scoreTone, useJobs, useSetMatchHidden, useSetMatchSaved, type Job } from "../lib/jobs";
@@ -172,6 +175,7 @@ function Review({ job, back }: { job: Job; back: ReactNode }) {
                       </div>
                     </div>
                   )}
+                  <p className="mt-3 text-xs text-ink-3">This score compares your resume with the job post. It isn't your chance of getting an interview.</p>
                 </div>
               </div>
             </Section>
@@ -254,6 +258,7 @@ function Materials({ job, tailor }: { job: Job; tailor: ReturnType<typeof useTai
               <FileText className="size-4 flex-none" aria-hidden />
               Resume tailored for {job.company}. It's attached when you apply.
             </div>
+            <ResumeChanges jobId={job.job_id} changes={tailor.data.resume_changes ?? []} initial={tailor.data.resume_wording ?? "ai"} />
             <div>
               <h3 className="mb-1.5 text-sm font-semibold">Cover letter</h3>
               <div className="max-h-96 overflow-y-auto rounded-md border border-line bg-canvas px-4 py-3 leading-relaxed whitespace-pre-wrap">
@@ -303,6 +308,62 @@ function Materials({ job, tailor }: { job: Job; tailor: ReturnType<typeof useTai
         </Section>
       )}
     </>
+  );
+}
+
+/** The AI's rewording of your resume bullets, next to your own, with the choice of which to send. */
+function ResumeChanges({ jobId, changes, initial }: { jobId: string; changes: ResumeChange[]; initial: ResumeWording }) {
+  const setWording = useSetResumeWording(jobId);
+  const [choice, setChoice] = useState<ResumeWording>(initial);
+  if (changes.length === 0)
+    return <p className="text-ink-2">Your resume bullets are reordered to put the most relevant first. The wording is your own.</p>;
+  const pick = (next: ResumeWording) => {
+    const before = choice;
+    setChoice(next);
+    setWording.mutate(next, { onError: () => setChoice(before) });
+  };
+  return (
+    <div>
+      <h3 className="text-sm font-semibold">Changes to your resume</h3>
+      <p className="mb-2.5 text-ink-2">
+        We reworded {changes.length === 1 ? "one bullet" : `${changes.length} bullets`} to fit this job. Check each one is true before you apply.
+      </p>
+      <ul className="flex flex-col gap-2.5">
+        {changes.map((c, i) => (
+          <li key={i} className="rounded-md border border-line">
+            <p className="border-b border-line px-3 py-1.5 text-xs text-ink-3">
+              {c.role} · {c.company}
+            </p>
+            <div className="grid sm:grid-cols-2">
+              <div className={cx("px-3 py-2", choice === "original" && "bg-accent-soft")}>
+                <p className="mb-0.5 text-xs font-medium text-ink-3">Your words</p>
+                <p>{c.before}</p>
+              </div>
+              <div className={cx("border-t border-line px-3 py-2 sm:border-t-0 sm:border-l", choice === "ai" && "bg-accent-soft")}>
+                <p className="mb-0.5 text-xs font-medium text-ink-3">Reworded</p>
+                <p>{c.after}</p>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-3">
+        <ChoiceChips
+          label="Which wording should we send?"
+          value={choice}
+          onChange={pick}
+          options={[
+            { value: "ai", label: "Reworded" },
+            { value: "original", label: "My own words" },
+          ]}
+        />
+      </div>
+      {setWording.error && (
+        <div className="mt-2">
+          <Alert>Couldn't save your choice: {setWording.error.message}</Alert>
+        </div>
+      )}
+    </div>
   );
 }
 

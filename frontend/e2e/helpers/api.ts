@@ -19,11 +19,19 @@ export const uniqueEmail = (tag: string) => `e2e-${tag}-${Date.now()}-${++counte
 
 /** Signs in through the backend's development sign-in path (bare email, non-production only). */
 export async function signIn(email = uniqueEmail("user"), fullName = "E2E Tester"): Promise<Session> {
-  const res = await fetch(`${API}/auth/google-sso`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, full_name: fullName }),
-  });
+  const attempt = () =>
+    fetch(`${API}/auth/google-sso`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, full_name: fullName }),
+    });
+  let res = await attempt();
+  // Sign-in is limited to 20 a minute per address, and the suite signs in more often than
+  // that. Wait for the window to pass rather than loosening the limit for tests.
+  for (let tries = 0; res.status === 429 && tries < 6; tries++) {
+    await new Promise((r) => setTimeout(r, 10_000));
+    res = await attempt();
+  }
   if (!res.ok) throw new Error(`signIn failed: ${res.status} ${await res.text()}`);
   return { ...(await res.json()), email };
 }
