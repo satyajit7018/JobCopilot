@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
 import { fromChosenSource, useSources } from "./profile";
 
@@ -14,7 +14,8 @@ export type ApplicationStatus =
   | "RESPONDED"
   | "INTERVIEW"
   | "REJECTED"
-  | "OFFER";
+  | "OFFER"
+  | "DISMISSED";
 
 // Mirrors backend JobListing (fields the UI reads).
 export interface Job {
@@ -58,6 +59,7 @@ export const STATUS_META: Record<ApplicationStatus, { label: string; tone: Tone 
   INTERVIEW: { label: "Interviewing", tone: "info" },
   OFFER: { label: "Offer", tone: "ok" },
   REJECTED: { label: "Closed", tone: "danger" },
+  DISMISSED: { label: "Not interested", tone: "neutral" },
 };
 
 /** Applications board columns, in pipeline order. DISCOVERED jobs live on the Jobs page. */
@@ -121,4 +123,86 @@ export function useVisibleJobs() {
     [query.data, sources],
   );
   return { ...query, data: visible, hiddenMatches: (query.data?.length ?? 0) - (visible?.length ?? 0) };
+}
+
+/** "Not interested": hides a match for good (searches won't bring it back). Undo restores it. */
+export function useSetMatchHidden() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ jobId, hidden }: { jobId: string; hidden: boolean }) =>
+      api(`/jobs/${encodeURIComponent(jobId)}/status`, { method: "PATCH", body: { status: hidden ? "DISMISSED" : "DISCOVERED" } }),
+    onMutate: async ({ jobId, hidden }) => {
+      await qc.cancelQueries({ queryKey: ["jobs"] });
+      const before = qc.getQueryData<Job[]>(["jobs"]);
+      qc.setQueryData<Job[]>(["jobs"], (jobs) =>
+        jobs?.map((j) => (j.job_id === jobId ? { ...j, status: hidden ? "DISMISSED" : "DISCOVERED" } : j)),
+      );
+      return { before };
+    },
+    onError: (_e, _v, ctx) => ctx?.before && qc.setQueryData(["jobs"], ctx.before),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
+}
+
+// --- Location filter -----------------------------------------------------------------
+
+export type Region = "india" | "usa" | "europe" | "canada";
+
+export const REGION_LABELS: Record<Region, string> = {
+  india: "India",
+  usa: "United States",
+  europe: "UK & Europe",
+  canada: "Canada",
+};
+
+// Word matches, like the backend scorer ("us" must not match "Australia").
+const REGION_PATTERNS: Record<Region, RegExp> = {
+  india: /\b(india|bangalore|bengaluru|hyderabad|pune|delhi|ncr|gurgaon|gurugram|noida|mumbai|chennai|kolkata|ahmedabad|jaipur|kochi)\b/i,
+  usa: /\b(usa|u\.s\.a?\.?|united states|us|amer|north america|new york|nyc|san francisco|sf|seattle|austin|boston|chicago|los angeles|denver|california|washington|texas)\b/i,
+  europe: /\b(uk|united kingdom|london|europe|emea|eu|germany|berlin|munich|amsterdam|netherlands|paris|france|dublin|ireland|spain|madrid|lisbon|portugal|poland|warsaw|stockholm|sweden|zurich|switzerland)\b/i,
+  canada: /\b(canada|toronto|vancouver|montreal)\b/i,
+};
+
+export function jobRegions(location: string | null | undefined): Region[] {
+  if (!location) return [];
+  return (Object.keys(REGION_PATTERNS) as Region[]).filter((r) => REGION_PATTERNS[r].test(location));
+}
+
+export function isRemote(location: string | null | undefined): boolean {
+  return /\bremote\b/i.test(location ?? "");
+}
+
+// --- "New since your last visit" -------------------------------------------------------
+
+/**
+ * When the user last left this page (ms), read once on arrival; the current visit is
+ * recorded on leaving, so "New" badges stay put while they look around.
+ */
+export function useLastVisit(page: string): number | null {
+  const key = `jobcopilot_last_visit_${page}`;
+  const [previous] = useState<number | null>(() => {
+    try {
+      const v = Number(localStorage.getItem(key));
+      return Number.isFinite(v) && v > 0 ? v : null;
+    } catch {
+      return null;
+    }
+  });
+  useEffect(
+    () => () => {
+      try {
+        localStorage.setItem(key, String(Date.now()));
+      } catch {
+        // Storage blocked: badges just won't persist.
+      }
+    },
+    [key],
+  );
+  return previous;
+}
+
+export function isNewSince(job: Job, since: number | null): boolean {
+  if (since === null || !job.created_at) return false;
+  const t = new Date(job.created_at).getTime();
+  return Number.isFinite(t) && t > since;
 }

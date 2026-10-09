@@ -14,7 +14,7 @@ import {
   useTailor,
   type SubmissionMode,
 } from "../lib/apply";
-import { STATUS_META, isMatch, scorePercent, scoreTone, useJobs, type Job } from "../lib/jobs";
+import { BOARD_COLUMNS, STATUS_META, isMatch, scorePercent, scoreTone, useJobs, useSetMatchHidden, type Job } from "../lib/jobs";
 import { useSetStatus } from "../lib/application";
 import { useIsPremium } from "../lib/billing";
 import { PremiumLock } from "../components/PremiumLock";
@@ -102,6 +102,7 @@ function Review({ job, back }: { job: Job; back: ReactNode }) {
       <PageHeader title="Review & apply" />
       <div className="mx-auto max-w-6xl px-4 py-5 md:px-7 md:py-6">
         <div className="mb-4">{back}</div>
+        {job.status === "DISMISSED" && <HiddenNotice job={job} />}
 
         <div className="mb-6 flex items-start gap-3 sm:gap-4">
           <CompanyMark name={job.company} />
@@ -406,10 +407,22 @@ function ApplyPanel({ job, prepared, onStarted }: { job: Job; prepared: boolean;
   );
 }
 
+function HiddenNotice({ job }: { job: Job }) {
+  const unhide = useSetMatchHidden();
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface px-4 py-2.5">
+      <p className="flex-1 text-ink-2">You marked this job "Not interested", so it's hidden from your matches.</p>
+      <Button size="sm" loading={unhide.isPending} onClick={() => unhide.mutate({ jobId: job.job_id, hidden: false })}>
+        Show it again
+      </Button>
+    </div>
+  );
+}
+
 /** Free plan: apply on the employer's site, then track it here. */
 function ApplyYourself({ job }: { job: Job }) {
   const setStatus = useSetStatus(job.job_id);
-  const applied = job.status !== "DISCOVERED" || setStatus.isSuccess;
+  const applied = BOARD_COLUMNS.some((c) => c.statuses.includes(job.status)) || setStatus.isSuccess;
 
   return (
     <div className="flex flex-col gap-4">

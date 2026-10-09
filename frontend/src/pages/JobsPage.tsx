@@ -1,9 +1,24 @@
 import { useMemo, useState } from "react";
-import { BriefcaseBusiness, Clock, ExternalLink, MapPin, Search, Wallet } from "lucide-react";
+import { BriefcaseBusiness, Clock, ExternalLink, EyeOff, MapPin, Search, Wallet } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Button, Card, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
+import { Alert, Badge, Button, Card, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
 import { Link } from "react-router";
-import { isMatch, matchSummary, relativeTime, scorePercent, scoreTone, useVisibleJobs, type Job } from "../lib/jobs";
+import {
+  REGION_LABELS,
+  isMatch,
+  isNewSince,
+  isRemote,
+  jobRegions,
+  matchSummary,
+  relativeTime,
+  scorePercent,
+  scoreTone,
+  useLastVisit,
+  useSetMatchHidden,
+  useVisibleJobs,
+  type Job,
+  type Region,
+} from "../lib/jobs";
 
 type Sort = "match" | "newest";
 
@@ -19,8 +34,13 @@ export function JobsPage() {
   const [sort, setSort] = useState<Sort>("match");
   const [remoteOnly, setRemoteOnly] = useState(false);
   const [query, setQuery] = useState("");
+  const [region, setRegion] = useState<Region | "">("");
+  const [minMatch, setMinMatch] = useState(0);
+  const lastVisit = useLastVisit("jobs");
+  const hide = useSetMatchHidden();
+  const [hiddenJob, setHiddenJob] = useState<Job | null>(null);
   // Changing a filter or the sort starts again from the first page.
-  const filterKey = `${sort}|${remoteOnly}|${query}`;
+  const filterKey = `${sort}|${remoteOnly}|${query}|${region}|${minMatch}`;
   const [page, setPage] = useState({ key: filterKey, limit: PAGE_SIZE });
   const limit = page.key === filterKey ? page.limit : PAGE_SIZE;
 
@@ -30,7 +50,9 @@ export function JobsPage() {
     const q = query.trim().toLowerCase();
     const list = matches.filter(
       (j) =>
-        (!remoteOnly || /remote/i.test(j.location)) &&
+        (!remoteOnly || isRemote(j.location)) &&
+        (!region || jobRegions(j.location).includes(region)) &&
+        scorePercent(j.match_score) >= minMatch &&
         (!q || `${j.title} ${j.company} ${j.location}`.toLowerCase().includes(q)),
     );
     return list.sort((a, b) =>
@@ -38,7 +60,13 @@ export function JobsPage() {
         ? b.match_score - a.match_score
         : new Date(postedAt(b) ?? 0).getTime() - new Date(postedAt(a) ?? 0).getTime(),
     );
-  }, [matches, sort, remoteOnly, query]);
+  }, [matches, sort, remoteOnly, query, region, minMatch]);
+  const newCount = useMemo(() => matches.filter((j) => isNewSince(j, lastVisit)).length, [matches, lastVisit]);
+
+  const hideJob = (job: Job) => {
+    setHiddenJob(job);
+    hide.mutate({ jobId: job.job_id, hidden: true });
+  };
 
   return (
     <>
@@ -48,6 +76,7 @@ export function JobsPage() {
           data ? (
             <>
               {matches.length} matches
+              {newCount > 0 && ` · ${newCount} new`}
               {hidden > 0 && (
                 <>
                   {" · "}
@@ -71,6 +100,22 @@ export function JobsPage() {
           <Chip on={remoteOnly} onClick={() => setRemoteOnly((v) => !v)}>
             Remote
           </Chip>
+          <FilterSelect
+            label="Location"
+            value={region}
+            onChange={(v) => setRegion(v as Region | "")}
+            options={[{ value: "", label: "Anywhere" }, ...Object.entries(REGION_LABELS).map(([value, label]) => ({ value, label }))]}
+          />
+          <FilterSelect
+            label="Match"
+            value={String(minMatch)}
+            onChange={(v) => setMinMatch(Number(v))}
+            options={[
+              { value: "0", label: "Any match" },
+              { value: "70", label: "70% or more" },
+              { value: "80", label: "80% or more" },
+            ]}
+          />
           <label className="relative ml-auto w-full sm:w-64">
             <span className="sr-only">Search jobs</span>
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
@@ -84,6 +129,29 @@ export function JobsPage() {
           </label>
         </div>
 
+        {hiddenJob && (
+          <div className="mb-3 flex items-center gap-3 rounded-md border border-line bg-surface px-4 py-2.5" role="status">
+            <EyeOff className="size-4 flex-none text-ink-3" aria-hidden />
+            <p className="min-w-0 flex-1 truncate">
+              Hid <span className="font-medium">{hiddenJob.title}</span>. It won't come back in new searches.
+            </p>
+            <button
+              type="button"
+              className="font-medium text-accent hover:underline"
+              onClick={() => {
+                hide.mutate({ jobId: hiddenJob.job_id, hidden: false });
+                setHiddenJob(null);
+              }}
+            >
+              Undo
+            </button>
+          </div>
+        )}
+        {hide.error && (
+          <div className="mb-3">
+            <Alert>Couldn't hide that job: {hide.error.message}</Alert>
+          </div>
+        )}
         {isPending ? (
           <Spinner label="Loading jobs" />
         ) : error ? (
@@ -99,7 +167,7 @@ export function JobsPage() {
               </EmptyState>
             ) : (
               <EmptyState icon={<Search className="size-5" />} title="Nothing matches these filters">
-                Try clearing the search or turning off Remote.
+                Try clearing the search or loosening the filters.
               </EmptyState>
             )}
           </Card>
@@ -108,7 +176,7 @@ export function JobsPage() {
             <Card className="overflow-hidden">
               <ul>
                 {visible.slice(0, limit).map((job) => (
-                  <JobRow key={job.job_id} job={job} />
+                  <JobRow key={job.job_id} job={job} isNew={isNewSince(job, lastVisit)} onHide={() => hideJob(job)} />
                 ))}
               </ul>
             </Card>
@@ -145,7 +213,36 @@ function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; chi
   );
 }
 
-function JobRow({ job }: { job: Job }) {
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="flex h-8 items-center rounded-full border border-line bg-surface pl-3 text-ink-2 focus-within:border-accent">
+      <span className="sr-only">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cx("h-full cursor-pointer rounded-full bg-transparent pr-2 font-medium focus:outline-none", value && value !== "0" && "text-accent-ink")}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function JobRow({ job, isNew, onHide }: { job: Job; isNew: boolean; onHide: () => void }) {
   const pct = scorePercent(job.match_score);
   const tone = scoreTone(pct);
   const why = matchSummary(job);
@@ -156,10 +253,11 @@ function JobRow({ job }: { job: Job }) {
       <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
         <CompanyMark name={job.company} />
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">
+          <h2 className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">
             <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className="hover:text-accent hover:underline">
               {job.title}
             </Link>
+            {isNew && <Badge tone="accent">New</Badge>}
           </h2>
           <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-ink-2">
             <span>{job.company}</span>
@@ -190,6 +288,10 @@ function JobRow({ job }: { job: Job }) {
           <span className={cx("block text-lg leading-none font-bold", toneText[tone])}>{pct}</span>
           <span className="text-xs tracking-wide text-ink-3 uppercase">match</span>
         </div>
+        <button type="button" onClick={onHide} className={buttonClass("ghost", "md")} title="Not interested">
+          <EyeOff className="size-4" aria-hidden />
+          <span className="sr-only">Not interested in {job.title} at {job.company}</span>
+        </button>
         <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("ghost", "md", "max-md:hidden")} title="View posting">
           <ExternalLink className="size-4" aria-hidden />
           <span className="sr-only">View posting (opens in a new tab)</span>

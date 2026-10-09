@@ -7,7 +7,11 @@ import { BOARD_COLUMNS, STATUS_META, relativeTime, useJobs, type Job } from "../
 
 export function ApplicationsPage() {
   const { data, isPending, error } = useJobs();
-  const tracked = (data ?? []).filter((j) => j.status !== "DISCOVERED");
+  const tracked = (data ?? []).filter((j) => BOARD_COLUMNS.some((c) => c.statuses.includes(j.status)));
+  // Only columns with something in them; an empty "In progress" column is just noise.
+  const columns = BOARD_COLUMNS.map((col) => ({ ...col, items: tracked.filter((j) => col.statuses.includes(j.status)) })).filter(
+    (col) => col.items.length > 0,
+  );
 
   return (
     <>
@@ -33,24 +37,23 @@ export function ApplicationsPage() {
             </EmptyState>
           </Card>
         ) : (
-          <div className="-mx-4 flex snap-x scroll-px-4 md:scroll-px-7 gap-3.5 overflow-x-auto px-4 pb-2 md:-mx-7 md:px-7 xl:mx-0 xl:grid xl:grid-cols-5 xl:overflow-visible xl:px-0">
-            {BOARD_COLUMNS.map((col) => {
-              const items = tracked.filter((j) => col.statuses.includes(j.status));
-              return (
-                <section key={col.key} aria-label={col.label} className="w-64 flex-none snap-start xl:w-auto">
-                  <h2 className="mb-2.5 flex items-center gap-1.5 text-sm font-semibold text-ink-2">
-                    {col.label}
-                    <span className="font-normal text-ink-3">{items.length}</span>
-                  </h2>
-                  <div className="flex flex-col gap-2.5">
-                    {items.map((job) => (
-                      <AppCard key={job.job_id} job={job} />
-                    ))}
-                    {items.length === 0 && <div className="rounded-lg border border-dashed border-line py-6 text-center text-xs text-ink-3">Nothing here</div>}
-                  </div>
-                </section>
-              );
-            })}
+          <div
+            className="-mx-4 flex snap-x scroll-px-4 gap-3.5 overflow-x-auto px-4 pb-2 md:-mx-7 md:scroll-px-7 md:px-7 xl:mx-0 xl:grid xl:overflow-visible xl:px-0"
+            style={{ gridTemplateColumns: `repeat(${Math.max(columns.length, 3)}, minmax(0, 1fr))` }}
+          >
+            {columns.map((col) => (
+              <section key={col.key} aria-label={col.label} className="w-64 flex-none snap-start xl:w-auto">
+                <h2 className="mb-2.5 flex items-center gap-1.5 text-sm font-semibold text-ink-2">
+                  {col.label}
+                  <span className="font-normal text-ink-3">{col.items.length}</span>
+                </h2>
+                <div className="flex flex-col gap-2.5">
+                  {col.items.map((job) => (
+                    <AppCard key={job.job_id} job={job} />
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
         )}
       </div>
@@ -61,7 +64,8 @@ export function ApplicationsPage() {
 function AppCard({ job }: { job: Job }) {
   const meta = STATUS_META[job.status] ?? { label: job.status, tone: "neutral" as const };
   const interview = job.status === "INTERVIEW" && job.interview_date ? new Date(job.interview_date) : null;
-  const when = relativeTime(job.applied_at ?? job.created_at);
+  const applied = relativeTime(job.applied_at);
+  const when = applied ? `applied ${applied}` : relativeTime(job.created_at);
   return (
     <Card className="relative p-3 hover:border-line-strong">
       <h3 className="text-sm font-semibold">

@@ -30,6 +30,27 @@ export function Logo() {
   );
 }
 
+/** Your plan at a glance, so Premium is easy to find (and to confirm you have it). */
+function PlanCard() {
+  const premium = useIsPremium();
+  if (premium)
+    return (
+      <p className="mb-2 flex items-center gap-1.5 px-2.5 text-xs font-medium text-accent-ink">
+        <Sparkles className="size-3.5" aria-hidden />
+        Premium
+      </p>
+    );
+  return (
+    <Link to="/plans" className="mb-3 block rounded-lg border border-accent/30 bg-accent-soft/40 px-3 py-2.5 hover:border-accent/60">
+      <span className="flex items-center gap-1.5 text-xs font-semibold text-accent-ink">
+        <Sparkles className="size-3.5" aria-hidden />
+        Free plan
+      </span>
+      <span className="mt-0.5 block text-xs text-ink-2">Upgrade to let JobCopilot write and send applications.</span>
+    </Link>
+  );
+}
+
 export function AppShell() {
   const { data: jobs } = useVisibleJobs();
   const newMatches = jobs?.filter(isMatch).length ?? 0;
@@ -69,6 +90,7 @@ export function AppShell() {
           ))}
         </nav>
         <div className="flex-1" />
+        <PlanCard />
         <div className="border-t border-line pt-2">
           <UserMenu placement="up" />
         </div>

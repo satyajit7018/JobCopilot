@@ -2,9 +2,9 @@ import { useMemo, type ReactNode } from "react";
 import { Link, Navigate } from "react-router";
 import { ArrowRight, BriefcaseBusiness, CalendarClock, CircleAlert, MailQuestion, PartyPopper } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Card, EmptyState, Spinner, buttonClass, cx } from "../components/ui";
+import { Alert, Card, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
 import { useAuth } from "../lib/auth";
-import { isMatch, scorePercent, useVisibleJobs, type Job } from "../lib/jobs";
+import { isMatch, matchSummary, scorePercent, scoreTone, useVisibleJobs, type Job } from "../lib/jobs";
 import { needsSetup as profileNeedsSetup, setupLater, useProfile } from "../lib/profile";
 import { SetupReminder } from "./SetupPage";
 
@@ -156,6 +156,8 @@ export function HomePage() {
               </Card>
             </section>
 
+            <TopMatches jobs={data ?? []} />
+
             <section aria-labelledby="pipeline">
               <h2 id="pipeline" className="mb-3 text-base font-semibold">
                 Your search
@@ -173,5 +175,62 @@ export function HomePage() {
         )}
       </div>
     </>
+  );
+}
+
+/** The best few new matches, so Home answers "what should I look at?" without a click. */
+function TopMatches({ jobs }: { jobs: Job[] }) {
+  const top = useMemo(
+    () =>
+      jobs
+        .filter(isMatch)
+        .sort((a, b) => b.match_score - a.match_score)
+        .slice(0, 3),
+    [jobs],
+  );
+  if (!top.length) return null;
+
+  return (
+    <section aria-labelledby="top-matches">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 id="top-matches" className="text-base font-semibold">
+          Top matches
+        </h2>
+        <Link to="/jobs" className="text-sm font-medium text-accent hover:underline">
+          All jobs
+        </Link>
+      </div>
+      <Card>
+        <ul>
+          {top.map((j) => {
+            const pct = scorePercent(j.match_score);
+            const why = matchSummary(j);
+            return (
+              <li key={j.job_id} className="flex items-center gap-3 border-b border-line px-4 py-3.5 last:border-b-0 sm:px-5">
+                <CompanyMark name={j.company} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold">{j.title}</p>
+                  <p className="truncate text-ink-2">
+                    {j.company}
+                    {j.location && ` · ${j.location}`}
+                  </p>
+                  {why && <p className="truncate text-xs text-ink-3">{why}</p>}
+                </div>
+                <span className={cx("w-10 text-right text-base font-bold", toneText[scoreTone(pct)])} aria-label={`${pct}% match`}>
+                  {pct}
+                </span>
+                <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className={buttonClass("secondary", "sm")}>
+                  Review
+                  <span className="sr-only">
+                    {" "}
+                    {j.title} at {j.company}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+    </section>
   );
 }
