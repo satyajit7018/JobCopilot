@@ -21,7 +21,7 @@ _LEVEL_WORDS = r"\b(intern|internship|junior|jr\.?|senior|sr\.?|staff|principal|
 
 
 def _rule(kind: str, value: Any, label: str) -> Dict[str, Any]:
-    rule_id = hashlib.sha1(f"{kind}:{value}".encode()).hexdigest()[:10]
+    rule_id = hashlib.sha256(f"{kind}:{value}".encode()).hexdigest()[:10]
     return {"id": rule_id, "kind": kind, "value": value, "label": label}
 
 
