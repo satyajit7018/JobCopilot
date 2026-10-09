@@ -205,6 +205,12 @@ class DatabaseManager(DatabaseAdapter):
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
                 self._ensure_columns(conn, "users", {"stripe_customer_id": "TEXT"})
                 cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_stripe_customer ON users(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;")
+                self._ensure_columns(conn, "users", {
+                    "razorpay_subscription_id": "TEXT",
+                    "subscription_status": "TEXT",
+                    "subscription_current_end": "TEXT",
+                })
+                cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_razorpay_sub ON users(razorpay_subscription_id) WHERE razorpay_subscription_id IS NOT NULL;")
 
                 # 2. Profiles Table
                 cursor.execute("""
@@ -810,6 +816,35 @@ class DatabaseManager(DatabaseAdapter):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT stripe_customer_id FROM users WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    def set_subscription(self, user_id: str, subscription_id: Optional[str], status: Optional[str],
+                         current_end: Optional[str] = None) -> bool:
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE users SET razorpay_subscription_id = ?, subscription_status = ?, "
+                    "subscription_current_end = ?, updated_at = ? WHERE user_id = ?",
+                    (subscription_id, status, current_end, datetime.now().isoformat(), user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+
+    def get_subscription(self, user_id: str) -> Optional[Dict[str, Any]]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT razorpay_subscription_id, subscription_status, subscription_current_end "
+                           "FROM users WHERE user_id = ?", (user_id,))
+            row = cursor.fetchone()
+            if not row or not row[0]:
+                return None
+            return {"subscription_id": row[0], "status": row[1], "current_end": row[2]}
+
+    def get_user_id_by_subscription(self, subscription_id: str) -> Optional[str]:
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM users WHERE razorpay_subscription_id = ?", (subscription_id,))
             row = cursor.fetchone()
             return row[0] if row else None
 

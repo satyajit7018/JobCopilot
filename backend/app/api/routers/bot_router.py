@@ -16,6 +16,7 @@ from app.bot.apply_ledger import ApplyLedgerManager, apply_ledger
 from app.core.celery_app import TaskManager
 from app.core.config import DEFAULT_SUBMISSION_MODE
 from app.core.database import db
+from app.core.plans import require_premium
 from app.core.models import ApplicationStatus, ApplyLedgerStatus, User
 from app.core.vector_vault import vault
 
@@ -164,7 +165,7 @@ async def apply_to_job(
     job_id: str,
     profile_id: Optional[str] = None,
     mode: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("auto_apply"))
 ):
     """Executes full autonomous stealth application workflow with persistent rate limiting and idempotency."""
     # Check Idempotent Apply Ledger before executing
@@ -192,7 +193,7 @@ async def apply_to_job_async(
     job_id: str,
     mode: Optional[str] = None,
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("auto_apply"))
 ):
     """
     Dispatches asynchronous application task to Celery/Redis background worker queue with idempotency checks.

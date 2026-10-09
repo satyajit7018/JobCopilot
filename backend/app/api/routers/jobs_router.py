@@ -15,6 +15,7 @@ from app.api.auth import get_current_user, limiter
 from app.api.ws_gateway import ws_manager
 from app.core.cover_letter import CoverLetterGenerator
 from app.core.database import db
+from app.core.plans import require_premium
 from app.core.models import ApplicationStatus, CandidateProfile, JobListing, User
 from app.core.outreach_generator import OutreachGenerator
 from app.core.resume_tailor import ResumeTailor
@@ -140,7 +141,7 @@ async def generate_tailored_assets(
     request: Request,
     job_id: str,
     profile_id: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("ai_writing"))
 ):
     """Compiles a tailored PDF resume, cover letter, and outreach package for a job.
 
@@ -192,7 +193,7 @@ async def generate_tailored_assets(
 @router.post("/resumes/tailor-multi")
 async def tailor_resumes_for_multiple_roles(
     payload: MultiRoleTailorRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("ai_writing"))
 ):
     """Compiles ATS-tailored resume summaries for multiple target roles."""
     profile = db.get_profile(user_id=current_user.user_id, profile_id=payload.profile_id)
@@ -295,7 +296,7 @@ async def get_held_applications(current_user: User = Depends(get_current_user)):
 @router.post("/outreach/alumni-referral")
 async def generate_alumni_referral(
     payload: AlumniReferralRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("ai_writing"))
 ):
     """Generates 280-char LinkedIn connection note and email for alumni referral outreach."""
     return {
@@ -313,7 +314,7 @@ async def generate_alumni_referral(
 @router.post("/outreach/recruiter-nudge")
 async def generate_recruiter_nudge_endpoint(
     payload: RecruiterNudgeRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("ai_writing"))
 ):
     """Generates polite, high-converting recruiter follow-up message."""
     return {

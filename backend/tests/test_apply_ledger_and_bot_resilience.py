@@ -11,7 +11,7 @@ from httpx import AsyncClient, ASGITransport
 
 from app.main import app
 from app.core.models import (
-    User, JobListing, ApplicationStatus, CandidateProfile,
+    User, UserRole, JobListing, ApplicationStatus, CandidateProfile,
     ApplyLedgerEntry, ApplyLedgerStatus, HITLEvent
 )
 from app.core.database import db
@@ -33,7 +33,7 @@ def test_user():
         user_id=uid,
         email=f"{uid}@jobcopilot.test",
         password_hash="mock_hash",
-        tier="ELITE",
+        role=UserRole.PRO,
         is_active=True
     )
     db.create_user(user)

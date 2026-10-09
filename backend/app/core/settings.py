@@ -73,6 +73,17 @@ class Settings(BaseSettings):
     STRIPE_PRO_PRICE_ID: str = "price_pro_monthly"
     STRIPE_ELITE_PRICE_ID: str = "price_elite_monthly"
 
+    # Razorpay (Premium subscriptions). Create two monthly plans in the dashboard:
+    # one in INR for users in India, one in USD for everyone else.
+    RAZORPAY_KEY_ID: Optional[str] = None
+    RAZORPAY_KEY_SECRET: Optional[str] = None
+    RAZORPAY_WEBHOOK_SECRET: Optional[str] = None
+    RAZORPAY_PLAN_ID_INR: Optional[str] = None
+    RAZORPAY_PLAN_ID_USD: Optional[str] = None
+    # Shown on the plans page; must match the plans above.
+    PREMIUM_PRICE_INR: int = 199
+    PREMIUM_PRICE_USD: int = 5
+
     # OAuth & SSO
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
 
@@ -176,6 +187,8 @@ class Settings(BaseSettings):
 
         # Stripe: only enforced once billing is wired (a secret key is present),
         # in which case the webhook secret must accompany it.
+        if self.RAZORPAY_KEY_ID and not (self.RAZORPAY_KEY_SECRET and self.RAZORPAY_WEBHOOK_SECRET):
+            errors.append("RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are required when RAZORPAY_KEY_ID is set.")
         if self.STRIPE_SECRET_KEY and not self.STRIPE_WEBHOOK_SECRET:
             errors.append("STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set.")
 

@@ -118,6 +118,21 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    def set_subscription(self, user_id: str, subscription_id: Optional[str], status: Optional[str],
+                         current_end: Optional[str] = None) -> bool:
+        """Stores the user's Razorpay subscription (id, status, paid-until ISO time)."""
+        pass
+
+    @abstractmethod
+    def get_subscription(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """{"subscription_id", "status", "current_end"} or None when the user never subscribed."""
+        pass
+
+    @abstractmethod
+    def get_user_id_by_subscription(self, subscription_id: str) -> Optional[str]:
+        pass
+
+    @abstractmethod
     def update_user_password(self, user_id: str, new_password_hash: str) -> bool:
         pass
 

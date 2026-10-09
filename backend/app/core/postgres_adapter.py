@@ -85,6 +85,10 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 CREATE INDEX IF NOT EXISTS idx_pg_users_email ON users(email);
                 ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id VARCHAR(64);
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_pg_users_stripe_customer ON users(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS razorpay_subscription_id VARCHAR(64);
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(32);
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_current_end VARCHAR(64);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_pg_users_razorpay_sub ON users(razorpay_subscription_id) WHERE razorpay_subscription_id IS NOT NULL;
 
                 CREATE TABLE IF NOT EXISTS profiles (
                     id VARCHAR(64) PRIMARY KEY,
@@ -500,6 +504,43 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
         try:
             with conn.cursor() as cursor:
                 cursor.execute("SELECT stripe_customer_id FROM users WHERE user_id = %s", (user_id,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+        finally:
+            self.release_connection(conn)
+
+    def set_subscription(self, user_id: str, subscription_id: Optional[str], status: Optional[str],
+                         current_end: Optional[str] = None) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE users SET razorpay_subscription_id = %s, subscription_status = %s, "
+                    "subscription_current_end = %s, updated_at = %s WHERE user_id = %s",
+                    (subscription_id, status, current_end, datetime.now().isoformat(), user_id))
+                conn.commit()
+                return cursor.rowcount > 0
+        finally:
+            self.release_connection(conn)
+
+    def get_subscription(self, user_id: str) -> Optional[Dict[str, Any]]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT razorpay_subscription_id, subscription_status, subscription_current_end "
+                               "FROM users WHERE user_id = %s", (user_id,))
+                row = cursor.fetchone()
+                if not row or not row[0]:
+                    return None
+                return {"subscription_id": row[0], "status": row[1], "current_end": row[2]}
+        finally:
+            self.release_connection(conn)
+
+    def get_user_id_by_subscription(self, subscription_id: str) -> Optional[str]:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT user_id FROM users WHERE razorpay_subscription_id = %s", (subscription_id,))
                 row = cursor.fetchone()
                 return row[0] if row else None
         finally:

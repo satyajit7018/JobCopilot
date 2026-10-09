@@ -9,9 +9,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from app.api.auth import get_current_user
 from app.api.ws_gateway import ws_manager
 from app.core.database import db
+from app.core.plans import require_premium
 from app.core.models import User
 
 router = APIRouter(tags=["interview"])
@@ -41,7 +41,7 @@ class InterviewerReconRequest(BaseModel):
 async def get_company_dossier(
     company: str,
     role: str = "Senior Software Engineer",
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("interview_prep"))
 ):
     """Generates technical architecture dossier and interview rounds for target company."""
     from app.core.interview_studio import InterviewStudioEngine
@@ -56,7 +56,7 @@ async def get_mock_questions(
     role: str = "Senior Software Engineer",
     profile_id: Optional[str] = None,
     category: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("interview_prep"))
 ):
     """Generates role-specific mock technical, system design, and STAR leadership questions."""
     from app.core.interview_studio import InterviewStudioEngine
@@ -71,7 +71,7 @@ async def get_mock_questions(
 @router.post("/interview/evaluate")
 async def evaluate_interview_answer(
     payload: InterviewEvalRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("interview_prep"))
 ):
     """Evaluates candidate response with multi-dimensional STAR scoring."""
     from app.core.interview_studio import InterviewStudioEngine
@@ -89,7 +89,7 @@ async def evaluate_interview_answer(
 @router.post("/interview/notify-invitation")
 async def trigger_interview_invitation_notification(
     payload: InterviewInvitationTriggerRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("interview_prep"))
 ):
     """Triggers an interview invitation alert and provides role-customized mock interview questions."""
     from app.core.interview_studio import InterviewStudioEngine
@@ -122,7 +122,7 @@ async def trigger_interview_invitation_notification(
 async def get_reverse_interview_questions(
     role: str = "Senior Software Engineer",
     company: str = "Target Company",
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("interview_prep"))
 ):
     """Generates strategic questions to ask the hiring manager."""
     from app.core.interview_studio import InterviewStudioEngine
@@ -137,7 +137,7 @@ async def get_reverse_interview_questions(
 @router.post("/interview/interviewer-recon")
 async def analyze_interviewer_recon(
     payload: InterviewerReconRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("interview_prep"))
 ):
     """Infers interviewer persona, technical biases, and strategic preparation advice."""
     from app.core.interview_studio import InterviewStudioEngine
@@ -154,7 +154,7 @@ async def analyze_interviewer_recon(
 @router.get("/interview/engineering-intel")
 async def get_company_engineering_intel_endpoint(
     company: str,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("interview_prep"))
 ):
     """Fetches company public engineering blog initiatives."""
     from app.core.interview_studio import InterviewStudioEngine
@@ -168,7 +168,7 @@ async def get_company_engineering_intel_endpoint(
 async def get_calendar_availability(
     timezone: str = "IST",
     days: int = 4,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("interview_prep"))
 ):
     """Calculates non-conflicting interview scheduling windows."""
     from app.core.calendar_sync import CalendarAvailabilityEngine

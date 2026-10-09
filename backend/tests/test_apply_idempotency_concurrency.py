@@ -38,7 +38,7 @@ async def test_concurrent_apply_idempotency_same_key():
     """
     user_id = f"usr_idem_{uuid.uuid4().hex[:8]}"
     email = f"{user_id}@test.com"
-    user = User(user_id=user_id, email=email, password_hash="test", role=UserRole.FREE)
+    user = User(user_id=user_id, email=email, password_hash="test", role=UserRole.PRO)  # automatic applying is Premium
     db.create_user(user)
 
     job_id = f"job_idem_{uuid.uuid4().hex[:8]}"
@@ -55,7 +55,7 @@ async def test_concurrent_apply_idempotency_same_key():
     db.save_job(job, user_id=user_id)
 
     token = create_jwt_token(
-        {"sub": user_id, "email": email, "role": "FREE", "type": "access"},
+        {"sub": user_id, "email": email, "role": "PRO", "type": "access"},
         timedelta(minutes=15),
     )
     idempotency_key = f"idem_key_{uuid.uuid4().hex}"
@@ -136,7 +136,7 @@ async def test_concurrent_apply_idempotency_different_keys():
     """
     user_id = f"usr_diff_{uuid.uuid4().hex[:8]}"
     email = f"{user_id}@test.com"
-    user = User(user_id=user_id, email=email, password_hash="test", role=UserRole.FREE)
+    user = User(user_id=user_id, email=email, password_hash="test", role=UserRole.PRO)  # automatic applying is Premium
     db.create_user(user)
 
     job_id = f"job_diff_{uuid.uuid4().hex[:8]}"
@@ -153,7 +153,7 @@ async def test_concurrent_apply_idempotency_different_keys():
     db.save_job(job, user_id=user_id)
 
     token = create_jwt_token(
-        {"sub": user_id, "email": email, "role": "FREE", "type": "access"},
+        {"sub": user_id, "email": email, "role": "PRO", "type": "access"},
         timedelta(minutes=15),
     )
     transport = ASGITransport(app=app)
@@ -284,11 +284,11 @@ async def test_apply_async_edge_cases():
     """Validates 404 (job not found), rate limit, tasks polling, and existing ledger 409 responses."""
     user_id = f"usr_edge_{uuid.uuid4().hex[:8]}"
     email = f"{user_id}@test.com"
-    user = User(user_id=user_id, email=email, password_hash="test", role=UserRole.FREE)
+    user = User(user_id=user_id, email=email, password_hash="test", role=UserRole.PRO)  # automatic applying is Premium
     db.create_user(user)
 
     token = create_jwt_token(
-        {"sub": user_id, "email": email, "role": "FREE", "type": "access"},
+        {"sub": user_id, "email": email, "role": "PRO", "type": "access"},
         timedelta(minutes=15),
     )
     headers = {"Authorization": f"Bearer {token}"}

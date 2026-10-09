@@ -18,7 +18,7 @@ async def test_inbound_webhook_subaddress_attribution(monkeypatch):
     """Asserts subaddress recipient (radar+usr_xyz@jobcopilot.app) attributes correctly to tenant."""
     user_id = f"usr_radar_{uuid.uuid4().hex[:6]}"
     email = f"{user_id}@test.com"
-    user = User(user_id=user_id, email=email, password_hash="test", role=UserRole.FREE)
+    user = User(user_id=user_id, email=email, password_hash="test", role=UserRole.PRO)  # inbox tracking is Premium
     db.create_user(user)
 
     # Create tracked job for this user

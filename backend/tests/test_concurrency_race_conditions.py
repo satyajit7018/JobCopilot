@@ -18,14 +18,19 @@ from app.core.rate_limiter import rate_limiter
 
 
 @pytest.mark.asyncio
-async def test_concurrent_rate_limiting_quota():
-    """Asserts that 10 concurrent apply attempts strictly enforce the FREE tier limit of 5 applies/day."""
+async def test_concurrent_rate_limiting_quota(monkeypatch):
+    """Asserts that 10 concurrent apply attempts strictly enforce a daily limit of 5 applies.
+
+    Automatic applying is Premium-only, so this uses a Premium (PRO) user with the cap pinned to 5.
+    """
+    from app.core.rate_limiter import SubscriptionTier, TierConfig
+    monkeypatch.setitem(TierConfig.LIMITS[SubscriptionTier.PRO], "daily_applies", 5)
     user_id = f"usr_race_{uuid.uuid4().hex[:6]}"
     email = f"{user_id}@test.com"
-    user = User(user_id=user_id, email=email, password_hash="test", role=UserRole.FREE)
+    user = User(user_id=user_id, email=email, password_hash="test", role=UserRole.PRO)
     db.create_user(user)
 
-    token = create_jwt_token({"sub": user_id, "email": email, "role": "FREE", "type": "access"}, timedelta(minutes=15))
+    token = create_jwt_token({"sub": user_id, "email": email, "role": "PRO", "type": "access"}, timedelta(minutes=15))
     headers = {"Authorization": f"Bearer {token}"}
 
     # Pre-create 10 jobs
@@ -56,7 +61,7 @@ async def test_concurrent_rate_limiting_quota():
     accepted = [r for r in responses if r.status_code == 202]
     rate_limited = [r for r in responses if r.status_code == 429]
 
-    # Exactly 5 should succeed (FREE limit = 5/day)
+    # Exactly 5 should succeed (daily limit = 5)
     assert len(accepted) == 5
     # Exactly 5 should be rate limited (429)
     assert len(rate_limited) == 5
