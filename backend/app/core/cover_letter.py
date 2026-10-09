@@ -60,35 +60,40 @@ class CoverLetterGenerator:
         """
         Generates a concise, 3-paragraph cover letter tailored to the role.
         """
-        # 1. Select top matching project
+        # Only facts from the profile: no invented experience, results or availability.
         top_project = profile.projects[0] if profile.projects else None
-        proj_highlight = ""
+        latest = profile.experience[0] if profile.experience else None
+        skills_str = ", ".join(profile.skills[:4])
+
+        # Paragraph 1: the role, and who is applying
+        p1 = f"I am writing to apply for the {job_title} role at {company_name}."
+        if latest and latest.title and latest.company:
+            p1 += f" I am currently {'an' if latest.title[:1].lower() in 'aeiou' else 'a'} {latest.title} at {latest.company}" if (latest.end_date or "").lower() == "present" else f" Most recently I was {'an' if latest.title[:1].lower() in 'aeiou' else 'a'} {latest.title} at {latest.company}"
+            p1 += f", working with {skills_str}." if skills_str else "."
+        elif skills_str:
+            p1 += f" I work with {skills_str}."
+
+        # Paragraph 2: one concrete example, taken from the resume
+        p2 = ""
         if top_project:
-            tech_str = ", ".join(top_project.technologies[:3]) if top_project.technologies else "Python"
-            metric_str = f" with {top_project.metrics}" if top_project.metrics else ""
-            proj_highlight = f"Recently, I built {top_project.name} using {tech_str}{metric_str} ({top_project.description.rstrip('.')})."
+            tech_str = f" using {', '.join(top_project.technologies[:3])}" if top_project.technologies else ""
+            metric_str = f" ({top_project.metrics})" if top_project.metrics else ""
+            desc = f": {top_project.description.rstrip('.')}" if top_project.description else ""
+            p2 = f"One example of my work is {top_project.name}{tech_str}{metric_str}{desc}."
+        elif latest and latest.highlights:
+            p2 = f"In my current work, I {latest.highlights[0][0].lower()}{latest.highlights[0][1:].rstrip('.')}."
 
-        # 2. Extract top skills
-        skills_str = ", ".join(profile.skills[:4]) if profile.skills else "Python, FastAPI, and distributed systems"
-
-        # Paragraph 1: Direct Hook & Specific Alignment
-        p1 = f"I am writing to apply for the {job_title} role at {company_name}. With hands-on experience building backend services and AI systems using {skills_str}, I am drawn to {company_name}'s focus on engineering high-scale, reliable software."
-
-        # Paragraph 2: Concrete Technical Proof
-        if proj_highlight:
-            p2 = f"{proj_highlight} I focus on writing clean, tested, and maintainable code with sub-50ms latency SLAs and solid automated test coverage."
-        else:
-            p2 = "In my work, I focus on architecting robust backend APIs and high-throughput pipelines, prioritizing system reliability and performance."
-
-        # Paragraph 3: Direct Call-to-Action
+        # Paragraph 3: availability (from the notice period) and links
         links = []
         if profile.github_url: links.append(f"GitHub: {profile.github_url}")
         if profile.portfolio_url: links.append(f"Portfolio: {profile.portfolio_url}")
-        link_str = f" Code samples and project documentation are available at {', '.join(links)}." if links else ""
+        link_str = f" You can see my work at {', '.join(links)}." if links else ""
+        notice = profile.preferences.notice_period_days if profile.preferences else 0
+        start = "I can start immediately" if not notice else f"I can start after my {notice}-day notice period"
 
-        p3 = f"I am available to start immediately and look forward to discussing how my background fits your team's technical roadmap.{link_str}\n\nBest regards,\n{profile.full_name}\n{profile.email} | {profile.phone}"
+        p3 = f"{start} and would welcome the chance to discuss how my background fits your team.{link_str}\n\nBest regards,\n{profile.full_name}\n{profile.email} | {profile.phone}"
 
-        full_letter = f"{p1}\n\n{p2}\n\n{p3}"
+        full_letter = "\n\n".join(p for p in (p1, p2, p3) if p)
         return cls.sanitize_anti_ai(full_letter)
 
     @classmethod
@@ -105,7 +110,10 @@ class CoverLetterGenerator:
         from app.core.prompts.cover_letter_prompts import CoverLetterPrompts
 
         fallback = lambda: cls.generate_cover_letter(profile, company_name, job_title, job_description, domain)
-        top_proj = f"{profile.projects[0].name} ({profile.projects[0].metrics or 'scaled system'})" if profile.projects else None
+        top_proj = (
+            f"{profile.projects[0].name}" + (f" ({profile.projects[0].metrics})" if profile.projects[0].metrics else "")
+            if profile.projects else None
+        )
         prompt = CoverLetterPrompts.build_cover_letter_prompt(
             candidate_name=profile.full_name,
             role_title=job_title,

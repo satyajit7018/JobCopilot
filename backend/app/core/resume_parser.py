@@ -8,7 +8,8 @@ import asyncio
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ class ResumeParser:
         ],
         "tools_libraries": [
             "Git", "GitHub", "Jira", "Postman", "OpenCV", "LangChain", "LlamaIndex",
-            "Playwright", "Selenium", "Pandas", "NumPy", "Apache Kafka", "RabbitMQ", "Celery"
+            "Playwright", "Selenium", "Pandas", "NumPy", "Apache Kafka", "Kafka", "RabbitMQ", "Celery"
         ]
     }
 
@@ -134,10 +135,11 @@ class ResumeParser:
         portfolio_url = portfolio_match.group(0) if portfolio_match else None
 
         # Location heuristic
-        location = "Remote / Global"
+        location = ""
+        # "based in X" first: the generic pattern would swallow the name before it.
         loc_patterns = [
-            r'\b([A-Z][a-zA-Z\s]+,\s*(?:[A-Z]{2}|India|USA|United States|UK|Canada|Germany|California|Texas|Washington|Bangalore|Bengaluru|Hyderabad|Delhi|Mumbai|Pune|Gurgaon|Noida))\b',
-            r'\bbased in\s+([A-Z][a-zA-Z\s]+,\s*[A-Z][a-zA-Z\s]+)\b'
+            r'\bbased in\s+([A-Z][a-zA-Z]+(?: [A-Z][a-zA-Z]+)?,\s*[A-Z][a-zA-Z]+(?: [A-Z][a-zA-Z]+)?)\b',
+            r'\b([A-Z][a-zA-Z]+(?: [A-Z][a-zA-Z]+){0,2},\s*(?:[A-Z]{2}|India|USA|United States|UK|Canada|Germany|California|Texas|Washington|Karnataka|Maharashtra|Telangana|Tamil Nadu|Bangalore|Bengaluru|Hyderabad|Delhi|Mumbai|Pune|Gurgaon|Noida)(?:,\s*India)?)\b',
         ]
         for pat in loc_patterns:
             m = re.search(pat, text)
@@ -207,47 +209,70 @@ class ResumeParser:
         return all_skills, categorized
 
     @classmethod
+    def extract_summary(cls, text: str) -> str:
+        """The resume's own summary/objective paragraph, if it has one."""
+        for raw_heading in ("SUMMARY", "PROFESSIONAL SUMMARY", "OBJECTIVE", "PROFILE", "ABOUT"):
+            m = re.search(rf"(?im)^\s*{raw_heading}\s*:?\s*$\n((?:.+\n?){{1,6}})", text)
+            if m:
+                para = []
+                for line in m.group(1).split("\n"):
+                    if not line.strip() or cls._section_of(line.strip()):
+                        break
+                    para.append(line.strip())
+                summary = " ".join(para)
+                # Drop salary/notice details people put in summaries; they have their own fields.
+                summary = re.split(r"\s*\b(?:current ctc|expected ctc|expected:|notice period)\b", summary, flags=re.IGNORECASE)[0]
+                return summary.strip()[:600]
+        return ""
+
+    @classmethod
     def extract_education(cls, text: str) -> List[Education]:
-        """Extracts education degrees and institutions."""
-        education_list = []
-        text_lower = text.lower()
+        """Degrees and schools as written; nothing is filled in when the resume doesn't say."""
+        lines = cls._sections(text).get("education", [])
+        entries: List[Education] = []
+        degree = school = year = ""
 
-        # Degree matching
-        deg_map = {
-            "b.tech": "Bachelor of Technology",
-            "bachelor of technology": "Bachelor of Technology",
-            "b.s.": "Bachelor of Science",
-            "bachelor of science": "Bachelor of Science",
-            "b.e.": "Bachelor of Engineering",
-            "m.s.": "Master of Science",
-            "master of science": "Master of Science",
-            "ph.d.": "Doctor of Philosophy",
-            "m.tech": "Master of Technology"
-        }
-        detected_degree = "Bachelor's Degree"
-        for k, v in deg_map.items():
-            if k in text_lower:
-                detected_degree = v
-                break
+        def flush():
+            nonlocal degree, school, year
+            if degree or school:
+                entries.append(Education(degree=degree, institution=school, graduation_year=year or None))
+            degree = school = year = ""
 
-        # Institution matching
-        inst = "University"
-        inst_match = re.search(r'([A-Z][a-zA-Z\s]+(?:Institute of Technology|University|College|Academy))', text)
-        if inst_match:
-            inst = inst_match.group(1).strip()
-        elif "vit" in text_lower or "vellore" in text_lower:
-            inst = "Vellore Institute of Technology"
+        for line in lines:
+            if cls.BULLET.match(line) or line.lower().startswith(("gpa", "cgpa", "grade", "relevant")):
+                continue
+            pieces = [p.strip() for p in re.split(r"\s*[|•·]\s*|\s+[-–—]\s+|,\s+", line) if p.strip()]
+            found_year = next((m.group(0) for m in re.finditer(r"(?:19|20)\d{2}", line)), "")
+            is_school = any(cls.INSTITUTION_WORDS.search(p) for p in pieces)
+            # A bare two-letter piece is a US state ("Cambridge, MA"), not a degree.
+            degree_pieces = [p for p in pieces if cls.DEGREE_WORDS.search(p) and not cls.INSTITUTION_WORDS.search(p)
+                             and not re.fullmatch(r"[A-Z]{2}", p)]
+            is_degree = bool(degree_pieces)
+            if is_school:
+                if school:
+                    flush()
+                school = next(p for p in pieces if cls.INSTITUTION_WORDS.search(p))
+            if is_degree:
+                if degree:
+                    flush()
+                degree = degree_pieces[0]
+                degree = re.sub(r"\s*,?\s*(?:19|20)\d{2}.*$", "", degree).strip()
+            if found_year:
+                year = found_year
+            if degree and school and year:
+                flush()
+        flush()
 
-        # Year matching
-        year_match = re.search(r'\b(201\d|202\d)\b', text)
-        grad_year = year_match.group(1) if year_match else "2025"
-
-        education_list.append(Education(
-            degree=detected_degree,
-            institution=inst,
-            graduation_year=grad_year
-        ))
-        return education_list
+        if not entries:
+            # Prose: "graduated with B.Tech in 2018 from Delhi Technological University".
+            m = re.search(
+                r"\b(B\.?\s?Tech|M\.?\s?Tech|B\.?E|B\.?S\.?c?|M\.?S\.?c?|MBA|Ph\.?D|Bachelor[^,.]*?|Master[^,.]*?)"
+                r"(?:\s+in\s+((?:19|20)\d{2}))?\s+(?:from|at)\s+([A-Z][\w.&' ]+?(?:University|Institute[\w ]*|College|School))",
+                text,
+            )
+            if m:
+                entries.append(Education(degree=m.group(1).strip(), institution=m.group(3).strip(), graduation_year=m.group(2)))
+        return entries
 
     @classmethod
     def extract_skills(cls, text: str) -> List[str]:
@@ -255,137 +280,220 @@ class ResumeParser:
         all_skills, _ = cls.categorize_skills(text)
         return all_skills
 
+    # --- Section-aware reading of experience, education and projects -------------------
+    # Rule: read what the resume says; leave a field empty rather than invent it.
+
+    SECTION_HEADERS = {
+        "experience": ("EXPERIENCE", "WORK EXPERIENCE", "PROFESSIONAL EXPERIENCE", "EMPLOYMENT", "WORK HISTORY", "CAREER HISTORY"),
+        "projects": ("PROJECTS", "PERSONAL PROJECTS", "KEY PROJECTS", "ACADEMIC PROJECTS", "SIDE PROJECTS"),
+        "education": ("EDUCATION", "ACADEMIC BACKGROUND", "QUALIFICATIONS"),
+        "other": ("SKILLS", "TECHNICAL SKILLS", "CERTIFICATIONS", "PUBLICATIONS", "SUMMARY", "PROFESSIONAL SUMMARY",
+                  "OBJECTIVE", "AWARDS", "LANGUAGES", "INTERESTS", "ACHIEVEMENTS", "PROFILE", "CONTACT"),
+    }
+    _MONTH = r"(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?"
+    _DATE = rf"(?:{_MONTH}\s+|\d{{1,2}}/)?(?:19|20)\d{{2}}"
+    DATE_RANGE = re.compile(rf"({_DATE})\s*(?:-|–|—|to|until)\s*({_DATE}|present|current|now|today|date)", re.IGNORECASE)
+    TITLE_WORDS = re.compile(
+        r"\b(engineer\w*|developer|intern|manager|lead|architect|scientist|analyst|consultant|designer|director|"
+        r"sde|sre|programmer|specialist|head|vp|officer|administrator|researcher|founder|co-founder|associate|"
+        r"technician|tester|devops)\b", re.IGNORECASE)
+    INSTITUTION_WORDS = re.compile(r"\b(university|institute|college|school|academy|polytechnic|iit|nit|bits|iiit)\b", re.IGNORECASE)
+    DEGREE_WORDS = re.compile(
+        r"\b(bachelor|master|b\.?\s?tech|m\.?\s?tech|b\.?\s?e\b|m\.?\s?e\b|b\.?s\.?c?\b|m\.?s\.?c?\b|b\.?a\b|m\.?a\b|"
+        r"mba|ph\.?\s?d|doctor|diploma|certificate|associate degree|bca|mca)", re.IGNORECASE)
+    BULLET = re.compile(r"^[•\-\*–—▪●◦]\s*")
+
     @classmethod
-    def extract_projects_and_experience(cls, text: str) -> Tuple[List[WorkExperience], List[Project]]:
-        """Extracts work experience and engineering projects dynamically from text sections."""
-        projects: List[Project] = []
+    def _section_of(cls, line: str) -> Optional[str]:
+        """Which section a heading line starts, if it is one ("EXPERIENCE", "Work History:")."""
+        clean = re.sub(r"[^A-Za-z ]", "", line).strip().upper()
+        if not clean or len(clean) > 40:
+            return None
+        for name, headers in cls.SECTION_HEADERS.items():
+            if clean in headers:
+                return name
+        return None
+
+    @classmethod
+    def _sections(cls, text: str) -> Dict[str, List[str]]:
+        sections: Dict[str, List[str]] = {}
+        current: Optional[str] = None
+        for raw in text.split("\n"):
+            line = raw.strip()
+            if not line:
+                continue
+            name = cls._section_of(line)
+            if name:
+                current = name
+                sections.setdefault(name, [])
+                continue
+            if current:
+                sections[current].append(line)
+        return sections
+
+    @classmethod
+    def _looks_like_location(cls, part: str) -> bool:
+        from app.core.match_scorer import MatchScorer
+        p = part.strip()
+        return bool(
+            MatchScorer._regions(p)
+            or re.fullmatch(r"(?i)remote|hybrid|on-?site", p)
+            or re.fullmatch(r"[A-Z][a-zA-Z.]+(?: [A-Z][a-zA-Z.]+)*,\s*[A-Z]{2}", p)
+        )
+
+    @classmethod
+    def _split_header(cls, line: str) -> List[str]:
+        parts: List[str] = []
+        for piece in re.split(r"\s*[|•·]\s*", line):
+            if cls.TITLE_WORDS.search(piece):
+                # "Senior Engineer, Acme - Pune" / "Engineer at Acme"
+                parts.extend(p for p in re.split(r",\s+|\s+[-–—]\s+|\s+at\s+|\s+@\s+", piece) if p)
+            else:
+                parts.append(piece)
+        return [p.strip(" ,;:-–—") for p in parts if p.strip(" ,;:-–—")]
+
+    @classmethod
+    def _parse_date(cls, value: str, end: bool = False) -> Optional[datetime]:
+        v = value.strip().lower()
+        if v in ("present", "current", "now", "today", "date"):
+            return datetime.now()
+        year = re.search(r"(19|20)\d{2}", v)
+        if not year:
+            return None
+        month = 12 if end else 1
+        m = re.match(r"([a-z]+)", v)
+        if m:
+            months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+            for i, name in enumerate(months):
+                if m.group(1).startswith(name):
+                    month = i + 1
+                    break
+        slash = re.match(r"(\d{1,2})/", v)
+        if slash:
+            month = max(1, min(12, int(slash.group(1))))
+        return datetime(int(year.group(0)), month, 1)
+
+    @classmethod
+    def extract_experience(cls, text: str) -> List[WorkExperience]:
+        lines = cls._sections(text).get("experience", [])
+        entries: List[Dict[str, Any]] = []
+        current: Optional[Dict[str, Any]] = None
+        for line in lines:
+            if cls.BULLET.match(line):
+                if current is not None:
+                    current["bullets"].append(cls.BULLET.sub("", line))
+                continue
+            if current is None or current["bullets"]:
+                current = {"headers": [], "bullets": []}
+                entries.append(current)
+            current["headers"].append(line)
+
         experience: List[WorkExperience] = []
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        for entry in entries:
+            header = "\n".join(entry["headers"])
+            start = end = ""
+            rng = cls.DATE_RANGE.search(header)
+            if rng:
+                start, end = rng.group(1).strip(), rng.group(2).strip()
+                if end.lower() in ("current", "now", "today", "date"):
+                    end = "Present"
+                elif end.lower() == "present":
+                    end = "Present"
+                header = header[:rng.start()] + header[rng.end():]
+            parts = [p for line in header.split("\n") for p in cls._split_header(line)]
+            title = next((p for p in parts if cls.TITLE_WORDS.search(p)), "")
+            company = next((p for p in parts if p != title and not cls._looks_like_location(p)
+                            and not re.fullmatch(r"[\d\s/-]+", p)), "")
+            location = next((p for p in parts if p not in (title, company) and cls._looks_like_location(p)), None)
+            if not (title or company):
+                continue
+            bullets = entry["bullets"]
+            experience.append(WorkExperience(
+                company=company,
+                title=title,
+                start_date=start,
+                end_date=end,
+                location=location,
+                highlights=bullets[:8],
+                tech_stack=[s for s in cls.extract_skills(" ".join(bullets))][:8],
+            ))
 
-        # Extract projects section
-        in_projects = False
-        in_exp = False
-        current_proj_name = None
-        current_proj_bullets = []
+        if not experience:
+            # Prose resumes: "worked at PayTM as tech lead ... from 2019 to now".
+            prose = re.search(
+                r"\b(?:work(?:ed|ing)|employed)\s+(?:at|for)\s+([A-Z][\w&.\-]*(?:\s+[A-Z][\w&.\-]*)*)\s+as\s+(?:an?\s+)?([a-zA-Z][a-zA-Z /-]{2,40}?)"
+                r"(?=\s+(?:building|working|doing|leading|from|since|where|and|,|\.)|[,.]|$)",
+                text,
+            )
+            if prose:
+                when = re.search(r"\b(?:from|since)\s+((?:19|20)\d{2})(?:\s+(?:to|until|-)\s+((?:19|20)\d{2}|now|present|today))?", text[prose.start():], re.IGNORECASE)
+                end_value = (when.group(2) or "Present") if when else ""
+                experience.append(WorkExperience(
+                    company=prose.group(1).strip(),
+                    title=prose.group(2).strip().title(),
+                    start_date=when.group(1) if when else "",
+                    end_date="Present" if end_value.lower() in ("now", "present", "today") else end_value,
+                ))
+        return experience
 
-        all_skills = cls.extract_skills(text)
+    @classmethod
+    def extract_projects(cls, text: str) -> List[Project]:
+        lines = cls._sections(text).get("projects", [])
+        projects: List[Project] = []
+        name: Optional[str] = None
+        bullets: List[str] = []
+
+        def flush():
+            if name:
+                desc = " ".join(bullets)
+                projects.append(Project(name=name, description=desc[:300],
+                                        technologies=cls.extract_skills(f"{name} {desc}")[:6]))
 
         for line in lines:
-            upper_line = line.upper()
-            if any(h in upper_line for h in ["PROJECTS", "PERSONAL PROJECTS", "KEY PROJECTS", "ACADEMIC PROJECTS"]):
-                in_projects = True
-                in_exp = False
+            if cls.BULLET.match(line):
+                bullets.append(cls.BULLET.sub("", line))
                 continue
-            elif any(h in upper_line for h in ["EXPERIENCE", "WORK EXPERIENCE", "EMPLOYMENT", "WORK HISTORY"]):
-                in_exp = True
-                in_projects = False
-                continue
-            elif any(h in upper_line for h in ["EDUCATION", "SKILLS", "CERTIFICATIONS", "PUBLICATIONS"]):
-                in_projects = False
-                in_exp = False
-                continue
-
-            if in_projects:
-                # Format: Project Name: Description
-                if ":" in line and not line.startswith(("http", "https")):
-                    parts = line.split(":", 1)
-                    p_name = parts[0].strip()
-                    p_desc = parts[1].strip()
-                    if 3 < len(p_name) < 70 and len(p_desc) > 5:
-                        p_desc_lower = p_desc.lower()
-                        p_name_lower = p_name.lower()
-                        proj_techs = [s for s in all_skills if s.lower() in p_desc_lower or s.lower() in p_name_lower]
-                        projects.append(Project(
-                            name=p_name,
-                            description=p_desc[:200],
-                            technologies=proj_techs[:5] if proj_techs else all_skills[:4],
-                            metrics="High-performance implementation"
-                        ))
-                        continue
-
-                # Multi-line Format: Project Name followed by bullet points
-                if not line.startswith(('•', '-', '*', '–', '—')) and len(line) < 60 and len(line) > 3:
-                    if current_proj_name and current_proj_bullets:
-                        desc = " ".join(current_proj_bullets)
-                        proj_techs = [s for s in all_skills if s.lower() in desc.lower() or s.lower() in current_proj_name.lower()]
-                        projects.append(Project(
-                            name=current_proj_name,
-                            description=desc[:200],
-                            technologies=proj_techs[:5] if proj_techs else all_skills[:4],
-                            metrics="Optimized throughput and performance"
-                        ))
-                    current_proj_name = re.sub(r'[|•\-_].*', '', line).strip()
-                    current_proj_bullets = []
-                elif line.startswith(('•', '-', '*', '–', '—')) and current_proj_name:
-                    current_proj_bullets.append(re.sub(r'^[•\-\*–—]\s*', '', line))
-
-        # Add the last project if parsed
-        if current_proj_name and current_proj_bullets:
-            desc = " ".join(current_proj_bullets)
-            proj_techs = [s for s in all_skills if s.lower() in desc.lower() or s.lower() in current_proj_name.lower()]
-            projects.append(Project(
-                name=current_proj_name,
-                description=desc[:200],
-                technologies=proj_techs[:5] if proj_techs else all_skills[:4],
-                metrics="High-scale system optimization"
-            ))
-
-        # Dynamic fallback if no explicit projects section found
-        if not projects:
-            top_tech = all_skills[:3] if len(all_skills) >= 3 else ["Python", "FastAPI", "Docker"]
-            projects.append(Project(
-                name=f"Distributed {top_tech[0]} Service & Data Pipeline",
-                description=f"High-throughput backend service built with {', '.join(top_tech)} for low-latency request processing.",
-                technologies=top_tech,
-                metrics="Sub-50ms P99 latency"
-            ))
-            if len(all_skills) >= 4:
-                sec_tech = all_skills[2:5]
-                projects.append(Project(
-                    name=f"High-Scale {sec_tech[0]} Application Platform",
-                    description=f"Microservices platform leveraging {', '.join(sec_tech)} with asynchronous event streaming.",
-                    technologies=sec_tech,
-                    metrics="10k+ requests/sec handled"
-                ))
-
-        # Dynamic work experience
-        text_lower = text.lower()
-        title = "Software Engineer"
-        if "senior" in text_lower or "lead" in text_lower:
-            title = "Senior Software Engineer"
-        elif "intern" in text_lower:
-            title = "Software Engineering Intern"
-        elif "machine learning" in text_lower or "ai engineer" in text_lower:
-            title = "AI / Machine Learning Engineer"
-
-        # Check for company names near title
-        comp_match = re.search(r'(?:at|@|Company:?)\s*([A-Z][a-zA-Z0-9\s]{2,25}(?:Inc|LLC|Technologies|Labs|Corp|Pvt Ltd)?)', text)
-        detected_company = comp_match.group(1).strip() if comp_match else "Technology Solutions"
-
-        experience.append(WorkExperience(
-            company=detected_company,
-            title=title,
-            start_date="2023",
-            end_date="Present",
-            location="Remote / Hybrid",
-            highlights=["Designed and deployed high-throughput backend services and automated workflows."],
-            tech_stack=all_skills[:5] if all_skills else ["Python", "FastAPI", "PostgreSQL", "Docker"]
-        ))
-
-        return experience, projects
+            flush()
+            name, bullets = None, []
+            if ":" in line and not line.lower().startswith("http"):
+                head, rest = line.split(":", 1)
+                if 2 < len(head.strip()) < 70:
+                    name, bullets = head.strip(), [rest.strip()]
+                    continue
+            name = re.split(r"\s+[|–—]\s+", line)[0].strip()[:80]
+        flush()
+        return projects
 
     @classmethod
-    def calculate_estimated_yoe(cls, text: str) -> float:
-        """Estimates total years of experience from graduation year and dates in resume."""
-        years = [int(y) for y in re.findall(r'\b(20[0-2]\d)\b', text)]
-        if not years:
-            return 1.0
-        earliest = min(years)
-        latest = max(years)
-        diff = latest - earliest
-        if 0 < diff <= 15:
-            return float(diff)
-        return 1.5
+    def extract_projects_and_experience(cls, text: str) -> Tuple[List[WorkExperience], List[Project]]:
+        """Work experience and projects as written in the resume (nothing is made up)."""
+        return cls.extract_experience(text), cls.extract_projects(text)
+
+    @classmethod
+    def calculate_estimated_yoe(cls, text: str, experience: Optional[List[WorkExperience]] = None) -> float:
+        """Years of experience: what the resume states ("5+ years"), else the sum of its job date ranges."""
+        stated = re.search(r"\b(\d{1,2})(?:\.\d)?\s*\+?\s*(?:years?|yrs?)\b(?:\s+of)?(?:\s+\w+){0,3}?\s+experience", text, re.IGNORECASE)
+        if stated and 0 < int(stated.group(1)) <= 40:
+            return float(stated.group(1))
+
+        spans = []
+        for job in experience if experience is not None else cls.extract_experience(text):
+            start = cls._parse_date(job.start_date) if job.start_date else None
+            end = cls._parse_date(job.end_date, end=True) if job.end_date else None
+            if start and end and end >= start:
+                spans.append((start, end))
+        if not spans:
+            return 0.0
+        spans.sort()
+        total_days, (cur_start, cur_end) = 0, spans[0]
+        for start, end in spans[1:]:
+            if start <= cur_end:
+                cur_end = max(cur_end, end)
+            else:
+                total_days += (cur_end - cur_start).days
+                cur_start, cur_end = start, end
+        total_days += (cur_end - cur_start).days
+        return round(total_days / 365.25, 1)
 
     @classmethod
     def parse_to_profile(cls, source_path_or_text: str, profile_id: str = "default_user") -> CandidateProfile:
@@ -395,14 +503,15 @@ class ResumeParser:
         all_skills, categorized_skills = cls.categorize_skills(text)
         education = cls.extract_education(text)
         experience, projects = cls.extract_projects_and_experience(text)
-        estimated_yoe = cls.calculate_estimated_yoe(text)
+        estimated_yoe = cls.calculate_estimated_yoe(text, experience)
 
-        # Certifications detection
+        # Certifications: only ones the resume says the person holds.
         certifications = []
-        if "aws" in text.lower() and "architect" in text.lower():
-            certifications.append("AWS Certified Solutions Architect – Associate")
-        if "gcp" in text.lower() or "google cloud" in text.lower():
-            certifications.append("Google Cloud Certified Professional Cloud Architect")
+        for line in cls._sections(text).get("other", []) + text.split("\n"):
+            for m in re.finditer(r"\b(?:certified|certification:?)\s+([A-Z][\w &/+-]{3,60}?)(?=[.,;|\n]|$)", line):
+                cert = m.group(0).strip(" .,;")
+                if cert not in certifications:
+                    certifications.append(cert)
 
         # Initial Recruiter Preferences
         prefs = RecruiterPreferences(
@@ -412,7 +521,7 @@ class ResumeParser:
             notice_period_days=0,
             work_authorization="Citizen",
             remote_preference="Remote / Hybrid / On-site",
-            why_looking_for_role="Seeking challenging technical opportunities to build high-scale, impactful software."
+            why_looking_for_role=""  # the user's own words, asked for in setup
         )
 
         return CandidateProfile(
@@ -424,7 +533,7 @@ class ResumeParser:
             linkedin_url=contact["linkedin_url"],
             github_url=contact["github_url"],
             portfolio_url=contact["portfolio_url"],
-            summary=f"Technical engineering professional with experience in {', '.join(all_skills[:5])}.",
+            summary=cls.extract_summary(text),
             education=education,
             experience=experience,
             projects=projects,

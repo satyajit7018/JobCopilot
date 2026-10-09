@@ -44,9 +44,10 @@ class FollowUpEngine:
             # Stage 2: 14-Day Value-Add Follow-up
             s1 = f"Hi {first_name}, following up on my application for the {job.title} role at {job.company}."
             if top_project:
-                s2 = f"Since applying, I released an update to {top_project.name} ({top_project.metrics or 'performance optimizations'}), which aligns closely with your tech stack."
+                result = f" ({top_project.metrics})" if top_project.metrics else ""
+                s2 = f"In case it's useful, my project {top_project.name}{result} shows the kind of work I'd bring to the role."
             else:
-                s2 = "I wanted to reiterate my strong interest in joining your backend engineering team."
+                s2 = "I wanted to reiterate my strong interest in joining your team."
             s3 = "Please let me know if there are any updates or additional details I can provide."
 
         body = f"{s1}\n\n{s2} {s3}\n\nBest regards,\n{profile.full_name}\n{profile.email} | {profile.phone}"
