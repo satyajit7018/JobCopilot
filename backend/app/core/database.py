@@ -2185,12 +2185,9 @@ class DatabaseManager(DatabaseAdapter):
                     conn.commit()
 
                     try:
-                        user_storage = Path(settings.BASE_DIR) / "storage" / "users" / user_id
-                        if user_storage.exists() and user_storage.is_dir():
-                            shutil.rmtree(user_storage, ignore_errors=True)
+                        settings.purge_user_files(user_id)
                     except Exception:
-                        logger.warning("database: failed to delete user storage directory during hard delete", exc_info=True)
-                        pass
+                        logger.warning("database: failed to delete user files during hard delete", exc_info=True)
 
                     return True
                 except Exception:

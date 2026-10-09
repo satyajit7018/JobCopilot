@@ -33,7 +33,7 @@ export function FeedbackDialog({ open, onClose }: { open: boolean; onClose: () =
         </h2>
         <button type="button" onClick={onClose} className="grid size-8 place-items-center rounded-md text-ink-3 hover:bg-subtle hover:text-ink">
           <X className="size-4" aria-hidden />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">Close feedback form</span>
         </button>
       </div>
       {send.isSuccess ? (

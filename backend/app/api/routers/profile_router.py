@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.api.auth import get_current_user
-from app.core.config import RESUMES_DIR
+from app.core.settings import settings
 from app.core.database import db
 from app.core.models import CandidateProfile, Education, User, WorkExperience
 from app.core.questionnaire import QuestionnaireEngine
@@ -57,7 +57,7 @@ async def upload_resume(
         if len(contents) > MAX_FILE_SIZE:
             raise HTTPException(status_code=413, detail="Resume file exceeds maximum allowed size (10MB).")
         safe_filename = Path(file.filename or "resume.pdf").name
-        file_path = RESUMES_DIR / f"{user_id}_{safe_filename}"
+        file_path = settings.user_files_dir(user_id, "resumes") / safe_filename
         with open(file_path, "wb") as buffer:
             buffer.write(contents)
         profile = await ResumeParser.parse_to_profile_async(str(file_path), profile_id=target_profile_id, user_id=user_id)

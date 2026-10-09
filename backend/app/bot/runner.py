@@ -28,6 +28,7 @@ from app.core.cover_letter import CoverLetterGenerator
 from app.core.database import db
 from app.core.models import ApplicationStatus
 from app.core.outreach_generator import OutreachGenerator
+from app.core.settings import settings
 from app.core.resume_tailor import ResumeTailor
 
 logger = logging.getLogger(__name__)
@@ -256,7 +257,7 @@ class AutonomousJobRunner:
                     await log(f"Auto-filled {len(filled_data)} form fields successfully.")
 
                     # Checkpoint Step 2: Form Filled
-                    screenshot_file = self.screenshots_dir / f"filled_{job.job_id}.png"
+                    screenshot_file = settings.user_files_dir(target_user, "screenshots") / f"filled_{job.job_id}.png"
                     await page.screenshot(path=str(screenshot_file), full_page=True)
 
                     CheckpointManager.save_step(

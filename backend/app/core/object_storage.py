@@ -18,7 +18,9 @@ class ObjectStorageAdapter:
 
     def __init__(self, backend: Optional[str] = None):
         self.backend = backend or os.environ.get("STORAGE_BACKEND", "local").lower()
-        self.local_base_dir = Path(os.environ.get("LOCAL_STORAGE_DIR", Path.home() / ".jobcopilot" / "storage"))
+        # Inside the app's data dir (the /data volume in production), not the container's home.
+        from app.core.settings import settings
+        self.local_base_dir = Path(os.environ.get("LOCAL_STORAGE_DIR", settings.app_dir / "storage"))
         self.local_base_dir.mkdir(parents=True, exist_ok=True)
 
         # S3 / R2 Configuration
