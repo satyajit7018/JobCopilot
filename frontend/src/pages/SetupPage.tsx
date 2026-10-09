@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
 import { Logo } from "../components/AppShell";
-import { PreferenceFields, ResumeDrop, SourceFields } from "../components/profile";
+import { BackgroundEditor, PreferenceFields, ResumeDrop, SourceFields } from "../components/profile";
 import { Alert, Button, Card, Spinner, buttonClass, cx } from "../components/ui";
 import { api } from "../lib/api";
 import {
@@ -20,7 +20,7 @@ import {
   type Profile,
 } from "../lib/profile";
 
-const STEPS = ["Your resume", "What you're looking for", "Where to look"];
+const STEPS = ["Your resume", "Check details", "What you're looking for", "Where to look"];
 
 interface DiscoveryResult {
   status?: string;
@@ -65,7 +65,7 @@ export function SetupPage() {
 
   // Start at preferences when a resume is already on file.
   useEffect(() => {
-    if (step === null && profile.isSuccess) setStep(needsSetup(profile.data) ? 0 : 1);
+    if (step === null && profile.isSuccess) setStep(needsSetup(profile.data) ? 0 : 2);
   }, [step, profile.isSuccess, profile.data]);
 
   const later = () => {
@@ -90,8 +90,9 @@ export function SetupPage() {
           <>
             <Stepper current={step} />
             {step === 0 && <ResumeStep onDone={() => setStep(1)} />}
-            {step === 1 && profile.data && <PreferencesStep profile={profile.data} onBack={() => setStep(0)} onDone={() => setStep(2)} />}
-            {step === 2 && <SourcesStep onBack={() => setStep(1)} />}
+            {step === 1 && profile.data && <CheckStep profile={profile.data} onBack={() => setStep(0)} onDone={() => setStep(2)} />}
+            {step === 2 && profile.data && <PreferencesStep profile={profile.data} onBack={() => setStep(1)} onDone={() => setStep(3)} />}
+            {step === 3 && <SourcesStep onBack={() => setStep(2)} />}
           </>
         )}
       </main>
@@ -106,6 +107,21 @@ function ResumeStep({ onDone }: { onDone: () => void }) {
       <h1 className="text-xl font-semibold sm:text-2xl">Start with your resume</h1>
       <p className="mt-1.5 mb-6 text-ink-2">We'll read it to fill in your profile and find roles that fit. You can change anything afterwards.</p>
       <ResumeDrop busy={upload.isPending} error={upload.error?.message} onSubmit={(input) => upload.mutate(input, { onSuccess: onDone })} />
+    </Card>
+  );
+}
+
+/** Resume reading isn't perfect: let people fix it before it drives their matches. */
+function CheckStep({ profile, onBack, onDone }: { profile: Profile; onBack: () => void; onDone: () => void }) {
+  return (
+    <Card className="p-5 sm:p-8">
+      <h1 className="text-xl font-semibold sm:text-2xl">Check what we read</h1>
+      <p className="mt-1.5 mb-6 text-ink-2">Your skills and work history decide which jobs you see. Fix anything we got wrong.</p>
+      <BackgroundEditor profile={profile} submitLabel="Looks right, continue" onSaved={onDone} />
+      <Button variant="ghost" className="mt-3" onClick={onBack}>
+        <ArrowLeft className="size-4" aria-hidden />
+        Use a different resume
+      </Button>
     </Card>
   );
 }
@@ -219,8 +235,42 @@ function SourcesStep({ onBack }: { onBack: () => void }) {
           {searching ? "Searching job sites" : problem ? "Try again" : "Find my matches"}
         </Button>
       </div>
-      {searching && <p className="mt-3 text-right text-xs text-ink-3" role="status">This can take up to a minute.</p>}
+      {searching && <SearchProgress />}
     </Card>
+  );
+}
+
+/** What the first search is doing, by elapsed time (it takes ~20s; the steps overlap on the server). */
+export const SEARCH_STAGES: { after: number; text: string }[] = [
+  { after: 0, text: "Checking career pages at about 30 tech companies" },
+  { after: 6_000, text: "Looking through startup job boards" },
+  { after: 12_000, text: "Scoring each job against your resume" },
+  { after: 20_000, text: "Saving your best matches" },
+  { after: 35_000, text: "Still working. Some job sites are slow today" },
+];
+
+export function searchStage(elapsedMs: number): string {
+  return [...SEARCH_STAGES].reverse().find((s) => elapsedMs >= s.after)!.text;
+}
+
+function SearchProgress() {
+  const [started] = useState(() => Date.now());
+  const [now, setNow] = useState(started);
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(t);
+  }, []);
+  const elapsed = now - started;
+  // An estimate, not real progress: eases toward 95% over about 25 seconds.
+  const pct = Math.min(95, Math.round(95 * (1 - Math.exp(-elapsed / 10_000))));
+
+  return (
+    <div className="mt-5" role="status" aria-live="polite">
+      <div className="h-1.5 overflow-hidden rounded-full bg-subtle" aria-hidden>
+        <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-2 text-sm text-ink-2">{searchStage(elapsed)}…</p>
+    </div>
   );
 }
 

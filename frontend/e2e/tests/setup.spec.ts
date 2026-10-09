@@ -12,7 +12,15 @@ test.describe("First-run setup", () => {
     await page.getByRole("button", { name: "Use this text" }).click();
 
     // Step 2 is filled in from the resume.
-    await expect(page.getByRole("heading", { name: "What kind of role are you after?" })).toBeVisible({ timeout: 30_000 });
+    // Check what we read: the employer comes from the resume, and corrections are saved.
+    await expect(page.getByRole("heading", { name: "Check what we read" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByLabel("Company").first()).toHaveValue("Example Payments");
+    await page.getByLabel("Add skills").fill("GraphQL, gRPC");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Remove gRPC" })).toBeVisible();
+    await page.getByRole("button", { name: "Looks right, continue" }).click();
+
+    await expect(page.getByRole("heading", { name: "What kind of role are you after?" })).toBeVisible();
     await expect(page.getByLabel("Where you live")).toHaveValue(/Pune/);
     await page.getByText("Remote only").click();
     await page.getByLabel("Expected salary").fill("30 LPA");
@@ -25,6 +33,7 @@ test.describe("First-run setup", () => {
 
     // The answers were saved.
     await page.goto("/profile");
+    await expect(page.getByText("gRPC", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Expected salary")).toHaveValue("30 LPA");
     await expect(page.getByRole("radio", { name: "Remote only" })).toBeChecked();
   });

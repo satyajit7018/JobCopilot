@@ -60,17 +60,19 @@ class OutreachGenerator:
 
         # Sentence 2: Technical proof point
         if top_project:
-            tech = ", ".join(top_project.technologies[:2]) if top_project.technologies else "Python"
+            tech = f" in {', '.join(top_project.technologies[:2])}" if top_project.technologies else ""
             metric = f" ({top_project.metrics})" if top_project.metrics else ""
             link = f" (code: {profile.github_url})" if profile.github_url else ""
-            s2 = f"Given your technical focus, you might find my work building {top_project.name} in {tech}{metric}{link} directly relevant."
+            s2 = f"Given your technical focus, you might find my work building {top_project.name}{tech}{metric}{link} directly relevant."
+        elif profile.skills:
+            s2 = f"I work mainly with {', '.join(profile.skills[:4])}."
         else:
-            s2 = "I specialize in building scalable Python backend microservices and reliable data pipelines with high test coverage."
+            s2 = ""
 
         # Sentence 3: Frictionless call to action
         s3 = "If my background aligns with what your team needs, I would be glad to share my code walkthrough."
 
-        body = f"{s1} {s2} {s3}\n\nBest,\n{profile.full_name}\n{profile.email} | {profile.phone}\n{profile.linkedin_url or ''}"
+        body = f"{' '.join(x for x in (s1, s2, s3) if x)}\n\nBest,\n{profile.full_name}\n{profile.email} | {profile.phone}\n{profile.linkedin_url or ''}"
 
         return {
             "subject": subject,

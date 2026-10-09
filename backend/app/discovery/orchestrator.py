@@ -82,6 +82,10 @@ class DiscoveryOrchestrator:
         """Scores raw leads against the profile and saves the matches (blocking)."""
         saved_jobs: List[JobListing] = []
         blacklist = [c.lower() for c in profile.preferences.company_blacklist]
+        target_user = user_id or getattr(profile, "user_id", "")
+        # Jobs already in the user's list, by fingerprint. A posting found again must not
+        # overwrite them: an application or a "Not interested" stays as the user left it.
+        existing = {j.fingerprint: j for j in db.get_jobs(user_id=target_user)}
 
         for lead in raw_leads:
             company = lead.get("company", "Company")
@@ -97,6 +101,9 @@ class DiscoveryOrchestrator:
 
             # Compute Deduplication Fingerprint
             fingerprint = JobDeduplicator.generate_fingerprint(company, title, location, desc)
+            known = existing.get(fingerprint)
+            if known is not None and known.status != ApplicationStatus.DISCOVERED:
+                continue
             # Compute Multi-Factor Match Score
             match_score, match_reasons, missing_skills = MatchScorer.compute_match_score(
                 profile=profile,
@@ -118,9 +125,8 @@ class DiscoveryOrchestrator:
                     location=location
                 )
 
-                target_user = user_id or getattr(profile, "user_id", "")
                 job = JobListing(
-                    job_id=f"job_{uuid.uuid4().hex[:12]}",
+                    job_id=known.job_id if known else f"job_{uuid.uuid4().hex[:12]}",
                     user_id=target_user,
                     fingerprint=fingerprint,
                     platform=lead.get("platform", "Direct"),
@@ -137,6 +143,8 @@ class DiscoveryOrchestrator:
                     missing_skills=missing_skills,
                     status=ApplicationStatus.DISCOVERED
                 )
+                if known is not None and known.created_at:
+                    job.created_at = known.created_at  # keeps "New since your last visit" honest
 
                 # Persist to Multi-Tenant DB
                 if db.save_job(job, user_id=target_user):

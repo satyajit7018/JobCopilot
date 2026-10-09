@@ -98,6 +98,12 @@ async def update_job_status(
         raise HTTPException(status_code=404, detail="Job not found.")
 
     job.status = new_status
+    # Marking a job applied (or further along) by hand records when, so follow-up
+    # reminders and "applied 3 days ago" work for applications made outside JobCopilot.
+    applied_or_later = {ApplicationStatus.SUBMITTED, ApplicationStatus.RESPONDED, ApplicationStatus.INTERVIEW,
+                        ApplicationStatus.OFFER, ApplicationStatus.REJECTED}
+    if new_status in applied_or_later and not job.applied_at:
+        job.applied_at = datetime.now().isoformat()
     db.save_job(job, user_id=current_user.user_id)
 
     return {

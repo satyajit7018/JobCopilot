@@ -13,6 +13,19 @@ from app.api.auth import create_jwt_token
 from app.core.models import User, UserRole
 
 
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    """Each test starts with empty rate-limit counters.
+
+    The limiter keeps per-minute counts in memory for the whole worker process, so
+    without this a test could get 429s just because earlier tests on the same
+    worker (under pytest-xdist) registered or signed in a few times.
+    """
+    from app.api.auth import limiter
+    limiter.reset()
+    yield
+
+
 @pytest.fixture(scope="session")
 def client() -> TestClient:
     """Unauthenticated standard TestClient."""

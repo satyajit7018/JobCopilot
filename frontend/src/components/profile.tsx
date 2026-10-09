@@ -1,6 +1,6 @@
 // Profile building blocks shared by the setup flow and the Profile page.
 import { useRef, useState, type DragEvent } from "react";
-import { FileText, Upload } from "lucide-react";
+import { FileText, Plus, Upload, X } from "lucide-react";
 import { Alert, Button, CheckRow, ChoiceChips, Field, Select, Textarea, cx } from "./ui";
 import {
   NOTICE_PERIODS,
@@ -10,7 +10,12 @@ import {
   noticeLabel,
   resumeFileError,
   withCurrent,
+  splitSkills,
+  useSaveBackground,
   type Answers,
+  type Education,
+  type Experience,
+  type Profile,
   type Question,
   type SourceState,
 } from "../lib/profile";
@@ -215,5 +220,136 @@ export function SourceFields({ value, onChange, disabled }: { value: SourceState
         ))}
       </div>
     </fieldset>
+  );
+}
+
+// --- Skills, work history and education ---------------------------------------------
+
+const blankJob = (): Experience => ({ title: "", company: "", start_date: "", end_date: "", highlights: [] });
+const blankSchool = (): Education => ({ degree: "", institution: "", graduation_year: "" });
+
+/** Edit what was read from the resume. Used in setup ("check what we read") and on Profile. */
+export function BackgroundEditor({
+  profile,
+  submitLabel,
+  onSaved,
+  onCancel,
+}: {
+  profile: Profile;
+  submitLabel: string;
+  onSaved: () => void;
+  onCancel?: () => void;
+}) {
+  const save = useSaveBackground();
+  const [skills, setSkills] = useState<string[]>(profile.skills);
+  const [newSkill, setNewSkill] = useState("");
+  const [jobs, setJobs] = useState<Experience[]>(profile.experience.length ? profile.experience : [blankJob()]);
+  const [schools, setSchools] = useState<Education[]>(profile.education.length ? profile.education : [blankSchool()]);
+
+  const addSkills = () => {
+    const extra = splitSkills(newSkill).filter((s) => !skills.some((k) => k.toLowerCase() === s.toLowerCase()));
+    if (extra.length) setSkills([...skills, ...extra]);
+    setNewSkill("");
+  };
+  const editJob = (i: number, patch: Partial<Experience>) => setJobs(jobs.map((j, k) => (k === i ? { ...j, ...patch } : j)));
+  const editSchool = (i: number, patch: Partial<Education>) => setSchools(schools.map((e, k) => (k === i ? { ...e, ...patch } : e)));
+
+  return (
+    <form
+      className="flex flex-col gap-6"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const pending = splitSkills(newSkill).filter((s) => !skills.some((k) => k.toLowerCase() === s.toLowerCase()));
+        save.mutate({ skills: [...skills, ...pending], experience: jobs, education: schools }, { onSuccess: onSaved });
+      }}
+    >
+      <fieldset>
+        <legend className="mb-2 font-semibold">Skills</legend>
+        <ul className="mb-2 flex flex-wrap gap-1.5" aria-label="Your skills">
+          {skills.map((s) => (
+            <li key={s} className="inline-flex h-7 items-center gap-1 rounded-full border border-line bg-subtle pr-1 pl-2.5 text-sm">
+              {s}
+              <button
+                type="button"
+                className="grid size-5 place-items-center rounded-full text-ink-3 hover:bg-line hover:text-ink"
+                onClick={() => setSkills(skills.filter((k) => k !== s))}
+              >
+                <X className="size-3" aria-hidden />
+                <span className="sr-only">Remove {s}</span>
+              </button>
+            </li>
+          ))}
+          {skills.length === 0 && <li className="text-ink-3">No skills yet.</li>}
+        </ul>
+        <div className="flex gap-2">
+          <Field
+            label="Add skills"
+            hint="Separate several with commas."
+            name="new-skill"
+            value={newSkill}
+            className="flex-1"
+            onChange={(e) => setNewSkill(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addSkills();
+              }
+            }}
+          />
+          <Button className="mt-6.5 self-start" onClick={addSkills} disabled={!newSkill.trim()}>
+            Add
+          </Button>
+        </div>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-3">
+        <legend className="mb-2 font-semibold">Work history</legend>
+        {jobs.map((j, i) => (
+          <div key={i} className="grid gap-2 rounded-md border border-line p-3 sm:grid-cols-2">
+            <Field label="Job title" name={`job-title-${i}`} value={j.title} onChange={(e) => editJob(i, { title: e.target.value })} />
+            <Field label="Company" name={`job-company-${i}`} value={j.company} onChange={(e) => editJob(i, { company: e.target.value })} />
+            <Field label="Started" hint="e.g. Jan 2022" name={`job-start-${i}`} value={j.start_date} onChange={(e) => editJob(i, { start_date: e.target.value })} />
+            <Field label="Ended" hint="Leave as Present if you work there now" name={`job-end-${i}`} value={j.end_date} onChange={(e) => editJob(i, { end_date: e.target.value })} />
+            <button type="button" className="justify-self-start text-sm font-medium text-ink-2 hover:text-danger" onClick={() => setJobs(jobs.filter((_, k) => k !== i))}>
+              Remove this job
+            </button>
+          </div>
+        ))}
+        <Button className="self-start" onClick={() => setJobs([...jobs, { ...blankJob(), end_date: "Present" }])}>
+          <Plus className="size-4" aria-hidden />
+          Add a job
+        </Button>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-3">
+        <legend className="mb-2 font-semibold">Education</legend>
+        {schools.map((e, i) => (
+          <div key={i} className="grid gap-2 rounded-md border border-line p-3 sm:grid-cols-[1fr_1fr_8rem]">
+            <Field label="Degree" name={`edu-degree-${i}`} value={e.degree} onChange={(ev) => editSchool(i, { degree: ev.target.value })} />
+            <Field label="School" name={`edu-school-${i}`} value={e.institution} onChange={(ev) => editSchool(i, { institution: ev.target.value })} />
+            <Field label="Year" name={`edu-year-${i}`} inputMode="numeric" value={e.graduation_year ?? ""} onChange={(ev) => editSchool(i, { graduation_year: ev.target.value })} />
+            <button type="button" className="justify-self-start text-sm font-medium text-ink-2 hover:text-danger" onClick={() => setSchools(schools.filter((_, k) => k !== i))}>
+              Remove
+            </button>
+          </div>
+        ))}
+        <Button className="self-start" onClick={() => setSchools([...schools, blankSchool()])}>
+          <Plus className="size-4" aria-hidden />
+          Add education
+        </Button>
+      </fieldset>
+
+      {save.error && <Alert>Couldn't save: {save.error.message}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" variant="primary" loading={save.isPending}>
+          {submitLabel}
+        </Button>
+        {onCancel && (
+          <Button variant="ghost" onClick={onCancel} disabled={save.isPending}>
+            Cancel
+          </Button>
+        )}
+      </div>
+    </form>
   );
 }

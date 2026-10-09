@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useLocation } from "react-router";
-import { KeyRound } from "lucide-react";
+import { Columns3, FileText, KeyRound, Target } from "lucide-react";
 import { useAuth, usePublicConfig, type SignInResult } from "../lib/auth";
 import { GoogleButton } from "../components/GoogleButton";
 import { Alert, Button, Card, Field } from "../components/ui";
@@ -40,12 +40,10 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-10">
-      <div className="mb-8 flex items-center gap-2 text-lg font-bold">
-        <img src="/favicon.svg" alt="" className="size-8" />
-        JobCopilot
-      </div>
-      <Card className="w-full max-w-100 p-6 sm:p-8">
+    <div className="flex min-h-dvh items-center justify-center px-4 py-10">
+      <div className="grid w-full max-w-4xl items-center gap-10 md:grid-cols-[1fr_25rem]">
+      <Pitch />
+      <Card className="w-full p-6 sm:p-8">
         {mfaToken ? (
           <MfaStep busy={busy} error={error} onSubmit={(code) => run(() => auth.completeMfa(mfaToken, code))} onBack={() => setMfaToken(null)} />
         ) : (
@@ -120,6 +118,39 @@ export function LoginPage() {
           </>
         )}
       </Card>
+      </div>
+    </div>
+  );
+}
+
+const PITCH_POINTS = [
+  { icon: Target, title: "Matches that make sense", text: "Every job gets a score and the reasons behind it, from your resume." },
+  { icon: FileText, title: "Applications in minutes", text: "A tailored resume and cover letter for each role, ready to review." },
+  { icon: Columns3, title: "Everything in one place", text: "Follow each application from applied to offer, with reminders to follow up." },
+];
+
+function Pitch() {
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-lg font-bold">
+        <img src="/favicon.svg" alt="" className="size-8" />
+        JobCopilot
+      </div>
+      <p className="mt-6 text-2xl font-semibold tracking-tight max-md:hidden">Find jobs that fit you. Spend less time applying.</p>
+      <ul className="mt-6 flex flex-col gap-5 max-md:hidden">
+        {PITCH_POINTS.map(({ icon: Icon, title, text }) => (
+          <li key={title} className="flex gap-3">
+            <span className="grid size-9 flex-none place-items-center rounded-lg bg-accent-soft text-accent">
+              <Icon className="size-4.5" aria-hidden />
+            </span>
+            <span>
+              <span className="block font-semibold">{title}</span>
+              <span className="text-ink-2">{text}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-ink-2 md:hidden">Find jobs that fit you. Spend less time applying.</p>
     </div>
   );
 }

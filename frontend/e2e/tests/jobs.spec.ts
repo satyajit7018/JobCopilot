@@ -20,6 +20,12 @@ test.describe("Jobs and review", () => {
     await page.getByLabel("Search jobs").fill("");
     await expect(rows).toHaveCount(2);
 
+    // "Not interested" hides a job; Undo brings it back.
+    await page.getByRole("button", { name: "Not interested in Frontend Engineer (React) at Vertex Labs" }).click();
+    await expect(rows).toHaveCount(1);
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(rows).toHaveCount(2);
+
     await page.getByRole("link", { name: "Review Senior Backend Engineer (Python) at Nimbus Systems" }).click();
     await expect(page.getByRole("heading", { name: "Senior Backend Engineer (Python)" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Start practice run" })).toBeVisible();
