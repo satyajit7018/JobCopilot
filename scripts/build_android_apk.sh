@@ -31,10 +31,14 @@ fi
 
 echo ""
 echo "🚀 Step 1: Initializing Bubblewrap Android TWA Project..."
-npx -y @bubblewrap/cli init --manifest="$HOST_URL/manifest.json" || {
-    echo "💡 Initializing local manifest wrapper..."
-    npx -y @bubblewrap/cli init --manifest="./frontend/manifest.json"
-}
+# Bubblewrap reads the web app manifest from the live site (frontend/public/manifest.json,
+# served at /manifest.json), so the frontend must be deployed at $HOST_URL first.
+if ! curl -fsS -o /dev/null "$HOST_URL/manifest.json"; then
+    echo "❌ Error: $HOST_URL/manifest.json is not reachable."
+    echo "Deploy the frontend first, then run: $0 https://your-domain"
+    exit 1
+fi
+npx -y @bubblewrap/cli init --manifest="$HOST_URL/manifest.json"
 
 echo ""
 echo "🔨 Step 2: Building signed Android APK & AAB..."
