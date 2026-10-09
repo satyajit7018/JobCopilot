@@ -120,7 +120,7 @@ async def delete_user_account(
     """
     GDPR Article 17 (Right to Erasure / Hard Delete).
     Permanently erases all database records tied to the candidate, cancels active
-    Stripe subscriptions, purges file uploads, and revokes credentials.
+    Stripe and Razorpay subscriptions, purges file uploads, and revokes credentials.
     Requires the account email plus re-authentication (password, or TOTP when MFA is on).
     """
     clean_confirm = payload.confirm_email.lower().strip()
@@ -160,6 +160,16 @@ async def delete_user_account(
     except Exception:
         logger.warning("account_router: failed to cancel stripe subscriptions during account deletion", exc_info=True)
         pass  # Non-blocking if Stripe is not configured or in test mode
+
+    # 1b. Stop Razorpay billing now (not at period end): the account is going away.
+    subscription = db.get_subscription(user_id)
+    if subscription and subscription.get("status") not in ("cancelled", "completed", "expired", "halted"):
+        try:
+            from app.core import razorpay_client
+            await razorpay_client.cancel_subscription(subscription["subscription_id"], at_cycle_end=False)
+        except Exception:
+            logger.error("account_router: failed to cancel razorpay subscription %s during account deletion",
+                         subscription.get("subscription_id"), exc_info=True)
 
     # 2. Hard erase database records and storage files
     success = db.hard_delete_user_account(user_id)

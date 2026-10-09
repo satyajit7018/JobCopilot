@@ -259,3 +259,22 @@ def test_billing_never_demotes_an_admin(razorpay):
         assert _role(admin) == "ADMIN"
     finally:
         db.hard_delete_user_account(admin.user_id)
+
+
+def test_deleting_the_account_cancels_razorpay_immediately(razorpay, monkeypatch):
+    user = _user(UserRole.PRO)
+    calls = []
+
+    async def cancel(sub_id, at_cycle_end=True):
+        calls.append((sub_id, at_cycle_end))
+        return {"id": sub_id, "status": "cancelled"}
+
+    monkeypatch.setattr(razorpay_client, "cancel_subscription", cancel)
+    monkeypatch.setattr(settings, "PASSWORD_AUTH_ENABLED", True)
+    db.set_subscription(user.user_id, "sub_del", "active")
+    import importlib
+    account_router = importlib.import_module("app.api.routers.account_router")
+    monkeypatch.setattr(account_router, "_reauthenticate_for_deletion", lambda payload, u: None)
+    res = client.request("DELETE", "/api/account", headers=_headers(user), json={"confirm_email": user.email, "password": "x"})
+    assert res.status_code == 200
+    assert calls == [("sub_del", False)]
