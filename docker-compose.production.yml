@@ -57,6 +57,8 @@ services:
       - GOOGLE_OAUTH_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID:?GOOGLE_OAUTH_CLIENT_ID is required (only prod sign-in path)}
       - INBOUND_EMAIL_WEBHOOK_SECRET=${INBOUND_EMAIL_WEBHOOK_SECRET:?INBOUND_EMAIL_WEBHOOK_SECRET is required (inbound webhook is public)}
       - METRICS_TOKEN=${METRICS_TOKEN:-}
+      # Email + password accounts need SMTP for confirmation/reset emails; Google-only until then.
+      - PASSWORD_AUTH_ENABLED=${PASSWORD_AUTH_ENABLED:-false}
     volumes:
       - jobcopilot_data:/data
     depends_on:
