@@ -4,6 +4,8 @@ import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation } fr
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiError } from "./lib/api";
 import { loadPage, setReloadTarget } from "./lib/chunks";
+import { installGlobalErrorReporting } from "./lib/errorReporting";
+import { ErrorScreen } from "./components/ErrorScreen";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { AppShell } from "./components/AppShell";
 import { Alert, Button, Card, Spinner } from "./components/ui";
@@ -64,6 +66,7 @@ function Root() {
 const router = createBrowserRouter([
   {
     element: <Root />,
+    errorElement: <ErrorScreen />,
     children: [
       { path: "/login", element: <LoginPage /> },
       // Public: readable without signing in (Google and Razorpay link to them).
@@ -101,6 +104,8 @@ const router = createBrowserRouter([
 if ("serviceWorker" in navigator) {
   void navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => void r.unregister()));
 }
+
+installGlobalErrorReporting();
 
 setReloadTarget(() => {
   const next = router.state.navigation.location;

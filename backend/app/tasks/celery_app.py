@@ -14,6 +14,15 @@ from typing import Any, Callable, Dict, Optional
 logger = logging.getLogger("jobcopilot.tasks")
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+# Errors in background jobs (hourly search, applying) go to Sentry too.
+if os.environ.get("SENTRY_DSN"):
+    try:
+        import sentry_sdk
+        sentry_sdk.init(dsn=os.environ["SENTRY_DSN"], environment=os.environ.get("ENV", "development"),
+                        traces_sample_rate=0.0, send_default_pii=False)
+    except Exception:
+        logger.warning("Sentry init failed in worker", exc_info=True)
 USE_CELERY = os.environ.get("USE_CELERY", "false").lower() in ["true", "1", "yes"]
 
 try:
