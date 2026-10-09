@@ -16,6 +16,7 @@ import {
 } from "../lib/apply";
 import { STATUS_META, isTracked, scorePercent, scoreTone, useJobs, useSetMatchHidden, useSetMatchSaved, type Job } from "../lib/jobs";
 import { useSetStatus } from "../lib/application";
+import { markDone } from "../lib/checklist";
 import { useIsPremium } from "../lib/billing";
 import { PremiumLock } from "../components/PremiumLock";
 import { noticeLabel, useProfile } from "../lib/profile";
@@ -93,6 +94,7 @@ export function JobReviewPage() {
 
 function Review({ job, back }: { job: Job; back: ReactNode }) {
   const tailor = useTailor(job.job_id);
+  useEffect(() => markDone("reviewed"), []);
   const premium = useIsPremium();
   const [taskId, setTaskId] = useState<string | null>(() => taskStore.get(job.job_id));
   const pct = scorePercent(job.match_score);

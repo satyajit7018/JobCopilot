@@ -1,10 +1,11 @@
 import { useMemo, type ReactNode } from "react";
 import { Link, Navigate } from "react-router";
-import { ArrowRight, BriefcaseBusiness, CalendarClock, CircleAlert, MailQuestion, PartyPopper } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, MailQuestion, PartyPopper, X } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { Alert, Card, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
 import { useAuth } from "../lib/auth";
-import { isMatch, isNewSince, matchSummary, readLastVisit, scorePercent, scoreTone, useVisibleJobs, type Job } from "../lib/jobs";
+import { buildChecklist, markDone, useChecklistFlags } from "../lib/checklist";
+import { isMatch, isNewSince, isTracked, matchSummary, readLastVisit, scorePercent, scoreTone, useVisibleJobs, type Job } from "../lib/jobs";
 import { needsSetup as profileNeedsSetup, setupLater, useProfile } from "../lib/profile";
 import { SetupReminder } from "./SetupPage";
 
@@ -144,6 +145,7 @@ export function HomePage() {
           <SetupReminder />
         ) : (
           <>
+            <GettingStarted jobs={data ?? []} />
             <section aria-labelledby="today">
               <h2 id="today" className="mb-3 text-base font-semibold">
                 Today
@@ -247,6 +249,58 @@ function TopMatches({ jobs }: { jobs: Job[] }) {
             );
           })}
         </ul>
+      </Card>
+    </section>
+  );
+}
+
+/** First steps, until they're all done or dismissed. */
+function GettingStarted({ jobs }: { jobs: Job[] }) {
+  const { user } = useAuth();
+  const flags = useChecklistFlags();
+  const steps = buildChecklist({ hasResume: true, hasTracked: jobs.some(isTracked), mfaEnabled: !!user?.mfa_enabled, flags });
+  const done = steps.filter((s) => s.done).length;
+  if (flags.dismissed || done === steps.length) return null;
+
+  return (
+    <section aria-labelledby="getting-started">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 id="getting-started" className="text-base font-semibold">
+          Getting started <span className="font-normal text-ink-3">· {done} of {steps.length} done</span>
+        </h2>
+        <button type="button" onClick={() => markDone("dismissed")} className="flex items-center gap-1 text-sm text-ink-3 hover:text-ink">
+          <X className="size-3.5" aria-hidden />
+          Hide
+        </button>
+      </div>
+      <Card>
+        <div className="h-1 overflow-hidden rounded-t-lg bg-subtle" aria-hidden>
+          <div className="h-full bg-accent" style={{ width: `${(done / steps.length) * 100}%` }} />
+        </div>
+        <ol>
+          {steps.map((s) => (
+            <li key={s.key} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0 sm:px-5">
+              <span
+                className={cx(
+                  "grid size-5 flex-none place-items-center rounded-full border",
+                  s.done ? "border-ok bg-ok text-white" : "border-line-strong",
+                )}
+                aria-hidden
+              >
+                {s.done && <Check className="size-3" />}
+              </span>
+              <span className={cx("flex-1", s.done && "text-ink-3 line-through")}>
+                {s.title}
+                <span className="sr-only">{s.done ? " (done)" : " (to do)"}</span>
+              </span>
+              {!s.done && (
+                <Link to={s.to} className={buttonClass("secondary", "sm")}>
+                  {s.cta}
+                </Link>
+              )}
+            </li>
+          ))}
+        </ol>
       </Card>
     </section>
   );

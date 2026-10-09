@@ -2,6 +2,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./api";
+import { markDone } from "./checklist";
 
 export interface Experience {
   company: string;
@@ -122,6 +123,7 @@ export function useSaveAnswers() {
     mutationFn: (answers: Partial<Answers>) => api<{ profile: Profile }>("/questionnaire", { method: "POST", body: { answers } }),
     onSuccess: ({ profile }) => {
       qc.setQueryData(["profile"], profile);
+      markDone("preferences");
       void qc.invalidateQueries({ queryKey: ["questionnaire"] });
     },
   });
@@ -140,6 +142,7 @@ export function useSaveBackground() {
     mutationFn: (background: Background) => api<{ profile: Profile }>("/profile/background", { method: "PUT", body: background }),
     onSuccess: ({ profile }) => {
       qc.setQueryData(["profile"], profile);
+      markDone("details");
     },
   });
 }
