@@ -1,21 +1,20 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useSearchParams } from "react-router";
+import { Link } from "react-router";
 import QRCode from "qrcode";
-import { Download, Laptop, ShieldCheck, ShieldOff, TriangleAlert } from "lucide-react";
+import { Check, Download, Laptop, ShieldCheck, ShieldOff, Sparkles, TriangleAlert } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Badge, Button, Card, CheckRow, CopyButton, Field, Spinner } from "../components/ui";
+import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CopyButton, Field, Spinner, buttonClass } from "../components/ui";
+import { GoogleButton } from "../components/GoogleButton";
 import { useLiveConsent, useSetLiveConsent } from "../lib/apply";
-import { useAuth } from "../lib/auth";
+import { useAuth, usePublicConfig } from "../lib/auth";
+import { subscriptionIsLive, useBillingPlan, useCancelPremium, useIsPremium } from "../lib/billing";
 import { relativeTime } from "../lib/jobs";
 import {
   eventLabel,
-  useBillingPortal,
-  useCheckout,
   useConfirmMfa,
   useDeleteAccount,
   useDisableMfa,
   useExportData,
-  usePlan,
   useRevokeSession,
   useSecurityActivity,
   useSessions,
@@ -36,17 +35,14 @@ function Section({ title, description, children, tone }: { title: string; descri
   );
 }
 
-const TIER_LABEL: Record<string, string> = { FREE: "Free", PRO: "Pro", ELITE: "Elite", ADMIN: "Admin" };
-
 export function SettingsPage() {
-  const [params] = useSearchParams();
+  const premium = useIsPremium();
   return (
     <>
       <PageHeader title="Settings" />
       <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-5 md:px-7 md:py-8">
-        {params.get("billing") === "success" && <Alert tone="ok">Thanks! Your plan is being updated. It can take a minute to show here.</Alert>}
         <PlanSection />
-        <AutomationSection />
+        {premium && <AutomationSection />}
         <TwoStepSection />
         <DevicesSection />
         <ActivitySection />
@@ -56,49 +52,67 @@ export function SettingsPage() {
   );
 }
 
+function formatDay(iso: string | null | undefined) {
+  return iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }) : null;
+}
+
 function PlanSection() {
-  const plan = usePlan();
-  const checkout = useCheckout();
-  const portal = useBillingPortal();
-  const p = plan.data;
-  const free = p?.tier === "FREE";
-  const error = checkout.error ?? portal.error;
+  const { user } = useAuth();
+  const premium = useIsPremium();
+  const plan = useBillingPlan();
+  const cancel = useCancelPremium();
+  const [confirming, setConfirming] = useState(false);
+  const sub = plan.data?.subscription;
+  const live = subscriptionIsLive(sub);
+  const until = formatDay(sub?.current_end);
 
   return (
     <Section title="Plan">
       {plan.isPending ? (
         <Spinner />
-      ) : !p ? (
-        <Alert>Couldn't load your plan: {plan.error?.message ?? "no data"}</Alert>
+      ) : !premium ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex-1">
+            <p className="text-lg font-semibold">Free</p>
+            <p className="text-ink-2">Job matches and tracking. Premium adds tailored applications, automatic applying, inbox tracking and interview prep.</p>
+          </div>
+          <Link to="/plans" className={buttonClass("primary")}>
+            <Sparkles className="size-4" aria-hidden />
+            See Premium
+          </Link>
+        </div>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-lg font-semibold">{TIER_LABEL[p.tier] ?? p.tier}</span>
-            {p.price_usd_monthly > 0 && <span className="text-ink-2">${p.price_usd_monthly}/month</span>}
-          </div>
-          <p className="text-ink-2">
-            {p.daily_limit === "Unlimited"
-              ? `Unlimited applications. ${p.applied_today} sent today.`
-              : `${p.applied_today} of ${p.daily_limit} applications used today. Resets daily.`}
+        <div className="flex flex-col gap-3">
+          <p className="flex items-center gap-2 text-lg font-semibold">
+            <Sparkles className="size-4 text-accent" aria-hidden />
+            Premium
           </p>
-          {error && <Alert tone="warn">{error.message}</Alert>}
-          <div className="flex flex-wrap gap-2">
-            {free ? (
-              <>
-                <Button variant="primary" loading={checkout.isPending && checkout.variables === "PRO"} onClick={() => checkout.mutate("PRO")}>
-                  Upgrade to Pro
+          {user?.role === "ADMIN" && !live ? (
+            <p className="text-ink-2">Included with your admin account.</p>
+          ) : sub?.status === "cancelling" ? (
+            <p className="text-ink-2">Cancelled. You keep Premium{until ? ` until ${until}` : " until the end of this month"}, then move to Free.</p>
+          ) : sub?.status === "pending" ? (
+            <Alert tone="warn">Your last payment didn't go through. Razorpay will retry; update your card from the link in their email.</Alert>
+          ) : (
+            <p className="text-ink-2">{until ? `Renews on ${until}.` : "Renews monthly."} Payments are handled by Razorpay.</p>
+          )}
+          {cancel.error && <Alert>{cancel.error.message}</Alert>}
+          {live && sub?.status !== "cancelling" &&
+            (confirming ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="w-full text-ink-2">Cancel Premium? You'll keep it until the end of the month you've paid for.</p>
+                <Button variant="danger" loading={cancel.isPending} onClick={() => cancel.mutate(undefined, { onSuccess: () => setConfirming(false) })}>
+                  Cancel Premium
                 </Button>
-                <Button loading={checkout.isPending && checkout.variables === "ELITE"} onClick={() => checkout.mutate("ELITE")}>
-                  Upgrade to Elite
+                <Button variant="ghost" onClick={() => setConfirming(false)}>
+                  Keep it
                 </Button>
-              </>
+              </div>
             ) : (
-              <Button loading={portal.isPending} onClick={() => portal.mutate()}>
-                Manage billing
+              <Button className="self-start" onClick={() => setConfirming(true)}>
+                Cancel Premium…
               </Button>
-            )}
-          </div>
-          {free && <p className="text-xs text-ink-3">You'll pay on Stripe's secure page. Cancel any time.</p>}
+            ))}
         </div>
       )}
     </Section>
@@ -364,16 +378,29 @@ function ActivitySection() {
   );
 }
 
+type DeleteProof = "google" | "password" | "code";
+
 function DataSection() {
   const { user, logout } = useAuth();
+  const { data: config } = usePublicConfig();
   const exportData = useExportData();
   const del = useDeleteAccount();
   const [deleting, setDeleting] = useState(false);
   const [email, setEmail] = useState("");
-  // Google sign-in accounts have no password they know, so a code from the app works too.
-  const [method, setMethod] = useState<"password" | "code">("password");
+  const googleOn = !!config?.google_client_id;
+  const passwordOn = config?.password_auth_enabled !== false;
+  // Google sign-in accounts have no password they know: they confirm with Google or a 2FA code.
+  const proofs: { value: DeleteProof; label: string }[] = [
+    ...(googleOn ? [{ value: "google" as const, label: "Google" }] : []),
+    ...(passwordOn ? [{ value: "password" as const, label: "Password" }] : []),
+    { value: "code", label: "Authenticator code" },
+  ];
+  const [chosen, setChosen] = useState<DeleteProof | null>(null);
+  const method = chosen && proofs.some((p) => p.value === chosen) ? chosen : proofs[0].value;
   const [secret, setSecret] = useState("");
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
   const emailMatches = email.trim().toLowerCase() === (user?.email ?? "").toLowerCase();
+  const ready = emailMatches && (method === "google" ? !!googleToken : !!secret.trim());
 
   return (
     <>
@@ -403,8 +430,9 @@ function DataSection() {
             className="flex flex-col gap-4"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!emailMatches || !secret.trim()) return;
-              const proof = method === "password" ? { password: secret } : { mfa_code: secret.replace(/\s/g, "") };
+              if (!ready) return;
+              const proof =
+                method === "google" ? { google_id_token: googleToken ?? "" } : method === "password" ? { password: secret } : { mfa_code: secret.replace(/\s/g, "") };
               del.mutate({ confirm_email: email.trim(), ...proof }, { onSuccess: () => void logout() });
             }}
           >
@@ -417,25 +445,38 @@ function DataSection() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            {method === "password" ? (
+            {proofs.length > 1 && (
+              <ChoiceChips
+                label="Confirm it's you with"
+                value={method}
+                options={proofs}
+                onChange={(v) => {
+                  setChosen(v);
+                  setSecret("");
+                  setGoogleToken(null);
+                  del.reset();
+                }}
+              />
+            )}
+            {method === "google" && config?.google_client_id ? (
+              googleToken ? (
+                <p className="flex items-center gap-1.5 text-ok" role="status">
+                  <Check className="size-4" aria-hidden />
+                  Confirmed with Google
+                </p>
+              ) : (
+                <div className="sm:w-80">
+                  <GoogleButton clientId={config.google_client_id} text="signin_with" onCredential={setGoogleToken} />
+                </div>
+              )
+            ) : method === "password" ? (
               <Field key="pw" label="Password" name="delete-password" type="password" autoComplete="current-password" value={secret} onChange={(e) => setSecret(e.target.value)} />
             ) : (
               <Field key="code" label="Authenticator code" name="delete-mfa-code" className="sm:w-40" inputMode="numeric" autoComplete="one-time-code" value={secret} onChange={(e) => setSecret(e.target.value)} />
             )}
-            <button
-              type="button"
-              className="self-start text-sm font-medium text-accent hover:underline"
-              onClick={() => {
-                setMethod((m) => (m === "password" ? "code" : "password"));
-                setSecret("");
-                del.reset();
-              }}
-            >
-              {method === "password" ? "Signed in with Google? Use a code from your app instead" : "Use your password instead"}
-            </button>
             {del.error && <Alert>{del.error.message}</Alert>}
             <div className="flex gap-2">
-              <Button type="submit" variant="danger" loading={del.isPending} disabled={!emailMatches || !secret.trim()}>
+              <Button type="submit" variant="danger" loading={del.isPending} disabled={!ready}>
                 Delete my account
               </Button>
               <Button variant="ghost" onClick={() => setDeleting(false)} disabled={del.isPending}>

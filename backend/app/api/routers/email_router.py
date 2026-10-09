@@ -10,9 +10,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from app.api.auth import get_current_user
 from app.api.ws_gateway import ws_manager
 from app.core.database import db
+from app.core.plans import is_premium, require_premium
 from app.core.models import User
 
 router = APIRouter(tags=["email"])
@@ -58,6 +58,11 @@ async def receive_inbound_email_webhook(request: Request):
         if recipient_user:
             tenant_user_id = recipient_user.user_id
 
+    # Inbox tracking is Premium: acknowledge (so the provider doesn't retry) but don't process.
+    tenant = db.get_user_by_id(tenant_user_id) if tenant_user_id else None
+    if tenant and not is_premium(tenant):
+        return {"status": "ignored", "reason": "premium_required"}
+
     result = await EmailSyncEngine.process_inbound_email(
         sender=parsed["sender"],
         recipient=parsed["recipient"],
@@ -73,7 +78,7 @@ async def receive_inbound_email_webhook(request: Request):
 @router.post("/email/inbound")
 async def receive_inbound_email(
     payload: InboundEmailPayload,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("email_tracking"))
 ):
     """Processes incoming recruiter email and syncs pipeline for authenticated tenant."""
     from app.email.sync import EmailSyncEngine
@@ -90,7 +95,7 @@ async def receive_inbound_email(
 
 
 @router.get("/email/messages")
-async def list_email_messages(current_user: User = Depends(get_current_user)):
+async def list_email_messages(current_user: User = Depends(require_premium("email_tracking"))):
     """Returns all parsed recruiter communications for authenticated tenant."""
     emails = db.get_emails(user_id=current_user.user_id)
     return {"count": len(emails), "messages": [e.dict() for e in emails]}
@@ -101,7 +106,7 @@ async def generate_job_followup(
     job_id: str,
     stage_days: int = 7,
     profile_id: Optional[str] = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_premium("ai_writing"))
 ):
     """Generates and saves a follow-up draft for a submitted application."""
     from app.email.followup import FollowUpEngine

@@ -462,10 +462,43 @@ async def require_org_owner(
 # =========================================================================
 # Auth API Endpoints (Public Allowlist: /register, /login, /refresh)
 # =========================================================================
+def verify_google_id_token(token: str) -> dict:
+    """Verifies a Google ID token (audience, issuer, verified email) and returns its claims.
+
+    Raises 503 if Google sign-in isn't configured and 401 for any invalid token.
+    """
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token
+
+    google_client_id = settings.GOOGLE_OAUTH_CLIENT_ID or os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+    if not google_client_id:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
+    try:
+        id_info = id_token.verify_oauth2_token(token, google_requests.Request(), google_client_id)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Google token verification failed.")
+    if id_info.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
+        raise HTTPException(status_code=401, detail="Invalid token issuer.")
+    if id_info.get("email_verified") is not True:
+        raise HTTPException(status_code=401, detail="Google account email is not verified.")
+    if not id_info.get("email"):
+        raise HTTPException(status_code=400, detail="Google token did not include an email address.")
+    return id_info
+
+
+def _require_password_auth() -> None:
+    if not settings.password_auth_enabled:
+        raise HTTPException(
+            status_code=403,
+            detail="Email and password sign-in is turned off. Continue with Google instead."
+        )
+
+
 @router.post("/register", response_model=TokenResponse)
 @limiter.limit("5/minute")
 async def register_user(request: Request, req: UserRegisterRequest):
     """Registers a new multi-tenant candidate account with Argon2id password hashing."""
+    _require_password_auth()
     clean_email = req.email.lower().strip()
     if not clean_email or "@" not in clean_email:
         raise HTTPException(status_code=400, detail="A valid email address is required.")
@@ -521,6 +554,7 @@ async def register_user(request: Request, req: UserRegisterRequest):
 @limiter.limit("15/minute")
 async def login_user(request: Request, req: UserLoginRequest):
     """Authenticates user credentials, enforces brute-force lockout, MFA gate, and issues JWT tokens."""
+    _require_password_auth()
     clean_email = req.email.lower().strip()
     ip_addr = client_ip(request)
     user_agent = request.headers.get("User-Agent")

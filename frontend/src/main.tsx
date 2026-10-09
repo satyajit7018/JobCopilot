@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiError } from "./lib/api";
+import { loadPage, setReloadTarget } from "./lib/chunks";
 import { AuthProvider, useAuth } from "./lib/auth";
 import { AppShell } from "./components/AppShell";
 import { Alert, Button, Card, Spinner } from "./components/ui";
@@ -78,10 +79,11 @@ const router = createBrowserRouter([
               { path: "applications", element: <ApplicationsPage /> },
               { path: "applications/:jobId", element: <ApplicationDetailPage /> },
               // Less-visited pages load on demand to keep the first download small.
-              { path: "prep", lazy: async () => ({ Component: (await import("./pages/PrepPage")).PrepPage }) },
+              { path: "prep", lazy: async () => ({ Component: (await loadPage(() => import("./pages/PrepPage"))).PrepPage }) },
               { path: "profile", element: <ProfilePage /> },
-              { path: "settings", lazy: async () => ({ Component: (await import("./pages/SettingsPage")).SettingsPage }) },
-              { path: "admin", lazy: async () => ({ Component: (await import("./pages/AdminPage")).AdminPage }) },
+              { path: "plans", lazy: async () => ({ Component: (await loadPage(() => import("./pages/PlansPage"))).PlansPage }) },
+              { path: "settings", lazy: async () => ({ Component: (await loadPage(() => import("./pages/SettingsPage"))).SettingsPage }) },
+              { path: "admin", lazy: async () => ({ Component: (await loadPage(() => import("./pages/AdminPage"))).AdminPage }) },
               { path: "*", element: <Navigate to="/" replace /> },
             ],
           },
@@ -96,6 +98,11 @@ const router = createBrowserRouter([
 if ("serviceWorker" in navigator) {
   void navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => void r.unregister()));
 }
+
+setReloadTarget(() => {
+  const next = router.state.navigation.location;
+  return next ? `${next.pathname}${next.search}${next.hash}` : null;
+});
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -28,13 +28,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             # accounts.google.com: Google Identity Services (real Sign in with Google).
-            "script-src 'self' https://accounts.google.com; "
+            # checkout.razorpay.com: Razorpay Checkout for Premium payments.
+            "script-src 'self' https://accounts.google.com https://checkout.razorpay.com; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data: https:; "
             "manifest-src 'self'; "
             "worker-src 'self'; "
-            "frame-src 'self' https://accounts.google.com; "
+            "frame-src 'self' https://accounts.google.com https://api.razorpay.com https://checkout.razorpay.com; "
             "connect-src 'self' ws: wss: http: https:;"
         )
 

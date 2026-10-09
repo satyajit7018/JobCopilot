@@ -22,6 +22,8 @@ import {
 } from "../lib/application";
 import { STATUS_META, relativeTime, useJobs, type ApplicationStatus, type Job, type Tone } from "../lib/jobs";
 import { useProfile } from "../lib/profile";
+import { useIsPremium } from "../lib/billing";
+import { PremiumLock } from "../components/PremiumLock";
 
 const FOLLOW_UP_AFTER_DAYS = 7;
 
@@ -92,6 +94,7 @@ export function ApplicationDetailPage() {
 function Detail({ job, back }: { job: Job; back: ReactNode }) {
   const ledger = useLedger(job.job_id);
   const emails = useEmails();
+  const premium = useIsPremium();
   const jobEmails = (emails.data ?? []).filter((e) => e.associated_job_id === job.job_id);
   const timeline = buildTimeline(job, ledger.data ?? null, emails.data ?? []);
   const meta = STATUS_META[job.status] ?? { label: job.status, tone: "neutral" as const };
@@ -128,7 +131,16 @@ function Detail({ job, back }: { job: Job; back: ReactNode }) {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
           <div className="flex min-w-0 flex-col gap-6">
             {job.status === "OFFER" && <OfferTools job={job} />}
-            {(job.status === "SUBMITTED" || job.status === "RESPONDED") && <FollowUp job={job} />}
+            {(job.status === "SUBMITTED" || job.status === "RESPONDED") &&
+              (premium ? (
+                <FollowUp job={job} />
+              ) : (
+                <Section title="Follow up">
+                  <PremiumLock title="Get a follow-up email drafted for you">
+                    A short, polite note to the recruiter, written from your application and ready to copy.
+                  </PremiumLock>
+                </Section>
+              ))}
 
             <Section title="Timeline">
               {ledger.isPending || emails.isPending ? (
@@ -158,7 +170,11 @@ function Detail({ job, back }: { job: Job; back: ReactNode }) {
             </Section>
 
             <Section title="Emails">
-              {emails.isPending ? (
+              {!premium ? (
+                <PremiumLock title="Track recruiter replies automatically">
+                  Premium reads replies about your applications from your inbox and moves them along your board for you.
+                </PremiumLock>
+              ) : emails.isPending ? (
                 <Spinner />
               ) : jobEmails.length === 0 ? (
                 <p className="flex items-center gap-2 text-ink-2">

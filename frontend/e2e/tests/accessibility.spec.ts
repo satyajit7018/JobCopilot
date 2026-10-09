@@ -29,6 +29,8 @@ test.describe("Accessibility", () => {
       ["/applications", "Applications"],
       ["/profile", "Profile"],
       ["/settings", "Settings"],
+      ["/plans", "Plans"],
+      ["/prep", "Prep"],
     ] as const) {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();

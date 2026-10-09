@@ -147,10 +147,11 @@ async def test_public_auth_config_shape():
         res = await ac.get("/api/auth/public-config")
         assert res.status_code == 200
         body = res.json()
-        assert set(body) == {"google_client_id", "is_production", "demo_enabled"}
+        assert set(body) == {"google_client_id", "is_production", "demo_enabled", "password_auth_enabled"}
         # In the (non-production) test env, the demo/email path is offered.
         assert body["is_production"] is False
         assert body["demo_enabled"] is True
+        assert body["password_auth_enabled"] is True
 
 
 @pytest.mark.asyncio

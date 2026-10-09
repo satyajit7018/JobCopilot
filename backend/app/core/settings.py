@@ -73,8 +73,22 @@ class Settings(BaseSettings):
     STRIPE_PRO_PRICE_ID: str = "price_pro_monthly"
     STRIPE_ELITE_PRICE_ID: str = "price_elite_monthly"
 
+    # Razorpay (Premium subscriptions). Create two monthly plans in the dashboard:
+    # one in INR for users in India, one in USD for everyone else.
+    RAZORPAY_KEY_ID: Optional[str] = None
+    RAZORPAY_KEY_SECRET: Optional[str] = None
+    RAZORPAY_WEBHOOK_SECRET: Optional[str] = None
+    RAZORPAY_PLAN_ID_INR: Optional[str] = None
+    RAZORPAY_PLAN_ID_USD: Optional[str] = None
+    # Shown on the plans page; must match the plans above.
+    PREMIUM_PRICE_INR: int = 199
+    PREMIUM_PRICE_USD: int = 5
+
     # OAuth & SSO
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
+
+    # Email + password accounts (None = on outside production, off in production)
+    PASSWORD_AUTH_ENABLED: Optional[bool] = None
 
     # SMTP / Inbound Email
     SMTP_HOST: str = "localhost"
@@ -173,6 +187,8 @@ class Settings(BaseSettings):
 
         # Stripe: only enforced once billing is wired (a secret key is present),
         # in which case the webhook secret must accompany it.
+        if self.RAZORPAY_KEY_ID and not (self.RAZORPAY_KEY_SECRET and self.RAZORPAY_WEBHOOK_SECRET):
+            errors.append("RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are required when RAZORPAY_KEY_ID is set.")
         if self.STRIPE_SECRET_KEY and not self.STRIPE_WEBHOOK_SECRET:
             errors.append("STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set.")
 
@@ -181,6 +197,14 @@ class Settings(BaseSettings):
                 "FATAL: production configuration is incomplete:\n  - " + "\n  - ".join(errors)
             )
         return self
+
+    @property
+    def password_auth_enabled(self) -> bool:
+        """Email + password sign-up and sign-in. Off in production unless PASSWORD_AUTH_ENABLED=true,
+        because confirmation and reset emails need an SMTP sender configured."""
+        if self.PASSWORD_AUTH_ENABLED is not None:
+            return self.PASSWORD_AUTH_ENABLED
+        return not self.is_production
 
     @property
     def is_production(self) -> bool:

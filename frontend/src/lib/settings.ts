@@ -1,50 +1,6 @@
-// Settings: plan and billing, two-step sign-in, devices, security activity, and your data.
+// Settings: two-step sign-in, devices, security activity, and your data.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
-
-export interface Plan {
-  tier: "FREE" | "PRO" | "ELITE" | string;
-  daily_limit: number | "Unlimited";
-  applied_today: number;
-  remaining_today: number | "Unlimited";
-  price_usd_monthly: number;
-}
-
-export function usePlan() {
-  return useQuery({ queryKey: ["plan"], queryFn: async () => (await api<{ plan: Plan }>("/billing/plan")).plan });
-}
-
-/** Where to send the user to pay. The server returns a placeholder id when Stripe isn't configured. */
-export function useCheckout() {
-  return useMutation({
-    mutationFn: async (tier: "PRO" | "ELITE") => {
-      const here = `${window.location.origin}/settings`;
-      const res = await api<{ session_id: string; checkout_url: string }>("/billing/checkout", {
-        method: "POST",
-        body: { tier, success_url: `${here}?billing=success`, cancel_url: here },
-      });
-      if (res.session_id.startsWith("cs_sim_")) throw new Error("Payments aren't set up on this server yet.");
-      return res.checkout_url;
-    },
-    onSuccess: (url) => window.location.assign(url),
-  });
-}
-
-export function useBillingPortal() {
-  return useMutation({
-    mutationFn: async () => {
-      const res = await api<{ portal_url?: string; url?: string }>("/billing/portal", {
-        method: "POST",
-        body: { return_url: `${window.location.origin}/settings` },
-      });
-      const url = res.portal_url ?? res.url;
-      // Without Stripe configured the server returns a placeholder ".../session/sim_<user>".
-      if (!url || /\/sim_/.test(url)) throw new Error("Billing management isn't set up on this server yet.");
-      return url;
-    },
-    onSuccess: (url) => window.location.assign(url),
-  });
-}
 
 // --- Two-step sign-in -------------------------------------------------------
 
@@ -152,6 +108,6 @@ export function useExportData() {
 
 export function useDeleteAccount() {
   return useMutation({
-    mutationFn: (input: { confirm_email: string; password?: string; mfa_code?: string }) => api("/account", { method: "DELETE", body: input }),
+    mutationFn: (input: { confirm_email: string; password?: string; mfa_code?: string; google_id_token?: string }) => api("/account", { method: "DELETE", body: input }),
   });
 }

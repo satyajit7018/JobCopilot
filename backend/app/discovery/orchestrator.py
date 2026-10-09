@@ -36,7 +36,7 @@ class DiscoveryOrchestrator:
         "supabase", "sentry", "datadog", "figma", "notion"
     ]
 
-    def __init__(self, min_match_threshold: float = 0.60):
+    def __init__(self, min_match_threshold: float = 0.65):
         self.min_match_threshold = min_match_threshold
         self.is_running = False
         self.last_run_at: Optional[str] = None

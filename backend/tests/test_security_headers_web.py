@@ -22,9 +22,10 @@ def test_api_security_headers(client: TestClient):
     res = client.get("/api/health")
     csp = res.headers.get("content-security-policy", "")
     assert "worker-src 'self'" in csp
-    # script-src is 'self' plus Google Identity Services (Sign in with Google), and nothing else.
+    # script-src is 'self' plus Google Identity Services (Sign in with Google) and
+    # Razorpay Checkout (Premium payments), and nothing else.
     script_directive = _directive(csp, "script-src")
-    assert script_directive == "script-src 'self' https://accounts.google.com"
+    assert script_directive == "script-src 'self' https://accounts.google.com https://checkout.razorpay.com"
     assert "'unsafe-inline'" not in script_directive
     assert res.headers.get("x-frame-options") == "DENY"
     assert res.headers.get("x-content-type-options") == "nosniff"

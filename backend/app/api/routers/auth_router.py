@@ -59,6 +59,7 @@ async def public_auth_config():
         # The bare-email/demo login path is dev-only; production requires a real
         # Google id_token (enforced in google_sso_auth below).
         "demo_enabled": not settings.is_production,
+        "password_auth_enabled": settings.password_auth_enabled,
     }
 
 
@@ -74,28 +75,14 @@ async def google_sso_auth(request: Request, payload: GoogleSSORequest):
       * the tokenless demo path is gated on settings (not os.environ) and is off in production,
       * deactivated accounts are refused, and MFA is enforced via complete_login().
     """
-    from google.auth.transport import requests as google_requests
-    from google.oauth2 import id_token
-
+    from app.api.auth import verify_google_id_token
     from app.core.settings import settings
 
     full_name = payload.full_name or "Google User"
 
     if payload.id_token:
-        google_client_id = settings.GOOGLE_OAUTH_CLIENT_ID or os.getenv("GOOGLE_OAUTH_CLIENT_ID")
-        if not google_client_id:
-            raise HTTPException(status_code=503, detail="Google sign-in is not configured.")
-        try:
-            id_info = id_token.verify_oauth2_token(payload.id_token, google_requests.Request(), google_client_id)
-        except ValueError:
-            raise HTTPException(status_code=401, detail="Google token verification failed.")
-        if id_info.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
-            raise HTTPException(status_code=401, detail="Invalid token issuer.")
-        if id_info.get("email_verified") is not True:
-            raise HTTPException(status_code=401, detail="Google account email is not verified.")
+        id_info = verify_google_id_token(payload.id_token)
         email = id_info.get("email")
-        if not email:
-            raise HTTPException(status_code=400, detail="Google token did not include an email address.")
         full_name = id_info.get("name", full_name)
     else:
         if settings.is_production:
