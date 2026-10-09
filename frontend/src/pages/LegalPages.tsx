@@ -25,7 +25,7 @@ function Mail({ email }: { email: string }) {
   );
 }
 
-function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
+function LegalLayout({ title, children, effective = true }: { title: string; children: ReactNode; effective?: boolean }) {
   return (
     <div className="min-h-dvh bg-canvas">
       <header className="flex h-14 items-center gap-2 border-b border-line bg-surface px-4 md:px-7">
@@ -40,7 +40,7 @@ function LegalLayout({ title, children }: { title: string; children: ReactNode }
           Back to JobCopilot
         </Link>
         <h1 className="text-2xl font-semibold">{title}</h1>
-        <p className="mt-1 text-ink-3">Effective {EFFECTIVE}</p>
+        {effective && <p className="mt-1 text-ink-3">Effective {EFFECTIVE}</p>}
         <div className="legal mt-6 flex flex-col gap-6 leading-relaxed text-ink-2 [&_h2]:mb-2 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-ink [&_li]:ml-5 [&_li]:list-disc [&_ul]:flex [&_ul]:flex-col [&_ul]:gap-1">
           {children}
         </div>
@@ -278,6 +278,91 @@ export function TermsPage() {
         <p>
           If we change these terms in a way that matters, we'll tell you in the app before it takes effect. These terms are governed by the laws of
           India.
+        </p>
+      </section>
+    </LegalLayout>
+  );
+}
+
+const FAQ: { q: string; a: ReactNode }[] = [
+  {
+    q: "How does JobCopilot find jobs for me?",
+    a: (
+      <>
+        Every hour we check the career pages of tech companies and startup job boards for new postings, and score each one against your resume
+        and preferences. Only good matches show up in Jobs. You can also press <strong>Find new jobs</strong> to check right away.
+      </>
+    ),
+  },
+  {
+    q: "What does the match score mean?",
+    a: (
+      <>
+        It combines how many of the skills a posting asks for are on your resume, whether the role is the kind you do, your experience level, and
+        location. A job only scores high when several skills match. Open a job to see the reasons and the skills you're missing.
+      </>
+    ),
+  },
+  {
+    q: "Some details from my resume are wrong.",
+    a: (
+      <>
+        Go to <Link to="/profile" className="text-accent hover:underline">Profile</Link> and press <strong>Edit</strong> next to your resume to fix
+        skills, work history and education. Your matches use these details, so it's worth getting them right.
+      </>
+    ),
+  },
+  {
+    q: "I don't want to see a job again.",
+    a: <>Press the hide button on the job in Jobs. It won't come back in future searches. Use Save to keep a job for later.</>,
+  },
+  {
+    q: "What do I get with Premium?",
+    a: (
+      <>
+        A resume and cover letter tailored to each job, automatic applying (you approve each application first), recruiter replies tracked from
+        your inbox, follow-up emails drafted for you, and interview prep. See <Link to="/plans" className="text-accent hover:underline">Plans</Link>.
+      </>
+    ),
+  },
+  {
+    q: "How do I cancel Premium?",
+    a: <>Settings → Plan → Cancel Premium. You keep Premium until the end of the month you've paid for, and you won't be charged again.</>,
+  },
+  {
+    q: "How do I download or delete my data?",
+    a: (
+      <>
+        Settings → Your data → <strong>Download my data</strong> gives you everything we store. Settings → <strong>Delete account</strong> erases
+        your account and data immediately. Details are in the <Link to="/privacy" className="text-accent hover:underline">Privacy Policy</Link>.
+      </>
+    ),
+  },
+];
+
+export function HelpPage() {
+  const op = useOperator();
+  return (
+    <LegalLayout title="Help" effective={false}>
+      <section className="flex flex-col gap-2">
+        {FAQ.map(({ q, a }) => (
+          <details key={q} className="group rounded-lg border border-line bg-surface px-4 py-3 open:pb-4">
+            <summary className="cursor-pointer list-none font-medium text-ink marker:hidden">
+              <span className="mr-2 inline-block text-ink-3 transition-transform group-open:rotate-90" aria-hidden>
+                ›
+              </span>
+              {q}
+            </summary>
+            <div className="mt-2 pl-5">{a}</div>
+          </details>
+        ))}
+      </section>
+
+      <section>
+        <h2>Still stuck?</h2>
+        <p>
+          Use <strong>Send feedback</strong> in the menu under your name, or email <Mail email={op.email} />. We usually reply within two working
+          days.
         </p>
       </section>
     </LegalLayout>

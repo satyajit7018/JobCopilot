@@ -63,7 +63,7 @@ from app.api.routers import (
 
 def test_all_domain_routers_exported_and_valid():
     """Validates that all domain routers are distinct APIRouter instances."""
-    assert len(all_routers) == 16
+    assert len(all_routers) == 17  # + support (feedback)
     for r in all_routers:
         assert isinstance(r, APIRouter)
 
