@@ -80,6 +80,12 @@ export function JobsPage() {
     <>
       <PageHeader
         title="Jobs"
+        actions={
+          <Button size="sm" loading={findNew.isPending} onClick={() => findNew.mutate()}>
+            <RefreshCw className="size-3.5" aria-hidden />
+            Find new jobs
+          </Button>
+        }
         subtitle={
           data ? (
             <>
@@ -98,7 +104,8 @@ export function JobsPage() {
         }
       />
       <div className="mx-auto max-w-5xl px-4 py-5 md:px-7 md:py-6">
-        <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative -mx-4 flex flex-none items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [scrollbar-width:none] [&>*]:flex-none">
           <Chip on={sort === "match"} onClick={() => setSort("match")}>
             Best match
           </Chip>
@@ -127,7 +134,8 @@ export function JobsPage() {
               { value: "80", label: "80% or more" },
             ]}
           />
-          <label className="relative ml-auto w-full sm:w-64">
+          </div>
+          <label className="relative w-full sm:ml-auto sm:w-64">
             <span className="sr-only">Search jobs</span>
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
             <input
@@ -140,7 +148,7 @@ export function JobsPage() {
           </label>
         </div>
 
-        <FindNewJobs search={findNew} />
+        <FindNewJobsStatus search={findNew} />
         {hiddenJob && (
           <div className="mb-3 flex items-center gap-3 rounded-md border border-line bg-surface px-4 py-2.5" role="status">
             <EyeOff className="size-4 flex-none text-ink-3" aria-hidden />
@@ -330,21 +338,17 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
   );
 }
 
-function FindNewJobs({ search }: { search: ReturnType<typeof useFindNewJobs> }) {
+function FindNewJobsStatus({ search }: { search: ReturnType<typeof useFindNewJobs> }) {
   const found = search.data?.matched_and_saved ?? 0;
+  if (search.isIdle) return null;
   return (
-    <div className="mb-4 flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-3">
-        <Button loading={search.isPending} onClick={() => search.mutate()}>
-          <RefreshCw className="size-4" aria-hidden />
-          Find new jobs
-        </Button>
-        <p className="text-ink-3">We also check for new jobs every hour.</p>
-      </div>
+    <div className="mb-4">
       {search.isPending && <SearchProgress />}
       {search.isSuccess && (
         <p className="text-ink-2" role="status">
-          {found > 0 ? `Found ${found} new ${found === 1 ? "match" : "matches"}. They're marked New.` : "No new matches since the last check."}
+          {found > 0
+            ? `Found ${found} new ${found === 1 ? "match" : "matches"}. They're marked New.`
+            : "No new matches since the last check. We also check every hour."}
         </p>
       )}
       {search.error && <Alert tone="warn">{search.error.message}</Alert>}

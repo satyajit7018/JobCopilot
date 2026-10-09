@@ -278,7 +278,7 @@ function GettingStarted({ jobs }: { jobs: Job[] }) {
           <div className="h-full bg-accent" style={{ width: `${(done / steps.length) * 100}%` }} />
         </div>
         <ol>
-          {steps.map((s) => (
+          {steps.filter((s) => !s.done).map((s) => (
             <li key={s.key} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0 sm:px-5">
               <span
                 className={cx(
