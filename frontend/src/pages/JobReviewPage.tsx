@@ -17,7 +17,7 @@ import {
   type ResumeWording,
   type SubmissionMode,
 } from "../lib/apply";
-import { STATUS_META, isTracked, scorePercent, scoreTone, useJobs, useSetMatchHidden, useSetMatchSaved, type Job } from "../lib/jobs";
+import { STATUS_META, isTracked, readableReason, scorePercent, scoreTone, useJobs, useSetMatchHidden, useSetMatchSaved, type Job } from "../lib/jobs";
 import { useSetStatus } from "../lib/application";
 import { markDone } from "../lib/checklist";
 import { useIsPremium } from "../lib/billing";
@@ -142,7 +142,7 @@ function Review({ job, back }: { job: Job; back: ReactNode }) {
           </a>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr] lg:items-start">
           <div className="flex min-w-0 flex-col gap-6">
             <Section title="Why it's a match">
               <div className="flex gap-4">
@@ -156,7 +156,7 @@ function Review({ job, back }: { job: Job; back: ReactNode }) {
                       {job.match_reasons.map((r) => (
                         <li key={r} className="flex gap-2">
                           <Check className="mt-0.5 size-4 flex-none text-ok" aria-hidden />
-                          {r}
+                          {readableReason(r)}
                         </li>
                       ))}
                     </ul>
@@ -180,15 +180,7 @@ function Review({ job, back }: { job: Job; back: ReactNode }) {
               </div>
             </Section>
 
-            {premium ? (
-              <Materials job={job} tailor={tailor} />
-            ) : (
-              <Section title="Your application">
-                <PremiumLock title="Get your resume and cover letter written for this job">
-                  JobCopilot tailors your resume to the role and drafts a cover letter, so you can read both before anything is sent.
-                </PremiumLock>
-              </Section>
-            )}
+            {premium && <Materials job={job} tailor={tailor} />}
           </div>
 
           {/* On phones the panel follows the materials; on desktop it's a sticky right column. */}
@@ -529,9 +521,14 @@ function ApplyYourself({ job }: { job: Job }) {
           </>
         )}
       </Card>
-      <PremiumLock title="Let JobCopilot apply for you">
-        With Premium, JobCopilot fills in and submits the application. You approve each one first.
-      </PremiumLock>
+      {/* One box for everything Premium adds here; two competed with the Apply button. */}
+      <PremiumLock
+        title="Let JobCopilot apply for you"
+        points={[
+          "A resume and cover letter written for this job",
+          "The application filled in and sent, after you approve it",
+        ]}
+      />
     </div>
   );
 }

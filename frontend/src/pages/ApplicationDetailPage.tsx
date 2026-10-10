@@ -97,6 +97,13 @@ function Detail({ job, back }: { job: Job; back: ReactNode }) {
   const premium = useIsPremium();
   const jobEmails = (emails.data ?? []).filter((e) => e.associated_job_id === job.job_id);
   const timeline = buildTimeline(job, ledger.data ?? null, emails.data ?? []);
+  // One box for what Premium adds here: beside the status on desktop, after the timeline on phones.
+  const premiumPitch = (
+    <PremiumLock
+      title="Let Premium keep this moving"
+      points={["A follow-up email to the recruiter, drafted for you", "Recruiter replies read from your inbox, with this page kept up to date"]}
+    />
+  );
   const meta = STATUS_META[job.status] ?? { label: job.status, tone: "neutral" as const };
   const interview = job.interview_date && !Number.isNaN(new Date(job.interview_date).getTime()) ? new Date(job.interview_date) : null;
 
@@ -131,22 +138,13 @@ function Detail({ job, back }: { job: Job; back: ReactNode }) {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
           <div className="flex min-w-0 flex-col gap-6">
             {job.status === "OFFER" && <OfferTools job={job} />}
-            {(job.status === "SUBMITTED" || job.status === "RESPONDED") &&
-              (premium ? (
-                <FollowUp job={job} />
-              ) : (
-                <Section title="Follow up">
-                  <PremiumLock title="Get a follow-up email drafted for you">
-                    A short, polite note to the recruiter, written from your application and ready to copy.
-                  </PremiumLock>
-                </Section>
-              ))}
+            {(job.status === "SUBMITTED" || job.status === "RESPONDED") && premium && <FollowUp job={job} />}
 
             <Section title="Timeline">
               {ledger.isPending || emails.isPending ? (
                 <Spinner />
               ) : timeline.length === 0 ? (
-                <p className="text-ink-2">Nothing has happened on this application yet.</p>
+                <p className="text-ink-2">No dates recorded yet. Status changes and replies will show here as they happen.</p>
               ) : (
                 <ol className="relative flex flex-col gap-4">
                   {timeline.map((e, i) => (
@@ -169,31 +167,31 @@ function Detail({ job, back }: { job: Job; back: ReactNode }) {
               )}
             </Section>
 
-            <Section title="Emails">
-              {!premium ? (
-                <PremiumLock title="Track recruiter replies automatically">
-                  Premium reads replies about your applications from your inbox and moves them along your board for you.
-                </PremiumLock>
-              ) : emails.isPending ? (
-                <Spinner />
-              ) : jobEmails.length === 0 ? (
-                <p className="flex items-center gap-2 text-ink-2">
-                  <Mail className="size-4 flex-none text-ink-3" aria-hidden />
-                  No emails about this application yet. Replies we pick up from your inbox show here.
-                </p>
-              ) : (
-                <ul className="flex flex-col divide-y divide-line">
-                  {jobEmails.map((e) => (
-                    <EmailItem key={e.message_id} email={e} />
-                  ))}
-                </ul>
-              )}
-            </Section>
+            {premium && (
+              <Section title="Emails">
+                {emails.isPending ? (
+                  <Spinner />
+                ) : jobEmails.length === 0 ? (
+                  <p className="flex items-center gap-2 text-ink-2">
+                    <Mail className="size-4 flex-none text-ink-3" aria-hidden />
+                    No emails about this application yet. Replies we pick up from your inbox show here.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col divide-y divide-line">
+                    {jobEmails.map((e) => (
+                      <EmailItem key={e.message_id} email={e} />
+                    ))}
+                  </ul>
+                )}
+              </Section>
+            )}
+            {!premium && <div className="lg:hidden">{premiumPitch}</div>}
           </div>
 
           {/* Status is the main control: first on phones, sticky right column on desktop. */}
-          <div className="order-first lg:sticky lg:top-6 lg:order-none">
+          <div className="order-first flex flex-col gap-4 lg:sticky lg:top-6 lg:order-none">
             <StatusCard job={job} />
+            {!premium && <div className="max-lg:hidden">{premiumPitch}</div>}
           </div>
         </div>
       </div>

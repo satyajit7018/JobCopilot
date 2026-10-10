@@ -120,7 +120,7 @@ class ResumeParser:
             r'(?:\+?\d{1,3}[-.\s]?)?(?:(?:\(?\d{3,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4})|(?:\d{5}[-.\s]?\d{5}))',
             text
         )
-        phone = phone_match.group(0) if phone_match else "+91 0000000000"
+        phone = phone_match.group(0) if phone_match else ""  # never a made-up number: it would go on applications
 
         # LinkedIn URL
         linkedin_match = re.search(r'https?://(?:www\.)?linkedin\.com/in/[A-Za-z0-9\-_]+', text)
@@ -516,8 +516,9 @@ class ResumeParser:
         # Initial Recruiter Preferences
         prefs = RecruiterPreferences(
             years_of_experience=estimated_yoe,
-            expected_ctc="15 LPA",
-            current_ctc="0 LPA",
+            # Salary is the user's to state; a resume doesn't say it and we don't guess.
+            expected_ctc="",
+            current_ctc="",
             notice_period_days=0,
             work_authorization="Citizen",
             remote_preference="Remote / Hybrid / On-site",

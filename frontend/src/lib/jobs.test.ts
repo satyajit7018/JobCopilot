@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTodos } from "../pages/HomePage";
-import { matchSummary, relativeTime, scorePercent, type Job } from "./jobs";
+import { matchSummary, readableReason, relativeTime, scorePercent, type Job } from "./jobs";
 
 function job(overrides: Partial<Job>): Job {
   return {
@@ -87,5 +87,13 @@ describe("buildTodos", () => {
     expect(todos[1].title).toBe("1 application needs you");
     expect(todos[2].title).toBe("Follow up with Acorn");
     expect(todos[3].title).toBe("1 strong match to look at");
+  });
+});
+
+describe("readableReason", () => {
+  it("rewrites the old experience sentence and leaves others alone", () => {
+    expect(readableReason("Experience level (5.0 yrs) fits Mid-Level requirements.")).toBe("Your 5 years of experience fits a mid-level role.");
+    expect(readableReason("Experience level (1.0 yrs) fits Intern requirements.")).toBe("Your 1 year of experience fits an internship.");
+    expect(readableReason("Role fits your backend background.")).toBe("Role fits your backend background.");
   });
 });

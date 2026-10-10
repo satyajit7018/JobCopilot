@@ -309,10 +309,12 @@ class MatchScorer:
         if is_tech:
             if not has_resume_data or (not profile.skills and yoe <= 0.0):
                 exp_score = 0.05
-                match_reasons.append("Provisional match score — upload your resume in Profile & Resume to calibrate precision.")
+                match_reasons.append("Rough score for now. Add your resume in Profile for an accurate one.")
             elif min_yoe <= yoe <= max_yoe + 1.0:
                 exp_score = 0.15
-                match_reasons.append(f"Experience level ({yoe:.1f} yrs) fits {seniority} requirements.")
+                years = f"{yoe:g} year{'' if yoe == 1 else 's'}"
+                role = "an internship" if seniority == "Intern" else f"a {seniority.lower()} role"
+                match_reasons.append(f"Your {years} of experience fits {role}.")
             elif yoe < min_yoe:
                 exp_score = max(0.0, 0.15 - (min_yoe - yoe) * 0.05)
             else:
