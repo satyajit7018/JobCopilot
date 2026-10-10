@@ -3,7 +3,7 @@ import { Columns3 } from "lucide-react";
 import { Link } from "react-router";
 import { PageHeader } from "../components/AppShell";
 import { HeldQuestions } from "../components/HeldQuestions";
-import { Alert, Badge, Card, Chip, EmptyState, Spinner, buttonClass } from "../components/ui";
+import { Alert, Badge, Card, Chip, EmptyState, SkeletonRows, buttonClass } from "../components/ui";
 import { BOARD_COLUMNS, STATUS_META, isTracked, relativeTime, useJobs, type Job } from "../lib/jobs";
 
 export function ApplicationsPage() {
@@ -20,7 +20,9 @@ export function ApplicationsPage() {
       <div className="px-4 py-5 md:px-7 md:py-6">
         <HeldQuestions />
         {isPending ? (
-          <Spinner label="Loading applications" />
+          <div className="max-w-2xl">
+            <SkeletonRows rows={4} avatar={false} label="Loading applications" />
+          </div>
         ) : error ? (
           <Alert>Couldn't load applications: {error.message}</Alert>
         ) : tracked.length === 0 ? (

@@ -21,11 +21,11 @@ type ButtonSize = "sm" | "md" | "lg";
 const buttonBase =
   "inline-flex items-center justify-center gap-1.5 rounded-md border font-medium whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-50";
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "border-accent bg-accent text-white hover:bg-accent-hover hover:border-accent-hover",
+  primary: "border-accent bg-accent text-on-solid hover:bg-accent-hover hover:border-accent-hover",
   secondary: "border-line-strong bg-surface text-ink hover:bg-subtle",
   ghost: "border-transparent bg-transparent text-ink-2 hover:bg-subtle hover:text-ink",
   // Only for the final step of an irreversible action.
-  danger: "border-danger bg-danger text-white hover:opacity-90",
+  danger: "border-danger bg-danger text-on-solid hover:opacity-90",
 };
 const buttonSizes: Record<ButtonSize, string> = {
   sm: "h-8 px-2.5 text-sm",
@@ -271,6 +271,27 @@ export function Spinner({ label = "Loading" }: { label?: string }) {
     <div role="status" className="flex items-center justify-center gap-2 py-16 text-ink-3">
       <LoaderCircle className="size-5 animate-spin" aria-hidden />
       <span>{label}…</span>
+    </div>
+  );
+}
+
+/** Grey rows shaped like a list while it loads, so the page doesn't jump when the data arrives. */
+export function SkeletonRows({ rows = 5, label = "Loading", avatar = true }: { rows?: number; label?: string; avatar?: boolean }) {
+  return (
+    <div role="status" className="overflow-hidden rounded-lg border border-line bg-surface shadow-card">
+      <span className="sr-only">{label}…</span>
+      <ul aria-hidden className="animate-pulse motion-reduce:animate-none">
+        {Array.from({ length: rows }, (_, i) => (
+          <li key={i} className="flex items-center gap-3 border-b border-line px-4 py-4 last:border-b-0 sm:gap-4 sm:px-5">
+            {avatar && <span className="size-10 flex-none rounded-md bg-subtle" />}
+            <span className="flex min-w-0 flex-1 flex-col gap-2">
+              <span className="h-3.5 w-2/5 rounded bg-subtle" />
+              <span className="h-3 w-3/5 rounded bg-subtle" />
+            </span>
+            <span className="h-8 w-20 flex-none rounded-md bg-subtle max-sm:hidden" />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

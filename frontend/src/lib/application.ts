@@ -77,6 +77,15 @@ export function useSetInterviewDate(jobId: string) {
   });
 }
 
+/** Saves the user's own notes on an application. */
+export function useSetNotes(jobId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (notes: string) => api(`/jobs/${encodeURIComponent(jobId)}/notes`, { method: "PATCH", body: { notes } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
+}
+
 /** ISO date-time -> the local "YYYY-MM-DDTHH:mm" a datetime-local input expects ("" if unset or invalid). */
 export function toLocalInput(iso: string | null | undefined): string {
   if (!iso) return "";
@@ -200,6 +209,22 @@ export function buildTimeline(job: Job, ledger: LedgerEntry | null, emails: Emai
 export function daysSince(iso: string | null | undefined, now: Date = new Date()): number | null {
   if (!valid(iso)) return null;
   return Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000);
+}
+
+/** A plain follow-up email anyone can send: filled in from the application, no AI. */
+export function plainFollowUp(job: Pick<Job, "title" | "company" | "applied_at">, name: string): { subject: string; body: string } {
+  const applied = valid(job.applied_at)
+    ? ` on ${new Date(job.applied_at).toLocaleDateString(undefined, { month: "long", day: "numeric" })}`
+    : " recently";
+  return {
+    subject: `Following up on my application: ${job.title}`,
+    body: [
+      "Hello,",
+      `I applied for the ${job.title} role at ${job.company}${applied} and wanted to check where things stand. I'm still very interested, and happy to share anything else that would help.`,
+      "Thank you for your time.",
+      name.trim() || "[Your name]",
+    ].join("\n\n"),
+  };
 }
 
 /** Parses "28", "28 LPA" or "28.5" into a number of LPA; null when it isn't a number. */

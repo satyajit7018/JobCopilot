@@ -3,8 +3,20 @@ Pytest Fixtures & Configuration for JobCopilot Test Suite
 Provides authenticated TestClient fixtures and multi-tenant database isolations.
 """
 
+import atexit
 import os
-import pytest
+import shutil
+import tempfile
+
+# Tests get their own throwaway data folder. Without this they wrote into the real local one
+# (~/.jobcopilot), which filled it with thousands of test users and slowed everything that
+# walks all users. Must be set before anything from `app` is imported.
+if "JOBCOPILOT_DATA_DIR" not in os.environ:
+    _data_dir = tempfile.mkdtemp(prefix="jobcopilot-tests-")
+    os.environ["JOBCOPILOT_DATA_DIR"] = _data_dir
+    atexit.register(shutil.rmtree, _data_dir, ignore_errors=True)
+
+import pytest  # noqa: E402
 from datetime import timedelta
 from fastapi.testclient import TestClient
 from app.main import app

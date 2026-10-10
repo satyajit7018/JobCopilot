@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router";
 import { ArrowLeft, CalendarClock, Check, ExternalLink, Mail, SearchX } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Badge, Button, Card, CompanyMark, CopyButton, EmptyState, Field, Select, Spinner, buttonClass, cx } from "../components/ui";
+import { Alert, Badge, Button, Card, CompanyMark, CopyButton, EmptyState, Field, Select, Spinner, Textarea, buttonClass, cx } from "../components/ui";
 import {
   INTENT_META,
   MANUAL_STATUSES,
@@ -16,7 +16,9 @@ import {
   fromLocalInput,
   toLocalInput,
   useLedger,
+  plainFollowUp,
   useSetInterviewDate,
+  useSetNotes,
   useSetStatus,
   type Email,
 } from "../lib/application";
@@ -109,7 +111,7 @@ function Detail({ job, back }: { job: Job; back: ReactNode }) {
 
   return (
     <>
-      <PageHeader title="Application" />
+      <PageHeader title="Application" tabTitle={`${job.title} at ${job.company}`} />
       <div className="mx-auto max-w-6xl px-4 py-5 md:px-7 md:py-6">
         <div className="mb-4">{back}</div>
 
@@ -139,6 +141,9 @@ function Detail({ job, back }: { job: Job; back: ReactNode }) {
           <div className="flex min-w-0 flex-col gap-6">
             {job.status === "OFFER" && <OfferTools job={job} />}
             {(job.status === "SUBMITTED" || job.status === "RESPONDED") && premium && <FollowUp job={job} />}
+            {job.status === "SUBMITTED" && !premium && <PlainFollowUp job={job} />}
+
+            <Notes job={job} />
 
             <Section title="Timeline">
               {ledger.isPending || emails.isPending ? (
@@ -233,6 +238,47 @@ function EmailItem({ email }: { email: Email }) {
   );
 }
 
+/** Your own notes: who you spoke to, what to follow up. Only you see them. */
+function Notes({ job }: { job: Job }) {
+  const setNotes = useSetNotes(job.job_id);
+  const stored = job.notes ?? "";
+  const [value, setValue] = useState(stored);
+  const [saved, setSaved] = useState(false);
+  const changed = value.trim() !== stored.trim();
+  return (
+    <Section title="Your notes">
+      <Textarea
+        label="Notes"
+        rows={3}
+        maxLength={4000}
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+          setSaved(false);
+        }}
+        placeholder="Who you spoke to, what they said, when to follow up"
+        hint="Only you can see these."
+      />
+      {setNotes.error && (
+        <div className="mt-2">
+          <Alert>Couldn't save your notes: {setNotes.error.message}</Alert>
+        </div>
+      )}
+      <div className="mt-3 flex items-center gap-3">
+        <Button size="sm" disabled={!changed} loading={setNotes.isPending} onClick={() => setNotes.mutate(value, { onSuccess: () => setSaved(true) })}>
+          Save notes
+        </Button>
+        {saved && !changed && (
+          <p className="flex items-center gap-1.5 text-ok" role="status">
+            <Check className="size-4" aria-hidden />
+            Notes saved
+          </p>
+        )}
+      </div>
+    </Section>
+  );
+}
+
 function StatusCard({ job }: { job: Job }) {
   const setStatus = useSetStatus(job.job_id);
   const manual = MANUAL_STATUSES.some((s) => s.value === job.status);
@@ -314,6 +360,24 @@ function InterviewDate({ job }: { job: Job }) {
         </p>
       )}
     </div>
+  );
+}
+
+/** Free plan: once an application has gone quiet, a ready-to-copy follow-up (Premium writes a tailored one). */
+function PlainFollowUp({ job }: { job: Job }) {
+  const profile = useProfile();
+  const days = daysSince(job.applied_at);
+  if (days === null || days < FOLLOW_UP_AFTER_DAYS) return null;
+  const mail = plainFollowUp(job, profile.data?.full_name ?? "");
+  return (
+    <Section title="Follow up" action={<CopyButton text={`Subject: ${mail.subject}\n\n${mail.body}`} label="Copy email" />}>
+      <div className="flex flex-col gap-3">
+        <p className="text-ink-2">It's been {days} days without a reply. A short follow-up is normal now.</p>
+        <p className="font-medium">{mail.subject}</p>
+        <div className="rounded-md border border-line bg-canvas px-4 py-3 leading-relaxed whitespace-pre-wrap">{mail.body}</div>
+        <p className="text-xs text-ink-3">We don't send this. Copy it into your email to the recruiter.</p>
+      </div>
+    </Section>
   );
 }
 

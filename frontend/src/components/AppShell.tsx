@@ -3,7 +3,8 @@ import { Link, NavLink, Outlet } from "react-router";
 import { BriefcaseBusiness, CircleHelp, Columns3, House, LogOut, MessageSquare, Mic, Settings, ShieldCheck, Sparkles, UserRound, type LucideIcon } from "lucide-react";
 import { initials, useAuth } from "../lib/auth";
 import { useIsPremium } from "../lib/billing";
-import { isMatch, useVisibleJobs } from "../lib/jobs";
+import { usePageTitle } from "../lib/pageTitle";
+import { VISIT_EVENT, isMatch, isNewSince, readLastVisit, useVisibleJobs } from "../lib/jobs";
 import { cx } from "./ui";
 import { FeedbackDialog } from "./FeedbackDialog";
 
@@ -54,7 +55,18 @@ function PlanCard() {
 
 export function AppShell() {
   const { data: jobs } = useVisibleJobs();
-  const newMatches = jobs?.filter(isMatch).length ?? 0;
+  // Matches found since the user last looked at Jobs (all of them before the first look),
+  // so the number changes and means "something to see".
+  // Leaving Jobs marks its matches as seen; re-read the count when that happens.
+  const [, refresh] = useState(0);
+  useEffect(() => {
+    const bump = () => refresh((n) => n + 1);
+    window.addEventListener(VISIT_EVENT, bump);
+    return () => window.removeEventListener(VISIT_EVENT, bump);
+  }, []);
+  const lastSeenJobs = readLastVisit("jobs");
+  const matches = jobs?.filter(isMatch) ?? [];
+  const newMatches = lastSeenJobs === null ? matches.length : matches.filter((j) => isNewSince(j, lastSeenJobs)).length;
 
   return (
     <div className="flex min-h-dvh">
@@ -83,7 +95,7 @@ export function AppShell() {
               <Icon className="size-4" aria-hidden />
               {label}
               {to === "/jobs" && newMatches > 0 && (
-                <span className="ml-auto rounded-full bg-accent px-1.5 text-xs font-semibold text-white" aria-label={`${newMatches} new`}>
+                <span className="ml-auto rounded-full bg-accent px-1.5 text-xs font-semibold text-on-solid" aria-label={`${newMatches} new`}>
                   {newMatches}
                 </span>
               )}
@@ -256,7 +268,19 @@ function MenuLink({
 }
 
 /** Page title bar shared by every screen. */
-export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
+export function PageHeader({
+  title,
+  subtitle,
+  actions,
+  tabTitle,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  actions?: ReactNode;
+  /** Browser tab name when it should differ from the heading (a job's title, "Home"). */
+  tabTitle?: string;
+}) {
+  usePageTitle(tabTitle ?? title);
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-surface px-4 py-4 md:h-15 md:px-7 md:py-0">
       <h1 className="text-lg font-semibold">{title}</h1>

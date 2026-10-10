@@ -114,6 +114,28 @@ async def update_job_status(
     }
 
 
+class UpdateNotesRequest(BaseModel):
+    notes: str = ""
+
+
+MAX_NOTES_LENGTH = 4000
+
+
+@router.patch("/jobs/{job_id}/notes")
+async def update_job_notes(job_id: str, payload: UpdateNotesRequest, current_user: User = Depends(get_current_user)):
+    """Saves the user's own notes on a job or application ("spoke to Priya, follow up Friday")."""
+    # "__meta__:" marks where stored notes end and internal fields begin; never let it in.
+    notes = payload.notes.replace("__meta__:", "").strip()
+    if len(notes) > MAX_NOTES_LENGTH:
+        raise HTTPException(status_code=400, detail=f"Notes can be up to {MAX_NOTES_LENGTH} characters.")
+    job = db.get_job_by_id(job_id, user_id=current_user.user_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    job.notes = notes or None
+    db.save_job(job, user_id=current_user.user_id)
+    return {"status": "success", "job_id": job.job_id, "notes": job.notes}
+
+
 class NotInterestedRequest(BaseModel):
     reason: str
 

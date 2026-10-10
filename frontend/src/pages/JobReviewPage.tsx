@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { ArrowLeft, Bookmark, BookmarkCheck, Check, CircleAlert, ExternalLink, FileText, MapPin, SearchX, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bookmark, BookmarkCheck, Check, CircleAlert, ExternalLink, EyeOff, FileText, MapPin, SearchX, ShieldCheck, Wallet } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
 import {
@@ -17,7 +17,19 @@ import {
   type ResumeWording,
   type SubmissionMode,
 } from "../lib/apply";
-import { STATUS_META, isTracked, readableReason, scorePercent, scoreTone, useJobs, useSetMatchHidden, useSetMatchSaved, type Job } from "../lib/jobs";
+import {
+  STATUS_META,
+  isTracked,
+  nextMatch,
+  readableReason,
+  scorePercent,
+  scoreTone,
+  useJobs,
+  useSetMatchHidden,
+  useSetMatchSaved,
+  useVisibleJobs,
+  type Job,
+} from "../lib/jobs";
 import { useSetStatus } from "../lib/application";
 import { markDone } from "../lib/checklist";
 import { useIsPremium } from "../lib/billing";
@@ -64,6 +76,7 @@ const taskStore = {
 export function JobReviewPage() {
   const { jobId = "" } = useParams();
   const { data, isPending, error } = useJobs();
+  const visible = useVisibleJobs();
   const job = data?.find((j) => j.job_id === jobId);
 
   const back = (
@@ -92,10 +105,10 @@ export function JobReviewPage() {
       </div>
     );
 
-  return <Review job={job} back={back} />;
+  return <Review key={job.job_id} job={job} back={back} next={nextMatch(visible.data ?? [], job.job_id)} />;
 }
 
-function Review({ job, back }: { job: Job; back: ReactNode }) {
+function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | null }) {
   const tailor = useTailor(job.job_id);
   useEffect(() => markDone("reviewed"), []);
   const premium = useIsPremium();
@@ -104,9 +117,20 @@ function Review({ job, back }: { job: Job; back: ReactNode }) {
 
   return (
     <>
-      <PageHeader title="Review & apply" />
+      <PageHeader title="Review & apply" tabTitle={`${job.title} at ${job.company}`} />
       <div className="mx-auto max-w-6xl px-4 py-5 md:px-7 md:py-6">
-        <div className="mb-4">{back}</div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          {back}
+          {next && (
+            <Link to={`/jobs/${encodeURIComponent(next.job_id)}`} className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+              Next match
+              <ArrowRight className="size-4" aria-hidden />
+              <span className="sr-only">
+                : {next.title} at {next.company}
+              </span>
+            </Link>
+          )}
+        </div>
         {job.status === "DISMISSED" && <HiddenNotice job={job} />}
 
         <div className="mb-6 flex items-start gap-3 sm:gap-4">
@@ -135,6 +159,7 @@ function Review({ job, back }: { job: Job; back: ReactNode }) {
             </div>
           </div>
           <SaveButton job={job} />
+          <HideButton job={job} />
           <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm", "max-sm:hidden")}>
             View posting
             <ExternalLink className="size-3.5" aria-hidden />
@@ -471,6 +496,17 @@ function SaveButton({ job }: { job: Job }) {
     <Button size="sm" aria-pressed={saved} onClick={() => save.mutate({ jobId: job.job_id, saved: !saved })}>
       {saved ? <BookmarkCheck className="size-3.5 text-accent" aria-hidden /> : <Bookmark className="size-3.5" aria-hidden />}
       {saved ? "Saved" : "Save"}
+    </Button>
+  );
+}
+
+function HideButton({ job }: { job: Job }) {
+  const hide = useSetMatchHidden();
+  if (job.status !== "DISCOVERED" && job.status !== "SAVED") return null;
+  return (
+    <Button size="sm" variant="ghost" title="Not interested" onClick={() => hide.mutate({ jobId: job.job_id, hidden: true })}>
+      <EyeOff className="size-3.5" aria-hidden />
+      <span className="max-sm:sr-only">Not interested</span>
     </Button>
   );
 }

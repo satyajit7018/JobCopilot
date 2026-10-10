@@ -1,3 +1,4 @@
+import { usePageTitle } from "../lib/pageTitle";
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation } from "react-router";
 import { Columns3, FileText, KeyRound, Target } from "lucide-react";
@@ -10,6 +11,7 @@ const PASSWORD_MIN = 12; // backend settings.PASSWORD_MIN_LENGTH
 type Mode = "signin" | "register";
 
 export function LoginPage() {
+  usePageTitle("Sign in");
   const auth = useAuth();
   const location = useLocation();
   const [mode, setMode] = useState<Mode>("signin");

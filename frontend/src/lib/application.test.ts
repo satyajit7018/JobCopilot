@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTimeline, daysSince, fromLocalInput, parseLpa, toLocalInput, type Email, type LedgerEntry } from "./application";
+import { buildTimeline, daysSince, fromLocalInput, parseLpa, plainFollowUp, toLocalInput, type Email, type LedgerEntry } from "./application";
 import type { Job } from "./jobs";
 
 const job = (over: Partial<Job> = {}): Job => ({
@@ -99,5 +99,15 @@ describe("interview date input", () => {
     expect(toLocalInput("garbage")).toBe("");
     expect(fromLocalInput("")).toBeNull();
     expect(fromLocalInput("garbage")).toBeNull();
+  });
+});
+
+describe("plainFollowUp", () => {
+  it("fills in the role, company and name, and never leaves a blank signature", () => {
+    const mail = plainFollowUp({ title: "Backend Engineer", company: "Acme", applied_at: "2026-03-02T10:00:00" }, "Asha Rao");
+    expect(mail.subject).toBe("Following up on my application: Backend Engineer");
+    expect(mail.body).toContain("the Backend Engineer role at Acme on ");
+    expect(mail.body.endsWith("Asha Rao")).toBe(true);
+    expect(plainFollowUp({ title: "T", company: "C", applied_at: null }, " ").body).toContain("[Your name]");
   });
 });

@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bookmark, BookmarkCheck, BriefcaseBusiness, Clock, ExternalLink, EyeOff, MapPin, RefreshCw, Search, Wallet } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { SearchProgress } from "../components/SearchProgress";
-import { Alert, Badge, Button, Card, Chip, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
+import { Alert, Badge, Button, Card, Chip, CompanyMark, EmptyState, SkeletonRows, buttonClass, cx, toneText } from "../components/ui";
 import { Link, useSearchParams } from "react-router";
 import {
   HIDE_REASONS,
@@ -13,6 +13,7 @@ import {
   jobRegions,
   matchSummary,
   relativeTime,
+  rememberMatchOrder,
   scorePercent,
   scoreTone,
   useFindNewJobs,
@@ -86,6 +87,8 @@ export function JobsPage() {
         : new Date(postedAt(b) ?? 0).getTime() - new Date(postedAt(a) ?? 0).getTime(),
     );
   }, [matches, sort, remoteOnly, savedOnly, query, region, minMatch]);
+  // "Next match" on a job page walks this list in the order shown here.
+  useEffect(() => rememberMatchOrder(visible.map((j) => j.job_id)), [visible]);
   const savedCount = useMemo(() => matches.filter((j) => j.status === "SAVED").length, [matches]);
   const save = useSetMatchSaved();
   const newCount = useMemo(() => matches.filter((j) => isNewSince(j, lastVisit)).length, [matches, lastVisit]);
@@ -184,7 +187,7 @@ export function JobsPage() {
           </div>
         )}
         {isPending ? (
-          <Spinner label="Loading jobs" />
+          <SkeletonRows rows={6} label="Loading jobs" />
         ) : error ? (
           <div className="flex flex-col items-start gap-3">
             <Alert>Couldn't load jobs: {error.message}</Alert>
