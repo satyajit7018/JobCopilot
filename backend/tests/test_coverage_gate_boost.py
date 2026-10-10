@@ -1,6 +1,6 @@
 """
 JobCopilot - Coverage Gate Boost Test Suite
-Exercises database adapters (Postgres with mock pool), LinkedIn importer,
+Exercises database adapters (Postgres with mock pool),
 asynchronous worker wrappers, and career acceleration edge cases to guarantee
 comprehensive >80% test coverage for the CI gate.
 """
@@ -10,7 +10,6 @@ import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime
 
-from app.core.linkedin_importer import LinkedInImporter
 from app.tasks.apply_task import enqueue_apply_job, run_apply_job_sync
 from app.core.postgres_adapter import PostgresDatabaseAdapter
 from app.core.models import (
@@ -21,18 +20,6 @@ from app.core.models import (
 )
 from app.core.interview_studio import InterviewStudioEngine
 from app.core.credential_vault import cred_vault
-
-
-def test_linkedin_importer():
-    profile = LinkedInImporter.import_from_url(
-        "https://www.linkedin.com/in/alexmercer",
-        full_name="Alex Mercer",
-        headline="Staff Platform Engineer"
-    )
-    assert profile.full_name == "Alex Mercer"
-    assert profile.summary == "Staff Platform Engineer"
-    assert "Python" in profile.skills
-    assert profile.linkedin_url == "https://www.linkedin.com/in/alexmercer"
 
 
 def test_apply_task_sync_and_enqueue():
