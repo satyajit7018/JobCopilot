@@ -57,6 +57,12 @@ export function PrepPage() {
   return premium ? <PrepTools /> : <PrepLocked />;
 }
 
+const SAMPLE = [
+  { label: "A likely question", text: "Tell me about a time you made a slow service faster. What did you measure before and after?" },
+  { label: "Feedback on your practice answer", text: "Clear structure. Add the numbers: how slow was it, and how fast did it get? Say which part was your work." },
+  { label: "A question to ask them", text: "What does the on-call rotation look like for this team, and how often does it page?" },
+];
+
 function PrepLocked() {
   return (
     <>
@@ -66,6 +72,22 @@ function PrepLocked() {
           Likely questions for each role, practice answers with feedback, and questions to ask them. Your upcoming interviews show
           here with everything you need.
         </PremiumLock>
+
+        {/* A fixed sample so the page shows what Prep is, not just that it's locked. */}
+        <section aria-labelledby="prep-sample" className="mt-8">
+          <h2 id="prep-sample" className="text-base font-semibold">
+            What it looks like
+          </h2>
+          <p className="text-ink-2">An example for a backend engineer interview. Yours are written for the job you're interviewing for.</p>
+          <Card className="mt-3 divide-y divide-line">
+            {SAMPLE.map((s) => (
+              <div key={s.label} className="px-4 py-3.5 sm:px-5">
+                <p className="text-xs font-medium tracking-wide text-ink-3 uppercase">{s.label}</p>
+                <p className="mt-1">{s.text}</p>
+              </div>
+            ))}
+          </Card>
+        </section>
       </div>
     </>
   );

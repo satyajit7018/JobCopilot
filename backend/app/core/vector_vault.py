@@ -145,8 +145,11 @@ class KnowledgeVault:
         resolved = (template or "").replace("{company}", str(company or "the company")).replace("{role}", str(role or "Software Engineer")).replace("{domain}", str(domain or "Technology"))
         if profile:
             prefs = profile.preferences
-            expected_ctc = str(getattr(prefs, "expected_ctc", "") or "15 LPA")
-            current_ctc = str(getattr(prefs, "current_ctc", "") or "12 LPA")
+            # No invented numbers on someone's application: say so when the user hasn't told us.
+            expected_ctc = str(getattr(prefs, "expected_ctc", "") or "").strip() or "Open to discussion"
+            current_ctc = str(getattr(prefs, "current_ctc", "") or "").strip()
+            if not current_ctc or current_ctc.upper() == "0 LPA":
+                current_ctc = "Prefer not to say"
             notice_days = str(getattr(prefs, "notice_period_days", 0) or 0)
             earliest_date = str(getattr(prefs, "earliest_start_date", "") or "Immediate")
             work_auth = str(getattr(prefs, "work_authorization", "") or "Authorized")

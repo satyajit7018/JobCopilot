@@ -187,7 +187,8 @@ export function answersFromProfile(p: Profile): Answers {
     linkedin_url: p.linkedin_url ?? "",
     github_url: p.github_url ?? "",
     expected_ctc: prefs.expected_ctc ?? "",
-    current_ctc: prefs.current_ctc ?? "",
+    // "0 LPA" was an old placeholder default, never something the user typed.
+    current_ctc: prefs.current_ctc === "0 LPA" ? "" : (prefs.current_ctc ?? ""),
     notice_period_days: prefs.notice_period_days ?? 0,
     work_authorization: prefs.work_authorization ?? "",
     willing_to_relocate: prefs.willing_to_relocate ?? true,

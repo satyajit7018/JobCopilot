@@ -185,7 +185,7 @@ export function PreferenceFields({
           value={value.expected_ctc}
           onChange={(e) => onChange({ expected_ctc: e.target.value })}
           placeholder="e.g. 28 LPA or $140k"
-          hint="Used to answer salary questions on applications."
+          hint="Used to answer salary questions on applications. Left blank, we answer “Open to discussion”."
         />
         <Select
           label="Can start"

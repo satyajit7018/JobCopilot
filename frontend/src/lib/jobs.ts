@@ -95,9 +95,19 @@ export function scoreTone(pct: number): Tone {
   return "neutral";
 }
 
+/** Matches saved before the wording changed still carry the old sentence; show the new one. */
+export function readableReason(reason: string): string {
+  const m = /^Experience level \((\d+(?:\.\d+)?) yrs\) fits (.+) requirements\.$/.exec(reason);
+  if (!m) return reason;
+  const years = Number(m[1]);
+  const role = m[2] === "Intern" ? "an internship" : `a ${m[2].toLowerCase()} role`;
+  return `Your ${years} year${years === 1 ? "" : "s"} of experience fits ${role}.`;
+}
+
 /** One plain sentence explaining the score, preferring a concrete reason. */
 export function matchSummary(job: Job): string | null {
-  const reason = job.match_reasons?.find((r) => r.trim());
+  const first = job.match_reasons?.find((r) => r.trim());
+  const reason = first && readableReason(first);
   const missing = job.missing_skills?.filter((s) => s.trim()) ?? [];
   if (reason && missing.length) return `${reason}. Missing: ${missing.slice(0, 2).join(", ")}`;
   if (reason) return reason;

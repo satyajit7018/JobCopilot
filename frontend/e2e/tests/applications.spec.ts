@@ -15,7 +15,9 @@ test.describe("Applications", () => {
 
     await page.getByRole("link", { name: "Platform Engineer (Go)" }).click();
     await expect(page).toHaveURL(/\/applications\/.+/);
-    await expect(page.getByRole("heading", { name: "Follow up" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
+    // Free plan: one Premium box for this page, not one per feature.
+    await expect(page.getByText("Let Premium keep this moving").filter({ visible: true })).toHaveCount(1);
 
     await page.getByLabel("Status").selectOption("INTERVIEW");
     await expect(page.getByText("Updated")).toBeVisible();

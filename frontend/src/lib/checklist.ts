@@ -58,16 +58,14 @@ export interface ChecklistStep {
 export function buildChecklist(input: {
   hasResume: boolean;
   hasTracked: boolean;
-  mfaEnabled: boolean;
   flags: Record<string, boolean>;
 }): ChecklistStep[] {
-  const { hasResume, hasTracked, mfaEnabled, flags } = input;
+  const { hasResume, hasTracked, flags } = input;
   return [
     { key: "resume", title: "Add your resume", done: hasResume, to: "/setup", cta: "Add" },
-    { key: "details", title: "Check the details we read from it", done: !!flags.details, to: "/profile", cta: "Check" },
+    { key: "details", title: "Check the details we read from your resume", done: !!flags.details, to: "/profile", cta: "Check" },
     { key: "preferences", title: "Tell us what you're looking for", done: !!flags.preferences, to: "/profile", cta: "Set" },
     { key: "reviewed", title: "Review a job match", done: !!flags.reviewed, to: "/jobs", cta: "See jobs" },
     { key: "tracked", title: "Track your first application", done: hasTracked, to: "/jobs", cta: "Start" },
-    { key: "mfa", title: "Turn on 2-step sign-in", done: mfaEnabled, to: "/settings", cta: "Turn on" },
   ];
 }

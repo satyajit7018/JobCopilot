@@ -66,11 +66,11 @@ test.describe("Retention features", () => {
 
     await page.goto("/");
     const checklist = page.getByRole("region", { name: /Getting started/ });
-    await expect(checklist.getByText("1 of 6 done")).toBeVisible();
+    await expect(checklist.getByText("1 of 5 done")).toBeVisible();
     await page.goto(`/jobs/${job}`);
     await expect(page.getByRole("heading", { name: "Backend Engineer" })).toBeVisible();
     await page.goto("/");
-    await expect(checklist.getByText("2 of 6 done")).toBeVisible();
+    await expect(checklist.getByText("2 of 5 done")).toBeVisible();
     await checklist.getByRole("button", { name: "Hide" }).click();
     await expect(checklist).toBeHidden();
   });

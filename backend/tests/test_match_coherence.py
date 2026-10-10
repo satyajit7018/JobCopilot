@@ -50,7 +50,7 @@ class TestMatchReasonCoherence:
             assert "0.0 yrs" not in r
 
         # 3. Must contain calibration notice
-        assert any("provisional" in r.lower() or "calibrate" in r.lower() for r in reasons)
+        assert any("rough score" in r.lower() for r in reasons)
 
     def test_empty_profile_semantic_scorer_does_not_boost(self):
         """compute_match_score_semantic must not falsely boost empty profile to 99%."""
@@ -90,5 +90,5 @@ class TestMatchReasonCoherence:
 
         score, reasons, _ = MatchScorer.compute_match_score(calibrated_profile, title, jd)
         assert score >= 0.50
-        assert any("fits Senior requirements" in r for r in reasons)
+        assert any("fits a senior role" in r for r in reasons)
         assert not any("Intern" in r for r in reasons)

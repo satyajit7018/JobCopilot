@@ -256,9 +256,8 @@ function TopMatches({ jobs }: { jobs: Job[] }) {
 
 /** First steps, until they're all done or dismissed. */
 function GettingStarted({ jobs }: { jobs: Job[] }) {
-  const { user } = useAuth();
   const flags = useChecklistFlags();
-  const steps = buildChecklist({ hasResume: true, hasTracked: jobs.some(isTracked), mfaEnabled: !!user?.mfa_enabled, flags });
+  const steps = buildChecklist({ hasResume: true, hasTracked: jobs.some(isTracked), flags });
   const done = steps.filter((s) => s.done).length;
   if (flags.dismissed || done === steps.length) return null;
 

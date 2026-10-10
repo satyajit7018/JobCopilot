@@ -271,9 +271,14 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
   const when = relativeTime(postedAt(job));
 
   return (
-    <li className="flex flex-col gap-3 border-b border-line px-4 py-4 last:border-b-0 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
+    <li className="flex flex-col gap-2 border-b border-line px-4 py-3.5 last:border-b-0 sm:flex-row sm:items-center sm:gap-4 sm:px-5 sm:py-4">
       <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
         <CompanyMark name={job.company} />
+        {/* Phones: the score sits beside the title so the actions fit on one short row. */}
+        <div className="order-last w-10 flex-none text-center sm:hidden" aria-hidden>
+          <span className={cx("block text-lg leading-none font-bold", toneText[tone])}>{pct}</span>
+          <span className="text-[0.625rem] tracking-wide text-ink-3 uppercase">match</span>
+        </div>
         <div className="min-w-0 flex-1">
           <h2 className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">
             <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className="hover:text-accent hover:underline">
@@ -302,11 +307,11 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
               </span>
             )}
           </div>
-          {why && <p className="mt-1.5 text-ink-2">{why}</p>}
+          {why && <p className="mt-1.5 line-clamp-2 text-ink-2 sm:line-clamp-none">{why}</p>}
         </div>
       </div>
-      <div className="flex items-center gap-4 pl-13 sm:pl-0">
-        <div className="w-14 text-center" aria-label={`${pct}% match`} title="Resume match, not your chance of an interview">
+      <div className="flex items-center gap-1 pl-13 sm:gap-4 sm:pl-0">
+        <div className="w-14 text-center max-sm:sr-only" aria-label={`${pct}% match`} title="Resume match, not your chance of an interview">
           <span className={cx("block text-lg leading-none font-bold", toneText[tone])}>{pct}</span>
           <span className="text-xs tracking-wide text-ink-3 uppercase">match</span>
         </div>
@@ -324,7 +329,7 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
           <ExternalLink className="size-4" aria-hidden />
           <span className="sr-only">View posting (opens in a new tab)</span>
         </a>
-        <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className={buttonClass(pct >= 80 ? "primary" : "secondary")}>
+        <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className={buttonClass(pct >= 80 ? "primary" : "secondary", "md", "max-sm:ml-auto")}>
           Review
           <span className="sr-only"> {job.title} at {job.company}</span>
         </Link>

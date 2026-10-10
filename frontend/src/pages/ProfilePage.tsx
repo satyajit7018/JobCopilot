@@ -253,7 +253,8 @@ function DetailsForm({ profile }: { profile: Profile }) {
               name="current_ctc"
               value={answers.current_ctc}
               onChange={(e) => set({ current_ctc: e.target.value })}
-              hint="Only given when a form asks for it."
+              placeholder="e.g. 18 LPA or $95k"
+              hint="Only given when a form asks for it. Left blank, we answer “Prefer not to say”."
             />
             <Field
               label="Current employer"
