@@ -12,6 +12,15 @@ import json
 import base64
 from pathlib import Path
 
+# Run against a throwaway data folder, never the real local one (~/.jobcopilot).
+if "JOBCOPILOT_DATA_DIR" not in os.environ:
+    import atexit
+    import shutil
+    import tempfile
+    _data_dir = tempfile.mkdtemp(prefix="jobcopilot-stress-")
+    os.environ["JOBCOPILOT_DATA_DIR"] = _data_dir
+    atexit.register(shutil.rmtree, _data_dir, ignore_errors=True)
+
 # Add backend directory to sys.path
 backend_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(backend_dir))
