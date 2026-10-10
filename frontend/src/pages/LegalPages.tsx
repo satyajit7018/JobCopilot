@@ -1,5 +1,6 @@
 // Privacy Policy and Terms. Public pages (no sign-in), written to match what the app does.
 // Operator name and support email come from the server (OPERATOR_NAME, SUPPORT_EMAIL).
+import { usePageTitle } from "../lib/pageTitle";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
@@ -26,6 +27,7 @@ function Mail({ email }: { email: string }) {
 }
 
 function LegalLayout({ title, children, effective = true }: { title: string; children: ReactNode; effective?: boolean }) {
+  usePageTitle(title);
   return (
     <div className="min-h-dvh bg-canvas">
       <header className="flex h-14 items-center gap-2 border-b border-line bg-surface px-4 md:px-7">

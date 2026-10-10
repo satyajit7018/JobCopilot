@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "react-router";
 import { Check, FileText, X } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
+import { UnsavedChanges } from "../components/UnsavedChanges";
 import { BackgroundEditor, PreferenceFields, ResumeDrop, SourceFields } from "../components/profile";
 import { Alert, Badge, Button, Card, Field, Spinner, Textarea } from "../components/ui";
 import { relativeTime, useRemoveSkipRule, useSkipRules } from "../lib/jobs";
@@ -274,6 +275,8 @@ function DetailsForm({ profile }: { profile: Profile }) {
           </div>
         )}
       </Section>
+
+      <UnsavedChanges when={dirty} onSave={invalid ? undefined : submit} saving={save.isPending} />
 
       {/* Save bar: appears once something changed, stays above the mobile tab bar. */}
       {(dirty || saved || save.error) && (

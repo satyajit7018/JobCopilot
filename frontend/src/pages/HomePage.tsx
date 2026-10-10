@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from "react";
 import { Link, Navigate } from "react-router";
 import { ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, MailQuestion, PartyPopper, X } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Card, CompanyMark, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
+import { Alert, Card, CompanyMark, EmptyState, SkeletonRows, buttonClass, cx, toneText } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { buildChecklist, markDone, useChecklistFlags } from "../lib/checklist";
 import { isMatch, isNewSince, isTracked, matchSummary, readLastVisit, scorePercent, scoreTone, useVisibleJobs, type Job } from "../lib/jobs";
@@ -134,10 +134,13 @@ export function HomePage() {
 
   return (
     <>
-      <PageHeader title={firstName ? `${greeting(now)}, ${firstName}` : greeting(now)} />
+      <PageHeader title={firstName ? `${greeting(now)}, ${firstName}` : greeting(now)} tabTitle="Home" />
       <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-5 md:px-7 md:py-8">
         {isPending ? (
-          <Spinner />
+          <>
+            <SkeletonRows rows={2} avatar={false} label="Loading your dashboard" />
+            <SkeletonRows rows={3} label="Loading your matches" />
+          </>
         ) : error ? (
           <Alert>Couldn't load your dashboard: {error.message}</Alert>
         ) : needsSetup ? (
@@ -282,7 +285,7 @@ function GettingStarted({ jobs }: { jobs: Job[] }) {
               <span
                 className={cx(
                   "grid size-5 flex-none place-items-center rounded-full border",
-                  s.done ? "border-ok bg-ok text-white" : "border-line-strong",
+                  s.done ? "border-ok bg-ok text-on-solid" : "border-line-strong",
                 )}
                 aria-hidden
               >

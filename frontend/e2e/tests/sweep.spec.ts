@@ -85,6 +85,20 @@ for (const plan of ["free", "premium"] as const) {
   }
 }
 
+test("dark mode keeps text readable on every screen", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const s = await signIn(uniqueEmail("sweep-dark"));
+  const { match, applied } = await seed(s);
+  await useSession(page, s);
+  const problems = watch(page);
+  for (const path of ["/", "/jobs", `/jobs/${match}`, "/applications", `/applications/${applied}`, "/prep", "/profile", "/settings", "/plans", "/help"]) {
+    await checkPage(page, path, "desktop");
+  }
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(15, 16, 20)");
+  expect(problems.console, "console errors").toEqual([]);
+});
+
 test("public pages work signed out", async ({ page }) => {
   const problems = watch(page);
   for (const path of ["/login", "/help", "/privacy", "/terms"]) {

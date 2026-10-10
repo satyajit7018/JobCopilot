@@ -1,3 +1,4 @@
+import { usePageTitle } from "../lib/pageTitle";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
@@ -42,8 +43,8 @@ function Stepper({ current }: { current: number }) {
               <span
                 className={cx(
                   "grid size-6 flex-none place-items-center rounded-full border text-xs",
-                  done && "border-ok bg-ok text-white",
-                  here && "border-accent bg-accent text-white",
+                  done && "border-ok bg-ok text-on-solid",
+                  here && "border-accent bg-accent text-on-solid",
                   !done && !here && "border-line-strong",
                 )}
               >
@@ -60,6 +61,7 @@ function Stepper({ current }: { current: number }) {
 }
 
 export function SetupPage() {
+  usePageTitle("Set up");
   const navigate = useNavigate();
   const profile = useProfile();
   const [step, setStep] = useState<number | null>(null);

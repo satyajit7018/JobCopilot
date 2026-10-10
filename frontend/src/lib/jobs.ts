@@ -143,6 +143,45 @@ export function useVisibleJobs() {
   return { ...query, data: visible, hiddenMatches: (query.data?.length ?? 0) - (visible?.length ?? 0) };
 }
 
+// --- "Next match" ---------------------------------------------------------------------
+
+const QUEUE_KEY = "jobcopilot_match_queue";
+
+/** Remembers the Jobs list as shown (filters and sort applied), so "Next match" follows it. */
+export function rememberMatchOrder(ids: string[]) {
+  try {
+    sessionStorage.setItem(QUEUE_KEY, JSON.stringify(ids));
+  } catch {
+    // Private mode: "Next match" falls back to best match first.
+  }
+}
+
+function matchOrder(): string[] {
+  try {
+    const raw = sessionStorage.getItem(QUEUE_KEY);
+    const ids: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The match after `currentId` in the list the user was looking at; best match first otherwise. */
+export function nextMatch(jobs: Job[], currentId: string, order: string[] = matchOrder()): Job | null {
+  const open = jobs.filter((j) => isMatch(j) && j.job_id !== currentId);
+  if (open.length === 0) return null;
+  const byId = new Map(open.map((j) => [j.job_id, j]));
+  const at = order.indexOf(currentId);
+  if (at >= 0) {
+    // Carry on down the list, then wrap to what was skipped above.
+    for (const id of [...order.slice(at + 1), ...order.slice(0, at)]) {
+      const job = byId.get(id);
+      if (job) return job;
+    }
+  }
+  return [...open].sort((a, b) => b.match_score - a.match_score)[0];
+}
+
 /** Moves a match between new, saved and hidden, updating the list right away. */
 function useSetMatchStatus() {
   const qc = useQueryClient();
@@ -254,6 +293,9 @@ export function isRemote(location: string | null | undefined): boolean {
  * When the user last left this page (ms), read once on arrival; the current visit is
  * recorded on leaving, so "New" badges stay put while they look around.
  */
+/** Fired when a page records that the user has seen it, so counts elsewhere can update. */
+export const VISIT_EVENT = "jobcopilot:visit";
+
 export function useLastVisit(page: string): number | null {
   const key = `jobcopilot_last_visit_${page}`;
   const [previous] = useState<number | null>(() => {
@@ -268,6 +310,7 @@ export function useLastVisit(page: string): number | null {
     () => () => {
       try {
         localStorage.setItem(key, String(Date.now()));
+        window.dispatchEvent(new Event(VISIT_EVENT));
       } catch {
         // Storage blocked: badges just won't persist.
       }

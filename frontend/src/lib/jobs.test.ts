@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTodos } from "../pages/HomePage";
-import { matchSummary, readableReason, relativeTime, scorePercent, type Job } from "./jobs";
+import { matchSummary, nextMatch, readableReason, relativeTime, scorePercent, type Job } from "./jobs";
 
 function job(overrides: Partial<Job>): Job {
   return {
@@ -95,5 +95,21 @@ describe("readableReason", () => {
     expect(readableReason("Experience level (5.0 yrs) fits Mid-Level requirements.")).toBe("Your 5 years of experience fits a mid-level role.");
     expect(readableReason("Experience level (1.0 yrs) fits Intern requirements.")).toBe("Your 1 year of experience fits an internship.");
     expect(readableReason("Role fits your backend background.")).toBe("Role fits your backend background.");
+  });
+});
+
+describe("nextMatch", () => {
+  const j = (id: string, score: number, status = "DISCOVERED") => ({ job_id: id, match_score: score, status }) as Job;
+  const jobs = [j("a", 0.9), j("b", 0.8), j("c", 0.7, "DISMISSED"), j("d", 0.6, "SAVED"), j("e", 0.95, "SUBMITTED")];
+
+  it("follows the list the user was looking at, skipping hidden and applied jobs", () => {
+    expect(nextMatch(jobs, "a", ["a", "c", "e", "d", "b"])?.job_id).toBe("d");
+  });
+  it("wraps to what was skipped above, and never returns the current job", () => {
+    expect(nextMatch(jobs, "b", ["a", "d", "b"])?.job_id).toBe("a");
+    expect(nextMatch([j("a", 0.9)], "a", ["a"])).toBeNull();
+  });
+  it("falls back to the best remaining match when there is no list", () => {
+    expect(nextMatch(jobs, "d", [])?.job_id).toBe("a");
   });
 });

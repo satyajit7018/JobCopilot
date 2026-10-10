@@ -101,4 +101,57 @@ test.describe("Guided job search", () => {
     await page.getByText("My own words", { exact: true }).click();
     await expect.poll(() => chosen).toBe("original");
   });
+
+  test("Next match walks the list, and Not interested works from the job page", async ({ page }) => {
+    const s = await signIn(uniqueEmail("next"));
+    await seedProfile(s);
+    const first = await seedJob(s, { company: "Nimbus Systems", title: "Backend Engineer" });
+    await seedJob(s, { company: "Vertex Labs", title: "Frontend Engineer" });
+    await useSession(page, s);
+
+    await page.goto(`/jobs/${first}`);
+    await expect(page).toHaveTitle("Backend Engineer at Nimbus Systems · JobCopilot");
+    await page.getByRole("button", { name: "Not interested" }).click();
+    await expect(page.getByText(/hidden from your matches/)).toBeVisible();
+    await page.getByRole("link", { name: /^Next match/ }).click();
+    await expect(page.getByRole("heading", { name: "Frontend Engineer" })).toBeVisible();
+    // The only other match is hidden now, so there's nowhere further to go.
+    await expect(page.getByRole("link", { name: /^Next match/ })).toHaveCount(0);
+  });
+
+  test("notes on an application are saved", async ({ page }) => {
+    const s = await signIn(uniqueEmail("notes"));
+    await seedProfile(s);
+    const job = await seedJob(s, { company: "Helix Robotics", title: "Platform Engineer", status: "SUBMITTED" });
+    await useSession(page, s);
+
+    await page.goto(`/applications/${job}`);
+    await expect(page).toHaveTitle("Platform Engineer at Helix Robotics · JobCopilot");
+    await page.getByLabel("Notes", { exact: true }).fill("Spoke to Priya. Follow up Friday.");
+    await page.getByRole("button", { name: "Save notes" }).click();
+    await expect(page.getByText("Notes saved")).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("Notes", { exact: true })).toHaveValue("Spoke to Priya. Follow up Friday.");
+  });
+
+  test("Profile asks before leaving with unsaved changes", async ({ page }) => {
+    const s = await signIn(uniqueEmail("unsaved"));
+    await seedProfile(s);
+    await useSession(page, s);
+
+    await page.goto("/profile");
+    await expect(page).toHaveTitle("Profile · JobCopilot");
+    await page.getByLabel("Phone").fill("+91 90000 00000");
+    await page.getByRole("link", { name: "Home" }).first().click();
+    const dialog = page.getByRole("dialog", { name: "Leave without saving?" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "Keep editing" }).click();
+    await expect(page).toHaveURL(/\/profile$/);
+
+    await page.getByRole("link", { name: "Home" }).first().click();
+    await dialog.getByRole("button", { name: "Save and leave" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await page.goto("/profile");
+    await expect(page.getByLabel("Phone")).toHaveValue("+91 90000 00000");
+  });
 });
