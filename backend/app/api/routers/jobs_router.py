@@ -78,9 +78,20 @@ async def company_logo_image(request: Request, name: str = ""):
 
 @router.get("/company-info")
 @limiter.limit("120/minute")
-async def company_about(request: Request, name: str = "", current_user: User = Depends(get_current_user)):
-    """A short description of a company in its own words, and its website. Either may be null."""
-    return await company_info.get_info(name.strip())
+async def company_about(request: Request, name: str = "", job_id: str = "", current_user: User = Depends(get_current_user)):
+    """A short description of a company in its own words, and its website. Either may be null.
+
+    With `job_id` (one of the user's jobs at this company), the posting's own "About us"
+    part fills in when the company's website has no summary.
+    """
+    name = name.strip()
+    posting = ""
+    if job_id:
+        job = db.get_job_by_id(job_id, user_id=current_user.user_id)
+        # Instahyre postings carry no description of their own; their company note is kept separately.
+        if job and job.platform != "Instahyre" and company_logo.normalise(job.company) == company_logo.normalise(name):
+            posting = job.description or ""
+    return await company_info.get_info(name, posting=posting)
 
 
 @router.get("/jobs")

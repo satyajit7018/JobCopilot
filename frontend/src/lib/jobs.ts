@@ -61,13 +61,19 @@ export interface CompanyInfo {
   /** The company in its own words (its website's summary, or the note on the posting). */
   about: string | null;
   website: string | null;
+  /** Where the text is from: the company's website, or a job posting. */
+  source: "website" | "posting" | null;
 }
 
-/** A short description of the company and its website; either can be missing. */
-export function useCompanyInfo(company: string) {
+/**
+ * A short description of the company and its website; either can be missing. The job id
+ * lets the server fall back to the posting's own "About us" part.
+ */
+export function useCompanyInfo(company: string, jobId: string) {
   return useQuery({
-    queryKey: ["company-info", company],
-    queryFn: ({ signal }) => api<CompanyInfo>(`/company-info?name=${encodeURIComponent(company)}`, { signal }),
+    queryKey: ["company-info", company, jobId],
+    queryFn: ({ signal }) =>
+      api<CompanyInfo>(`/company-info?name=${encodeURIComponent(company)}&job_id=${encodeURIComponent(jobId)}`, { signal }),
     staleTime: 60 * 60_000,
     retry: false,
   });

@@ -71,6 +71,73 @@ def about_from_page(page: str) -> Optional[str]:
     return clean_about(found.get("description", "")) or clean_about(found.get("og:description", ""))
 
 
+_STOP = re.compile(
+    r"\b(about the (?:role|team|job|position|opportunity)|the role|role overview|what you.ll do|what you will do|"
+    r"responsibilities|your role|job description|requirements|the opportunity|who you are|"
+    r"what we.re looking for|position overview|the team|about you)\b",
+    re.I,
+)
+_VACANCY = re.compile(r"\b(seeking|looking for|is hiring|are hiring|we.re hiring|join our|you will|you.ll|this role)\b", re.I)
+_SAYS_WHAT_IT_IS = r"(?:\s*\([^)]*\))?,?\s+(?:is|are|helps|provides|builds|accelerates|powers|enables|offers|makes|we)\b"
+
+
+def about_from_posting(company: str, text: str) -> Optional[str]:
+    """The "About us" part of a job posting, in the posting's own words, or None.
+
+    Looks for an "About <company>" / "About us" / "Who we are" heading, or a posting that
+    opens by saying what the company is ("Stripe is ...", "At Tide, we ..."). Takes whole
+    sentences up to where the posting turns to the role. Never rewrites anything.
+    """
+    plain = re.sub(r"[ \t\xa0]+", " ", re.sub(r"<[^>]+>", " ", html.unescape(html.unescape(text or "")))).strip()
+    words = re.findall(r"[A-Za-z0-9]+", company or "")
+    if not plain or not words or len(words[0]) < 3:
+        return None
+    first = re.escape(words[0])
+    # A heading may use a short form of the name ("About Fam" for FamPay).
+    short = re.escape(words[0][:3]) + r"[A-Za-z0-9]*"
+    heading = re.compile(rf"\b(?:about\s+(?:us|the company|{short}(?:\s+\([^)]*\))?)|who we are)\b\s*[:\-–]?\s*", re.I)
+
+    body = None
+    found = heading.search(plain[:1500])
+    if found:
+        body = plain[found.end():]
+        again = heading.match(body)  # "Who we are  About Stripe  Stripe is ..."
+        if again:
+            body = body[again.end():]
+    else:
+        opening = re.search(rf"\b(?:At\s+{first}\b|{first}{_SAYS_WHAT_IT_IS})", plain[:60])
+        if opening:
+            body = plain[opening.start():]
+    if not body:
+        return None
+
+    stop = _STOP.search(body, 60)
+    if stop:
+        body = body[:stop.start()]
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", body) if p.strip()]
+    if paragraphs and len(paragraphs[0]) >= 120:
+        body = paragraphs[0]
+    body = re.sub(r"https?://\S*[^\s.,;:!?)]", "", body)
+    body = re.sub(r"\s+", " ", body).strip()
+    body = re.sub(r"^\([^)]*\)\s*", "", body)  # "About Fam (previously FamPay) ..."
+    body = re.sub(r"\s+([.,;:])", r"\1", body)
+    # A posting that opens with the vacancy ("X is seeking a DevOps engineer") isn't about the company.
+    if _VACANCY.search(re.split(r"(?<=[.!?])\s+", body)[0]):
+        return None
+
+    kept = ""
+    for sentence in re.split(r"(?<=[.!?])\s+", body):
+        if not re.search(r"[.!?]$", sentence):
+            break  # a cut-off last sentence
+        if len(kept) + len(sentence) + 1 > MAX_ABOUT_CHARS:
+            break
+        kept = f"{kept} {sentence}".strip()
+    if len(kept) >= 60:
+        return kept
+    # One very long opening sentence: keep its start.
+    return clean_about(body) if len(body) > MAX_ABOUT_CHARS and not kept else None
+
+
 def _is_public_host(host: str) -> bool:
     """Only ever fetch from the public internet, never an internal address."""
     try:
@@ -117,10 +184,14 @@ def remember(name: str, about: str) -> None:
         _save(key, record)
 
 
-async def get_info(name: str) -> Dict[str, Optional[str]]:
-    """{"about", "website"} for a company; either may be None."""
+async def get_info(name: str, posting: str = "") -> Dict[str, Optional[str]]:
+    """{"about", "website", "source"} for a company; any may be None.
+
+    `posting` is a job description from this company. Its "About us" part is used when the
+    company's website gave no summary. `source` says where the text is from: "website" or "posting".
+    """
     key = company_logo.normalise(name or "")
-    empty: Dict[str, Optional[str]] = {"about": None, "website": None}
+    empty: Dict[str, Optional[str]] = {"about": None, "website": None, "source": None}
     if not key or len(name) > company_logo.MAX_NAME_LENGTH:
         return empty
     record = _load(key)
@@ -139,4 +210,11 @@ async def get_info(name: str) -> Dict[str, Optional[str]]:
                 pass  # lookup unavailable right now: answer with what we have, retry next time
             finally:
                 _locks.pop(key, None)
-    return {"about": record.get("about"), "website": record.get("website")}
+    if not record.get("about") and not record.get("posting_about") and posting:
+        from_posting = about_from_posting(name, posting)
+        if from_posting:
+            record = {**_load(key), "posting_about": from_posting}
+            _save(key, record)
+    about = record.get("about") or record.get("posting_about")
+    source = (record.get("about_source") or "website") if record.get("about") else ("posting" if about else None)
+    return {"about": about, "website": record.get("website"), "source": source}

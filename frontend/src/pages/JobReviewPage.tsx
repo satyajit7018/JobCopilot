@@ -111,8 +111,8 @@ export function JobReviewPage() {
 }
 
 /** The company in its own words, or at least a link to its website. Hidden when we have neither. */
-function AboutCompany({ company }: { company: string }) {
-  const { data } = useCompanyInfo(company);
+function AboutCompany({ company, jobId }: { company: string; jobId: string }) {
+  const { data } = useCompanyInfo(company, jobId);
   if (!data?.about && !data?.website) return null;
   const site = data.website?.replace(/^https?:\/\//, "");
   return (
@@ -122,14 +122,16 @@ function AboutCompany({ company }: { company: string }) {
       ) : (
         <p className="text-ink-2">We don't have a description of {company} yet. Their website has the details.</p>
       )}
-      {data.website && (
+      {(data.about || data.website) && (
         <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
-          {data.about && <span>In the company's own words.</span>}
-          <a href={data.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
-            Visit {site}
-            <ExternalLink className="size-3.5" aria-hidden />
-            <span className="sr-only">(opens in a new tab)</span>
-          </a>
+          {data.about && <span>{data.source === "posting" ? "From the job posting." : "From the company's website."}</span>}
+          {data.website && (
+            <a href={data.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+              Visit {site}
+              <ExternalLink className="size-3.5" aria-hidden />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+          )}
         </p>
       )}
     </Section>
@@ -231,7 +233,7 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
               </div>
             </Section>
 
-            <AboutCompany company={job.company} />
+            <AboutCompany company={job.company} jobId={job.job_id} />
 
             {premium && <Materials job={job} tailor={tailor} />}
           </div>
