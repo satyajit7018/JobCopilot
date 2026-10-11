@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 
 /** What the first search is doing, by elapsed time (it takes ~20s; the steps overlap on the server). */
 export const SEARCH_STAGES: { after: number; text: string }[] = [
-  { after: 0, text: "Checking career pages at about 30 tech companies" },
-  { after: 6_000, text: "Looking through startup job boards" },
+  { after: 0, text: "Checking career pages at about 50 tech companies" },
+  { after: 6_000, text: "Looking through startup job boards and Instahyre" },
   { after: 12_000, text: "Scoring each job against your resume" },
   { after: 20_000, text: "Saving your best matches" },
   { after: 35_000, text: "Still working. Some job sites are slow today" },

@@ -55,6 +55,19 @@ def _resolve_submission_mode(mode: Optional[str], user_id: str) -> str:
     return resolved
 
 
+# Job sites where people apply while signed in to the site. JobCopilot never automates these.
+APPLY_YOURSELF_PLATFORMS = {"instahyre"}
+
+
+def _assert_site_allows_auto_apply(user_id: str, job_id: str) -> None:
+    job = db.get_job_by_id(job_id, user_id=user_id)
+    if job and (job.platform or "").strip().lower() in APPLY_YOURSELF_PLATFORMS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Automatic applying isn't available for {job.platform} jobs. Apply on {job.platform}, then mark it applied.",
+        )
+
+
 def _assert_can_apply(user_id: str, job_id: str) -> None:
     """Shared idempotency-ledger + rate-limit precondition check for apply endpoints."""
     existing_ledger = apply_ledger.get_ledger_for_job(user_id, job_id)
@@ -168,6 +181,7 @@ async def apply_to_job(
     current_user: User = Depends(require_premium("auto_apply"))
 ):
     """Executes full autonomous stealth application workflow with persistent rate limiting and idempotency."""
+    _assert_site_allows_auto_apply(current_user.user_id, job_id)
     # Check Idempotent Apply Ledger before executing
     _assert_can_apply(current_user.user_id, job_id)
 
@@ -199,6 +213,7 @@ async def apply_to_job_async(
     Dispatches asynchronous application task to Celery/Redis background worker queue with idempotency checks.
     Returns HTTP 202 Accepted with a unique task_id for progress polling.
     """
+    _assert_site_allows_auto_apply(current_user.user_id, job_id)
     resolved_mode = _resolve_submission_mode(mode, current_user.user_id)
 
     # 1. Rate-limit check first

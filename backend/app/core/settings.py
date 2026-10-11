@@ -122,6 +122,9 @@ class Settings(BaseSettings):
     # Stealth Bot & Proxy
     PROXY_PASSWORD: str = "secret"
 
+    # Read Instahyre's public job search during discovery. Off = career pages and startup boards only.
+    INSTAHYRE_ENABLED: bool = True
+
     # Observability
     SENTRY_DSN: Optional[str] = None
 

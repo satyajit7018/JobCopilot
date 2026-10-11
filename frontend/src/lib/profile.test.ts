@@ -90,13 +90,14 @@ describe("job sources", () => {
     expect(sourceForPlatform("Greenhouse")).toBe("ats");
     expect(sourceForPlatform("Y Combinator")).toBe("startups");
     expect(sourceForPlatform("HackerNews")).toBe("startups");
+    expect(sourceForPlatform("Instahyre")).toBe("instahyre");
     expect(sourceForPlatform("Some Board")).toBeNull();
     expect(sourceForPlatform(undefined)).toBeNull();
   });
 
   it("only offers places that are really searched", () => {
-    expect(SOURCES.map((s) => s.id)).toEqual(["ats", "startups"]);
-    for (const site of ["LinkedIn", "Naukri", "Instahyre", "Cutshort", "Cuvette", "Indeed", "Wellfound"]) {
+    expect(SOURCES.map((s) => s.id)).toEqual(["ats", "startups", "instahyre"]);
+    for (const site of ["LinkedIn", "Naukri", "Cutshort", "Cuvette", "Indeed", "Wellfound"]) {
       expect(sourceForPlatform(site)).toBeNull();
       expect(JSON.stringify(SOURCES)).not.toContain(site);
     }
