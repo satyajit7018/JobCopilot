@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from app.api.auth import get_current_user, limiter
 from app.api.ws_gateway import ws_manager
 from app.core.cover_letter import CoverLetterGenerator
-from app.core import company_logo, match_feedback
+from app.core import company_info, company_logo, match_feedback
 from app.core.database import db
 from app.core.plans import require_premium
 from app.core.models import ApplicationStatus, CandidateProfile, JobListing, User
@@ -74,6 +74,13 @@ async def company_logo_image(request: Request, name: str = ""):
     if not data:
         return Response(status_code=204, headers={"Cache-Control": "public, max-age=86400"})
     return Response(content=data, media_type=company_logo.media_type(data), headers={"Cache-Control": "public, max-age=604800"})
+
+
+@router.get("/company-info")
+@limiter.limit("120/minute")
+async def company_about(request: Request, name: str = "", current_user: User = Depends(get_current_user)):
+    """A short description of a company in its own words, and its website. Either may be null."""
+    return await company_info.get_info(name.strip())
 
 
 @router.get("/jobs")

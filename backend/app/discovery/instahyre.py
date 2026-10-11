@@ -2,9 +2,10 @@
 JobCopilot - Instahyre listings.
 
 Reads the public job search that Instahyre's own website uses. It gives the role, company,
-cities and the skills asked for, but not the full description, so the description we keep
-says exactly that and the posting link carries the rest. A few pages per run, one at a
-time: the result is shared by every user for the hour (see orchestrator.get_leads).
+cities, the skills asked for and a note about the company, but not the full description,
+so the description we keep says exactly that and the posting link carries the rest. A few
+pages per run, one at a time: the result is shared by every user for the hour (see
+orchestrator.get_leads).
 """
 
 import asyncio
@@ -12,6 +13,8 @@ import logging
 from typing import Any, Dict, List, Optional
 
 import httpx
+
+from app.core import company_info
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +43,6 @@ def to_lead(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     parts = []
     if skills:
         parts.append(f"Skills asked for: {', '.join(skills)}.")
-    if about:
-        parts.append(f"About {company}: {about}")
     parts.append("The full description is on the Instahyre posting.")
     cities = [c.strip() for c in str(item.get("locations") or "").split(",") if c.strip()]
     return {
@@ -53,6 +54,8 @@ def to_lead(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "url": url,
         "description": " ".join(parts),
         "posted_date": None,
+        # The company note Instahyre publishes with the posting; shown as "About the company".
+        "company_about": about,
     }
 
 
@@ -79,6 +82,7 @@ async def fetch_instahyre_jobs(client: Optional[httpx.AsyncClient] = None) -> Li
                     lead = to_lead(item)
                     if lead:
                         leads[lead["external_id"]] = lead
+                        company_info.remember(lead["company"], lead["company_about"])
                 if len(items) < PAGE_SIZE:
                     break
                 await asyncio.sleep(PAUSE_SECONDS)

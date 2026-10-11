@@ -57,6 +57,22 @@ export function useJobDescription(jobId: string) {
   });
 }
 
+export interface CompanyInfo {
+  /** The company in its own words (its website's summary, or the note on the posting). */
+  about: string | null;
+  website: string | null;
+}
+
+/** A short description of the company and its website; either can be missing. */
+export function useCompanyInfo(company: string) {
+  return useQuery({
+    queryKey: ["company-info", company],
+    queryFn: ({ signal }) => api<CompanyInfo>(`/company-info?name=${encodeURIComponent(company)}`, { signal }),
+    staleTime: 60 * 60_000,
+    retry: false,
+  });
+}
+
 export type Tone = "neutral" | "accent" | "ok" | "warn" | "info" | "danger";
 
 export const STATUS_META: Record<ApplicationStatus, { label: string; tone: Tone }> = {
