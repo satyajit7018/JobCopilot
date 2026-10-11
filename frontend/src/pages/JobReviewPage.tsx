@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { ArrowLeft, ArrowRight, Bookmark, BookmarkCheck, Check, CircleAlert, ExternalLink, EyeOff, FileText, MapPin, SearchX, ShieldCheck, Wallet } from "lucide-react";
-import { PageHeader } from "../components/AppShell";
-import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, ScoreRing, Spinner, buttonClass, cx, toneText } from "../components/ui";
+import { ArrowLeft, ArrowRight, Bookmark, BookmarkCheck, Check, CircleAlert, ExternalLink, EyeOff, FileText, SearchX, ShieldCheck } from "lucide-react";
+import { MatchReceipt } from "../components/MatchReceipt";
+import { toast } from "../components/Toast";
+import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, Group, ScoreRing, Segmented, Spinner, buttonClass, cx, rowClass, toneText } from "../components/ui";
 import {
   newKey,
   outcome,
@@ -22,7 +23,6 @@ import {
   applyOnSiteOnly,
   isTracked,
   nextMatch,
-  readableReason,
   scorePercent,
   useCompanyInfo,
   useJobDescription,
@@ -34,6 +34,7 @@ import {
 } from "../lib/jobs";
 import { useSetStatus } from "../lib/application";
 import { markDone } from "../lib/checklist";
+import { usePageTitle } from "../lib/pageTitle";
 import { useIsPremium } from "../lib/billing";
 import { PremiumLock } from "../components/PremiumLock";
 import { noticeLabel, useProfile } from "../lib/profile";
@@ -44,13 +45,13 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
   const id = `sec-${title.toLowerCase().replace(/\W+/g, "-")}`;
   return (
     <section aria-labelledby={id}>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 id={id} className="text-base font-semibold">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 id={id} className="px-1 text-xs font-normal text-ink-2">
           {title}
         </h2>
         {action}
       </div>
-      <Card className="p-4 sm:p-5">{children}</Card>
+      <Card className="p-5">{children}</Card>
     </section>
   );
 }
@@ -145,12 +146,12 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
   const premium = useIsPremium();
   const [taskId, setTaskId] = useState<string | null>(() => taskStore.get(job.job_id));
   const pct = scorePercent(job.match_score);
+  usePageTitle(`${job.title} at ${job.company}`);
 
   return (
     <>
-      <PageHeader title="Review & apply" tabTitle={`${job.title} at ${job.company}`} />
-      <div className="mx-auto max-w-6xl px-4 py-5 md:px-7 md:py-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mx-auto max-w-6xl px-4 pt-3 pb-28 md:px-7 md:pt-8 md:pb-10">
+        <div className="mb-5 flex items-center justify-between gap-3">
           {back}
           {next && (
             <Link to={`/jobs/${encodeURIComponent(next.job_id)}`} className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
@@ -164,55 +165,27 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
         </div>
         {job.status === "DISMISSED" && <HiddenNotice job={job} />}
 
-        <div className="mb-6 flex items-start gap-3 sm:gap-4">
+        <div className="mb-7 flex items-center gap-4">
           <CompanyMark name={job.company} size="lg" />
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold sm:text-xl">{job.title}</h1>
-            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-ink-2">
-              <span>{job.company}</span>
-              {job.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="size-3.5" aria-hidden />
-                  {job.location}
-                </span>
-              )}
-              {job.salary_range && (
-                <span className="flex items-center gap-1">
-                  <Wallet className="size-3.5" aria-hidden />
-                  {job.salary_range}
-                </span>
-              )}
-              <a href={job.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-medium text-accent sm:hidden">
-                View posting
-                <ExternalLink className="size-3.5" aria-hidden />
-                <span className="sr-only">(opens in a new tab)</span>
-              </a>
+            <h1 className="text-lg leading-tight font-bold sm:text-xl">{job.title}</h1>
+            <p className="mt-1 text-ink-2">{[job.company, job.location, job.salary_range].filter(Boolean).join(" · ")}</p>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <SaveButton job={job} />
+              <HideButton job={job} />
             </div>
           </div>
-          <SaveButton job={job} />
-          <HideButton job={job} />
-          <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm", "max-sm:hidden")}>
-            View posting
-            <ExternalLink className="size-3.5" aria-hidden />
-            <span className="sr-only">(opens in a new tab)</span>
-          </a>
+          <ScoreRing pct={pct} size="lg" className="max-sm:hidden" />
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr] lg:items-start">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_auto_1fr] lg:items-start">
           <div className="flex min-w-0 flex-col gap-6">
             <Section title="Why it's a match">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
-                <ScoreRing pct={pct} size="lg" />
+              <div className="flex items-start gap-4">
+                <ScoreRing pct={pct} size="md" className="sm:hidden" />
                 <div className="min-w-0 flex-1">
                   {job.match_reasons.length ? (
-                    <ul className="flex flex-col gap-1.5">
-                      {job.match_reasons.map((r) => (
-                        <li key={r} className="flex gap-2">
-                          <Check className="mt-0.5 size-4 flex-none text-ok" aria-hidden />
-                          {readableReason(r)}
-                        </li>
-                      ))}
-                    </ul>
+                    <MatchReceipt job={job} max={8} />
                   ) : (
                     <p className="text-ink-2">No details were recorded for this match.</p>
                   )}
@@ -239,12 +212,13 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
           </div>
 
           {/* On phones the panel follows the materials; on desktop it's a sticky right column. */}
-          <div className="lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <div className="lg:sticky lg:top-6 lg:col-start-2 lg:row-span-3 lg:row-start-1">
             {!premium || applyOnSiteOnly(job) ? (
               <ApplyYourself job={job} />
             ) : taskId ? (
               <Progress
                 taskId={taskId}
+                job={job}
                 onRetry={() => {
                   taskStore.set(job.job_id, null);
                   setTaskId(null);
@@ -265,7 +239,7 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
           {description.isPending ? (
             <div className="min-w-0 lg:col-start-1" role="status">
               <span className="sr-only">Loading the job description…</span>
-              <div aria-hidden className="flex animate-pulse flex-col gap-2.5 rounded-lg border border-line bg-surface p-5 motion-reduce:animate-none">
+              <div aria-hidden className="flex animate-pulse flex-col gap-2.5 rounded-lg bg-surface p-5 motion-reduce:animate-none">
                 <span className="h-3.5 w-1/3 rounded bg-subtle" />
                 <span className="h-3 w-full rounded bg-subtle" />
                 <span className="h-3 w-5/6 rounded bg-subtle" />
@@ -278,9 +252,53 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
               </div>
             )
           )}
+
+          <div className="min-w-0 lg:col-start-1">
+            <Details job={job} />
+          </div>
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Where this posting came from. Only facts we hold are shown; a row with nothing to say is
+ * left out.
+ */
+function Details({ job }: { job: Job }) {
+  const day = (iso: string | null) => {
+    const d = iso ? new Date(iso) : null;
+    return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
+  };
+  const rows: [string, ReactNode][] = [];
+  const posted = day(job.posted_date);
+  const found = day(job.created_at);
+  if (job.platform && job.platform !== "DIRECT_CALL") rows.push(["Source", job.platform]);
+  if (posted) rows.push(["Posted", posted]);
+  if (found) rows.push(["Found by JobCopilot", found]);
+  if (job.location) rows.push(["Place", job.location]);
+  if (job.salary_range) rows.push(["Pay", job.salary_range]);
+  const hasLink = /^https?:\/\//.test(job.url);
+  if (!rows.length && !hasLink) return null;
+  return (
+    <Group label="Details">
+      <dl>
+        {rows.map(([label, value]) => (
+          <div key={label} className={cx(rowClass, "min-h-12 after:left-4")}>
+            <dt className="flex-1 text-ink-2">{label}</dt>
+            <dd className="text-right font-medium">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {hasLink && (
+        <a href={job.url} target="_blank" rel="noopener noreferrer" className={cx(rowClass, "min-h-12 font-medium text-accent after:left-4 hover:bg-subtle/50")}>
+          <span className="flex-1">View the original posting</span>
+          <ExternalLink className="size-4" aria-hidden />
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+      )}
+    </Group>
   );
 }
 
@@ -319,7 +337,7 @@ function Materials({ job, tailor }: { job: Job; tailor: ReturnType<typeof useTai
             <ResumeChanges jobId={job.job_id} changes={tailor.data.resume_changes ?? []} initial={tailor.data.resume_wording ?? "ai"} />
             <div>
               <h3 className="mb-1.5 text-sm font-semibold">Cover letter</h3>
-              <div className="max-h-96 overflow-y-auto rounded-md border border-line bg-canvas px-4 py-3 leading-relaxed whitespace-pre-wrap">
+              <div className="max-h-96 overflow-y-auto rounded-md bg-subtle px-4 py-3 leading-relaxed whitespace-pre-wrap">
                 {tailor.data.cover_letter}
               </div>
               <p className="mt-1.5 text-xs text-ink-3">The letter is written fresh for each application, so it may differ slightly when it's sent.</p>
@@ -388,7 +406,7 @@ function ResumeChanges({ jobId, changes, initial }: { jobId: string; changes: Re
       </p>
       <ul className="flex flex-col gap-2.5">
         {changes.map((c, i) => (
-          <li key={i} className="rounded-md border border-line">
+          <li key={i} className="rounded-md bg-subtle">
             <p className="border-b border-line px-3 py-1.5 text-xs text-ink-3">
               {c.role} · {c.company}
             </p>
@@ -468,49 +486,59 @@ function ApplyPanel({ job, prepared, onStarted }: { job: Job; prepared: boolean;
         <p className="mt-0.5 text-ink-2">Nothing is sent until you approve it here.</p>
       </div>
 
-      <ChoiceChips
-        label="How"
-        value={mode}
-        onChange={setMode}
-        options={[
-          { value: "DRY_RUN", label: "Practice run" },
-          { value: "LIVE", label: "Submit for real" },
-        ]}
-        hint={
-          live
-            ? "We fill in the employer's form and submit it for you."
-            : "We fill in the form to check everything works, then stop. Nothing is submitted."
-        }
-      />
+      <div className="flex flex-col gap-2">
+        <Segmented
+          label="How"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "DRY_RUN", label: "Practice run" },
+            { value: "LIVE", label: "Submit for real" },
+          ]}
+        />
+        <p className="text-xs text-ink-3">
+          {live
+            ? "We fill in the employer's form and submit it for you, after these three steps."
+            : "We fill in the form to check everything works, then stop. Nothing is submitted."}
+        </p>
+      </div>
 
       {live && (
-        <div className="flex flex-col gap-2.5">
-          {!prepared && (
-            <Alert tone="warn">
-              <span className="inline-flex gap-1.5">
-                <CircleAlert className="mt-0.5 size-4 flex-none" aria-hidden />
-                Prepare your application first so you can read it.
-              </span>
-            </Alert>
-          )}
-          {consent.isPending ? null : (
+        <ol className="flex flex-col gap-4">
+          <ApprovalStep n={1} done={prepared} title="Read what will be sent">
+            {prepared ? (
+              <p className="text-ink-2">Your resume and cover letter are ready under "Your application".</p>
+            ) : (
+              <Alert tone="warn">
+                <span className="inline-flex gap-1.5">
+                  <CircleAlert className="mt-0.5 size-4 flex-none" aria-hidden />
+                  Prepare your application first so you can read it.
+                </span>
+              </Alert>
+            )}
+          </ApprovalStep>
+          <ApprovalStep n={2} done={reviewed} title="Confirm it's right">
             <CheckRow
-              checked={hasConsent}
-              disabled={setConsent.isPending}
-              onChange={(on) => setConsent.mutate(on)}
-              title="Let JobCopilot submit applications for me"
-              detail="Applies to every real submission. Uncheck it any time to turn it off."
+              checked={reviewed}
+              disabled={!prepared}
+              onChange={setReviewed}
+              title="I've read the cover letter and my details"
+              detail="They're accurate and I want to apply to this job."
             />
-          )}
-          {setConsent.error && <Alert>Couldn't save that: {setConsent.error.message}</Alert>}
-          <CheckRow
-            checked={reviewed}
-            disabled={!prepared}
-            onChange={setReviewed}
-            title="I've read the cover letter and my details"
-            detail="They're accurate and I want to apply to this job."
-          />
-        </div>
+          </ApprovalStep>
+          <ApprovalStep n={3} done={hasConsent} title="Allow JobCopilot to send it">
+            {consent.isPending ? null : (
+              <CheckRow
+                checked={hasConsent}
+                disabled={setConsent.isPending}
+                onChange={(on) => setConsent.mutate(on)}
+                title="Let JobCopilot submit applications for me"
+                detail="Applies to every real submission. Uncheck it any time to turn it off."
+              />
+            )}
+            {setConsent.error && <Alert>Couldn't save that: {setConsent.error.message}</Alert>}
+          </ApprovalStep>
+        </ol>
       )}
 
       {start.error && <Alert>{start.error.message}</Alert>}
@@ -529,12 +557,43 @@ function ApplyPanel({ job, prepared, onStarted }: { job: Job; prepared: boolean;
   );
 }
 
+/** One numbered step of approving a real submission; the number becomes a tick when done. */
+function ApprovalStep({ n, done, title, children }: { n: number; done: boolean; title: string; children: ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span
+        className={cx(
+          "mt-0.5 grid size-6 flex-none place-items-center rounded-full text-xs font-semibold",
+          done ? "bg-ok text-on-solid" : "bg-subtle text-ink-2",
+        )}
+        aria-hidden
+      >
+        {done ? <Check className="size-3.5" strokeWidth={2.5} /> : n}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <p className="font-semibold">
+          {title}
+          <span className="sr-only">{done ? " (done)" : " (to do)"}</span>
+        </p>
+        {children}
+      </div>
+    </li>
+  );
+}
+
 function SaveButton({ job }: { job: Job }) {
   const save = useSetMatchSaved();
   if (job.status !== "DISCOVERED" && job.status !== "SAVED") return null;
   const saved = job.status === "SAVED";
   return (
-    <Button size="sm" aria-pressed={saved} onClick={() => save.mutate({ jobId: job.job_id, saved: !saved })}>
+    <Button
+      size="sm"
+      aria-pressed={saved}
+      onClick={() => {
+        save.mutate({ jobId: job.job_id, saved: !saved });
+        toast(saved ? "Removed from saved" : "Saved for later");
+      }}
+    >
       {saved ? <BookmarkCheck className="size-3.5 text-accent" aria-hidden /> : <Bookmark className="size-3.5" aria-hidden />}
       {saved ? "Saved" : "Save"}
     </Button>
@@ -555,7 +614,7 @@ function HideButton({ job }: { job: Job }) {
 function HiddenNotice({ job }: { job: Job }) {
   const unhide = useSetMatchHidden();
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface px-4 py-2.5">
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-surface px-4 py-3">
       <p className="flex-1 text-ink-2">You marked this job "Not interested", so it's hidden from your matches.</p>
       <Button size="sm" loading={unhide.isPending} onClick={() => unhide.mutate({ jobId: job.job_id, hidden: false })}>
         Show it again
@@ -591,11 +650,19 @@ function ApplyYourself({ job }: { job: Job }) {
                 ? `This job is on ${site}, where you apply with your own ${site} account. Apply there, then come back and mark it applied so we can track it for you.`
                 : `Apply on ${job.company}'s site, then come back and mark it applied so we can track it for you.`}
             </p>
-            <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("primary")}>
+            <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("primary", "md", "max-md:hidden")}>
               Open the application
               <ExternalLink className="size-3.5" aria-hidden />
               <span className="sr-only">(opens in a new tab)</span>
             </a>
+            {/* Phones: the main action stays within reach, pinned above the tab bar. */}
+            <div className="fixed inset-x-0 bottom-16 z-10 border-t border-line bg-canvas px-4 py-2.5 md:hidden">
+              <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("primary", "lg", "w-full")}>
+                Open the application
+                <ExternalLink className="size-4" aria-hidden />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </div>
             {setStatus.error && <Alert>Couldn't save: {setStatus.error.message}</Alert>}
             <Button loading={setStatus.isPending} onClick={() => setStatus.mutate("SUBMITTED")}>
               I've applied
@@ -617,7 +684,7 @@ function ApplyYourself({ job }: { job: Job }) {
   );
 }
 
-function Progress({ taskId, onRetry }: { taskId: string; onRetry: () => void }) {
+function Progress({ taskId, job, onRetry }: { taskId: string; job: Job; onRetry: () => void }) {
   const task = useApplyTask(taskId);
   const phase = taskPhase(task.data);
   const [elapsed, setElapsed] = useState(0);
@@ -660,9 +727,27 @@ function Progress({ taskId, onRetry }: { taskId: string; onRetry: () => void }) 
   return (
     <Card className="flex flex-col gap-4 p-5" aria-live="polite">
       <div>
-        <h2 className={cx("text-base font-semibold", toneText[o.tone])}>{o.title}</h2>
+        <h2 className={cx("flex items-center gap-2 text-base font-semibold", toneText[o.tone])}>
+          {task.data?.result?.submitted && <Check className="size-5" strokeWidth={2.25} aria-hidden />}
+          {o.title}
+        </h2>
         <p className="mt-1 text-ink-2">{o.detail}</p>
       </div>
+      {/* The receipt: what went, and where. Only for a real submission. */}
+      {task.data?.result?.submitted && (
+        <dl className="overflow-hidden rounded-md bg-subtle">
+          {[
+            ["Sent to", job.company],
+            ["Role", job.title],
+            ["With", "Your tailored resume and cover letter"],
+          ].map(([label, value]) => (
+            <div key={label} className="flex gap-3 px-3.5 py-2.5">
+              <dt className="w-16 flex-none text-ink-2">{label}</dt>
+              <dd className="min-w-0 flex-1 font-medium">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       <div className="flex flex-col gap-2">
         <Link to="/applications" className={buttonClass(phase === "succeeded" ? "primary" : "secondary")}>
           Go to Applications

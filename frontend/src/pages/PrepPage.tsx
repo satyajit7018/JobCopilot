@@ -32,16 +32,16 @@ function Section({ title, description, action, children }: { title: string; desc
   const id = `sec-${title.toLowerCase().replace(/\W+/g, "-")}`;
   return (
     <section aria-labelledby={id}>
-      <div className="mb-3 flex items-end justify-between gap-3">
-        <div>
-          <h2 id={id} className="text-base font-semibold">
+      <div className="mb-2 flex items-end justify-between gap-3">
+        <div className="px-1">
+          <h2 id={id} className="text-xs font-normal text-ink-2">
             {title}
           </h2>
-          {description && <p className="text-ink-2">{description}</p>}
+          {description && <p className="text-xs text-ink-3">{description}</p>}
         </div>
         {action}
       </div>
-      <Card className="p-4 sm:p-5">{children}</Card>
+      <Card className="p-5">{children}</Card>
     </section>
   );
 }
@@ -66,7 +66,7 @@ const SAMPLE = [
 function PrepLocked() {
   return (
     <>
-      <PageHeader title="Prep" />
+      <PageHeader width="max-w-3xl" title="Prep" />
       <div className="mx-auto max-w-3xl px-4 py-5 md:px-7 md:py-8">
         <PremiumLock title="Get ready for every interview">
           Likely questions for each role, practice answers with feedback, and questions to ask them. Your upcoming interviews show
@@ -118,7 +118,7 @@ function PrepTools() {
 
   return (
     <>
-      <PageHeader title="Prep" subtitle={interviews.length ? `${interviews.length} upcoming ${interviews.length === 1 ? "interview" : "interviews"}` : undefined} />
+      <PageHeader width="max-w-4xl" title="Prep" subtitle={interviews.length ? `${interviews.length} upcoming ${interviews.length === 1 ? "interview" : "interviews"}` : undefined} />
       <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-5 md:px-7 md:py-8">
         <Card className="flex flex-col gap-4 p-4 sm:p-5">
           {interviews.length > 0 && (
@@ -272,7 +272,7 @@ function AnswerBox({ q, onClose }: { q: PracticeQuestion; onClose: () => void })
       </div>
 
       {result && (
-        <div className="mt-1 flex flex-col gap-4 rounded-md border border-line bg-canvas p-4" aria-live="polite">
+        <div className="mt-1 flex flex-col gap-4 rounded-md bg-subtle p-4" aria-live="polite">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="text-xl font-semibold">{result.overall_score}/100</span>
             <Badge tone={result.overall_score >= 80 ? "ok" : result.overall_score >= 60 ? "neutral" : "warn"}>{plainText(result.rating)}</Badge>

@@ -276,7 +276,7 @@ export function BackgroundEditor({
         <legend className="mb-2 font-semibold">Skills</legend>
         <ul className="mb-2 flex flex-wrap gap-1.5" aria-label="Your skills">
           {skills.map((s) => (
-            <li key={s} className="inline-flex h-7 items-center gap-1 rounded-full border border-line bg-subtle pr-1 pl-2.5 text-sm">
+            <li key={s} className="inline-flex h-7 items-center gap-1 rounded-full bg-subtle pr-1 pl-2.5 text-sm">
               {s}
               <button
                 type="button"
@@ -314,7 +314,7 @@ export function BackgroundEditor({
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-2 font-semibold">Work history</legend>
         {jobs.map((j, i) => (
-          <div key={i} className="grid gap-2 rounded-md border border-line p-3 sm:grid-cols-2">
+          <div key={i} className="grid gap-2 rounded-md bg-subtle p-3 sm:grid-cols-2">
             <Field label="Job title" name={`job-title-${i}`} value={j.title} onChange={(e) => editJob(i, { title: e.target.value })} />
             <Field label="Company" name={`job-company-${i}`} value={j.company} onChange={(e) => editJob(i, { company: e.target.value })} />
             <Field label="Started" hint="e.g. Jan 2022" name={`job-start-${i}`} value={j.start_date} onChange={(e) => editJob(i, { start_date: e.target.value })} />
@@ -333,7 +333,7 @@ export function BackgroundEditor({
       <fieldset className="flex flex-col gap-3">
         <legend className="mb-2 font-semibold">Education</legend>
         {schools.map((e, i) => (
-          <div key={i} className="grid gap-2 rounded-md border border-line p-3 sm:grid-cols-[1fr_1fr_8rem]">
+          <div key={i} className="grid gap-2 rounded-md bg-subtle p-3 sm:grid-cols-[1fr_1fr_8rem]">
             <Field label="Degree" name={`edu-degree-${i}`} value={e.degree} onChange={(ev) => editSchool(i, { degree: ev.target.value })} />
             <Field label="School" name={`edu-school-${i}`} value={e.institution} onChange={(ev) => editSchool(i, { institution: ev.target.value })} />
             <Field label="Year" name={`edu-year-${i}`} inputMode="numeric" value={e.graduation_year ?? ""} onChange={(ev) => editSchool(i, { graduation_year: ev.target.value })} />

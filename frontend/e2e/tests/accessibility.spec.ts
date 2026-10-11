@@ -24,9 +24,9 @@ test.describe("Accessibility", () => {
     await useSession(page, s);
 
     for (const [path, heading] of [
-      ["/", /Good (morning|afternoon|evening)/],
+      ["/", "Today"],
       ["/jobs", "Jobs"],
-      ["/applications", "Applications"],
+      ["/applications", "Applied"],
       ["/profile", "Profile"],
       ["/settings", "Settings"],
       ["/plans", "Plans"],

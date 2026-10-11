@@ -30,7 +30,7 @@ function LegalLayout({ title, children, effective = true }: { title: string; chi
   usePageTitle(title);
   return (
     <div className="min-h-dvh bg-canvas">
-      <header className="flex h-14 items-center gap-2 border-b border-line bg-surface px-4 md:px-7">
+      <header className="flex h-14 items-center gap-2 px-4 md:px-7">
         <Link to="/" className="flex items-center gap-2 font-bold">
           <img src="/favicon.svg" alt="" className="size-7" />
           JobCopilot
@@ -348,7 +348,7 @@ export function HelpPage() {
     <LegalLayout title="Help" effective={false}>
       <section className="flex flex-col gap-2">
         {FAQ.map(({ q, a }) => (
-          <details key={q} className="group rounded-lg border border-line bg-surface px-4 py-3 open:pb-4">
+          <details key={q} className="group rounded-lg bg-surface px-4 py-3 open:pb-4">
             <summary className="cursor-pointer list-none font-medium text-ink marker:hidden">
               <span className="mr-2 inline-block text-ink-3 transition-transform group-open:rotate-90" aria-hidden>
                 ›

@@ -17,7 +17,7 @@ export function PremiumLock({
   className?: string;
 }) {
   return (
-    <div className={cx("flex flex-col items-start gap-3 rounded-lg border border-accent/30 bg-accent-soft/40 p-4", className)}>
+    <div className={cx("flex flex-col items-start gap-3 rounded-lg bg-surface p-5", className)}>
       <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold text-accent-ink">
         <Sparkles className="size-3.5" aria-hidden />
         Premium
@@ -36,7 +36,7 @@ export function PremiumLock({
           </ul>
         )}
       </div>
-      <Link to="/plans" className={buttonClass("primary", "sm")}>
+      <Link to="/plans" className={buttonClass("secondary", "sm")}>
         See Premium
       </Link>
     </div>

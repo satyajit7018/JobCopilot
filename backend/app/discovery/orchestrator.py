@@ -8,7 +8,7 @@ and persists discovered jobs to SQLite.
 import asyncio
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -27,6 +27,9 @@ from app.discovery.instahyre import fetch_instahyre_jobs
 from app.discovery.vc_boards import VCBoardFeeders
 
 logger = logging.getLogger(__name__)
+
+# Cache "owner" for facts about the shared hourly read (not any one user's data).
+LAST_READ_OWNER = "__discovery__"
 
 
 class DiscoveryOrchestrator:
@@ -119,6 +122,14 @@ class DiscoveryOrchestrator:
             leads = await asyncio.to_thread(self._with_fingerprints, raw)
             self._leads = (time.monotonic(), leads)
             self.total_discovered += len(leads)
+            # Shown in the app as "Checked N postings X minutes ago". Kept in the shared
+            # cache because the hourly read runs in the worker, not the web process.
+            from app.core.cache import cache_manager
+            await cache_manager.set(
+                LAST_READ_OWNER, "discovery", "last_read",
+                {"postings": len(leads), "at": datetime.now(timezone.utc).isoformat()},
+                ttl_seconds=2 * 24 * 3600,
+            )
             return leads
 
     @staticmethod
@@ -199,6 +210,7 @@ class DiscoveryOrchestrator:
                     description=desc[:1500],
                     salary_range=salary,
                     seniority_level=MatchScorer.infer_job_seniority(title, desc),
+                    posted_date=lead.get("posted_date") or None,
                     match_score=match_score,
                     priority_score=priority_score,
                     match_reasons=match_reasons,

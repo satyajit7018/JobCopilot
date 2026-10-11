@@ -12,7 +12,7 @@ from app.api.auth import get_current_user, limiter
 from app.api.ws_gateway import ws_manager
 from app.core.database import db
 from app.core.models import User
-from app.discovery.orchestrator import discovery_orchestrator
+from app.discovery.orchestrator import LAST_READ_OWNER, discovery_orchestrator
 
 router = APIRouter(tags=["discovery"])
 
@@ -80,7 +80,9 @@ async def get_discovery_status(current_user: User = Depends(get_current_user)):
         "is_running": discovery_orchestrator.is_running,
         "last_run_at": discovery_orchestrator.last_run_at,
         "total_discovered": discovery_orchestrator.total_discovered,
-        "total_matched": discovery_orchestrator.total_matched
+        "total_matched": discovery_orchestrator.total_matched,
+        # The last shared read of every source: {"postings": n, "at": ISO time}, or null.
+        "last_read": await cache_manager.get(LAST_READ_OWNER, "discovery", "last_read"),
     }
     await cache_manager.set(current_user.user_id, "discovery", "status", status_data, ttl_seconds=15)
     return status_data

@@ -2,7 +2,7 @@ import { usePageTitle } from "../lib/pageTitle";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Check, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 import { Logo } from "../components/AppShell";
 import { BackgroundEditor, PreferenceFields, ResumeDrop, SourceFields } from "../components/profile";
 import { SearchProgress } from "../components/SearchProgress";
@@ -30,33 +30,28 @@ interface DiscoveryResult {
   matched_and_saved?: number;
 }
 
+/** A row of small dots and "Step 2 of 4", so the screen stays about the one question on it. */
 function Stepper({ current }: { current: number }) {
   return (
-    <ol className="mb-6 flex items-center justify-center gap-2 sm:mb-8 sm:gap-3" aria-label="Setup progress">
-      {STEPS.map((label, i) => {
-        const done = i < current;
-        const here = i === current;
-        return (
-          <li key={label} className="flex items-center gap-2 sm:gap-3" aria-current={here ? "step" : undefined}>
-            {i > 0 && <span className="h-px w-5 bg-line-strong sm:w-10" aria-hidden />}
-            <span className={cx("flex items-center gap-2 font-medium", here ? "text-ink" : done ? "text-ink-2" : "text-ink-3")}>
-              <span
-                className={cx(
-                  "grid size-6 flex-none place-items-center rounded-full border text-xs",
-                  done && "border-ok bg-ok text-on-solid",
-                  here && "border-accent bg-accent text-on-solid",
-                  !done && !here && "border-line-strong",
-                )}
-              >
-                {done ? <Check className="size-3.5" aria-label="done" /> : i + 1}
-              </span>
-              {/* Only the current step's name shows on phones. */}
-              <span className={cx(!here && "hidden sm:inline")}>{label}</span>
+    <div className="mb-5 flex items-center gap-3 px-1 sm:mb-6">
+      <ol className="flex items-center gap-1.5" aria-label="Setup progress">
+        {STEPS.map((label, i) => (
+          <li
+            key={label}
+            aria-current={i === current ? "step" : undefined}
+            className={cx("h-1.5 rounded-full transition-all duration-300 ease-calm", i === current ? "w-6 bg-accent" : i < current ? "w-1.5 bg-accent" : "w-1.5 bg-line-strong")}
+          >
+            <span className="sr-only">
+              {label}
+              {i < current ? " (done)" : i === current ? " (current)" : ""}
             </span>
           </li>
-        );
-      })}
-    </ol>
+        ))}
+      </ol>
+      <p className="text-xs text-ink-2">
+        Step {current + 1} of {STEPS.length} · {STEPS[current]}
+      </p>
+    </div>
   );
 }
 

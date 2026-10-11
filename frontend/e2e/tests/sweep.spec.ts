@@ -95,7 +95,7 @@ test("dark mode keeps text readable on every screen", async ({ page }) => {
   for (const path of ["/", "/jobs", `/jobs/${match}`, "/applications", `/applications/${applied}`, "/prep", "/profile", "/settings", "/plans", "/help"]) {
     await checkPage(page, path, "desktop");
   }
-  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(15, 16, 20)");
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(0, 0, 0)");
   expect(problems.console, "console errors").toEqual([]);
 });
 
