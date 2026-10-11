@@ -1,11 +1,11 @@
 import { useMemo, type ReactNode } from "react";
 import { Link, Navigate } from "react-router";
-import { ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, MailQuestion, PartyPopper, X } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, MailQuestion, MapPin, PartyPopper, Sparkles, Wallet, X } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Card, CompanyMark, EmptyState, SkeletonRows, buttonClass, cx, toneText } from "../components/ui";
+import { Alert, Badge, Card, CompanyMark, EmptyState, ScoreRing, SkeletonRows, buttonClass, cx, lift } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { buildChecklist, markDone, useChecklistFlags } from "../lib/checklist";
-import { isMatch, isNewSince, isTracked, matchSummary, readLastVisit, scorePercent, scoreTone, useVisibleJobs, type Job } from "../lib/jobs";
+import { isMatch, isNewSince, isTracked, matchSummary, readLastVisit, readableReason, scorePercent, useVisibleJobs, type Job } from "../lib/jobs";
 import { needsSetup as profileNeedsSetup, setupLater, useProfile } from "../lib/profile";
 import { SetupReminder } from "./SetupPage";
 
@@ -128,6 +128,15 @@ export function HomePage() {
     ];
   }, [data]);
 
+  const top = useMemo(
+    () =>
+      (data ?? [])
+        .filter(isMatch)
+        .sort((a, b) => b.match_score - a.match_score)
+        .slice(0, 5),
+    [data],
+  );
+
   // First run: no resume on file yet. Send the user to setup unless they postponed it.
   const needsSetup = profile.isSuccess && profileNeedsSetup(profile.data);
   if (needsSetup && !setupLater.get()) return <Navigate to="/setup" replace />;
@@ -135,7 +144,7 @@ export function HomePage() {
   return (
     <>
       <PageHeader title={firstName ? `${greeting(now)}, ${firstName}` : greeting(now)} tabTitle="Home" />
-      <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-5 md:px-7 md:py-8">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-5 md:px-7 md:py-8">
         {isPending ? (
           <>
             <SkeletonRows rows={2} avatar={false} label="Loading your dashboard" />
@@ -149,50 +158,58 @@ export function HomePage() {
         ) : (
           <>
             <GettingStarted jobs={data ?? []} />
-            <section aria-labelledby="today">
-              <h2 id="today" className="mb-3 text-base font-semibold">
-                Today
-              </h2>
-              <Card>
-                {todos.length === 0 ? (
-                  <EmptyState icon={<PartyPopper className="size-5" />} title="You're all caught up">
-                    Nothing needs you right now. New matches and replies will show up here.
-                  </EmptyState>
-                ) : (
-                  <ul>
-                    {todos.map((t) => (
-                      <li key={t.key} className="flex items-center gap-3 border-b border-line px-4 py-3.5 last:border-b-0 sm:px-5">
-                        <span className={cx("size-2 flex-none rounded-full", t.dot)} aria-hidden />
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold">{t.title}</p>
-                          {t.detail && <p className="truncate text-ink-2">{t.detail}</p>}
-                        </div>
-                        <Link to={t.to} className={buttonClass("secondary", "sm")}>
-                          {t.cta}
-                          <ArrowRight className="size-3.5" aria-hidden />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Card>
-            </section>
-
-            <TopMatches jobs={data ?? []} />
-
-            <section aria-labelledby="pipeline">
-              <h2 id="pipeline" className="mb-3 text-base font-semibold">
-                Your search
-              </h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {counts.map((c) => (
-                  <Link key={c.label} to={c.to} className="rounded-lg border border-line bg-surface p-4 shadow-card hover:border-line-strong">
-                    <span className="block text-xl font-semibold">{c.value}</span>
-                    <span className="text-ink-2">{c.label}</span>
-                  </Link>
-                ))}
+            {/* Wide screens: matches on the left, what needs you and your numbers on the right.
+                Phones: one column, in the order the `order-*` classes give. */}
+            <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start">
+              <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
+                {top[0] && <BestMatch job={top[0]} />}
+                <TopMatches jobs={top.slice(1)} />
               </div>
-            </section>
+              <div className="contents lg:flex lg:flex-col lg:gap-6">
+                <section aria-labelledby="today" className="order-2">
+                  <h2 id="today" className="mb-3 font-display text-base font-semibold">
+                    Today
+                  </h2>
+                  <Card>
+                    {todos.length === 0 ? (
+                      <EmptyState icon={<PartyPopper className="size-5" />} title="You're all caught up">
+                        Nothing needs you right now. New matches and replies will show up here.
+                      </EmptyState>
+                    ) : (
+                      <ul>
+                        {todos.map((t) => (
+                          <li key={t.key} className="flex items-center gap-3 border-b border-line px-4 py-3.5 last:border-b-0">
+                            <span className={cx("size-2 flex-none rounded-full", t.dot)} aria-hidden />
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold">{t.title}</p>
+                              {t.detail && <p className="truncate text-ink-2">{t.detail}</p>}
+                            </div>
+                            <Link to={t.to} className={buttonClass("secondary", "sm")}>
+                              {t.cta}
+                              <ArrowRight className="size-3.5" aria-hidden />
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Card>
+                </section>
+
+                <section aria-labelledby="pipeline" className="order-4">
+                  <h2 id="pipeline" className="mb-3 font-display text-base font-semibold">
+                    Your search
+                  </h2>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
+                    {counts.map((c) => (
+                      <Link key={c.label} to={c.to} className={cx("rounded-lg border border-line bg-surface p-4 shadow-card", lift)}>
+                        <span className="block font-display text-2xl font-semibold">{c.value}</span>
+                        <span className="text-ink-2">{c.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -200,36 +217,101 @@ export function HomePage() {
   );
 }
 
-/** The best few new matches, so Home answers "what should I look at?" without a click. */
-function TopMatches({ jobs }: { jobs: Job[] }) {
-  const top = useMemo(
-    () =>
-      jobs
-        .filter(isMatch)
-        .sort((a, b) => b.match_score - a.match_score)
-        .slice(0, 3),
-    [jobs],
+/** The single best match, big enough to act on straight from Home. */
+function BestMatch({ job }: { job: Job }) {
+  const pct = scorePercent(job.match_score);
+  const reasons = job.match_reasons.filter((r) => r.trim()).slice(0, 3);
+  const missing = job.missing_skills.filter((s) => s.trim()).slice(0, 4);
+  return (
+    <section aria-labelledby="best-match" className="order-1">
+      <div className="relative overflow-hidden rounded-lg border border-accent/25 bg-linear-to-br from-accent-soft/70 via-surface via-45% to-spark-soft/70 p-5 shadow-card sm:p-6">
+        <p id="best-match" className="mb-4 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-spark-ink uppercase">
+          <Sparkles className="size-3.5" aria-hidden />
+          Your best match right now
+        </p>
+        <div className="flex items-start gap-4">
+          <CompanyMark name={job.company} size="lg" />
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-lg leading-tight font-semibold sm:text-xl">{job.title}</h2>
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-ink-2">
+              <span className="font-medium text-ink">{job.company}</span>
+              {job.location && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="size-3.5" aria-hidden />
+                  {job.location}
+                </span>
+              )}
+              {job.salary_range && (
+                <span className="flex items-center gap-1">
+                  <Wallet className="size-3.5" aria-hidden />
+                  {job.salary_range}
+                </span>
+              )}
+            </div>
+          </div>
+          <ScoreRing pct={pct} size="lg" className="max-sm:hidden" />
+        </div>
+        {(reasons.length > 0 || missing.length > 0) && (
+          <div className="mt-4 flex flex-col gap-2">
+            {reasons.length > 0 && (
+              <ul className="flex flex-col gap-1.5">
+                {reasons.map((r) => (
+                  <li key={r} className="flex gap-2">
+                    <Check className="mt-0.5 size-4 flex-none text-ok" aria-hidden />
+                    {readableReason(r)}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {missing.length > 0 && (
+              <p className="flex flex-wrap items-center gap-1.5 text-ink-2">
+                Not on your resume:
+                {missing.map((m) => (
+                  <Badge key={m} tone="warn">
+                    {m}
+                  </Badge>
+                ))}
+              </p>
+            )}
+          </div>
+        )}
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <ScoreRing pct={pct} size="md" className="sm:hidden" />
+          <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className={buttonClass("primary", "lg")}>
+            Review this job
+            <ArrowRight className="size-4" aria-hidden />
+          </Link>
+          <Link to="/jobs" className={buttonClass("ghost", "lg", "max-sm:hidden")}>
+            See all matches
+          </Link>
+        </div>
+      </div>
+    </section>
   );
-  if (!top.length) return null;
+}
+
+/** The next few matches, so Home answers "what else should I look at?" without a click. */
+function TopMatches({ jobs }: { jobs: Job[] }) {
+  if (!jobs.length) return null;
 
   return (
-    <section aria-labelledby="top-matches">
+    <section aria-labelledby="top-matches" className="order-3">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 id="top-matches" className="text-base font-semibold">
-          Top matches
+        <h2 id="top-matches" className="font-display text-base font-semibold">
+          More top matches
         </h2>
         <Link to="/jobs" className="text-sm font-medium text-accent hover:underline">
           All jobs
         </Link>
       </div>
-      <Card>
+      <Card className="overflow-hidden">
         <ul>
-          {top.map((j) => {
+          {jobs.map((j) => {
             const pct = scorePercent(j.match_score);
             const why = matchSummary(j);
             return (
-              <li key={j.job_id} className="flex items-center gap-3 border-b border-line px-4 py-3.5 last:border-b-0 sm:px-5">
-                <CompanyMark name={j.company} size="sm" />
+              <li key={j.job_id} className="flex items-center gap-3 border-b border-line px-4 py-3.5 transition-colors last:border-b-0 hover:bg-subtle/60 sm:px-5">
+                <CompanyMark name={j.company} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">{j.title}</p>
                   <p className="truncate text-ink-2">
@@ -238,9 +320,7 @@ function TopMatches({ jobs }: { jobs: Job[] }) {
                   </p>
                   {why && <p className="truncate text-xs text-ink-3">{why}</p>}
                 </div>
-                <span className={cx("w-10 text-right text-base font-bold", toneText[scoreTone(pct)])} aria-label={`${pct}% match`}>
-                  {pct}
-                </span>
+                <ScoreRing pct={pct} size="sm" />
                 <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className={buttonClass("secondary", "sm")}>
                   Review
                   <span className="sr-only">
@@ -264,46 +344,35 @@ function GettingStarted({ jobs }: { jobs: Job[] }) {
   const done = steps.filter((s) => s.done).length;
   if (flags.dismissed || done === steps.length) return null;
 
+  const next = steps.find((s) => !s.done);
+  if (!next) return null;
+
   return (
-    <section aria-labelledby="getting-started">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 id="getting-started" className="text-base font-semibold">
-          Getting started <span className="font-normal text-ink-3">· {done} of {steps.length} done</span>
-        </h2>
-        <button type="button" onClick={() => markDone("dismissed")} className="flex items-center gap-1 text-sm text-ink-3 hover:text-ink">
-          <X className="size-3.5" aria-hidden />
-          Hide
-        </button>
-      </div>
-      <Card>
-        <div className="h-1 overflow-hidden rounded-t-lg bg-subtle" aria-hidden>
-          <div className="h-full bg-accent" style={{ width: `${(done / steps.length) * 100}%` }} />
-        </div>
-        <ol>
-          {steps.filter((s) => !s.done).map((s) => (
-            <li key={s.key} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0 sm:px-5">
-              <span
-                className={cx(
-                  "grid size-5 flex-none place-items-center rounded-full border",
-                  s.done ? "border-ok bg-ok text-on-solid" : "border-line-strong",
-                )}
-                aria-hidden
-              >
-                {s.done && <Check className="size-3" />}
-              </span>
-              <span className={cx("flex-1", s.done && "text-ink-3 line-through")}>
-                {s.title}
-                <span className="sr-only">{s.done ? " (done)" : " (to do)"}</span>
-              </span>
-              {!s.done && (
-                <Link to={s.to} className={buttonClass("secondary", "sm")}>
-                  {s.cta}
-                </Link>
-              )}
-            </li>
-          ))}
-        </ol>
-      </Card>
+    <section
+      aria-labelledby="getting-started"
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-card"
+    >
+      <h2 id="getting-started" className="flex items-center gap-2.5 font-semibold max-sm:basis-full">
+        Getting started
+        <span className="h-1.5 w-20 overflow-hidden rounded-full bg-subtle" aria-hidden>
+          <span className="block h-full rounded-full bg-accent" style={{ width: `${(done / steps.length) * 100}%` }} />
+        </span>
+        <span className="font-normal text-ink-3">
+          {done} of {steps.length} done
+        </span>
+      </h2>
+      <p className="flex min-w-0 flex-1 items-center gap-2 text-ink-2">
+        <span className="max-sm:sr-only">Next:</span>
+        <span className="truncate">{next.title}</span>
+      </p>
+      <Link to={next.to} className={buttonClass("secondary", "sm")}>
+        {next.cta}
+        <span className="sr-only">: {next.title}</span>
+      </Link>
+      <button type="button" onClick={() => markDone("dismissed")} className="flex items-center gap-1 text-sm text-ink-3 hover:text-ink">
+        <X className="size-3.5" aria-hidden />
+        Hide
+      </button>
     </section>
   );
 }

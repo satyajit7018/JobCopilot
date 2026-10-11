@@ -8,13 +8,13 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from app.api.auth import get_current_user, limiter
 from app.api.ws_gateway import ws_manager
 from app.core.cover_letter import CoverLetterGenerator
-from app.core import match_feedback
+from app.core import company_logo, match_feedback
 from app.core.database import db
 from app.core.plans import require_premium
 from app.core.models import ApplicationStatus, CandidateProfile, JobListing, User
@@ -63,6 +63,17 @@ class UpdateJobStatusRequest(BaseModel):
 class UpdateInterviewDateRequest(BaseModel):
     # ISO 8601 date-time, or null to clear it.
     interview_date: Optional[str] = None
+
+
+@router.get("/company-logo")
+@limiter.limit("240/minute")
+async def company_logo_image(request: Request, name: str = ""):
+    """A company's logo for the job lists. Open (image tags can't send a sign-in token) and
+    rate-limited; "no logo" is an empty 204 so the app falls back to the initial quietly."""
+    data = await company_logo.get_logo(name.strip())
+    if not data:
+        return Response(status_code=204, headers={"Cache-Control": "public, max-age=86400"})
+    return Response(content=data, media_type=company_logo.media_type(data), headers={"Cache-Control": "public, max-age=604800"})
 
 
 @router.get("/jobs")

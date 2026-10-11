@@ -29,6 +29,8 @@ export default async function globalSetup() {
       JOBCOPILOT_DATA_DIR: dataDir,
       // Non-production: /auth/google-sso accepts a bare email (the dev sign-in path the helpers use).
       ENV: "development",
+      // The suite never depends on the internet: company tiles show their initial.
+      COMPANY_LOGOS_ENABLED: "false",
       INSTAHYRE_ENABLED: "false",
       PYTHONUNBUFFERED: "1",
     },

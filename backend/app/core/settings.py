@@ -127,6 +127,8 @@ class Settings(BaseSettings):
 
     # Observability
     SENTRY_DSN: Optional[str] = None
+    # Company logos are looked up by the server (see core/company_logo.py). Off = initials only.
+    COMPANY_LOGOS_ENABLED: bool = True
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
