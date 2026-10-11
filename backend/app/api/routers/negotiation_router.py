@@ -90,7 +90,6 @@ async def model_equity(
     }
 
 
-@router.post("/salary/compare-offers")
 @router.post("/negotiation/compare-offers")
 async def compare_offers_endpoint(
     payload: MultiOfferCompareRequest,
@@ -101,7 +100,6 @@ async def compare_offers_endpoint(
     return SalaryNegotiationEngine.compare_multiple_offers(payload.offers)
 
 
-@router.post("/salary/counter-script")
 @router.post("/negotiation/advanced-counter")
 async def generate_advanced_counter_script_endpoint(
     payload: AdvancedCounterOfferRequest,

@@ -5,7 +5,6 @@ Modular FastAPI APIRouters decomposing the monolithic endpoints.py into domain-d
 
 from app.api.routers.account_router import router as account_router
 from app.api.routers.admin_router import router as admin_router
-from app.api.routers.analytics_router import router as analytics_router
 from app.api.routers.auth_router import router as auth_router
 from app.api.routers.backup_router import router as backup_router
 from app.api.routers.billing_router import router as billing_router
@@ -16,7 +15,6 @@ from app.api.routers.email_router import router as email_router
 from app.api.routers.interview_router import router as interview_router
 from app.api.routers.jobs_router import router as jobs_router
 from app.api.routers.negotiation_router import router as negotiation_router
-from app.api.routers.org_router import router as org_router
 from app.api.routers.profile_router import router as profile_router
 from app.api.routers.support_router import router as support_router
 from app.api.routers.vault_router import router as vault_router
@@ -29,13 +27,11 @@ all_routers = [
     jobs_router,
     bot_router,
     email_router,
-    analytics_router,
     interview_router,
     negotiation_router,
     billing_router,
     backup_router,
     admin_router,
-    org_router,
     account_router,
     compliance_router,
     support_router,
@@ -49,13 +45,11 @@ __all__ = [
     "jobs_router",
     "bot_router",
     "email_router",
-    "analytics_router",
     "interview_router",
     "negotiation_router",
     "billing_router",
     "backup_router",
     "admin_router",
-    "org_router",
     "account_router",
     "compliance_router",
     "support_router",

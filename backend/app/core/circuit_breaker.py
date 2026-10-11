@@ -1,7 +1,7 @@
 """
 JobCopilot - Distributed Circuit Breaker Pattern
 Protects system stability against cascading failures and outbound latency spikes.
-Fails fast when external dependencies (ATS boards, LLMs, Stripe, Email) suffer outages.
+Fails fast when external dependencies (ATS boards, LLMs, Email) suffer outages.
 """
 
 import asyncio
@@ -151,10 +151,9 @@ class CircuitBreaker:
 # =========================================================================
 ats_api_breaker = CircuitBreaker("ats_api", failure_threshold=5, recovery_timeout=30.0)
 llm_api_breaker = CircuitBreaker("llm_api", failure_threshold=3, recovery_timeout=20.0)
-stripe_api_breaker = CircuitBreaker("stripe_api", failure_threshold=4, recovery_timeout=30.0)
 email_api_breaker = CircuitBreaker("email_api", failure_threshold=5, recovery_timeout=30.0)
 
-_ALL_BREAKERS = [ats_api_breaker, llm_api_breaker, stripe_api_breaker, email_api_breaker]
+_ALL_BREAKERS = [ats_api_breaker, llm_api_breaker, email_api_breaker]
 
 
 def get_all_circuit_statuses() -> Dict[str, Dict[str, Any]]:

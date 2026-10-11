@@ -68,12 +68,6 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     USE_CELERY: bool = False
 
-    # Stripe Billing
-    STRIPE_SECRET_KEY: Optional[str] = None
-    STRIPE_WEBHOOK_SECRET: Optional[str] = None
-    STRIPE_PRO_PRICE_ID: str = "price_pro_monthly"
-    STRIPE_ELITE_PRICE_ID: str = "price_elite_monthly"
-
     # Razorpay (Premium subscriptions). Create two monthly plans in the dashboard:
     # one in INR for users in India, one in USD for everyone else.
     RAZORPAY_KEY_ID: Optional[str] = None
@@ -192,12 +186,10 @@ class Settings(BaseSettings):
         if self.USE_CELERY and "localhost" in self.REDIS_URL:
             errors.append("USE_CELERY=true requires a non-localhost REDIS_URL in production.")
 
-        # Stripe: only enforced once billing is wired (a secret key is present),
-        # in which case the webhook secret must accompany it.
+        # Razorpay: only enforced once billing is wired (a key id is present),
+        # in which case both secrets must accompany it.
         if self.RAZORPAY_KEY_ID and not (self.RAZORPAY_KEY_SECRET and self.RAZORPAY_WEBHOOK_SECRET):
             errors.append("RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET are required when RAZORPAY_KEY_ID is set.")
-        if self.STRIPE_SECRET_KEY and not self.STRIPE_WEBHOOK_SECRET:
-            errors.append("STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set.")
 
         if errors:
             raise ValueError(

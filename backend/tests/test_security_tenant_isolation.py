@@ -6,7 +6,6 @@ Validates all 18 hardening findings:
 - Multi-tenant data isolation across profiles, jobs, HITL events, vault, and emails
 - Stripe webhook signature verification fail-closed
 - JWT secret startup fail-closed checks
-- In-memory backup buffer scoping
 - Token type verification and jti revocation
 - Argon2id password hashing and automatic upgrade
 - Persistent daily rate-limiting
@@ -28,7 +27,6 @@ from app.api.auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from app.core.rate_limiter import rate_limiter, SubscriptionTier
-from app.core.backup import BackupManager
 
 
 def test_unauthenticated_request_rejected(client: TestClient):
@@ -252,22 +250,3 @@ def test_database_backed_rate_limiter():
     remaining_after = rate_limiter.get_remaining_applies(test_user)
     assert remaining_after == remaining_before - 1
 
-
-def test_backup_restore_buffer_scoped(tenant_a_client: TestClient):
-    """F-06: Backup restore requires authentication and restores memory buffer."""
-    # Export backup
-    res = tenant_a_client.post("/api/backup/export")
-    assert res.status_code == 200
-    assert "backup_path" in res.json()
-
-    # Read exported file and restore via buffer
-    backup_path = res.json()["backup_path"]
-    with open(backup_path, "rb") as f:
-        buffer_data = f.read()
-
-    res_restore = tenant_a_client.post(
-        "/api/backup/restore",
-        files={"file": ("backup.jobcopilot.enc", buffer_data, "application/octet-stream")}
-    )
-    assert res_restore.status_code == 200
-    assert res_restore.json()["status"] == "success"

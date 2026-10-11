@@ -6,7 +6,7 @@ direct call logging, held job inspection, and referral/nudge outreach generation
 
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
@@ -17,7 +17,7 @@ from app.core.cover_letter import CoverLetterGenerator
 from app.core import company_info, company_logo, match_feedback
 from app.core.database import db
 from app.core.plans import require_premium
-from app.core.models import ApplicationStatus, CandidateProfile, JobListing, User
+from app.core.models import ApplicationStatus, JobListing, User
 from app.core.outreach_generator import OutreachGenerator
 from app.core.resume_tailor import ResumeTailor
 
@@ -39,11 +39,6 @@ class RecruiterNudgeRequest(BaseModel):
     recruiter_name: str = "Recruiter"
     days_elapsed: int = 5
     recent_highlight: Optional[str] = None
-
-
-class MultiRoleTailorRequest(BaseModel):
-    roles: List[str]
-    profile_id: Optional[str] = None
 
 
 class LogDirectCallRequest(BaseModel):
@@ -324,42 +319,6 @@ async def set_resume_wording(job_id: str, payload: ResumeWordingRequest, current
     return {"status": "success", "resume_wording": payload.choice}
 
 
-@router.post("/resumes/tailor-multi")
-async def tailor_resumes_for_multiple_roles(
-    payload: MultiRoleTailorRequest,
-    current_user: User = Depends(require_premium("ai_writing"))
-):
-    """Compiles ATS-tailored resume summaries for multiple target roles."""
-    profile = db.get_profile(user_id=current_user.user_id, profile_id=payload.profile_id)
-    if not profile:
-        profile = CandidateProfile(
-            id=current_user.user_id,
-            user_id=current_user.user_id,
-            full_name=current_user.full_name or "Candidate",
-            email=current_user.email,
-            phone="+1-000-000-0000",
-            location="Remote",
-            skills=["Python", "FastAPI", "React", "PostgreSQL", "Docker"]
-        )
-
-    results = {}
-    for role in payload.roles:
-        res = ResumeTailor.tailor_for_job(profile, role, f"Seeking a {role} experienced in scalable systems.")
-        results[role] = {
-            "role": role,
-            "tailored_skills": res.get("tailored_skills", profile.skills),
-            "reordered_projects": res.get("reordered_projects", [p.name for p in profile.projects]),
-            "match_strength": "95%",
-            "recommended_bullets": [
-                f"Engineered high-throughput microservices for {role} role using {profile.skills[0] if profile.skills else 'Python'}.",
-                "Optimized database latency by 45% and established 99.9% uptime SLAs.",
-                "Implemented automated CI/CD pipelines with comprehensive unit and integration testing."
-            ]
-        }
-
-    return {"status": "success", "resumes": results}
-
-
 @router.post("/jobs/log-call")
 async def log_direct_recruiter_call(
     payload: LogDirectCallRequest,
@@ -405,26 +364,6 @@ async def log_direct_recruiter_call(
         "role_title": payload.role_title,
         "current_status": status_enum.value
     }
-
-
-@router.get("/jobs/held")
-async def get_held_applications(current_user: User = Depends(get_current_user)):
-    """Retrieves all applications currently paused on novel questions for authenticated tenant."""
-    pending_events = db.get_pending_hitl_events(user_id=current_user.user_id)
-    held_jobs = []
-    for evt in pending_events:
-        held_jobs.append({
-            "event_id": evt.event_id,
-            "job_id": evt.job_id,
-            "company": evt.company,
-            "role_title": evt.role_title,
-            "question_text": evt.question_text,
-            "input_type": evt.input_type,
-            "ai_suggested_draft": evt.ai_suggested_draft,
-            "created_at": evt.created_at,
-            "status": "ON_HOLD"
-        })
-    return {"status": "success", "count": len(held_jobs), "held_applications": held_jobs}
 
 
 # Registered after /jobs/held so that path isn't read as a job id.

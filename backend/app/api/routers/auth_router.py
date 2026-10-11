@@ -7,14 +7,12 @@ import os
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.api.auth import (
     client_ip,
     complete_login,
-    enum_value,
-    get_current_user,
     hash_password,
     limiter,
 )
@@ -126,16 +124,3 @@ async def google_sso_auth(request: Request, payload: GoogleSSORequest):
 
     return complete_login(user, client_ip(request), request.headers.get("User-Agent"), "auth.login.google_sso")
 
-
-@router.get("/auth/status")
-async def auth_status(current_user: User = Depends(get_current_user)):
-    """Returns local vault encryption status and user authentication state."""
-    return {
-        "status": "success",
-        "is_authenticated": True,
-        "encryption": "Argon2id + AES-256-GCM",
-        "keychain_storage": "OS_KEYCHAIN_SECURE",
-        "user_id": current_user.user_id,
-        "email": current_user.email,
-        "role": enum_value(current_user.role)
-    }

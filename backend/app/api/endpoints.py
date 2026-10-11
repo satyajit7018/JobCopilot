@@ -13,7 +13,6 @@ from app.api.routers import (
     account_router,
     admin_router,
     all_routers,
-    analytics_router,
     auth_router,
     backup_router,
     billing_router,
@@ -24,15 +23,12 @@ from app.api.routers import (
     interview_router,
     jobs_router,
     negotiation_router,
-    org_router,
     profile_router,
     vault_router,
 )
 
 # Re-export request models for backwards compatibility
 from app.api.routers.auth_router import GoogleSSORequest
-from app.api.routers.backup_router import RestoreBackupPayload
-from app.api.routers.billing_router import CheckoutRequest, CustomerPortalRequest
 from app.api.routers.bot_router import HITLResolveRequest, ResolveHeldApplicationRequest
 from app.api.routers.email_router import InboundEmailPayload
 from app.api.routers.interview_router import (
@@ -43,7 +39,6 @@ from app.api.routers.interview_router import (
 from app.api.routers.jobs_router import (
     AlumniReferralRequest,
     LogDirectCallRequest,
-    MultiRoleTailorRequest,
     RecruiterNudgeRequest,
     UpdateJobStatusRequest,
 )
@@ -55,7 +50,7 @@ from app.api.routers.negotiation_router import (
     OfferEvalRequest,
 )
 from app.api.routers.profile_router import QuestionnaireSubmitRequest
-from app.api.routers.vault_router import VaultLearnRequest, VaultSemanticSearchRequest, VaultTestMatchRequest
+from app.api.routers.vault_router import VaultLearnRequest
 from app.api.ws_gateway import MultiTenantWebSocketGateway, ws_manager
 from app.core.models import (
     AdminAuditLog,
@@ -115,11 +110,8 @@ __all__ = [
     "GoogleSSORequest",
     "QuestionnaireSubmitRequest",
     "VaultLearnRequest",
-    "VaultTestMatchRequest",
-    "VaultSemanticSearchRequest",
     "AlumniReferralRequest",
     "RecruiterNudgeRequest",
-    "MultiRoleTailorRequest",
     "LogDirectCallRequest",
     "HITLResolveRequest",
     "ResolveHeldApplicationRequest",
@@ -132,9 +124,6 @@ __all__ = [
     "MultiOfferCompareRequest",
     "AdvancedCounterOfferRequest",
     "CounterOfferRequest",
-    "CheckoutRequest",
-    "CustomerPortalRequest",
-    "RestoreBackupPayload",
     "ApplyLedgerEntry",
     "ApplyLedgerStatus",
     "Organization",
@@ -148,13 +137,11 @@ __all__ = [
     "jobs_router",
     "bot_router",
     "email_router",
-    "analytics_router",
     "interview_router",
     "negotiation_router",
     "billing_router",
     "backup_router",
     "admin_router",
-    "org_router",
     "account_router",
     "compliance_router",
     "ConsentType",

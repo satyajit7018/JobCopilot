@@ -43,8 +43,6 @@ from app.core.models import (
     MFASetupResponse,
     MFAVerifyRequest,
     RefreshTokenRequest,
-    RequestPasswordResetRequest,
-    ResetPasswordRequest,
     SecurityLogListResponse,
     SessionListResponse,
     TokenResponse,
@@ -53,7 +51,6 @@ from app.core.models import (
     UserRegisterRequest,
     UserResponse,
     UserRole,
-    VerifyEmailRequest,
 )
 from app.core.security_logger import security_logger
 from app.core.session_manager import session_manager
@@ -721,77 +718,6 @@ async def refresh_token(request: Request, payload: RefreshTokenRequest):
         email=user.email,
         role=role_str
     )
-
-
-@router.post("/verify-email")
-async def verify_email(req: VerifyEmailRequest):
-    """Verifies user email from a signed verification token."""
-    payload = decode_jwt_token(req.token)
-    if payload.get("type") != "verify_email":
-        raise HTTPException(status_code=400, detail="Invalid verification token type.")
-
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=400, detail="Invalid token subject.")
-
-    db.set_email_verified(user_id, True)
-    return {"status": "success", "message": "Email address verified successfully!"}
-
-
-@router.post("/request-reset")
-@limiter.limit("3/minute")
-async def request_password_reset(request: Request, req: RequestPasswordResetRequest):
-    """Initiates a secure password reset workflow without user enumeration."""
-    clean_email = req.email.lower().strip()
-    user = db.get_user_by_email(clean_email)
-    if user:
-        reset_token = create_jwt_token(
-            {"sub": user.user_id, "email": clean_email, "type": "reset_password"},
-            timedelta(minutes=15)
-        )
-        mailer.send_password_reset_email(clean_email, reset_token)
-
-    return {
-        "status": "success",
-        "message": "If an account with this email exists, a password reset link has been sent."
-    }
-
-
-@router.post("/reset-password")
-@limiter.limit("5/minute")
-async def reset_password(request: Request, req: ResetPasswordRequest):
-    """Completes password reset using a single-use signed token."""
-    if len(req.new_password) < settings.PASSWORD_MIN_LENGTH:
-        raise HTTPException(
-            status_code=400,
-            detail=f"New password must be at least {settings.PASSWORD_MIN_LENGTH} characters."
-        )
-
-    payload = decode_jwt_token(req.token)
-    if payload.get("type") != "reset_password":
-        raise HTTPException(status_code=400, detail="Invalid reset token type.")
-
-    jti = payload.get("jti")
-    if jti and db.is_token_revoked(jti):
-        raise HTTPException(status_code=401, detail="Reset token has already been used or revoked.")
-
-    user_id = payload.get("sub")
-    user = db.get_user_by_id(user_id) if user_id else None
-    if not user:
-        raise HTTPException(status_code=404, detail="User account not found.")
-
-    # Update password with Argon2id hash
-    new_hash = hash_password(req.new_password)
-    db.update_user_password(user.user_id, new_hash)
-
-    # Revoke single-use reset token
-    if jti:
-        db.revoke_token(jti, user.user_id, str(payload.get("exp", "")))
-
-    # A password reset must end every existing session (audit P1-11).
-    session_manager.revoke_all_sessions(user.user_id)
-
-    return {"status": "success", "message": "Password reset successfully. You can now log in."}
 
 
 @router.post("/logout")
