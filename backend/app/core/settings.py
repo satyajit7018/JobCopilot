@@ -119,9 +119,6 @@ class Settings(BaseSettings):
     LLM_DAILY_TOKEN_LIMIT_PRO: int = 500_000
     LLM_DAILY_TOKEN_LIMIT_ELITE: int = 2_000_000
 
-    # Stealth Bot & Proxy
-    PROXY_PASSWORD: str = "secret"
-
     # Read Instahyre's public job search during discovery. Off = career pages and startup boards only.
     INSTAHYRE_ENABLED: bool = True
 

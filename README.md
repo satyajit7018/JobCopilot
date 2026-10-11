@@ -153,7 +153,6 @@ flowchart TD
 - **Provider-Agnostic LLM Engine (`llm_client.py`)**: Seamless support for OpenAI, Anthropic Claude, and 100% offline rule-based deterministic fallback.
 - **Inbound Email Webhook Radar (`inbound_provider.py`)**: Subaddress tenant attribution (`radar+usr_123@jobcopilot.app`) with HMAC-SHA256 signature verification.
 - **Object Storage (`object_storage.py`)**: Unified file driver for Local FileSystem, AWS S3, and Cloudflare R2 with pre-signed secure download URLs.
-- **Residential Proxy Rotator (`proxy_rotator.py`)**: Multi-provider residential IP rotation supporting Bright Data, Oxylabs, and custom pools.
 - **Celery + Redis Task Engine (`celery_app.py`)**: Distributed asynchronous background task queues with prioritized routing and local in-memory fallback.
 - **Multi-Tenant WebSocket Gateway (`ws_gateway.py`)**: Real-time event streams and HITL notifications segmented per `user_id`.
 

@@ -15,7 +15,6 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.api.auth import create_jwt_token
-from app.core.migrations import migration_runner
 from app.core.rate_limiter import SubscriptionTier, rate_limiter
 from app.main import app
 
@@ -113,9 +112,3 @@ class TestSaaSPhase3:
             res = await deliver(deleted)
             assert res.status_code == 200 and res.json()["active_tier"] == "FREE"
             assert rate_limiter.get_user_tier(user_id) == SubscriptionTier.FREE
-
-    def test_schema_migrations_runner(self):
-        """Verifies atomic schema migration execution."""
-        count = migration_runner.apply_all()
-        # Should apply migrations without error
-        assert count >= 0
