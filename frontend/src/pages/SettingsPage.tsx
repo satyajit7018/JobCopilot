@@ -26,11 +26,11 @@ function Section({ title, description, children, tone }: { title: string; descri
   const id = `sec-${title.toLowerCase().replace(/\W+/g, "-")}`;
   return (
     <section aria-labelledby={id}>
-      <h2 id={id} className={tone === "danger" ? "text-base font-semibold text-danger" : "text-base font-semibold"}>
+      <h2 id={id} className={tone === "danger" ? "px-1 text-xs font-normal text-danger" : "px-1 text-xs font-normal text-ink-2"}>
         {title}
       </h2>
-      {description && <p className="text-ink-2">{description}</p>}
-      <Card className={tone === "danger" ? "mt-3 border-danger/40 p-4 sm:p-5" : "mt-3 p-4 sm:p-5"}>{children}</Card>
+      <Card className="mt-2 p-5">{children}</Card>
+      {description && <p className="mt-2 px-1 text-xs text-ink-3">{description}</p>}
     </section>
   );
 }
@@ -210,7 +210,7 @@ function MfaEnroll({ setup, onDone, onCancel }: { setup: MfaSetup; onDone: () =>
         <li>
           <p className="font-medium">1. Scan this with your authenticator app</p>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-            {qr ? <img src={qr} alt="QR code for your authenticator app" className="size-40 rounded-md border border-line" /> : <Spinner label="Making the code" />}
+            {qr ? <img src={qr} alt="QR code for your authenticator app" className="size-40 rounded-md bg-white p-1" /> : <Spinner label="Making the code" />}
             <div className="min-w-0">
               <p className="text-ink-2">Can't scan? Enter this key instead:</p>
               <code className="mt-1 block font-mono break-all">{setup.secret}</code>

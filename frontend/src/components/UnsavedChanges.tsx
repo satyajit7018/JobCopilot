@@ -33,7 +33,7 @@ export function UnsavedChanges({ when, onSave, saving }: { when: boolean; onSave
       ref={ref}
       onClose={() => blocker.reset?.()}
       aria-labelledby="unsaved-title"
-      className="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-5 text-ink shadow-pop backdrop:bg-scrim"
+      className="m-auto w-[min(26rem,calc(100vw-2rem))] rounded-xl bg-surface p-5 text-ink shadow-pop backdrop:bg-scrim"
     >
       <h2 id="unsaved-title" className="font-semibold">
         Leave without saving?

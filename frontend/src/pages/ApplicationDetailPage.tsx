@@ -42,13 +42,13 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
   const id = `sec-${title.toLowerCase().replace(/\W+/g, "-")}`;
   return (
     <section aria-labelledby={id}>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 id={id} className="text-base font-semibold">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 id={id} className="px-1 text-xs font-normal text-ink-2">
           {title}
         </h2>
         {action}
       </div>
-      <Card className="p-4 sm:p-5">{children}</Card>
+      <Card className="p-5">{children}</Card>
     </section>
   );
 }
@@ -374,7 +374,7 @@ function PlainFollowUp({ job }: { job: Job }) {
       <div className="flex flex-col gap-3">
         <p className="text-ink-2">It's been {days} days without a reply. A short follow-up is normal now.</p>
         <p className="font-medium">{mail.subject}</p>
-        <div className="rounded-md border border-line bg-canvas px-4 py-3 leading-relaxed whitespace-pre-wrap">{mail.body}</div>
+        <div className="rounded-md bg-subtle px-4 py-3 leading-relaxed whitespace-pre-wrap">{mail.body}</div>
         <p className="text-xs text-ink-3">We don't send this. Copy it into your email to the recruiter.</p>
       </div>
     </Section>
@@ -392,7 +392,7 @@ function FollowUp({ job }: { job: Job }) {
       {draft.data ? (
         <div className="flex flex-col gap-3">
           <p className="font-medium">{draft.data.followup.subject}</p>
-          <div className="rounded-md border border-line bg-canvas px-4 py-3 leading-relaxed whitespace-pre-wrap">{draft.data.followup.body}</div>
+          <div className="rounded-md bg-subtle px-4 py-3 leading-relaxed whitespace-pre-wrap">{draft.data.followup.body}</div>
           <p className="text-xs text-ink-3">We don't send this. Copy it into your email to the recruiter.</p>
         </div>
       ) : (
@@ -494,7 +494,7 @@ function OfferTools({ job }: { job: Job }) {
                 <h3 className="text-sm font-semibold">Counter-offer email</h3>
                 <CopyButton text={counter.data.counter_offer_script} label="Copy email" />
               </div>
-              <div className="rounded-md border border-line bg-canvas px-4 py-3 leading-relaxed whitespace-pre-wrap">{counter.data.counter_offer_script}</div>
+              <div className="rounded-md bg-subtle px-4 py-3 leading-relaxed whitespace-pre-wrap">{counter.data.counter_offer_script}</div>
               <p className="mt-1.5 text-xs text-ink-3">We don't send this. Edit it to sound like you, then send it yourself.</p>
             </div>
           )}

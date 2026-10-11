@@ -336,7 +336,7 @@ function Materials({ job, tailor }: { job: Job; tailor: ReturnType<typeof useTai
             <ResumeChanges jobId={job.job_id} changes={tailor.data.resume_changes ?? []} initial={tailor.data.resume_wording ?? "ai"} />
             <div>
               <h3 className="mb-1.5 text-sm font-semibold">Cover letter</h3>
-              <div className="max-h-96 overflow-y-auto rounded-md border border-line bg-canvas px-4 py-3 leading-relaxed whitespace-pre-wrap">
+              <div className="max-h-96 overflow-y-auto rounded-md bg-subtle px-4 py-3 leading-relaxed whitespace-pre-wrap">
                 {tailor.data.cover_letter}
               </div>
               <p className="mt-1.5 text-xs text-ink-3">The letter is written fresh for each application, so it may differ slightly when it's sent.</p>
@@ -405,7 +405,7 @@ function ResumeChanges({ jobId, changes, initial }: { jobId: string; changes: Re
       </p>
       <ul className="flex flex-col gap-2.5">
         {changes.map((c, i) => (
-          <li key={i} className="rounded-md border border-line">
+          <li key={i} className="rounded-md bg-subtle">
             <p className="border-b border-line px-3 py-1.5 text-xs text-ink-3">
               {c.role} · {c.company}
             </p>

@@ -19,7 +19,7 @@ export function PlansPage() {
       <PageHeader width="max-w-4xl" title="Plans" />
       <div className="mx-auto max-w-4xl px-4 py-5 md:px-7 md:py-8">
         <div className="mb-6 max-w-xl">
-          <h1 className="text-xl font-semibold">Find jobs for free. Let JobCopilot do the work with Premium.</h1>
+          <p className="text-base font-semibold">Find jobs for free. Let JobCopilot do the work with Premium.</p>
           <p className="mt-1 text-ink-2">Premium writes your applications, applies with your approval, watches your inbox and gets you ready for interviews.</p>
         </div>
 
@@ -29,17 +29,21 @@ export function PlansPage() {
           <Alert>Couldn't load plans: {plan.error?.message ?? "no data"}</Alert>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            <Card className="flex flex-col gap-4 p-6">
+            <Card className={cx("flex flex-col gap-4 p-6", !premium && "ring-2 ring-accent")}>
               <div>
                 <h2 className="text-base font-semibold">Free</h2>
                 <p className="mt-1 text-2xl font-semibold">{formatPrice({ ...price, amount: 0 })}</p>
                 <p className="text-ink-3">forever</p>
               </div>
               <FeatureList premium={false} />
-              {!premium && <p className="mt-auto font-medium text-ink-2">Your current plan</p>}
+              {!premium && (
+                <p className="mt-auto">
+                  <Badge tone="accent">Current plan</Badge>
+                </p>
+              )}
             </Card>
 
-            <Card className="flex flex-col gap-4 border-accent p-6 ring-1 ring-accent max-md:order-first">
+            <Card className={cx("flex flex-col gap-4 p-6 max-md:order-first", premium && "ring-2 ring-accent")}>
               <div>
                 <h2 className="flex items-center gap-2 text-base font-semibold">
                   <Sparkles className="size-4 text-accent" aria-hidden />

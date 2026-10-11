@@ -25,7 +25,7 @@ export function FeedbackDialog({ open, onClose }: { open: boolean; onClose: () =
       ref={ref}
       onClose={onClose}
       aria-labelledby="feedback-title"
-      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-0 text-ink shadow-pop backdrop:bg-scrim"
+      className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-xl bg-surface p-0 text-ink shadow-pop backdrop:bg-scrim"
     >
       <div className="flex items-center justify-between border-b border-line px-5 py-3">
         <h2 id="feedback-title" className="font-semibold">

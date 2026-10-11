@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "react-router";
-import { Check, FileText, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
+import { initials } from "../lib/auth";
 import { UnsavedChanges } from "../components/UnsavedChanges";
 import { BackgroundEditor, PreferenceFields, ResumeDrop, SourceFields } from "../components/profile";
 import { Alert, Badge, Button, Card, Field, Spinner, Textarea } from "../components/ui";
@@ -38,11 +39,11 @@ function Section({ title, description, children }: { title: string; description?
   const id = title.toLowerCase().replace(/\W+/g, "-");
   return (
     <section aria-labelledby={id}>
-      <h2 id={id} className="text-base font-semibold">
+      <h2 id={id} className="px-1 text-xs font-normal text-ink-2">
         {title}
       </h2>
-      {description && <p className="text-ink-2">{description}</p>}
-      <Card className="mt-3 p-4 sm:p-6">{children}</Card>
+      <Card className="mt-2 p-5 sm:p-6">{children}</Card>
+      {description && <p className="mt-2 px-1 text-xs text-ink-3">{description}</p>}
     </section>
   );
 }
@@ -115,11 +116,18 @@ function ResumeSection({ profile, onReplaced }: { profile: Profile; onReplaced: 
       ) : (
         <div className="flex flex-col gap-5">
           <div className="flex items-start gap-3">
-            <div className="grid size-10 flex-none place-items-center rounded-md bg-accent-soft text-accent">
-              <FileText className="size-5" aria-hidden />
+            <div className="grid size-14 flex-none place-items-center rounded-full bg-accent-soft text-base font-semibold text-accent-ink" aria-hidden>
+              {initials(profile.full_name || profile.email)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold">{profile.full_name}</p>
+              <p className="text-base font-semibold">{profile.full_name}</p>
+              {/* The most recent role on the resume, exactly as read. */}
+              {profile.experience?.[0]?.title && (
+                <p>
+                  {profile.experience[0].title}
+                  {profile.experience[0].company && ` at ${profile.experience[0].company}`}
+                </p>
+              )}
               <p className="text-ink-2">{[profile.location, profile.email].filter(Boolean).join(" · ")}</p>
             </div>
             <div className="flex gap-2">
@@ -281,7 +289,7 @@ function DetailsForm({ profile }: { profile: Profile }) {
       {/* Save bar: appears once something changed, stays above the mobile tab bar. */}
       {(dirty || saved || save.error) && (
         <div className="fixed inset-x-0 bottom-18 z-20 px-4 md:bottom-6 md:left-58 md:px-7">
-          <div className="mx-auto flex max-w-3xl items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3 shadow-pop">
+          <div className="mx-auto flex max-w-3xl items-center gap-3 rounded-full bg-surface py-2.5 pr-2.5 pl-5 shadow-pop">
             <p className="flex-1 text-ink-2" role="status">
               {save.error ? (
                 <span className="text-danger">Couldn't save: {save.error.message}</span>
