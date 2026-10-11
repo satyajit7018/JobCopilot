@@ -30,10 +30,7 @@ from app.api.endpoints import (
     MultiOfferCompareRequest,
     AdvancedCounterOfferRequest,
     CounterOfferRequest,
-    Organization,
-    Membership,
     AdminAuditLog,
-    OrgRole,
 )
 from app.api.routers import (
     auth_router,
@@ -80,10 +77,7 @@ def test_backwards_compatible_model_exports():
     assert MultiOfferCompareRequest is not None
     assert AdvancedCounterOfferRequest is not None
     assert CounterOfferRequest is not None
-    assert Organization is not None
-    assert Membership is not None
     assert AdminAuditLog is not None
-    assert OrgRole is not None
     assert isinstance(ws_manager, MultiTenantWebSocketGateway)
 
 

@@ -49,7 +49,6 @@ function Metrics() {
     { label: "Users", value: data.total_users },
     { label: "Jobs found", value: data.total_jobs },
     { label: "Applications", value: data.total_applications },
-    { label: "Organizations", value: data.total_organizations },
   ];
   const paid = Object.entries(data.active_subscriptions ?? {}).filter(([tier, n]) => (tier === "PRO" || tier === "ELITE") && n > 0);
   return (

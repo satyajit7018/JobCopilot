@@ -1,6 +1,6 @@
 """
 JobCopilot - Phase P1 Epic C Test Suite
-Tests SaaS Multi-Tenant Organization & Team Workspaces, RBAC Roles,
+Tests admin roles,
 Admin Panel & Impersonation Audit, Billing Lifecycle Sync, and GDPR Self-Service.
 """
 
@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.core.database import db
-from app.core.models import User, UserRole, CandidateProfile, JobListing, ApplicationStatus, Organization, Membership, OrgRole
+from app.core.models import User, UserRole, CandidateProfile, JobListing, ApplicationStatus
 from app.api.auth import hash_password, create_jwt_token
 from datetime import timedelta
 

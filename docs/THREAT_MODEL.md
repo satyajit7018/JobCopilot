@@ -41,7 +41,7 @@ graph TD
     
     subgraph "External Third Parties"
         StealthBot -->|Candidate-Directed Applies| ATS["Job Portals & ATS (Greenhouse, Lever, etc.)"]
-        Routers -->|Billing| Stripe["Stripe API"]
+        Routers -->|Billing| Razorpay["Razorpay API"]
         Routers -->|Intelligence| LLM["LLM Providers (Claude, OpenAI, Gemini)"]
     end
 ```
@@ -56,7 +56,7 @@ graph TD
 | **S-01** | Forged JWT access token via weak secret or `alg: none` attack. | Critical | Fail-closed validation in `auth.py`: production mandates cryptographically secure secrets `>= 32 bytes`. Alg restricted to `HS256`. |
 | **S-02** | Hijacked user session via stolen bearer token. | High | **User Sessions Table (`user_sessions`)**: Real-time session listing and remote revocation. Tokens revoked immediately via `revoked_tokens` blacklist. |
 | **S-03** | Stolen candidate password used to log in. | High | **MFA / TOTP Engine (`mfa.py`)**: RFC 6238 TOTP enrollment and login challenge gate with single-use backup recovery codes. |
-| **S-04** | Spoofed external webhooks (e.g. Stripe billing). | High | Webhook signature verification in `billing_router.py` with secret validation before processing subscription events. |
+| **S-04** | Spoofed external webhooks (e.g. Razorpay billing). | High | Webhook signature verification in `billing_router.py` with secret validation before processing subscription events. |
 
 ---
 
@@ -103,7 +103,6 @@ graph TD
 | Threat ID | Description | Impact | Mitigations in Codebase |
 | :--- | :--- | :--- | :--- |
 | **E-01** | Candidate self-upgrading subscription or role to `ADMIN`. | Critical | FastAPI RBAC dependencies (`require_admin`) enforce database-verified role checking. Self-service profile updates cannot mutate `role`. |
-| **E-02** | User accessing or mutating resources of another organization. | High | Org membership dependency (`require_org_admin`, `require_org_owner`) verifies active membership records in `memberships` table. |
 
 ---
 
@@ -144,7 +143,7 @@ This policy represents the explicit, documented decision of the engineering and 
 ## 5. Security Verification & CI Continuous Assurance
 
 Security posture is validated continuously through automated CI quality gates:
-1. **Gitleaks**: Scans commit history for high-entropy tokens, AWS/Stripe keys, and hardcoded secrets.
+1. **Gitleaks**: Scans commit history for high-entropy tokens, AWS/Razorpay keys, and hardcoded secrets.
 2. **Bandit SAST**: Scans `backend/app` for insecure function calls, weak crypto, and SQL injection flaws (0 High, 0 Medium permitted).
 3. **Semgrep SAST**: Performs semantic analysis for security anti-patterns across API handlers.
 4. **Pytest Regression & Coverage Gate**: Enforces minimum 80% test coverage with dedicated security suites (`test_security_epic_f.py`, `test_security_tenant_isolation.py`, `test_auth_advanced.py`).

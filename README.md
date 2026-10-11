@@ -80,9 +80,8 @@ flowchart TD
         Redis[(Redis 7 Cluster)]
         CeleryWorker[Celery Distributed Task Workers]
         S3Storage[(AWS S3 / Cloudflare R2 Storage)]
-        ProxyPool[Residential Proxy Rotator: Bright Data / Oxylabs]
         WSGateway[Multi-Tenant WebSocket Gateway]
-        StripeGateway[Stripe Billing & Tiered RateLimiter]
+        BillingGateway[Razorpay Billing & Rate Limiter]
     end
 
     CandidateJourney <--> WSGateway
@@ -90,9 +89,8 @@ flowchart TD
     D <--> LLM
     E --> CeleryWorker
     CeleryWorker <--> Redis
-    CeleryWorker <--> ProxyPool
     D <--> S3Storage
-    CandidateJourney <--> StripeGateway
+    CandidateJourney <--> BillingGateway
 ```
 
 ---
@@ -161,7 +159,7 @@ flowchart TD
   - **`FREE`**: 5 applies/day, standard feeds.
   - **`PRO` ($29/mo)**: 30 applies/day, 0-day priority feeds, triple-threat outreach.
   - **`ELITE` ($79/mo)**: Unlimited applies, residential proxy rotation, priority queue routing.
-- **Stripe Billing Integration**: Real Stripe Checkout Session creation (`POST /api/billing/checkout`), Customer Portal sessions (`POST /api/billing/portal`), and webhook lifecycle listener (`POST /api/billing/webhook`). Webhooks resolve users by stored Stripe customer id, derive tier from price id + status, validate redirect URLs, and never overwrite an `ADMIN` role.
+- **Razorpay billing**: Premium subscriptions through Razorpay (`POST /api/billing/razorpay/subscribe`, `/verify`, `/cancel`) and a signed webhook (`POST /api/billing/razorpay/webhook`) that keeps the plan in step with the subscription. Billing never overwrites an `ADMIN` role.
 
 ---
 
@@ -220,10 +218,9 @@ Before opening the app to real traffic, set these and run migrations:
 # Required secrets (the app fails closed without the email secret)
 export INBOUND_EMAIL_WEBHOOK_SECRET=...    # app refuses to start in prod without it
 export METRICS_TOKEN=...                    # Prometheus must send it as a Bearer token
-export STRIPE_PRO_PRICE_ID=price_...        # real Stripe price ids
-export STRIPE_ELITE_PRICE_ID=price_...
+export RAZORPAY_KEY_ID=...                  # with RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET
 
-# Apply the schema (adds users.stripe_customer_id, etc.)
+# Apply the schema
 cd backend && alembic upgrade head
 ```
 

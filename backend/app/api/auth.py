@@ -37,7 +37,6 @@ from app.core.database import db
 from app.core.mailer import mailer
 from app.core.mfa import mfa_engine
 from app.core.models import (
-    Membership,
     MFADisableRequest,
     MFALoginChallengeRequest,
     MFASetupResponse,
@@ -301,46 +300,6 @@ def session_is_active(payload: Dict[str, Any]) -> bool:
     return bool(record) and record.get("user_id") == payload.get("sub") and bool(record.get("is_active"))
 
 
-# =========================================================================
-# FastAPI Security Dependencies (F-01, F-02, F-08)
-# =========================================================================
-async def get_current_user_optional(
-    auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
-) -> Optional[User]:
-    """
-    Resolves the authenticated user from JWT Bearer token if present.
-    Returns None if no token or token is invalid.
-    """
-    if auth and auth.credentials:
-        try:
-            payload = decode_jwt_token(auth.credentials)
-            if payload.get("type") == "access":
-                jti = payload.get("jti")
-                if jti and db.is_token_revoked(jti):
-                    return None
-                if not session_is_active(payload):
-                    return None
-                user_id = payload.get("sub")
-                if user_id:
-                    user = db.get_user_by_id(user_id)
-                    if user and user.is_active:
-                        return user
-        except Exception:
-            logging.getLogger("jobcopilot.auth").debug("Optional user resolution failed", exc_info=True)
-
-    # Gated dev escape hatch (F-02)
-    if os.getenv("JOBCOPILOT_DEV_AUTH") == "1" and os.getenv("ENV", "").lower() != "production":
-        return User(
-            user_id="dev_user",
-            email="dev@jobcopilot.local",
-            password_hash="",
-            full_name="Dev User",
-            role=UserRole.FREE
-        )
-
-    return None
-
-
 async def get_current_user(
     auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> User:
@@ -410,50 +369,6 @@ async def require_admin(
             detail="Admin access required for this resource."
         )
     return current_user
-
-
-async def get_current_org_membership(
-    org_id: str,
-    current_user: User = Depends(get_current_user)
-) -> Membership:
-    """Verifies that the authenticated user is an active member of the specified organization."""
-    membership = db.get_membership(org_id, current_user.user_id)
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of this organization."
-        )
-    return membership
-
-
-async def require_org_admin(
-    org_id: str,
-    current_user: User = Depends(get_current_user)
-) -> Membership:
-    """Requires the authenticated user to be an OWNER or ADMIN of the specified organization."""
-    membership = await get_current_org_membership(org_id, current_user)
-    role_val = enum_value(membership.role)
-    if role_val not in ["OWNER", "ADMIN"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Organization administrator privileges required."
-        )
-    return membership
-
-
-async def require_org_owner(
-    org_id: str,
-    current_user: User = Depends(get_current_user)
-) -> Membership:
-    """Requires the authenticated user to be the OWNER of the specified organization."""
-    membership = await get_current_org_membership(org_id, current_user)
-    role_val = enum_value(membership.role)
-    if role_val != "OWNER":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Organization owner privileges required."
-        )
-    return membership
 
 
 # =========================================================================

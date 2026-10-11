@@ -16,7 +16,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 from app.main import app
 from app.core.models import CandidateProfile, RecruiterPreferences, JobListing, ApplicationStatus, Project
 from app.core.database import db
-from app.core.analytics import AnalyticsEngine
 from app.api.auth import create_jwt_token
 
 

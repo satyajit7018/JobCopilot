@@ -59,9 +59,6 @@ from app.core.models import (
     ConsentGrantRequest,
     ConsentStatusResponse,
     ConsentType,
-    Membership,
-    Organization,
-    OrgRole,
     UserConsent,
 )
 
@@ -126,10 +123,7 @@ __all__ = [
     "CounterOfferRequest",
     "ApplyLedgerEntry",
     "ApplyLedgerStatus",
-    "Organization",
-    "Membership",
     "AdminAuditLog",
-    "OrgRole",
     "auth_router",
     "profile_router",
     "vault_router",
