@@ -19,6 +19,7 @@ import {
 } from "../lib/apply";
 import {
   STATUS_META,
+  applyOnSiteOnly,
   isTracked,
   nextMatch,
   readableReason,
@@ -206,7 +207,7 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
 
           {/* On phones the panel follows the materials; on desktop it's a sticky right column. */}
           <div className="lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-            {!premium ? (
+            {!premium || applyOnSiteOnly(job) ? (
               <ApplyYourself job={job} />
             ) : taskId ? (
               <Progress
@@ -519,8 +520,9 @@ function HiddenNotice({ job }: { job: Job }) {
   );
 }
 
-/** Free plan: apply on the employer's site, then track it here. */
+/** Free plan, or a site we never apply on for you: apply there, then track it here. */
 function ApplyYourself({ job }: { job: Job }) {
+  const site = applyOnSiteOnly(job);
   const setStatus = useSetStatus(job.job_id);
   const applied = isTracked(job) || setStatus.isSuccess;
 
@@ -540,7 +542,11 @@ function ApplyYourself({ job }: { job: Job }) {
           </>
         ) : (
           <>
-            <p className="text-ink-2">Apply on {job.company}'s site, then come back and mark it applied so we can track it for you.</p>
+            <p className="text-ink-2">
+              {site
+                ? `This job is on ${site}, where you apply with your own ${site} account. Apply there, then come back and mark it applied so we can track it for you.`
+                : `Apply on ${job.company}'s site, then come back and mark it applied so we can track it for you.`}
+            </p>
             <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("primary")}>
               Open the application
               <ExternalLink className="size-3.5" aria-hidden />
@@ -554,13 +560,15 @@ function ApplyYourself({ job }: { job: Job }) {
         )}
       </Card>
       {/* One box for everything Premium adds here; two competed with the Apply button. */}
-      <PremiumLock
-        title="Let JobCopilot apply for you"
-        points={[
-          "A resume and cover letter written for this job",
-          "The application filled in and sent, after you approve it",
-        ]}
-      />
+      {!site && (
+        <PremiumLock
+          title="Let JobCopilot apply for you"
+          points={[
+            "A resume and cover letter written for this job",
+            "The application filled in and sent, after you approve it",
+          ]}
+        />
+      )}
     </div>
   );
 }

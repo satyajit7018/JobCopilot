@@ -1,7 +1,7 @@
 """
 JobCopilot - 0-Day Discovery Orchestrator & Background Poller
 Orchestrates parallel ingestion across Greenhouse, Lever, Ashby, Y Combinator,
-and HackerNews. Deduplicates, scores against CandidateProfile, ranks priority,
+HackerNews and Instahyre. Deduplicates, scores against CandidateProfile, ranks priority,
 and persists discovered jobs to SQLite.
 """
 
@@ -19,7 +19,11 @@ from app.core import match_feedback
 from app.core.match_scorer import MatchScorer
 from app.core.models import ApplicationStatus, CandidateProfile, JobListing
 from app.core.priority_ranker import PriorityRanker
+from app.core.settings import settings
 from app.discovery.ats_apis import ATSApiFeeders
+from app.discovery.companies import BY_SLUG as CAREER_PAGE_BY_SLUG
+from app.discovery.companies import CAREER_PAGES, CareerPage, in_india
+from app.discovery.instahyre import fetch_instahyre_jobs
 from app.discovery.vc_boards import VCBoardFeeders
 
 logger = logging.getLogger(__name__)
@@ -28,16 +32,8 @@ logger = logging.getLogger(__name__)
 class DiscoveryOrchestrator:
     """Coordinates multi-source 0-day job discovery and matching."""
 
-    CURATED_TECH_COMPANIES = [
-        # Top Indian Unicorns & High-Scale Tech Employers
-        "swiggy", "razorpay", "zepto", "cred", "phonepe",
-        "browserstack", "postman", "meesho", "groww", "juspay",
-        "zomato", "flipkart", "dream11", "inmobi", "sarvam-ai",
-        # Global High-Growth Tech & YC Companies
-        "stripe", "retool", "perplexity", "linear",
-        "scale", "whatnot", "brex", "vercel",
-        "supabase", "sentry", "datadog", "figma", "notion"
-    ]
+    # Slugs of the career pages read every cycle (see discovery/companies.py).
+    CURATED_TECH_COMPANIES = [page.slug for page in CAREER_PAGES]
 
     # Postings already scored for a user (saved or not) are remembered this long,
     # so hourly runs only score what's new.
@@ -55,6 +51,19 @@ class DiscoveryOrchestrator:
         self.total_discovered = 0
         self.total_matched = 0
 
+    @staticmethod
+    async def _fetch_career_page(page: CareerPage, client: httpx.AsyncClient) -> List[Dict[str, Any]]:
+        """One company's board, under the company's real name."""
+        fetch = {
+            "Greenhouse": ATSApiFeeders.fetch_greenhouse_jobs,
+            "Lever": ATSApiFeeders.fetch_lever_jobs,
+            "Ashby": ATSApiFeeders.fetch_ashby_jobs,
+        }[page.platform]
+        jobs = await fetch(page.slug, client)
+        for job in jobs:
+            job["company"] = page.name
+        return [j for j in jobs if in_india(j.get("location", ""))] if page.india_only else jobs
+
     async def _fetch_all_raw_leads(self, target_companies: List[str]) -> List[Dict[str, Any]]:
         """Fetches real, current job openings from company career pages (ATS APIs) and startup boards."""
         raw_leads: List[Dict[str, Any]] = []
@@ -67,13 +76,21 @@ class DiscoveryOrchestrator:
         async with httpx.AsyncClient(http2=has_h2, timeout=10.0) as client:
             tasks = []
             for comp in target_companies:
-                tasks.append(ATSApiFeeders.fetch_greenhouse_jobs(comp, client))
-                tasks.append(ATSApiFeeders.fetch_lever_jobs(comp, client))
-                tasks.append(ATSApiFeeders.fetch_ashby_jobs(comp, client))
+                page = CAREER_PAGE_BY_SLUG.get(comp)
+                if page:
+                    tasks.append(self._fetch_career_page(page, client))
+                else:
+                    # Not a board we know: try the slug on each platform.
+                    tasks.append(ATSApiFeeders.fetch_greenhouse_jobs(comp, client))
+                    tasks.append(ATSApiFeeders.fetch_lever_jobs(comp, client))
+                    tasks.append(ATSApiFeeders.fetch_ashby_jobs(comp, client))
 
             # VC & Fast-Track Boards
             tasks.append(VCBoardFeeders.fetch_yc_fast_track_jobs(client=client))
             tasks.append(VCBoardFeeders.fetch_hn_who_is_hiring(max_posts=15, client=client))
+
+            if settings.INSTAHYRE_ENABLED:
+                tasks.append(fetch_instahyre_jobs())
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
             for res in results:

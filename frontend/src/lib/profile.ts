@@ -226,6 +226,7 @@ export function withCurrent(options: string[], current: string): string[] {
 export const SOURCES = [
   { id: "ats", name: "Company career pages", detail: "Greenhouse, Lever and Ashby" },
   { id: "startups", name: "Startup job boards", detail: "Y Combinator companies and Hacker News \"Who is hiring\"" },
+  { id: "instahyre", name: "Instahyre", detail: "Tech jobs across India" },
 ] as const;
 
 export type SourceId = (typeof SOURCES)[number]["id"];
@@ -234,6 +235,7 @@ export type SourceState = Record<SourceId, boolean>;
 const PLATFORM_HINTS: [SourceId, string[]][] = [
   ["ats", ["greenhouse", "lever", "ashby", "workday"]],
   ["startups", ["y combinator", "yc", "hackernews", "hacker news"]],
+  ["instahyre", ["instahyre"]],
 ];
 
 /** Which source a job's platform belongs to, or null when it isn't one of ours. */

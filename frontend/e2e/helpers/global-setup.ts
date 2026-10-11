@@ -31,6 +31,7 @@ export default async function globalSetup() {
       ENV: "development",
       // The suite never depends on the internet: company tiles show their initial.
       COMPANY_LOGOS_ENABLED: "false",
+      INSTAHYRE_ENABLED: "false",
       PYTHONUNBUFFERED: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],

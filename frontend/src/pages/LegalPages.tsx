@@ -291,7 +291,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
     q: "How does JobCopilot find jobs for me?",
     a: (
       <>
-        Every hour we check the career pages of tech companies and startup job boards for new postings, and score each one against your resume
+        Every hour we check the career pages of tech companies, startup job boards and Instahyre for new postings, and score each one against your resume
         and preferences. Only good matches show up in Jobs. You can also press <strong>Find new jobs</strong> to check right away.
       </>
     ),

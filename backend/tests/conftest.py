@@ -16,6 +16,9 @@ if "JOBCOPILOT_DATA_DIR" not in os.environ:
     os.environ["JOBCOPILOT_DATA_DIR"] = _data_dir
     atexit.register(shutil.rmtree, _data_dir, ignore_errors=True)
 
+# Tests never read live job sites; the ones about a source stand in for it themselves.
+os.environ.setdefault("INSTAHYRE_ENABLED", "false")
+
 import pytest  # noqa: E402
 from datetime import timedelta
 from fastapi.testclient import TestClient

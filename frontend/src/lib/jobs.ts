@@ -83,6 +83,14 @@ export function isTracked(job: Job): boolean {
   return BOARD_COLUMNS.some((c) => c.statuses.includes(job.status));
 }
 
+/**
+ * Sites where you apply while signed in to the site itself. JobCopilot never applies there
+ * for you, on any plan (the server refuses too).
+ */
+export function applyOnSiteOnly(job: Pick<Job, "platform">): string | null {
+  return /instahyre/i.test(job.platform ?? "") ? "Instahyre" : null;
+}
+
 /** Backend stores 0–1; tolerate legacy rows already stored as 0–100. */
 export function scorePercent(score: number | null | undefined): number {
   if (!score || score < 0) return 0;
