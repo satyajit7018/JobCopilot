@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router";
 import { ArrowLeft, ArrowRight, Bookmark, BookmarkCheck, Check, CircleAlert, ExternalLink, EyeOff, FileText, SearchX, ShieldCheck } from "lucide-react";
 import { MatchReceipt } from "../components/MatchReceipt";
 import { toast } from "../components/Toast";
-import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, Group, ScoreRing, Spinner, buttonClass, cx, rowClass, toneText } from "../components/ui";
+import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, Group, ScoreRing, Segmented, Spinner, buttonClass, cx, rowClass, toneText } from "../components/ui";
 import {
   newKey,
   outcome,
@@ -218,6 +218,7 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
             ) : taskId ? (
               <Progress
                 taskId={taskId}
+                job={job}
                 onRetry={() => {
                   taskStore.set(job.job_id, null);
                   setTaskId(null);
@@ -485,49 +486,59 @@ function ApplyPanel({ job, prepared, onStarted }: { job: Job; prepared: boolean;
         <p className="mt-0.5 text-ink-2">Nothing is sent until you approve it here.</p>
       </div>
 
-      <ChoiceChips
-        label="How"
-        value={mode}
-        onChange={setMode}
-        options={[
-          { value: "DRY_RUN", label: "Practice run" },
-          { value: "LIVE", label: "Submit for real" },
-        ]}
-        hint={
-          live
-            ? "We fill in the employer's form and submit it for you."
-            : "We fill in the form to check everything works, then stop. Nothing is submitted."
-        }
-      />
+      <div className="flex flex-col gap-2">
+        <Segmented
+          label="How"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "DRY_RUN", label: "Practice run" },
+            { value: "LIVE", label: "Submit for real" },
+          ]}
+        />
+        <p className="text-xs text-ink-3">
+          {live
+            ? "We fill in the employer's form and submit it for you, after these three steps."
+            : "We fill in the form to check everything works, then stop. Nothing is submitted."}
+        </p>
+      </div>
 
       {live && (
-        <div className="flex flex-col gap-2.5">
-          {!prepared && (
-            <Alert tone="warn">
-              <span className="inline-flex gap-1.5">
-                <CircleAlert className="mt-0.5 size-4 flex-none" aria-hidden />
-                Prepare your application first so you can read it.
-              </span>
-            </Alert>
-          )}
-          {consent.isPending ? null : (
+        <ol className="flex flex-col gap-4">
+          <ApprovalStep n={1} done={prepared} title="Read what will be sent">
+            {prepared ? (
+              <p className="text-ink-2">Your resume and cover letter are ready under "Your application".</p>
+            ) : (
+              <Alert tone="warn">
+                <span className="inline-flex gap-1.5">
+                  <CircleAlert className="mt-0.5 size-4 flex-none" aria-hidden />
+                  Prepare your application first so you can read it.
+                </span>
+              </Alert>
+            )}
+          </ApprovalStep>
+          <ApprovalStep n={2} done={reviewed} title="Confirm it's right">
             <CheckRow
-              checked={hasConsent}
-              disabled={setConsent.isPending}
-              onChange={(on) => setConsent.mutate(on)}
-              title="Let JobCopilot submit applications for me"
-              detail="Applies to every real submission. Uncheck it any time to turn it off."
+              checked={reviewed}
+              disabled={!prepared}
+              onChange={setReviewed}
+              title="I've read the cover letter and my details"
+              detail="They're accurate and I want to apply to this job."
             />
-          )}
-          {setConsent.error && <Alert>Couldn't save that: {setConsent.error.message}</Alert>}
-          <CheckRow
-            checked={reviewed}
-            disabled={!prepared}
-            onChange={setReviewed}
-            title="I've read the cover letter and my details"
-            detail="They're accurate and I want to apply to this job."
-          />
-        </div>
+          </ApprovalStep>
+          <ApprovalStep n={3} done={hasConsent} title="Allow JobCopilot to send it">
+            {consent.isPending ? null : (
+              <CheckRow
+                checked={hasConsent}
+                disabled={setConsent.isPending}
+                onChange={(on) => setConsent.mutate(on)}
+                title="Let JobCopilot submit applications for me"
+                detail="Applies to every real submission. Uncheck it any time to turn it off."
+              />
+            )}
+            {setConsent.error && <Alert>Couldn't save that: {setConsent.error.message}</Alert>}
+          </ApprovalStep>
+        </ol>
       )}
 
       {start.error && <Alert>{start.error.message}</Alert>}
@@ -543,6 +554,30 @@ function ApplyPanel({ job, prepared, onStarted }: { job: Job; prepared: boolean;
         </p>
       </div>
     </Card>
+  );
+}
+
+/** One numbered step of approving a real submission; the number becomes a tick when done. */
+function ApprovalStep({ n, done, title, children }: { n: number; done: boolean; title: string; children: ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span
+        className={cx(
+          "mt-0.5 grid size-6 flex-none place-items-center rounded-full text-xs font-semibold",
+          done ? "bg-ok text-on-solid" : "bg-subtle text-ink-2",
+        )}
+        aria-hidden
+      >
+        {done ? <Check className="size-3.5" strokeWidth={2.5} /> : n}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <p className="font-semibold">
+          {title}
+          <span className="sr-only">{done ? " (done)" : " (to do)"}</span>
+        </p>
+        {children}
+      </div>
+    </li>
   );
 }
 
@@ -649,7 +684,7 @@ function ApplyYourself({ job }: { job: Job }) {
   );
 }
 
-function Progress({ taskId, onRetry }: { taskId: string; onRetry: () => void }) {
+function Progress({ taskId, job, onRetry }: { taskId: string; job: Job; onRetry: () => void }) {
   const task = useApplyTask(taskId);
   const phase = taskPhase(task.data);
   const [elapsed, setElapsed] = useState(0);
@@ -692,9 +727,27 @@ function Progress({ taskId, onRetry }: { taskId: string; onRetry: () => void }) 
   return (
     <Card className="flex flex-col gap-4 p-5" aria-live="polite">
       <div>
-        <h2 className={cx("text-base font-semibold", toneText[o.tone])}>{o.title}</h2>
+        <h2 className={cx("flex items-center gap-2 text-base font-semibold", toneText[o.tone])}>
+          {task.data?.result?.submitted && <Check className="size-5" strokeWidth={2.25} aria-hidden />}
+          {o.title}
+        </h2>
         <p className="mt-1 text-ink-2">{o.detail}</p>
       </div>
+      {/* The receipt: what went, and where. Only for a real submission. */}
+      {task.data?.result?.submitted && (
+        <dl className="overflow-hidden rounded-md bg-subtle">
+          {[
+            ["Sent to", job.company],
+            ["Role", job.title],
+            ["With", "Your tailored resume and cover letter"],
+          ].map(([label, value]) => (
+            <div key={label} className="flex gap-3 px-3.5 py-2.5">
+              <dt className="w-16 flex-none text-ink-2">{label}</dt>
+              <dd className="min-w-0 flex-1 font-medium">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       <div className="flex flex-col gap-2">
         <Link to="/applications" className={buttonClass(phase === "succeeded" ? "primary" : "secondary")}>
           Go to Applications

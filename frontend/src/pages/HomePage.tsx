@@ -216,13 +216,15 @@ function ScanLine({ jobs }: { jobs: Job[] }) {
     <span className="inline-flex flex-wrap items-center gap-x-1.5">
       <span className={cx("size-1.5 rounded-full bg-accent", data?.is_running && "animate-pulse motion-reduce:animate-none")} aria-hidden />
       {data?.is_running ? "Checking for new jobs now" : `Checked ${read.postings.toLocaleString()} postings ${when}`}
-      {fresh > 0 && (
+      {fresh > 0 ? (
         <>
           <span aria-hidden>·</span>
           <Link to="/jobs" className="font-medium text-accent hover:underline">
             {fresh} new for you
           </Link>
         </>
+      ) : (
+        since !== null && !data?.is_running && <span>· nothing new since your last visit. We check every hour.</span>
       )}
     </span>
   );

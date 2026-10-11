@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { Check, Minus, Sparkles } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Badge, Button, Card, Spinner, cx } from "../components/ui";
+import { Alert, Badge, Button, Card, Spinner, buttonClass, cx } from "../components/ui";
 import { CheckoutDismissed, PLAN_FEATURES, detectRegion, formatPrice, useBillingPlan, useIsPremium, useUpgrade, type Region } from "../lib/billing";
 
 export function PlansPage() {
@@ -23,7 +23,9 @@ export function PlansPage() {
           <p className="mt-1 text-ink-2">Premium writes your applications, applies with your approval, watches your inbox and gets you ready for interviews.</p>
         </div>
 
-        {plan.isPending ? (
+        {upgrade.isSuccess ? (
+          <Welcome />
+        ) : plan.isPending ? (
           <Spinner />
         ) : !p || !price ? (
           <Alert>Couldn't load plans: {plan.error?.message ?? "no data"}</Alert>
@@ -75,8 +77,8 @@ export function PlansPage() {
                 ) : (
                   <>
                     {error && <Alert>{error.message}</Alert>}
-                    <Button variant="primary" loading={upgrade.isPending} onClick={() => upgrade.mutate(region)}>
-                      Upgrade to Premium
+                    <Button variant="primary" size="lg" loading={upgrade.isPending} onClick={() => upgrade.mutate(region)}>
+                      Upgrade for {formatPrice(price)} a month
                     </Button>
                     <p className="text-xs text-ink-3">
                       Secure payment by Razorpay. Renews monthly; cancel any time in Settings. See the{" "}
@@ -97,6 +99,41 @@ export function PlansPage() {
         </p>
       </div>
     </>
+  );
+}
+
+/** Straight after paying: confirm it worked and point at the first thing Premium does. */
+function Welcome() {
+  return (
+    <Card className="mx-auto flex max-w-xl flex-col items-start gap-5 rounded-xl p-6 sm:p-8">
+      <span className="grid size-12 place-items-center rounded-full bg-ok-soft text-ok" aria-hidden>
+        <Check className="size-6" strokeWidth={2.25} />
+      </span>
+      <div role="status">
+        <h2 className="text-lg font-bold">You're on Premium</h2>
+        <p className="mt-1 text-ink-2">Your payment went through and everything is switched on. It renews monthly; you can cancel any time in Settings.</p>
+      </div>
+      <ol className="flex w-full flex-col overflow-hidden rounded-md bg-subtle">
+        {[
+          ["Open a match", "Pick a job from your matches."],
+          ["Prepare your application", "JobCopilot writes a resume and cover letter for that job. Read them."],
+          ["Approve it", "Nothing is sent until you say so."],
+        ].map(([title, text], i) => (
+          <li key={title} className="flex gap-3 px-4 py-3">
+            <span className="grid size-6 flex-none place-items-center rounded-full bg-surface text-xs font-semibold text-ink-2" aria-hidden>
+              {i + 1}
+            </span>
+            <span>
+              <span className="block font-semibold">{title}</span>
+              <span className="text-ink-2">{text}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <Link to="/jobs" className={buttonClass("primary", "lg", "max-sm:w-full")}>
+        Go to your matches
+      </Link>
+    </Card>
   );
 }
 

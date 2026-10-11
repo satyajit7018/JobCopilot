@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet } from "react-router";
-import { BriefcaseBusiness, CircleHelp, ListChecks, LogOut, MessageSquare, Mic, Settings, ShieldCheck, Sparkles, Sun, UserRound, type LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, CircleHelp, ListChecks, LogOut, MessageSquare, Mic, Settings, ShieldCheck, Sparkles, Sun, UserRound, WifiOff, type LucideIcon } from "lucide-react";
 import { initials, useAuth } from "../lib/auth";
 import { useIsPremium } from "../lib/billing";
 import { usePageTitle } from "../lib/pageTitle";
@@ -123,6 +123,7 @@ export function AppShell() {
       </div>
 
       <Toaster />
+      <OfflineNotice />
 
       {/* Mobile tab bar */}
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-20 flex h-16 border-t border-line bg-surface md:hidden">
@@ -140,6 +141,29 @@ export function AppShell() {
           </NavLink>
         ))}
       </nav>
+    </div>
+  );
+}
+
+/** Says so when the device loses its connection, so a failed save isn't a mystery. */
+function OfflineNotice() {
+  const [offline, setOffline] = useState(() => typeof navigator !== "undefined" && navigator.onLine === false);
+  useEffect(() => {
+    const update = () => setOffline(!navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  if (!offline) return null;
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-3 z-40 flex justify-center px-4" role="status">
+      <p className="flex items-center gap-2 rounded-full bg-warn-soft px-4 py-2 font-medium text-warn shadow-pop">
+        <WifiOff className="size-4" aria-hidden />
+        You're offline. What you see may be out of date, and changes won't save until you're back.
+      </p>
     </div>
   );
 }
