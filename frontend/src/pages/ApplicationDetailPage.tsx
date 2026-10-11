@@ -111,7 +111,7 @@ function Detail({ job, back }: { job: Job; back: ReactNode }) {
 
   return (
     <>
-      <PageHeader title="Application" tabTitle={`${job.title} at ${job.company}`} />
+      <PageHeader width="max-w-6xl" title="Application" tabTitle={`${job.title} at ${job.company}`} />
       <div className="mx-auto max-w-6xl px-4 py-5 md:px-7 md:py-6">
         <div className="mb-4">{back}</div>
 

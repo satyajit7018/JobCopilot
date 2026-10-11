@@ -1,11 +1,11 @@
 import { useMemo, type ReactNode } from "react";
 import { Link, Navigate } from "react-router";
-import { ArrowRight, BriefcaseBusiness, CalendarClock, Check, CircleAlert, MailQuestion, MapPin, PartyPopper, Sparkles, Wallet, X } from "lucide-react";
+import { BriefcaseBusiness, CalendarClock, ChevronRight, CircleAlert, MailQuestion, X } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Badge, Card, CompanyMark, EmptyState, ScoreRing, SkeletonRows, buttonClass, cx, lift } from "../components/ui";
-import { useAuth } from "../lib/auth";
+import { MatchReceipt } from "../components/MatchReceipt";
+import { Alert, Card, CompanyMark, Group, ScoreRing, SkeletonRows, buttonClass, cx, rowClass } from "../components/ui";
 import { buildChecklist, markDone, useChecklistFlags } from "../lib/checklist";
-import { isMatch, isNewSince, isTracked, matchSummary, readLastVisit, readableReason, scorePercent, useVisibleJobs, type Job } from "../lib/jobs";
+import { isMatch, isNewSince, isTracked, readLastVisit, relativeTime, scorePercent, useSearchStatus, useVisibleJobs, type Job } from "../lib/jobs";
 import { needsSetup as profileNeedsSetup, setupLater, useProfile } from "../lib/profile";
 import { SetupReminder } from "./SetupPage";
 
@@ -105,111 +105,98 @@ export function buildTodos(jobs: Job[], now: Date = new Date()): Todo[] {
   return todos;
 }
 
-function greeting(now: Date) {
-  const h = now.getHours();
-  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-}
+/** Things that need the person (not just "there are matches"): shown under "Needs you". */
+const NEEDS_YOU = (t: Todo) => t.key.startsWith("iv-") || t.key === "blocked" || t.key === "follow-up";
 
 export function HomePage() {
-  const { user } = useAuth();
   const { data, isPending, error } = useVisibleJobs();
   const profile = useProfile();
   const now = useMemo(() => new Date(), []);
-  const todos = useMemo(() => buildTodos(data ?? [], now), [data, now]);
-  const firstName = user?.full_name?.trim().split(/\s+/)[0];
+  const jobs = useMemo(() => data ?? [], [data]);
+  const needsYou = useMemo(() => buildTodos(jobs, now).filter(NEEDS_YOU), [jobs, now]);
 
-  const counts = useMemo(() => {
-    const jobs = data ?? [];
-    return [
+  const numbers = useMemo(
+    () => [
       { label: "Matches", value: jobs.filter(isMatch).length, to: "/jobs" },
       { label: "Applied", value: jobs.filter((j) => ["SUBMITTED", "RESPONDED"].includes(j.status)).length, to: "/applications" },
       { label: "Interviewing", value: jobs.filter((j) => j.status === "INTERVIEW").length, to: "/applications" },
-      { label: "Offers", value: jobs.filter((j) => j.status === "OFFER").length, to: "/applications" },
-    ];
-  }, [data]);
-
+    ],
+    [jobs],
+  );
   const top = useMemo(
     () =>
-      (data ?? [])
+      jobs
         .filter(isMatch)
         .sort((a, b) => b.match_score - a.match_score)
-        .slice(0, 5),
-    [data],
+        .slice(0, 7),
+    [jobs],
   );
 
   // First run: no resume on file yet. Send the user to setup unless they postponed it.
   const needsSetup = profile.isSuccess && profileNeedsSetup(profile.data);
   if (needsSetup && !setupLater.get()) return <Navigate to="/setup" replace />;
 
+  const date = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+
   return (
     <>
-      <PageHeader title={firstName ? `${greeting(now)}, ${firstName}` : greeting(now)} tabTitle="Home" />
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-5 md:px-7 md:py-8">
+      <PageHeader title="Today" eyebrow={date} subtitle={<ScanLine jobs={jobs} />} />
+      <div className="mx-auto flex max-w-5xl flex-col gap-8 px-4 py-5 md:px-7 md:py-7">
         {isPending ? (
           <>
-            <SkeletonRows rows={2} avatar={false} label="Loading your dashboard" />
+            <SkeletonRows rows={2} avatar={false} label="Loading today" />
             <SkeletonRows rows={3} label="Loading your matches" />
           </>
         ) : error ? (
-          <Alert>Couldn't load your dashboard: {error.message}</Alert>
+          <Alert>Couldn't load today: {error.message}</Alert>
         ) : needsSetup ? (
           // Without a resume there's nothing to show yet; an "all caught up" state would mislead.
           <SetupReminder />
         ) : (
           <>
-            <GettingStarted jobs={data ?? []} />
-            {/* Wide screens: matches on the left, what needs you and your numbers on the right.
-                Phones: one column, in the order the `order-*` classes give. */}
-            <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start">
-              <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
-                {top[0] && <BestMatch job={top[0]} />}
-                <TopMatches jobs={top.slice(1)} />
+            {/* Wide screens: the best match on the left, what needs you and your numbers on
+                the right. Phones: one column, in the order the `order-*` classes give. */}
+            <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start lg:gap-6">
+              <div className="contents lg:block">
+                {top[0] ? <BestMatch job={top[0]} /> : <NoMatchesYet />}
               </div>
               <div className="contents lg:flex lg:flex-col lg:gap-6">
-                <section aria-labelledby="today" className="order-2">
-                  <h2 id="today" className="mb-3 font-display text-base font-semibold">
-                    Today
-                  </h2>
-                  <Card>
-                    {todos.length === 0 ? (
-                      <EmptyState icon={<PartyPopper className="size-5" />} title="You're all caught up">
-                        Nothing needs you right now. New matches and replies will show up here.
-                      </EmptyState>
-                    ) : (
-                      <ul>
-                        {todos.map((t) => (
-                          <li key={t.key} className="flex items-center gap-3 border-b border-line px-4 py-3.5 last:border-b-0">
-                            <span className={cx("size-2 flex-none rounded-full", t.dot)} aria-hidden />
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold">{t.title}</p>
-                              {t.detail && <p className="truncate text-ink-2">{t.detail}</p>}
-                            </div>
-                            <Link to={t.to} className={buttonClass("secondary", "sm")}>
-                              {t.cta}
-                              <ArrowRight className="size-3.5" aria-hidden />
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </Card>
-                </section>
-
-                <section aria-labelledby="pipeline" className="order-4">
-                  <h2 id="pipeline" className="mb-3 font-display text-base font-semibold">
-                    Your search
-                  </h2>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
-                    {counts.map((c) => (
-                      <Link key={c.label} to={c.to} className={cx("rounded-lg border border-line bg-surface p-4 shadow-card", lift)}>
-                        <span className="block font-display text-2xl font-semibold">{c.value}</span>
-                        <span className="text-ink-2">{c.label}</span>
-                      </Link>
+                <GettingStarted jobs={jobs} />
+                {needsYou.length > 0 && (
+                  <Group label="Needs you" className="order-1">
+                    <ul>
+                      {needsYou.map((t) => (
+                        <li key={t.key} className={cx(rowClass, "after:left-4")}>
+                          <span className={cx("size-2 flex-none rounded-full", t.dot)} aria-hidden />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold">{t.title}</p>
+                            {t.detail && <p className="truncate text-xs text-ink-2">{t.detail}</p>}
+                          </div>
+                          <Link to={t.to} className={buttonClass("secondary", "sm")}>
+                            {t.cta}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </Group>
+                )}
+                <Group label="Your search" className="order-4">
+                  <ul>
+                    {numbers.map((n) => (
+                      <li key={n.label}>
+                        <Link to={n.to} className={cx(rowClass, "min-h-12 after:left-4 hover:bg-subtle/50")}>
+                          <span className="flex-1">{n.label}</span>
+                          <span className="font-semibold tabular-nums">{n.value}</span>
+                          <ChevronRight className="size-4 text-ink-3" aria-hidden />
+                        </Link>
+                      </li>
                     ))}
-                  </div>
-                </section>
+                  </ul>
+                </Group>
               </div>
             </div>
+
+            <UpNext jobs={top.slice(1)} />
           </>
         )}
       </div>
@@ -217,162 +204,158 @@ export function HomePage() {
   );
 }
 
-/** The single best match, big enough to act on straight from Home. */
+/** "Checked 4,048 postings 12m ago · 3 new for you": the hourly check, made visible. */
+function ScanLine({ jobs }: { jobs: Job[] }) {
+  const { data } = useSearchStatus();
+  const since = readLastVisit("jobs");
+  const fresh = since === null ? 0 : jobs.filter((j) => isMatch(j) && isNewSince(j, since)).length;
+  const read = data?.last_read;
+  const when = read ? relativeTime(read.at) : null;
+  if (!read || !when) return fresh > 0 ? <>{fresh} new for you</> : null;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-1.5">
+      <span className={cx("size-1.5 rounded-full bg-accent", data?.is_running && "animate-pulse motion-reduce:animate-none")} aria-hidden />
+      {data?.is_running ? "Checking for new jobs now" : `Checked ${read.postings.toLocaleString()} postings ${when}`}
+      {fresh > 0 && (
+        <>
+          <span aria-hidden>·</span>
+          <Link to="/jobs" className="font-medium text-accent hover:underline">
+            {fresh} new for you
+          </Link>
+        </>
+      )}
+    </span>
+  );
+}
+
+const HERO_DRAWN_KEY = "jobcopilot_hero_drawn";
+
+/** The hero's ring draws itself once a day, or whenever the best match is a new one. */
+function shouldDraw(job: Job): boolean {
+  const today = new Date().toDateString();
+  try {
+    const seen = sessionStorage.getItem(HERO_DRAWN_KEY);
+    sessionStorage.setItem(HERO_DRAWN_KEY, `${today}|${job.job_id}`);
+    return seen !== `${today}|${job.job_id}`;
+  } catch {
+    return false;
+  }
+}
+
+/** The single best match, big enough to act on straight from Today. */
 function BestMatch({ job }: { job: Job }) {
   const pct = scorePercent(job.match_score);
-  const reasons = job.match_reasons.filter((r) => r.trim()).slice(0, 3);
-  const missing = job.missing_skills.filter((s) => s.trim()).slice(0, 4);
+  const draw = useMemo(() => shouldDraw(job), [job.job_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const meta = [job.company, job.location, job.salary_range].filter(Boolean).join(" · ");
   return (
-    <section aria-labelledby="best-match" className="order-1">
-      <div className="relative overflow-hidden rounded-lg border border-accent/25 bg-linear-to-br from-accent-soft via-surface via-55% to-surface p-5 shadow-card sm:p-6">
-        <p id="best-match" className="mb-4 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-spark-ink uppercase">
-          <Sparkles className="size-3.5" aria-hidden />
-          Your best match right now
-        </p>
-        <div className="flex items-start gap-4">
-          <CompanyMark name={job.company} size="lg" />
-          <div className="min-w-0 flex-1">
-            <h2 className="font-display text-lg leading-tight font-semibold sm:text-xl">{job.title}</h2>
-            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-ink-2">
-              <span className="font-medium text-ink">{job.company}</span>
-              {job.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="size-3.5" aria-hidden />
-                  {job.location}
-                </span>
-              )}
-              {job.salary_range && (
-                <span className="flex items-center gap-1">
-                  <Wallet className="size-3.5" aria-hidden />
-                  {job.salary_range}
-                </span>
-              )}
-            </div>
-          </div>
-          <ScoreRing pct={pct} size="lg" className="max-sm:hidden" />
+    <section aria-labelledby="best-match" className="order-2 rounded-xl bg-surface p-5 sm:p-7">
+      <p id="best-match" className="mb-4 text-xs text-ink-2">
+        Best match for you
+      </p>
+      <div className="flex items-center gap-4 sm:gap-5">
+        <ScoreRing pct={pct} size="lg" draw={draw} />
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg leading-tight font-bold">{job.title}</h2>
+          <p className="mt-1 text-ink-2">{meta}</p>
         </div>
-        {(reasons.length > 0 || missing.length > 0) && (
-          <div className="mt-4 flex flex-col gap-2">
-            {reasons.length > 0 && (
-              <ul className="flex flex-col gap-1.5">
-                {reasons.map((r) => (
-                  <li key={r} className="flex gap-2">
-                    <Check className="mt-0.5 size-4 flex-none text-ok" aria-hidden />
-                    {readableReason(r)}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {missing.length > 0 && (
-              <p className="flex flex-wrap items-center gap-1.5 text-ink-2">
-                Not on your resume:
-                {missing.map((m) => (
-                  <Badge key={m} tone="warn">
-                    {m}
-                  </Badge>
-                ))}
-              </p>
-            )}
-          </div>
-        )}
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <ScoreRing pct={pct} size="md" className="sm:hidden" />
-          <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className={buttonClass("primary", "lg")}>
-            Review this job
-            <ArrowRight className="size-4" aria-hidden />
-          </Link>
-          <Link to="/jobs" className={buttonClass("ghost", "lg", "max-sm:hidden")}>
-            See all matches
-          </Link>
-        </div>
+        <CompanyMark name={job.company} size="lg" />
       </div>
-    </section>
-  );
-}
-
-/** The next few matches, so Home answers "what else should I look at?" without a click. */
-function TopMatches({ jobs }: { jobs: Job[] }) {
-  if (!jobs.length) return null;
-
-  return (
-    <section aria-labelledby="top-matches" className="order-3">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 id="top-matches" className="font-display text-base font-semibold">
-          More top matches
-        </h2>
-        <Link to="/jobs" className="text-sm font-medium text-accent hover:underline">
-          All jobs
+      <MatchReceipt job={job} max={3} className="mt-5" />
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className={buttonClass("primary", "lg", "max-sm:w-full")}>
+          Review
+          <span className="sr-only">
+            {" "}
+            {job.title} at {job.company}
+          </span>
+        </Link>
+        <Link to="/jobs" className={buttonClass("ghost", "lg", "text-accent max-sm:hidden")}>
+          See all matches
         </Link>
       </div>
-      <Card className="overflow-hidden">
-        <ul>
-          {jobs.map((j) => {
-            const pct = scorePercent(j.match_score);
-            const why = matchSummary(j);
-            return (
-              <li key={j.job_id} className="flex items-center gap-3 border-b border-line px-4 py-3.5 transition-colors last:border-b-0 hover:bg-subtle/60 sm:px-5">
-                <CompanyMark name={j.company} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{j.title}</p>
-                  <p className="truncate text-ink-2">
-                    {j.company}
-                    {j.location && ` · ${j.location}`}
-                  </p>
-                  {why && <p className="truncate text-xs text-ink-3">{why}</p>}
-                </div>
-                <ScoreRing pct={pct} size="sm" />
-                <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className={buttonClass("secondary", "sm")}>
-                  Review
-                  <span className="sr-only">
-                    {" "}
-                    {j.title} at {j.company}
-                  </span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
     </section>
   );
 }
 
-/** First steps, until they're all done or dismissed. */
+function NoMatchesYet() {
+  return (
+    <Card className="order-2 rounded-xl p-6">
+      <BriefcaseBusiness className="mb-3 size-7 text-accent" aria-hidden />
+      <h2 className="text-base font-semibold">No matches yet</h2>
+      <p className="mt-1 max-w-md text-ink-2">We check for new jobs every hour and score each one against your resume. The best one will show up here.</p>
+      <Link to="/jobs" className={buttonClass("secondary", "md", "mt-4")}>
+        Search now
+      </Link>
+    </Card>
+  );
+}
+
+/** The next few matches: a grouped list on phones, a grid of cards on wide screens. */
+function UpNext({ jobs }: { jobs: Job[] }) {
+  if (!jobs.length) return null;
+  return (
+    <section aria-labelledby="up-next">
+      <div className="mb-2 flex items-center justify-between gap-3 px-1">
+        <h2 id="up-next" className="text-xs font-normal text-ink-2">
+          Up next
+        </h2>
+        <Link to="/jobs" className="font-medium text-accent hover:underline">
+          See all
+        </Link>
+      </div>
+      <ul className="overflow-hidden rounded-lg bg-surface md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:rounded-none md:bg-transparent">
+        {jobs.map((j) => (
+          <li
+            key={j.job_id}
+            className={cx(rowClass, "transition-colors hover:bg-subtle/50 md:rounded-lg md:bg-surface md:py-3.5 md:after:hidden md:hover:bg-surface md:hover:shadow-pop")}
+          >
+            <CompanyMark name={j.company} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-semibold">
+                <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className="after:absolute after:inset-0">
+                  {j.title}
+                </Link>
+              </p>
+              <p className="truncate text-xs text-ink-2">
+                {j.company}
+                {j.location && ` · ${j.location}`}
+              </p>
+            </div>
+            <ScoreRing pct={scorePercent(j.match_score)} size="sm" />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** First steps, as one quiet row until they're all done or dismissed. */
 function GettingStarted({ jobs }: { jobs: Job[] }) {
   const flags = useChecklistFlags();
   const steps = buildChecklist({ hasResume: true, hasTracked: jobs.some(isTracked), flags });
   const done = steps.filter((s) => s.done).length;
   if (flags.dismissed || done === steps.length) return null;
-
   const next = steps.find((s) => !s.done);
   if (!next) return null;
 
   return (
-    <section
-      aria-labelledby="getting-started"
-      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-card"
-    >
-      <h2 id="getting-started" className="flex items-center gap-2.5 font-semibold max-sm:basis-full">
-        Getting started
-        <span className="h-1.5 w-20 overflow-hidden rounded-full bg-subtle" aria-hidden>
-          <span className="block h-full rounded-full bg-accent" style={{ width: `${(done / steps.length) * 100}%` }} />
-        </span>
-        <span className="font-normal text-ink-3">
-          {done} of {steps.length} done
-        </span>
-      </h2>
-      <p className="flex min-w-0 flex-1 items-center gap-2 text-ink-2">
-        <span className="max-sm:sr-only">Next:</span>
-        <span className="truncate">{next.title}</span>
-      </p>
-      <Link to={next.to} className={buttonClass("secondary", "sm")}>
-        {next.cta}
-        <span className="sr-only">: {next.title}</span>
-      </Link>
-      <button type="button" onClick={() => markDone("dismissed")} className="flex items-center gap-1 text-sm text-ink-3 hover:text-ink">
-        <X className="size-3.5" aria-hidden />
-        Hide
-      </button>
+    <section aria-labelledby="getting-started" className="order-3 rounded-lg bg-surface px-4 py-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="getting-started" className="text-xs font-normal whitespace-nowrap text-ink-2">
+          Getting started · {done} of {steps.length} done
+        </h2>
+        <button type="button" onClick={() => markDone("dismissed")} className="flex items-center gap-1 text-xs text-ink-3 hover:text-ink">
+          <X className="size-3.5" aria-hidden />
+          Hide
+        </button>
+      </div>
+      <div className="mt-2 flex items-center gap-3">
+        <p className="min-w-0 flex-1 font-semibold">{next.title}</p>
+        <Link to={next.to} className={buttonClass("secondary", "sm")}>
+          {next.cta}
+          <span className="sr-only">: {next.title}</span>
+        </Link>
+      </div>
     </section>
   );
 }

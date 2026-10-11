@@ -1,11 +1,12 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/bricolage-grotesque";
 
 /*
  * JobCopilot design tokens. This is the ONLY place colors, type sizes and radii are defined.
  * Tailwind's default palette and type scale are reset so off-system values fail to compile
  * into anything: use bg-surface, text-ink-2, text-sm, rounded-lg, etc.
+ *
+ * The look ("Calm"): soft white cards on a pale page with no borders or resting shadows,
+ * the device's own font, one tint for everything you can tap, and colour only for meaning.
  */
 @theme {
   --color-*: initial;
@@ -14,81 +15,83 @@
   --color-current: currentColor;
 
   /* Neutrals */
-  --color-canvas: #f7f7f8;
+  --color-canvas: #f2f3f5;
   --color-surface: #ffffff;
-  --color-subtle: #f2f3f5;
-  --color-line: #e4e5e9;
-  --color-line-strong: #d1d3d9;
-  --color-ink: #14151a;
-  --color-ink-2: #545866;
-  --color-ink-3: #6b6f7c; /* ≥4.5:1 on surface, canvas and subtle (WCAG AA) */
+  --color-subtle: #e9eaee; /* pressed rows, fields, ring track */
+  --color-line: #e3e4e8; /* hairlines between rows inside a card */
+  --color-line-strong: #cfd1d8;
+  --color-ink: #0f1013;
+  --color-ink-2: #5a5d68;
+  --color-ink-3: #636773; /* ≥4.5:1 on surface, canvas and subtle (WCAG AA) */
 
-  /* Accent: the brand color, used for anything you can act on */
+  /* The tint: everything you can tap, and nothing else */
   --color-accent: #4f46e5;
   --color-accent-hover: #4338ca;
-  --color-accent-soft: #eef0ff;
+  --color-accent-soft: #eceefe;
   --color-accent-ink: #3730a3;
-
-  /* Spark: the warm second brand color. Decoration and highlights only, never a status. */
-  --color-spark: #f26b3a;
-  --color-spark-soft: #fff0e8;
-  --color-spark-ink: #a83c12; /* ≥4.5:1 on spark-soft and surface */
 
   /* Status colors carry meaning only */
   --color-ok: #13743a;
-  --color-ok-soft: #e8f6ec;
-  --color-warn: #a34a07;
-  --color-warn-soft: #fef3e2;
-  --color-info: #1d4ed8;
-  --color-info-soft: #e8effe;
+  --color-ok-soft: #e4f4e9;
+  --color-warn: #9a4406;
+  --color-warn-soft: #fdf0dc;
+  /* "Info" is the tint: one blue-ish colour in the app, not two. */
+  --color-info: #3730a3;
+  --color-info-soft: #eceefe;
   --color-danger: #b91c1c;
-  --color-danger-soft: #fdecec;
+  --color-danger-soft: #fdeaea;
 
   /* Text on a solid accent / ok / danger fill, and the veil behind dialogs */
   --color-on-solid: #ffffff;
-  --color-scrim: rgb(20 21 26 / 0.3);
+  --color-scrim: rgb(15 16 19 / 0.35);
 
-  /* Six type sizes */
+  /* Six type sizes: footnote, body, headline, title, and two large titles */
   --text-*: initial;
-  --text-xs: 0.75rem;
-  --text-xs--line-height: 1rem;
-  --text-sm: 0.875rem;
-  --text-sm--line-height: 1.25rem;
-  --text-base: 1rem;
-  --text-base--line-height: 1.5rem;
-  --text-lg: 1.25rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.375rem;
+  --text-lg: 1.375rem;
   --text-lg--line-height: 1.75rem;
-  --text-xl: 1.5rem;
-  --text-xl--line-height: 2rem;
-  --text-2xl: 2rem;
+  --text-xl: 1.75rem;
+  --text-xl--line-height: 2.125rem;
+  --text-2xl: 2.125rem;
   --text-2xl--line-height: 2.5rem;
 
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-  /* Headings, the wordmark and big numbers */
-  --font-display: "Bricolage Grotesque Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  /* The device's own font: San Francisco on Apple devices, Roboto on Android, Segoe UI on
+     Windows. Nothing to download. */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
 
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
 
-  --shadow-card: 0 1px 2px rgb(20 21 26 / 0.06);
-  --shadow-pop: 0 8px 24px rgb(20 21 26 / 0.12);
+  /* Cards rest flat. Shadow is only for things that float (menus, sheets, dialogs). */
+  --shadow-card: 0 0 #0000;
+  --shadow-pop: 0 10px 30px rgb(15 16 19 / 0.14), 0 2px 6px rgb(15 16 19 / 0.06);
+
+  /* One easing curve for every movement. */
+  --ease-calm: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /*
  * Dark mode follows the device setting. Same tokens, second set of values: components never
  * mention a colour scheme. Text colours keep at least 4.5:1 on canvas, surface and subtle.
- * The accent is lighter here so links stay readable, which is why solid fills carry dark
- * text (--color-on-solid) instead of white.
+ * The tint is lighter here so links stay readable, which is why solid fills carry dark
+ * text (--color-on-solid) instead of white. The page is true black so cards float without
+ * borders.
  */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-canvas: #0f1014;
-    --color-surface: #17181d;
-    --color-subtle: #202228;
-    --color-line: #2b2d36;
-    --color-line-strong: #3d404b;
-    --color-ink: #f2f3f5;
-    --color-ink-2: #b6bac6;
+    --color-canvas: #000000;
+    --color-surface: #1a1b1f;
+    --color-subtle: #26272d;
+    --color-line: #2c2d34;
+    --color-line-strong: #3d3f49;
+    --color-ink: #f5f5f7;
+    --color-ink-2: #a9adb9;
     --color-ink-3: #979baa;
 
     --color-accent: #8f97ff;
@@ -96,24 +99,19 @@
     --color-accent-soft: #24264d;
     --color-accent-ink: #cdd0ff;
 
-    --color-spark: #ff9466;
-    --color-spark-soft: #38201a;
-    --color-spark-ink: #ffb596;
-
     --color-ok: #5fd08a;
     --color-ok-soft: #12301f;
     --color-warn: #f2a65e;
     --color-warn-soft: #3a2410;
-    --color-info: #82acff;
-    --color-info-soft: #172a52;
+    --color-info: #cdd0ff;
+    --color-info-soft: #24264d;
     --color-danger: #f78d8d;
     --color-danger-soft: #3d1818;
 
     --color-on-solid: #0f1014;
     --color-scrim: rgb(0 0 0 / 0.6);
 
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.5);
+    --shadow-pop: 0 10px 30px rgb(0 0 0 / 0.6);
   }
 }
 
@@ -127,10 +125,24 @@
     @apply bg-canvas text-sm text-ink antialiased;
   }
   h1 {
-    font-family: var(--font-display);
-    letter-spacing: -0.015em;
+    letter-spacing: -0.02em;
   }
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
+
+/* The ring filling in, once, for a match that's new to the user. */
+@keyframes ring-draw {
+  from {
+    stroke-dashoffset: var(--ring-around);
+  }
+}
+.ring-draw {
+  animation: ring-draw 0.7s var(--ease-calm) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ring-draw {
+    animation: none;
   }
 }

@@ -377,10 +377,29 @@ export function readLastVisit(page: string): number | null {
 }
 
 /** "Find new jobs": checks for postings now (we also check every hour automatically). */
+export interface SearchStatus {
+  is_running: boolean;
+  /** The last shared read of every source, or null before the first one. */
+  last_read: { postings: number; at: string } | null;
+}
+
+/** How many postings the last hourly check read, and when. Real figures from the server. */
+export function useSearchStatus() {
+  return useQuery({
+    queryKey: ["discovery-status"],
+    queryFn: ({ signal }) => api<SearchStatus>("/discovery/status", { signal }),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
 export function useFindNewJobs() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api<{ status?: string; message?: string; matched_and_saved?: number }>("/discovery/run", { method: "POST" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      qc.invalidateQueries({ queryKey: ["discovery-status"] });
+    },
   });
 }

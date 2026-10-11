@@ -16,7 +16,7 @@ test.describe("Jobs and review", () => {
 
     await page.getByLabel("Search jobs").fill("react");
     await expect(rows).toHaveCount(1);
-    await expect(page.getByText("Vertex Labs", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /at Vertex Labs/ })).toBeVisible();
     await page.getByLabel("Search jobs").fill("");
     await expect(rows).toHaveCount(2);
 

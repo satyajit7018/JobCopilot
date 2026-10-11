@@ -39,7 +39,7 @@ export function SettingsPage() {
   const premium = useIsPremium();
   return (
     <>
-      <PageHeader title="Settings" />
+      <PageHeader width="max-w-3xl" title="Settings" />
       <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-5 md:px-7 md:py-8">
         <PlanSection />
         {premium && <AutomationSection />}

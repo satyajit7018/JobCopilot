@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bookmark, BookmarkCheck, BriefcaseBusiness, Clock, ExternalLink, EyeOff, MapPin, RefreshCw, Search, Wallet } from "lucide-react";
+import { Bookmark, BookmarkCheck, BriefcaseBusiness, EyeOff, RefreshCw, Search } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { SearchProgress } from "../components/SearchProgress";
-import { Alert, Badge, Button, Card, Chip, CompanyMark, EmptyState, ScoreRing, SkeletonRows, buttonClass, cx } from "../components/ui";
+import { Alert, Button, Card, Chip, CompanyMark, EmptyState, ScoreRing, Segmented, SkeletonRows, cx, rowClass } from "../components/ui";
 import { Link, useSearchParams } from "react-router";
 import {
   HIDE_REASONS,
@@ -11,7 +11,6 @@ import {
   isNewSince,
   isRemote,
   jobRegions,
-  matchSummary,
   relativeTime,
   rememberMatchOrder,
   scorePercent,
@@ -27,9 +26,6 @@ import {
 } from "../lib/jobs";
 
 type Sort = "match" | "newest";
-
-/** From this score up, a row gets the "strong match" edge. */
-const STRONG_MATCH = 90;
 
 /** How many jobs to show at once; the rest sit behind "Show more". */
 const PAGE_SIZE = 20;
@@ -130,12 +126,15 @@ export function JobsPage() {
       <div className="mx-auto max-w-5xl px-4 py-5 md:px-7 md:py-6">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="relative -mx-4 flex flex-none items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [scrollbar-width:none] [&>*]:flex-none">
-          <Chip on={sort === "match"} onClick={() => setSort("match")}>
-            Best match
-          </Chip>
-          <Chip on={sort === "newest"} onClick={() => setSort("newest")}>
-            Newest
-          </Chip>
+          <Segmented
+            label="Sort"
+            value={sort}
+            onChange={setSort}
+            options={[
+              { value: "match", label: "Best match" },
+              { value: "newest", label: "Newest" },
+            ]}
+          />
           <Chip on={remoteOnly} onClick={() => setRemoteOnly(!remoteOnly)}>
             Remote
           </Chip>
@@ -167,7 +166,7 @@ export function JobsPage() {
               placeholder="Search title or company"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="h-9 w-full rounded-md border border-line bg-surface pr-3 pl-9 text-sm placeholder:text-ink-3 focus:border-accent focus:outline-none"
+              className="h-9 w-full rounded-full border border-transparent bg-surface pr-3 pl-9 text-sm placeholder:text-ink-3 focus:border-accent focus:outline-none"
             />
           </label>
         </div>
@@ -251,7 +250,7 @@ function FilterSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex h-8 items-center rounded-full border border-line bg-surface pl-3 text-ink-2 focus-within:border-accent">
+    <label className="flex h-8 items-center rounded-full border border-transparent bg-surface pl-3 text-ink-2 focus-within:border-accent">
       <span className="sr-only">{label}</span>
       <select
         value={value}
@@ -268,77 +267,54 @@ function FilterSelect({
   );
 }
 
+/**
+ * One job in two lines, so many fit on a screen: this list is for sorting through matches
+ * quickly. The whole row opens the job; save and hide are always there at the end.
+ */
 function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean; onHide: () => void; onToggleSave: () => void }) {
   const saved = job.status === "SAVED";
   const pct = scorePercent(job.match_score);
-  const why = matchSummary(job);
   const when = relativeTime(postedAt(job));
+  const meta = [job.company, job.location, job.salary_range].filter(Boolean).join(" · ");
+  const action = "relative z-10 grid h-11 w-8 flex-none place-items-center rounded-md text-ink-3 hover:bg-subtle hover:text-ink sm:w-10";
 
   return (
-    <li
-      className={cx(
-        "flex flex-col gap-2 border-b border-line px-4 py-3.5 transition-colors last:border-b-0 hover:bg-subtle/60 sm:flex-row sm:items-center sm:gap-4 sm:px-5 sm:py-4",
-        // The very best matches get a green edge so they stand out while scrolling.
-        pct >= STRONG_MATCH && "shadow-[inset_3px_0_0_var(--color-ok)]",
-      )}
-    >
-      <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
-        <CompanyMark name={job.company} />
-        {/* Phones: the score sits beside the title so the actions fit on one short row. */}
-        <div className="order-last flex-none sm:hidden" aria-hidden>
-          <ScoreRing pct={pct} size="sm" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">
-            <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className="hover:text-accent hover:underline">
-              {job.title}
-            </Link>
-            {isNew && <Badge tone="accent">New</Badge>}
-          </h2>
-          <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-ink-2">
-            <span>{job.company}</span>
-            {job.location && (
-              <span className="flex items-center gap-1">
-                <MapPin className="size-3.5" aria-hidden />
-                {job.location}
-              </span>
-            )}
-            {job.salary_range && (
-              <span className="flex items-center gap-1">
-                <Wallet className="size-3.5" aria-hidden />
-                {job.salary_range}
-              </span>
-            )}
-            {when && (
-              <span className="flex items-center gap-1 text-ink-3">
-                <Clock className="size-3.5" aria-hidden />
-                {when}
-              </span>
-            )}
-          </div>
-          {why && <p className="mt-1.5 line-clamp-2 text-ink-2 sm:line-clamp-none">{why}</p>}
-        </div>
+    <li className={cx(rowClass, "gap-3 py-2.5 pr-1.5 transition-colors hover:bg-subtle/50 sm:pr-3")}>
+      <CompanyMark name={job.company} />
+      <div className="min-w-0 flex-1">
+        <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+          {isNew && (
+            <span className="size-2 flex-none rounded-full bg-accent" aria-hidden />
+          )}
+          {/* The link's ::after covers the row, so the whole row is one target. */}
+          <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className="line-clamp-2 after:absolute after:inset-0 sm:line-clamp-1">
+            <span className="sr-only">Review </span>
+            {job.title}
+            <span className="sr-only">
+              {" "}
+              at {job.company}
+              {isNew && " (new)"}
+            </span>
+          </Link>
+        </h2>
+        <p className="truncate text-xs text-ink-2">{meta}</p>
       </div>
-      <div className="flex items-center gap-1 pl-13 sm:gap-4 sm:pl-0">
-        <ScoreRing pct={pct} className="max-sm:sr-only" />
-        <button type="button" onClick={onToggleSave} aria-pressed={saved} className={buttonClass("ghost", "md")} title={saved ? "Saved" : "Save for later"}>
-          {saved ? <BookmarkCheck className="size-4 text-accent" aria-hidden /> : <Bookmark className="size-4" aria-hidden />}
+      <p className="flex-none text-right text-xs text-ink-3 max-md:hidden">
+        {job.platform}
+        {when && ` · ${when}`}
+      </p>
+      <ScoreRing pct={pct} size="sm" draw={isNew} />
+      <div className="flex flex-none">
+        <button type="button" onClick={onToggleSave} aria-pressed={saved} className={action} title={saved ? "Saved" : "Save for later"}>
+          {saved ? <BookmarkCheck className="size-5 text-accent" strokeWidth={1.75} aria-hidden /> : <Bookmark className="size-5" strokeWidth={1.75} aria-hidden />}
           <span className="sr-only">
             {saved ? "Saved" : "Save"} {job.title} at {job.company}
           </span>
         </button>
-        <button type="button" onClick={onHide} className={buttonClass("ghost", "md")} title="Not interested">
-          <EyeOff className="size-4" aria-hidden />
+        <button type="button" onClick={onHide} className={action} title="Not interested">
+          <EyeOff className="size-5" strokeWidth={1.75} aria-hidden />
           <span className="sr-only">Not interested in {job.title} at {job.company}</span>
         </button>
-        <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("ghost", "md", "max-md:hidden")} title="View posting">
-          <ExternalLink className="size-4" aria-hidden />
-          <span className="sr-only">View posting (opens in a new tab)</span>
-        </a>
-        <Link to={`/jobs/${encodeURIComponent(job.job_id)}`} className={buttonClass(pct >= 80 ? "primary" : "secondary", "md", "max-sm:ml-auto")}>
-          Review
-          <span className="sr-only"> {job.title} at {job.company}</span>
-        </Link>
       </div>
     </li>
   );
@@ -351,7 +327,7 @@ function HiddenNotice({ job, onUndo }: { job: Job; onUndo: () => void }) {
   const answered = why.isSuccess;
   const rule = why.data?.rule ?? null;
   return (
-    <div className="mb-3 rounded-md border border-line bg-surface px-4 py-2.5" role="status">
+    <div className="mb-3 rounded-lg bg-surface px-4 py-3" role="status">
       <div className="flex items-center gap-3">
         <EyeOff className="size-4 flex-none text-ink-3" aria-hidden />
         <p className="min-w-0 flex-1 truncate">
@@ -391,7 +367,7 @@ function HiddenNotice({ job, onUndo }: { job: Job; onUndo: () => void }) {
               type="button"
               disabled={why.isPending}
               onClick={() => why.mutate({ jobId: job.job_id, reason: r.value })}
-              className="h-7 rounded-full border border-line px-2.5 text-xs font-medium text-ink-2 hover:bg-subtle disabled:opacity-60"
+              className="h-7 rounded-full bg-subtle px-2.5 text-xs font-medium text-ink-2 hover:text-ink disabled:opacity-60"
             >
               {r.label}
             </button>

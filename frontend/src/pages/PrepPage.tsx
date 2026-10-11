@@ -66,7 +66,7 @@ const SAMPLE = [
 function PrepLocked() {
   return (
     <>
-      <PageHeader title="Prep" />
+      <PageHeader width="max-w-3xl" title="Prep" />
       <div className="mx-auto max-w-3xl px-4 py-5 md:px-7 md:py-8">
         <PremiumLock title="Get ready for every interview">
           Likely questions for each role, practice answers with feedback, and questions to ask them. Your upcoming interviews show
@@ -118,7 +118,7 @@ function PrepTools() {
 
   return (
     <>
-      <PageHeader title="Prep" subtitle={interviews.length ? `${interviews.length} upcoming ${interviews.length === 1 ? "interview" : "interviews"}` : undefined} />
+      <PageHeader width="max-w-4xl" title="Prep" subtitle={interviews.length ? `${interviews.length} upcoming ${interviews.length === 1 ? "interview" : "interviews"}` : undefined} />
       <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-5 md:px-7 md:py-8">
         <Card className="flex flex-col gap-4 p-4 sm:p-5">
           {interviews.length > 0 && (

@@ -16,7 +16,7 @@ export function PlansPage() {
 
   return (
     <>
-      <PageHeader title="Plans" />
+      <PageHeader width="max-w-4xl" title="Plans" />
       <div className="mx-auto max-w-4xl px-4 py-5 md:px-7 md:py-8">
         <div className="mb-6 max-w-xl">
           <h1 className="text-xl font-semibold">Find jobs for free. Let JobCopilot do the work with Premium.</h1>

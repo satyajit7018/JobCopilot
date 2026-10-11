@@ -15,7 +15,7 @@ test.describe("Retention features", () => {
     await page.getByRole("button", { name: "Save Backend Engineer at Nimbus Systems" }).click();
     await page.getByRole("button", { name: /^Saved \(1\)$/ }).click();
     await expect(rows).toHaveCount(1);
-    await expect(page.getByText("Nimbus Systems", { exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: /at Nimbus Systems/ })).toBeVisible();
 
     // Saved survives a reload, and can be undone from the review page.
     await page.reload();

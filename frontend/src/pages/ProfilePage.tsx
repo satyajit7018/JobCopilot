@@ -65,7 +65,7 @@ export function ProfilePage() {
   const updated = relativeTime(p.updated_at);
   return (
     <>
-      <PageHeader title="Profile" subtitle={updated ? `Updated ${updated}` : undefined} />
+      <PageHeader width="max-w-3xl" title="Profile" subtitle={updated ? `Updated ${updated}` : undefined} />
       <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-5 pb-28 md:px-7 md:py-8">
         <ResumeSection profile={p} onReplaced={() => setVersion((v) => v + 1)} />
         <DetailsForm key={version} profile={p} />

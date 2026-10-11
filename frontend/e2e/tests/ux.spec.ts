@@ -142,13 +142,13 @@ test.describe("Guided job search", () => {
     await page.goto("/profile");
     await expect(page).toHaveTitle("Profile · JobCopilot");
     await page.getByLabel("Phone").fill("+91 90000 00000");
-    await page.getByRole("link", { name: "Home" }).first().click();
+    await page.getByRole("link", { name: "Today" }).first().click();
     const dialog = page.getByRole("dialog", { name: "Leave without saving?" });
     await expect(dialog).toBeVisible();
     await dialog.getByRole("button", { name: "Keep editing" }).click();
     await expect(page).toHaveURL(/\/profile$/);
 
-    await page.getByRole("link", { name: "Home" }).first().click();
+    await page.getByRole("link", { name: "Today" }).first().click();
     await dialog.getByRole("button", { name: "Save and leave" }).click();
     await expect(page).toHaveURL(/\/$/);
     await page.goto("/profile");

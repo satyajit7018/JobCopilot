@@ -16,7 +16,7 @@ export function ApplicationsPage() {
 
   return (
     <>
-      <PageHeader title="Applications" subtitle={data ? `${tracked.length} tracked` : undefined} />
+      <PageHeader width="max-w-none" title="Applied" subtitle={data ? `${tracked.length} tracked` : undefined} />
       <div className="px-4 py-5 md:px-7 md:py-6">
         <HeldQuestions />
         {isPending ? (

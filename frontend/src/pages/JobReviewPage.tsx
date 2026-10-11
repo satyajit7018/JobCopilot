@@ -148,7 +148,7 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
 
   return (
     <>
-      <PageHeader title="Review & apply" tabTitle={`${job.title} at ${job.company}`} />
+      <PageHeader width="max-w-6xl" title="Review & apply" tabTitle={`${job.title} at ${job.company}`} />
       <div className="mx-auto max-w-6xl px-4 py-5 md:px-7 md:py-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           {back}
