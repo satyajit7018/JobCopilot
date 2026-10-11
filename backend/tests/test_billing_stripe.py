@@ -34,27 +34,3 @@ async def test_billing_plan_endpoint(auth_header):
         assert data["status"] == "success"
         assert data["plan"]["tier"] == "FREE"
 
-
-@pytest.mark.asyncio
-async def test_create_checkout_session(auth_header):
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test", headers=auth_header) as ac:
-        res = await ac.post("/api/billing/checkout", json={"tier": "PRO"})
-        assert res.status_code == 200
-        data = res.json()
-        assert data["status"] == "success"
-        assert data["tier"] == "PRO"
-        assert "checkout_url" in data
-        assert "https://checkout.stripe.com" in data["checkout_url"]
-
-
-@pytest.mark.asyncio
-async def test_create_customer_portal_session(auth_header):
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test", headers=auth_header) as ac:
-        res = await ac.post("/api/billing/portal", json={})
-        assert res.status_code == 200
-        data = res.json()
-        assert data["status"] == "success"
-        assert "portal_url" in data
-        assert "stripe.com" in data["portal_url"]

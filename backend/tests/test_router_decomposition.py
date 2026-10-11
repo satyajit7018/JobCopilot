@@ -1,6 +1,6 @@
 """
 JobCopilot - Router Decomposition & Domain Modularity Tests
-Verifies that all 12 domain routers are cleanly modularized, properly mounted under /api,
+Verifies that all domain routers are cleanly modularized, properly mounted under /api,
 preserve 100% backwards compatibility, enforce authentication boundaries, and respond correctly.
 """
 
@@ -15,10 +15,8 @@ from app.api.endpoints import (
     GoogleSSORequest,
     QuestionnaireSubmitRequest,
     VaultLearnRequest,
-    VaultTestMatchRequest,
     AlumniReferralRequest,
     RecruiterNudgeRequest,
-    MultiRoleTailorRequest,
     LogDirectCallRequest,
     UpdateJobStatusRequest,
     HITLResolveRequest,
@@ -32,9 +30,6 @@ from app.api.endpoints import (
     MultiOfferCompareRequest,
     AdvancedCounterOfferRequest,
     CounterOfferRequest,
-    CheckoutRequest,
-    CustomerPortalRequest,
-    RestoreBackupPayload,
     Organization,
     Membership,
     AdminAuditLog,
@@ -48,13 +43,11 @@ from app.api.routers import (
     jobs_router,
     bot_router,
     email_router,
-    analytics_router,
     interview_router,
     negotiation_router,
     billing_router,
     backup_router,
     admin_router,
-    org_router,
     account_router,
     compliance_router,
     all_routers,
@@ -63,7 +56,7 @@ from app.api.routers import (
 
 def test_all_domain_routers_exported_and_valid():
     """Validates that all domain routers are distinct APIRouter instances."""
-    assert len(all_routers) == 17  # + support (feedback)
+    assert len(all_routers) == 15
     for r in all_routers:
         assert isinstance(r, APIRouter)
 
@@ -73,10 +66,8 @@ def test_backwards_compatible_model_exports():
     assert GoogleSSORequest is not None
     assert QuestionnaireSubmitRequest is not None
     assert VaultLearnRequest is not None
-    assert VaultTestMatchRequest is not None
     assert AlumniReferralRequest is not None
     assert RecruiterNudgeRequest is not None
-    assert MultiRoleTailorRequest is not None
     assert LogDirectCallRequest is not None
     assert HITLResolveRequest is not None
     assert ResolveHeldApplicationRequest is not None
@@ -89,9 +80,6 @@ def test_backwards_compatible_model_exports():
     assert MultiOfferCompareRequest is not None
     assert AdvancedCounterOfferRequest is not None
     assert CounterOfferRequest is not None
-    assert CheckoutRequest is not None
-    assert CustomerPortalRequest is not None
-    assert RestoreBackupPayload is not None
     assert Organization is not None
     assert Membership is not None
     assert AdminAuditLog is not None
@@ -112,7 +100,6 @@ def test_route_topology_coverage(client: TestClient):
         "/api/health",
         # Auth Router
         "/api/auth/google-sso",
-        "/api/auth/status",
         "/api/auth/login",
         "/api/auth/register",
         "/api/auth/logout",
@@ -124,7 +111,6 @@ def test_route_topology_coverage(client: TestClient):
         # Vault Router
         "/api/vault",
         "/api/vault/learn",
-        "/api/vault/test-match",
         # Discovery Router
         "/api/discovery/run",
         "/api/discovery/status",
@@ -132,9 +118,7 @@ def test_route_topology_coverage(client: TestClient):
         "/api/jobs",
         "/api/jobs/{job_id}/status",
         "/api/jobs/{job_id}/tailor",
-        "/api/resumes/tailor-multi",
         "/api/jobs/log-call",
-        "/api/jobs/held",
         "/api/outreach/alumni-referral",
         "/api/outreach/recruiter-nudge",
         # Bot Router
@@ -150,8 +134,6 @@ def test_route_topology_coverage(client: TestClient):
         "/api/email/inbound",
         "/api/email/messages",
         "/api/email/followup/{job_id}",
-        # Analytics Router
-        "/api/analytics/funnel",
         # Interview Studio Router
         "/api/interview/dossier",
         "/api/interview/questions",
@@ -164,42 +146,29 @@ def test_route_topology_coverage(client: TestClient):
         # Negotiation Router
         "/api/negotiation/evaluate",
         "/api/negotiation/equity",
-        "/api/salary/compare-offers",
         "/api/negotiation/compare-offers",
-        "/api/salary/counter-script",
         "/api/negotiation/advanced-counter",
         "/api/negotiation/counter-offer",
         # Billing Router
-        "/api/billing/webhook",
         "/api/billing/plan",
-        "/api/billing/checkout",
-        "/api/billing/portal",
-        "/api/billing/sync",
-        "/api/billing/proration-preview",
+        "/api/billing/razorpay/subscribe",
+        "/api/billing/razorpay/verify",
+        "/api/billing/razorpay/cancel",
+        "/api/billing/razorpay/webhook",
         # Admin Router
         "/api/admin/users",
-        "/api/admin/orgs",
         "/api/admin/metrics",
         "/api/admin/impersonate/{user_id}",
         "/api/admin/audit-logs",
         "/api/admin/users/{user_id}/role",
-        # Org Router
-        "/api/orgs",
-        "/api/orgs/{org_id}",
-        "/api/orgs/{org_id}/members",
-        "/api/orgs/{org_id}/members/{user_id}",
         # Account Router
         "/api/account/export",
         "/api/account",
-        # Backup Router
-        "/api/backup/export",
-        "/api/backup/restore",
+        # Storage downloads
         "/api/storage/download",
         # Compliance Router
         "/api/compliance/consent",
         "/api/compliance/consent/history",
-        "/api/compliance/legal/tos",
-        "/api/compliance/legal/dpa",
     ]
 
     for path in expected_paths:
@@ -212,14 +181,11 @@ def test_unauthenticated_protected_routes_return_401(client: TestClient):
         ("GET", "/api/profile"),
         ("GET", "/api/vault"),
         ("GET", "/api/jobs"),
-        ("GET", "/api/analytics/funnel"),
         ("GET", "/api/interview/dossier?company=Google"),
         ("POST", "/api/interview/evaluate"),
         ("POST", "/api/negotiation/evaluate"),
         ("GET", "/api/calendar/availability"),
         ("GET", "/api/billing/plan"),
-        ("POST", "/api/backup/export"),
-        ("GET", "/api/jobs/held"),
     ]
 
     for method, path in protected_endpoints:
@@ -232,11 +198,6 @@ def test_unauthenticated_protected_routes_return_401(client: TestClient):
 
 def test_authenticated_domain_router_responses(auth_client: TestClient):
     """Exercises domain routers with authenticated credentials to verify proper dispatching."""
-    # 1. Analytics Router
-    res_analytics = auth_client.get("/api/analytics/funnel")
-    assert res_analytics.status_code == 200
-    assert res_analytics.json()["status"] == "success"
-
     # 2. Interview Router: Dossier
     res_dossier = auth_client.get("/api/interview/dossier?company=Stripe&role=Staff+Engineer")
     assert res_dossier.status_code == 200

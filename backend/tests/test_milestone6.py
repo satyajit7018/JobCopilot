@@ -46,18 +46,6 @@ class TestMilestone6:
         self.headers = {"Authorization": f"Bearer {self.token}"}
 
     @pytest.mark.asyncio
-    async def test_analytics_funnel_endpoint(self):
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test", headers=self.headers) as ac:
-            res = await ac.get("/api/analytics/funnel")
-            assert res.status_code == 200
-            data = res.json()
-            assert data["status"] == "success"
-            metrics = data["metrics"]
-            assert "total_sourced" in metrics
-            assert "response_rate_percent" in metrics
-
-    @pytest.mark.asyncio
     async def test_inbound_email_radar_flow(self):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test", headers=self.headers) as ac:

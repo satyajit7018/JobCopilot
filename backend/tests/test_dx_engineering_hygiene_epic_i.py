@@ -55,21 +55,19 @@ def test_canonical_v1_and_legacy_api_routing(client, auth_headers):
     headers = {"Authorization": auth_headers["Authorization"]}
 
     # 1. Canonical /api/v1 route
-    res_v1 = client.get("/api/v1/analytics/funnel", headers=headers)
+    res_v1 = client.get("/api/v1/billing/plan", headers=headers)
     assert res_v1.status_code == 200
-    assert "metrics" in res_v1.json()
     # Canonical v1 routes MUST NOT have Deprecation header
     assert "Deprecation" not in res_v1.headers
     assert "Sunset" not in res_v1.headers
 
     # 2. Legacy /api route
-    res_legacy = client.get("/api/analytics/funnel", headers=headers)
+    res_legacy = client.get("/api/billing/plan", headers=headers)
     assert res_legacy.status_code == 200
-    assert "metrics" in res_legacy.json()
     # Legacy routes MUST have RFC 8594 Deprecation & Sunset headers
     assert res_legacy.headers.get("Deprecation") == "true"
     assert "Sunset" in res_legacy.headers
-    assert res_legacy.headers.get("Link") == '</api/v1/analytics/funnel>; rel="successor-version"'
+    assert res_legacy.headers.get("Link") == '</api/v1/billing/plan>; rel="successor-version"'
 
 
 def test_v1_openapi_schema_endpoint(client):

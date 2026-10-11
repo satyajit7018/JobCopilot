@@ -244,44 +244,6 @@ def test_api_v1_consent_history_and_filtering(auth_client: TestClient):
         assert item["consent_type"] == "telemetry_analytics"
 
 
-def test_api_v1_legal_metadata_endpoints(client: TestClient):
-    """Verifies public legal metadata endpoints for Terms of Service and DPA."""
-    # Terms of Service
-    tos_res = client.get("/api/v1/compliance/legal/tos")
-    assert tos_res.status_code == 200
-    tos_data = tos_res.json()
-    assert tos_data["version"] == "1.0"
-    assert "Terms of Service" in tos_data["title"]
-    assert len(tos_data["sections"]) >= 8
-    assert tos_data["document_path"] == "docs/compliance/TERMS_OF_SERVICE.md"
-
-    # Data Processing Agreement
-    dpa_res = client.get("/api/v1/compliance/legal/dpa")
-    assert dpa_res.status_code == 200
-    dpa_data = dpa_res.json()
-    assert dpa_data["version"] == "1.0"
-    assert dpa_data["gdpr_article_28_aligned"] is True
-    assert len(dpa_data["subprocessors"]) >= 3
-    assert dpa_data["document_path"] == "docs/compliance/DATA_PROCESSING_AGREEMENT.md"
-
-
-def test_legacy_api_compliance_routing(client: TestClient, auth_client: TestClient):
-    """Verifies backward compatibility on legacy /api/compliance routes."""
-    # Legacy ToS endpoint
-    legacy_tos = client.get("/api/compliance/legal/tos")
-    assert legacy_tos.status_code == 200
-    assert legacy_tos.json()["version"] == "1.0"
-
-    # Legacy DPA endpoint
-    legacy_dpa = client.get("/api/compliance/legal/dpa")
-    assert legacy_dpa.status_code == 200
-    assert legacy_dpa.json()["gdpr_article_28_aligned"] is True
-
-    # Legacy consent retrieval
-    legacy_consent = auth_client.get("/api/compliance/consent")
-    assert legacy_consent.status_code == 200
-
-
 def test_unauthenticated_consent_actions_blocked(client: TestClient):
     """Verifies that unauthenticated access to consent mutations or candidate history is rejected."""
     # POST /api/v1/compliance/consent without auth

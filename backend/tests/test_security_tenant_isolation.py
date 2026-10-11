@@ -155,17 +155,6 @@ def test_cross_tenant_vault_isolation(tenant_a_client: TestClient, tenant_b_clie
     assert "Tenant A Secret Sauce 42" not in b_answers
 
 
-def test_stripe_webhook_fail_closed(client: TestClient, monkeypatch):
-    """F-04: Billing webhook rejects unconfigured secret with 503 and invalid signature with 400."""
-    monkeypatch.delenv("STRIPE_WEBHOOK_SECRET", raising=False)
-    res = client.post("/api/billing/webhook", content=b'{"id":"evt_123"}', headers={"Stripe-Signature": "fake_sig"})
-    assert res.status_code == 503
-
-    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_test_secret_123")
-    res_bad_sig = client.post("/api/billing/webhook", content=b'{"id":"evt_123"}', headers={"Stripe-Signature": "t=1,v1=invalid"})
-    assert res_bad_sig.status_code == 400
-
-
 def test_token_revocation_and_type_check(client: TestClient):
     """F-08 & F-14: Refresh tokens rejected on protected endpoints and revoked tokens fail."""
     user_id = "usr_revocation_test"

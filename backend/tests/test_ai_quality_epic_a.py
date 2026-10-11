@@ -175,14 +175,3 @@ def test_vector_vault_semantic_search_and_endpoint(auth_client: TestClient):
     top_entry, sim_score = results[0]
     assert "deadlock" in top_entry.question_pattern.lower()
     assert sim_score > 0.0
-
-    # Test REST API endpoint /api/vault/semantic-search
-    res_api = auth_client.post("/api/vault/semantic-search", json={
-        "query": "How do you handle database deadlocks?",
-        "top_k": 3
-    })
-    assert res_api.status_code == 200
-    data = res_api.json()
-    assert data["status"] == "success"
-    assert data["count"] > 0
-    assert "similarity_score" in data["results"][0]

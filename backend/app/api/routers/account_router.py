@@ -145,23 +145,7 @@ async def delete_user_account(
 
     user_id = current_user.user_id
 
-    # 1. Cancel Stripe subscription if active customer
-    try:
-        from app.core.settings import settings
-        if settings.STRIPE_SECRET_KEY:
-            import stripe
-            stripe.api_key = settings.STRIPE_SECRET_KEY
-            # Cancel using the real Stripe customer id (the app user id is not a Stripe customer).
-            customer_id = db.get_stripe_customer_id(user_id)
-            if customer_id:
-                subscriptions = stripe.Subscription.list(customer=customer_id, limit=5)
-                for sub in subscriptions.auto_paging_iter():
-                    stripe.Subscription.delete(sub.id)
-    except Exception:
-        logger.warning("account_router: failed to cancel stripe subscriptions during account deletion", exc_info=True)
-        pass  # Non-blocking if Stripe is not configured or in test mode
-
-    # 1b. Stop Razorpay billing now (not at period end): the account is going away.
+    # 1. Stop Razorpay billing now (not at period end): the account is going away.
     subscription = db.get_subscription(user_id)
     if subscription and subscription.get("status") not in ("cancelled", "completed", "expired", "halted"):
         try:

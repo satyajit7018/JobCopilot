@@ -116,20 +116,6 @@ def test_google_sso_endpoint(client: TestClient):
     assert data["email"] == "alex.dev@gmail.com"
 
 
-def test_multi_role_tailor_endpoint(auth_client: TestClient):
-    payload = {
-        "roles": ["Backend Engineer", "Full Stack Engineer", "AI/ML Engineer"],
-        "profile_id": "default_user"
-    }
-    res = auth_client.post("/api/resumes/tailor-multi", json=payload)
-    assert res.status_code == 200
-    data = res.json()
-    assert data["status"] == "success"
-    assert "Backend Engineer" in data["resumes"]
-    assert "AI/ML Engineer" in data["resumes"]
-    assert len(data["resumes"]["Backend Engineer"]["recommended_bullets"]) >= 2
-
-
 def test_manual_call_logger_endpoint(auth_client: TestClient):
     payload = {
         "company": "Anthropic",
@@ -159,11 +145,6 @@ def test_held_application_resolution_lifecycle(auth_client: TestClient):
         input_type="text"
     )
     db.save_hitl_event(event, user_id="usr_test_tenant_a")
-
-    # Fetch held applications
-    res_held = auth_client.get("/api/jobs/held")
-    assert res_held.status_code == 200
-    assert res_held.json()["status"] == "success"
 
     # Resolve held application
     res_resolve = auth_client.post("/api/hitl/resolve-held", json={

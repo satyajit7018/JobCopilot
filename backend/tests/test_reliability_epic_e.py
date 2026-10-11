@@ -70,25 +70,20 @@ def test_idempotency_middleware_success_and_replay():
     idem_key = f"key_{uuid.uuid4().hex}"
     headers["Idempotency-Key"] = idem_key
 
-    payload = {"name": f"Idempotent Corp {uuid.uuid4().hex[:6]}", "plan_tier": "PRO"}
+    payload = {"message": f"Idempotent feedback {uuid.uuid4().hex[:6]}", "page": "/jobs"}
 
     # Request 1: Initial execution
-    res1 = client.post("/api/orgs", json=payload, headers=headers)
+    res1 = client.post("/api/feedback", json=payload, headers=headers)
     assert res1.status_code == 201
     data1 = res1.json()
-    assert "org_id" in data1
     assert res1.headers.get("Idempotency-Key") == idem_key
 
     # Request 2: Replay with identical key and payload
-    res2 = client.post("/api/orgs", json=payload, headers=headers)
+    res2 = client.post("/api/feedback", json=payload, headers=headers)
     assert res2.status_code == 201
     assert res2.headers.get("Idempotency-Replayed") == "true"
     assert res2.headers.get("X-Cache-Lookup") == "HIT"
-    assert res2.json()["org_id"] == data1["org_id"]
-
-    # Verify database has exactly 1 org for this user
-    user_orgs = db.list_user_organizations(user.user_id)
-    assert len([o for o in user_orgs if o["org_id"] == data1["org_id"]]) == 1
+    assert res2.json() == data1
 
 
 def test_idempotency_middleware_payload_mismatch():
@@ -99,11 +94,11 @@ def test_idempotency_middleware_payload_mismatch():
     headers["Idempotency-Key"] = idem_key
 
     # Request 1: Original payload
-    res1 = client.post("/api/orgs", json={"name": "Org Original", "plan_tier": "PRO"}, headers=headers)
+    res1 = client.post("/api/feedback", json={"message": "Original feedback", "page": "/jobs"}, headers=headers)
     assert res1.status_code == 201
 
     # Request 2: Divergent payload with same key
-    res2 = client.post("/api/orgs", json={"name": "Org Divergent Tampered", "plan_tier": "ELITE"}, headers=headers)
+    res2 = client.post("/api/feedback", json={"message": "Divergent tampered feedback", "page": "/jobs"}, headers=headers)
     assert res2.status_code == 422
     assert "mismatch" in res2.json()["detail"].lower()
 
