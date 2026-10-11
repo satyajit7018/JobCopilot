@@ -7,6 +7,7 @@ import { usePageTitle } from "../lib/pageTitle";
 import { VISIT_EVENT, isMatch, isNewSince, readLastVisit, useVisibleJobs } from "../lib/jobs";
 import { cx } from "./ui";
 import { FeedbackDialog } from "./FeedbackDialog";
+import { Toaster } from "./Toast";
 
 interface NavItem {
   to: string;
@@ -120,6 +121,8 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      <Toaster />
 
       {/* Mobile tab bar */}
       <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-20 flex h-16 border-t border-line bg-surface md:hidden">

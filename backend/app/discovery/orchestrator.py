@@ -210,6 +210,7 @@ class DiscoveryOrchestrator:
                     description=desc[:1500],
                     salary_range=salary,
                     seniority_level=MatchScorer.infer_job_seniority(title, desc),
+                    posted_date=lead.get("posted_date") or None,
                     match_score=match_score,
                     priority_score=priority_score,
                     match_reasons=match_reasons,

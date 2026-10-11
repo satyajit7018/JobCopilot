@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { ArrowLeft, ArrowRight, Bookmark, BookmarkCheck, Check, CircleAlert, ExternalLink, EyeOff, FileText, MapPin, SearchX, ShieldCheck, Wallet } from "lucide-react";
-import { PageHeader } from "../components/AppShell";
-import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, ScoreRing, Spinner, buttonClass, cx, toneText } from "../components/ui";
+import { ArrowLeft, ArrowRight, Bookmark, BookmarkCheck, Check, CircleAlert, ExternalLink, EyeOff, FileText, SearchX, ShieldCheck } from "lucide-react";
+import { MatchReceipt } from "../components/MatchReceipt";
+import { toast } from "../components/Toast";
+import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, Group, ScoreRing, Spinner, buttonClass, cx, rowClass, toneText } from "../components/ui";
 import {
   newKey,
   outcome,
@@ -22,7 +23,6 @@ import {
   applyOnSiteOnly,
   isTracked,
   nextMatch,
-  readableReason,
   scorePercent,
   useCompanyInfo,
   useJobDescription,
@@ -34,6 +34,7 @@ import {
 } from "../lib/jobs";
 import { useSetStatus } from "../lib/application";
 import { markDone } from "../lib/checklist";
+import { usePageTitle } from "../lib/pageTitle";
 import { useIsPremium } from "../lib/billing";
 import { PremiumLock } from "../components/PremiumLock";
 import { noticeLabel, useProfile } from "../lib/profile";
@@ -44,13 +45,13 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
   const id = `sec-${title.toLowerCase().replace(/\W+/g, "-")}`;
   return (
     <section aria-labelledby={id}>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 id={id} className="text-base font-semibold">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 id={id} className="px-1 text-xs font-normal text-ink-2">
           {title}
         </h2>
         {action}
       </div>
-      <Card className="p-4 sm:p-5">{children}</Card>
+      <Card className="p-5">{children}</Card>
     </section>
   );
 }
@@ -145,12 +146,12 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
   const premium = useIsPremium();
   const [taskId, setTaskId] = useState<string | null>(() => taskStore.get(job.job_id));
   const pct = scorePercent(job.match_score);
+  usePageTitle(`${job.title} at ${job.company}`);
 
   return (
     <>
-      <PageHeader width="max-w-6xl" title="Review & apply" tabTitle={`${job.title} at ${job.company}`} />
-      <div className="mx-auto max-w-6xl px-4 py-5 md:px-7 md:py-6">
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mx-auto max-w-6xl px-4 pt-3 pb-28 md:px-7 md:pt-8 md:pb-10">
+        <div className="mb-5 flex items-center justify-between gap-3">
           {back}
           {next && (
             <Link to={`/jobs/${encodeURIComponent(next.job_id)}`} className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
@@ -164,55 +165,27 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
         </div>
         {job.status === "DISMISSED" && <HiddenNotice job={job} />}
 
-        <div className="mb-6 flex items-start gap-3 sm:gap-4">
+        <div className="mb-7 flex items-center gap-4">
           <CompanyMark name={job.company} size="lg" />
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold sm:text-xl">{job.title}</h1>
-            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-ink-2">
-              <span>{job.company}</span>
-              {job.location && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="size-3.5" aria-hidden />
-                  {job.location}
-                </span>
-              )}
-              {job.salary_range && (
-                <span className="flex items-center gap-1">
-                  <Wallet className="size-3.5" aria-hidden />
-                  {job.salary_range}
-                </span>
-              )}
-              <a href={job.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 font-medium text-accent sm:hidden">
-                View posting
-                <ExternalLink className="size-3.5" aria-hidden />
-                <span className="sr-only">(opens in a new tab)</span>
-              </a>
+            <h1 className="text-lg leading-tight font-bold sm:text-xl">{job.title}</h1>
+            <p className="mt-1 text-ink-2">{[job.company, job.location, job.salary_range].filter(Boolean).join(" · ")}</p>
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <SaveButton job={job} />
+              <HideButton job={job} />
             </div>
           </div>
-          <SaveButton job={job} />
-          <HideButton job={job} />
-          <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("secondary", "sm", "max-sm:hidden")}>
-            View posting
-            <ExternalLink className="size-3.5" aria-hidden />
-            <span className="sr-only">(opens in a new tab)</span>
-          </a>
+          <ScoreRing pct={pct} size="lg" className="max-sm:hidden" />
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr] lg:items-start">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_auto_1fr] lg:items-start">
           <div className="flex min-w-0 flex-col gap-6">
             <Section title="Why it's a match">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
-                <ScoreRing pct={pct} size="lg" />
+              <div className="flex items-start gap-4">
+                <ScoreRing pct={pct} size="md" className="sm:hidden" />
                 <div className="min-w-0 flex-1">
                   {job.match_reasons.length ? (
-                    <ul className="flex flex-col gap-1.5">
-                      {job.match_reasons.map((r) => (
-                        <li key={r} className="flex gap-2">
-                          <Check className="mt-0.5 size-4 flex-none text-ok" aria-hidden />
-                          {readableReason(r)}
-                        </li>
-                      ))}
-                    </ul>
+                    <MatchReceipt job={job} max={8} />
                   ) : (
                     <p className="text-ink-2">No details were recorded for this match.</p>
                   )}
@@ -239,7 +212,7 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
           </div>
 
           {/* On phones the panel follows the materials; on desktop it's a sticky right column. */}
-          <div className="lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <div className="lg:sticky lg:top-6 lg:col-start-2 lg:row-span-3 lg:row-start-1">
             {!premium || applyOnSiteOnly(job) ? (
               <ApplyYourself job={job} />
             ) : taskId ? (
@@ -265,7 +238,7 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
           {description.isPending ? (
             <div className="min-w-0 lg:col-start-1" role="status">
               <span className="sr-only">Loading the job description…</span>
-              <div aria-hidden className="flex animate-pulse flex-col gap-2.5 rounded-lg border border-line bg-surface p-5 motion-reduce:animate-none">
+              <div aria-hidden className="flex animate-pulse flex-col gap-2.5 rounded-lg bg-surface p-5 motion-reduce:animate-none">
                 <span className="h-3.5 w-1/3 rounded bg-subtle" />
                 <span className="h-3 w-full rounded bg-subtle" />
                 <span className="h-3 w-5/6 rounded bg-subtle" />
@@ -278,9 +251,53 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
               </div>
             )
           )}
+
+          <div className="min-w-0 lg:col-start-1">
+            <Details job={job} />
+          </div>
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * Where this posting came from. Only facts we hold are shown; a row with nothing to say is
+ * left out.
+ */
+function Details({ job }: { job: Job }) {
+  const day = (iso: string | null) => {
+    const d = iso ? new Date(iso) : null;
+    return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
+  };
+  const rows: [string, ReactNode][] = [];
+  const posted = day(job.posted_date);
+  const found = day(job.created_at);
+  if (job.platform && job.platform !== "DIRECT_CALL") rows.push(["Source", job.platform]);
+  if (posted) rows.push(["Posted", posted]);
+  if (found) rows.push(["Found by JobCopilot", found]);
+  if (job.location) rows.push(["Place", job.location]);
+  if (job.salary_range) rows.push(["Pay", job.salary_range]);
+  const hasLink = /^https?:\/\//.test(job.url);
+  if (!rows.length && !hasLink) return null;
+  return (
+    <Group label="Details">
+      <dl>
+        {rows.map(([label, value]) => (
+          <div key={label} className={cx(rowClass, "min-h-12 after:left-4")}>
+            <dt className="flex-1 text-ink-2">{label}</dt>
+            <dd className="text-right font-medium">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {hasLink && (
+        <a href={job.url} target="_blank" rel="noopener noreferrer" className={cx(rowClass, "min-h-12 font-medium text-accent after:left-4 hover:bg-subtle/50")}>
+          <span className="flex-1">View the original posting</span>
+          <ExternalLink className="size-4" aria-hidden />
+          <span className="sr-only">(opens in a new tab)</span>
+        </a>
+      )}
+    </Group>
   );
 }
 
@@ -534,7 +551,14 @@ function SaveButton({ job }: { job: Job }) {
   if (job.status !== "DISCOVERED" && job.status !== "SAVED") return null;
   const saved = job.status === "SAVED";
   return (
-    <Button size="sm" aria-pressed={saved} onClick={() => save.mutate({ jobId: job.job_id, saved: !saved })}>
+    <Button
+      size="sm"
+      aria-pressed={saved}
+      onClick={() => {
+        save.mutate({ jobId: job.job_id, saved: !saved });
+        toast(saved ? "Removed from saved" : "Saved for later");
+      }}
+    >
       {saved ? <BookmarkCheck className="size-3.5 text-accent" aria-hidden /> : <Bookmark className="size-3.5" aria-hidden />}
       {saved ? "Saved" : "Save"}
     </Button>
@@ -555,7 +579,7 @@ function HideButton({ job }: { job: Job }) {
 function HiddenNotice({ job }: { job: Job }) {
   const unhide = useSetMatchHidden();
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface px-4 py-2.5">
+    <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg bg-surface px-4 py-3">
       <p className="flex-1 text-ink-2">You marked this job "Not interested", so it's hidden from your matches.</p>
       <Button size="sm" loading={unhide.isPending} onClick={() => unhide.mutate({ jobId: job.job_id, hidden: false })}>
         Show it again
@@ -591,11 +615,19 @@ function ApplyYourself({ job }: { job: Job }) {
                 ? `This job is on ${site}, where you apply with your own ${site} account. Apply there, then come back and mark it applied so we can track it for you.`
                 : `Apply on ${job.company}'s site, then come back and mark it applied so we can track it for you.`}
             </p>
-            <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("primary")}>
+            <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("primary", "md", "max-md:hidden")}>
               Open the application
               <ExternalLink className="size-3.5" aria-hidden />
               <span className="sr-only">(opens in a new tab)</span>
             </a>
+            {/* Phones: the main action stays within reach, pinned above the tab bar. */}
+            <div className="fixed inset-x-0 bottom-16 z-10 border-t border-line bg-canvas px-4 py-2.5 md:hidden">
+              <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("primary", "lg", "w-full")}>
+                Open the application
+                <ExternalLink className="size-4" aria-hidden />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </div>
             {setStatus.error && <Alert>Couldn't save: {setStatus.error.message}</Alert>}
             <Button loading={setStatus.isPending} onClick={() => setStatus.mutate("SUBMITTED")}>
               I've applied

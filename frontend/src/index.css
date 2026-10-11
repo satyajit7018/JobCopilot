@@ -146,3 +146,19 @@
     animation: none;
   }
 }
+
+/* Toasts rise a little as they appear. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.toast-in {
+  animation: toast-in 0.2s var(--ease-calm) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-in {
+    animation: none;
+  }
+}

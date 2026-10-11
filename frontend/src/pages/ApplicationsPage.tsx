@@ -16,7 +16,7 @@ export function ApplicationsPage() {
 
   return (
     <>
-      <PageHeader width="max-w-none" title="Applied" subtitle={data ? `${tracked.length} tracked` : undefined} />
+      <PageHeader width="max-w-none" title="Applied" subtitle={data ? [interviewsSoon(tracked), `${tracked.length} tracked`].filter(Boolean).join(" · ") : undefined} />
       <div className="px-4 py-5 md:px-7 md:py-6">
         <HeldQuestions />
         {isPending ? (
@@ -65,6 +65,16 @@ export function ApplicationsPage() {
       </div>
     </>
   );
+}
+
+/** The one line that matters: interviews with a date in the next seven days. */
+export function interviewsSoon(jobs: Job[], now: Date = new Date()): string | null {
+  const end = now.getTime() + 7 * 86_400_000;
+  const n = jobs.filter((j) => {
+    const at = j.status === "INTERVIEW" && j.interview_date ? new Date(j.interview_date).getTime() : NaN;
+    return at >= now.getTime() && at <= end;
+  }).length;
+  return n ? `${n} ${n === 1 ? "interview" : "interviews"} in the next 7 days` : null;
 }
 
 type Column = (typeof BOARD_COLUMNS)[number] & { items: Job[] };

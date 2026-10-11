@@ -10,6 +10,8 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
+from datetime import datetime, timezone
+
 import httpx
 
 from app.core.circuit_breaker import CircuitOpenError, ats_api_breaker
@@ -46,6 +48,14 @@ class ATSApiFeeders:
         cleaned = _WS_RE.sub(' ', cleaned).strip()
         return cleaned
 
+    @staticmethod
+    def _iso_from_epoch_ms(value: Any) -> Optional[str]:
+        """Lever gives the posting time as milliseconds since 1970; everything else here is ISO."""
+        try:
+            return datetime.fromtimestamp(int(value) / 1000, tz=timezone.utc).isoformat() if value else None
+        except (TypeError, ValueError, OverflowError, OSError):
+            return None
+
     @classmethod
     async def fetch_greenhouse_jobs(cls, company_slug: str, client: Optional[httpx.AsyncClient] = None) -> List[Dict[str, Any]]:
         """
@@ -69,7 +79,6 @@ class ATSApiFeeders:
                         job_url = rj.get("absolute_url", "")
                         job_id = str(rj.get("id", ""))
                         description = cls._clean_html(rj.get("content", ""))
-                        updated_at = rj.get("updated_at")
 
                         jobs.append({
                             "external_id": job_id,
@@ -79,7 +88,9 @@ class ATSApiFeeders:
                             "location": location,
                             "url": job_url,
                             "description": description,
-                            "posted_date": updated_at
+                            # When it was first published. "updated_at" changes on every edit,
+                            # so it is not shown as the posting date.
+                            "posted_date": rj.get("first_published") or None
                         })
 
             async def _op():
@@ -136,7 +147,7 @@ class ATSApiFeeders:
                                 "location": location,
                                 "url": job_url,
                                 "description": description,
-                                "posted_date": str(created_at) if created_at else None
+                                "posted_date": cls._iso_from_epoch_ms(created_at)
                             })
 
             async def _op():

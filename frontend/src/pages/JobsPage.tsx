@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bookmark, BookmarkCheck, BriefcaseBusiness, EyeOff, RefreshCw, Search } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { SearchProgress } from "../components/SearchProgress";
+import { toast } from "../components/Toast";
 import { Alert, Button, Card, Chip, CompanyMark, EmptyState, ScoreRing, Segmented, SkeletonRows, cx, rowClass } from "../components/ui";
 import { Link, useSearchParams } from "react-router";
 import {
@@ -65,6 +66,7 @@ export function JobsPage() {
   const lastVisit = useLastVisit("jobs");
   const hide = useSetMatchHidden();
   const [hiddenJob, setHiddenJob] = useState<Job | null>(null);
+  const closeNotice = useCallback(() => setHiddenJob(null), []);
   const findNew = useFindNewJobs();
 
   const matches = useMemo(() => (data ?? []).filter(isMatch), [data]);
@@ -176,6 +178,7 @@ export function JobsPage() {
           <HiddenNotice
             key={hiddenJob.job_id}
             job={hiddenJob}
+            onClose={closeNotice}
             onUndo={() => {
               hide.mutate({ jobId: hiddenJob.job_id, hidden: false });
               setHiddenJob(null);
@@ -216,7 +219,14 @@ export function JobsPage() {
                     job={job}
                     isNew={isNewSince(job, lastVisit)}
                     onHide={() => hideJob(job)}
-                    onToggleSave={() => save.mutate({ jobId: job.job_id, saved: job.status !== "SAVED" })}
+                    onToggleSave={() => {
+                      const saved = job.status !== "SAVED";
+                      save.mutate({ jobId: job.job_id, saved });
+                      toast(saved ? "Saved for later" : "Removed from saved", {
+                        label: "Undo",
+                        onClick: () => save.mutate({ jobId: job.job_id, saved: !saved }),
+                      });
+                    }}
                   />
                 ))}
               </ul>
@@ -321,13 +331,20 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
 }
 
 /** After "Not interested": undo, and an optional reason that tunes new searches. */
-function HiddenNotice({ job, onUndo }: { job: Job; onUndo: () => void }) {
+function HiddenNotice({ job, onUndo, onClose }: { job: Job; onUndo: () => void; onClose: () => void }) {
   const why = useHideReason();
   const removeRule = useRemoveSkipRule();
   const answered = why.isSuccess;
   const rule = why.data?.rule ?? null;
+  // Floats over the list (so the rows don't jump) and goes away by itself: sooner once
+  // a reason is given, since there's nothing left to do.
+  useEffect(() => {
+    if (why.isPending) return;
+    const t = setTimeout(onClose, answered ? 6_000 : 12_000);
+    return () => clearTimeout(t);
+  }, [answered, why.isPending, onClose]);
   return (
-    <div className="mb-3 rounded-lg bg-surface px-4 py-3" role="status">
+    <div className="toast-in fixed inset-x-3 bottom-20 z-30 mx-auto max-w-xl rounded-lg bg-surface px-4 py-3 shadow-pop md:bottom-6" role="status">
       <div className="flex items-center gap-3">
         <EyeOff className="size-4 flex-none text-ink-3" aria-hidden />
         <p className="min-w-0 flex-1 truncate">

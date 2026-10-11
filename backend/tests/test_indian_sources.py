@@ -119,3 +119,8 @@ def test_automatic_apply_is_refused_for_instahyre_jobs(auth_client: TestClient):
     for path in (f"/api/bot/apply/{job.job_id}", f"/api/jobs/apply-async/{job.job_id}"):
         res = auth_client.post(path)
         assert res.status_code == 400 and "Apply on Instahyre" in res.json()["detail"]
+
+
+def test_posting_dates_are_real_and_readable():
+    assert ATSApiFeeders._iso_from_epoch_ms(1790573982021).startswith("2026-09-")
+    assert ATSApiFeeders._iso_from_epoch_ms("not a number") is None and ATSApiFeeders._iso_from_epoch_ms(None) is None
