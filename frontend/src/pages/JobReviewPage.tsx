@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowLeft, ArrowRight, Bookmark, BookmarkCheck, Check, CircleAlert, ExternalLink, EyeOff, FileText, MapPin, SearchX, ShieldCheck, Wallet } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
-import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, Spinner, buttonClass, cx, toneText } from "../components/ui";
+import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CompanyMark, CopyButton, EmptyState, ScoreRing, Spinner, buttonClass, cx, toneText } from "../components/ui";
 import {
   newKey,
   outcome,
@@ -23,7 +23,6 @@ import {
   nextMatch,
   readableReason,
   scorePercent,
-  scoreTone,
   useJobs,
   useSetMatchHidden,
   useSetMatchSaved,
@@ -134,7 +133,7 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
         {job.status === "DISMISSED" && <HiddenNotice job={job} />}
 
         <div className="mb-6 flex items-start gap-3 sm:gap-4">
-          <CompanyMark name={job.company} />
+          <CompanyMark name={job.company} size="lg" />
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-semibold sm:text-xl">{job.title}</h1>
             <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-ink-2">
@@ -170,11 +169,8 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:grid-rows-[auto_1fr] lg:items-start">
           <div className="flex min-w-0 flex-col gap-6">
             <Section title="Why it's a match">
-              <div className="flex gap-4">
-                <div className="w-14 flex-none text-center" aria-label={`${pct}% match`}>
-                  <span className={cx("block text-2xl leading-none font-bold", toneText[scoreTone(pct)])}>{pct}</span>
-                  <span className="text-xs tracking-wide text-ink-3 uppercase">match</span>
-                </div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+                <ScoreRing pct={pct} size="lg" />
                 <div className="min-w-0 flex-1">
                   {job.match_reasons.length ? (
                     <ul className="flex flex-col gap-1.5">
