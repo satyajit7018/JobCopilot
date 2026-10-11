@@ -28,7 +28,7 @@ import {
 
 type Sort = "match" | "newest";
 
-/** From this score up, a row gets the "strong match" wash. */
+/** From this score up, a row gets the "strong match" edge. */
 const STRONG_MATCH = 90;
 
 /** How many jobs to show at once; the rest sit behind "Show more". */
@@ -278,8 +278,8 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
     <li
       className={cx(
         "flex flex-col gap-2 border-b border-line px-4 py-3.5 transition-colors last:border-b-0 hover:bg-subtle/60 sm:flex-row sm:items-center sm:gap-4 sm:px-5 sm:py-4",
-        // The very best matches get a soft wash so they stand out while scrolling.
-        pct >= STRONG_MATCH && "bg-linear-to-r from-ok-soft/60 to-transparent to-40%",
+        // The very best matches get a green edge so they stand out while scrolling.
+        pct >= STRONG_MATCH && "shadow-[inset_3px_0_0_var(--color-ok)]",
       )}
     >
       <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">

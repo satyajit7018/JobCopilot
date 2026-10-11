@@ -224,7 +224,7 @@ function BestMatch({ job }: { job: Job }) {
   const missing = job.missing_skills.filter((s) => s.trim()).slice(0, 4);
   return (
     <section aria-labelledby="best-match" className="order-1">
-      <div className="relative overflow-hidden rounded-lg border border-accent/25 bg-linear-to-br from-accent-soft/70 via-surface via-45% to-spark-soft/70 p-5 shadow-card sm:p-6">
+      <div className="relative overflow-hidden rounded-lg border border-accent/25 bg-linear-to-br from-accent-soft via-surface via-55% to-surface p-5 shadow-card sm:p-6">
         <p id="best-match" className="mb-4 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-spark-ink uppercase">
           <Sparkles className="size-3.5" aria-hidden />
           Your best match right now
