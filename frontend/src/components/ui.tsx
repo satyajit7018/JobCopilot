@@ -88,6 +88,9 @@ export function Badge({ tone = "neutral", children, className }: { tone?: Tone; 
   );
 }
 
+/** For cards you can click: they rise a little under the pointer. */
+export const lift = "transition duration-150 hover:border-line-strong hover:shadow-pop motion-safe:hover:-translate-y-0.5";
+
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
   return <div className={clsx("rounded-lg border border-line bg-surface shadow-card", className)}>{children}</div>;
 }
@@ -308,9 +311,13 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center px-6 py-16 text-center">
-      <div className="mb-4 grid size-12 place-items-center rounded-full bg-accent-soft text-accent">{icon}</div>
-      <h3 className="text-base font-semibold">{title}</h3>
+    <div className="flex flex-col items-center px-6 py-14 text-center">
+      <div className="relative mb-5 grid size-20 place-items-center rounded-full bg-accent-soft/50" aria-hidden>
+        <div className="grid size-13 place-items-center rounded-full bg-accent-soft text-accent">{icon}</div>
+        <span className="absolute top-1 right-1.5 size-2.5 rounded-full bg-spark" />
+        <span className="absolute bottom-2 left-0.5 size-1.5 rounded-full bg-accent/40" />
+      </div>
+      <h3 className="font-display text-lg font-semibold">{title}</h3>
       {children && <p className="mt-1 max-w-sm text-ink-2">{children}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
@@ -326,21 +333,80 @@ export function Alert({ tone = "danger", children }: { tone?: Tone; children: Re
 }
 
 const LOGO_TINTS = ["#0F766E", "#7C3AED", "#C2410C", "#1D4ED8", "#BE185D", "#4D7C0F"];
+const markSizes = { sm: "size-8 text-xs", md: "size-10 text-sm", lg: "size-14 text-lg" };
 
-/** Deterministic colored initial for a company (no remote logos, no tracking). */
-export function CompanyMark({ name, size = "md" }: { name: string; size?: "sm" | "md" }) {
+/**
+ * The company's logo, or a coloured initial when we don't have one. Logos come from our
+ * own server (which looks them up once and keeps them), so no other site sees what you view.
+ */
+export function CompanyMark({ name, size = "md" }: { name: string; size?: keyof typeof markSizes }) {
+  return <CompanyMarkImage key={name} name={name} size={size} />;
+}
+
+function CompanyMarkImage({ name, size }: { name: string; size: keyof typeof markSizes }) {
+  const [logo, setLogo] = useState<"waiting" | "shown" | "none">("waiting");
   let hash = 0;
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const clean = name.trim();
   return (
     <div
       aria-hidden
-      className={clsx(
-        "grid flex-none place-items-center rounded-md font-bold text-white",
-        size === "md" ? "size-10 text-sm" : "size-8 text-xs",
-      )}
+      className={clsx("relative grid flex-none place-items-center overflow-hidden rounded-md font-bold text-white", markSizes[size])}
       style={{ background: LOGO_TINTS[hash % LOGO_TINTS.length] }}
     >
-      {name.trim()[0]?.toUpperCase() ?? "?"}
+      {clean[0]?.toUpperCase() ?? "?"}
+      {clean && logo !== "none" && (
+        <img
+          src={`/api/company-logo?name=${encodeURIComponent(clean)}`}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setLogo("shown")}
+          onError={() => setLogo("none")}
+          className={clsx("absolute inset-0 size-full bg-white object-contain p-1 ring-1 ring-line ring-inset", logo !== "shown" && "opacity-0")}
+        />
+      )}
+    </div>
+  );
+}
+
+const ringSizes = {
+  sm: { box: "size-10", r: 16, stroke: 3.5, number: "text-sm" },
+  md: { box: "size-13", r: 21, stroke: 4, number: "text-base" },
+  lg: { box: "size-24", r: 40, stroke: 7, number: "text-2xl" },
+};
+
+/** The match score as a ring that fills up, coloured by how strong the match is. */
+export function ScoreRing({ pct, size = "md", className }: { pct: number; size?: keyof typeof ringSizes; className?: string }) {
+  const { box, r, stroke, number } = ringSizes[size];
+  const view = (r + stroke) * 2;
+  const around = 2 * Math.PI * r;
+  const tone = pct >= 80 ? "ok" : pct >= 60 ? "warn" : "neutral";
+  return (
+    <div
+      role="img"
+      aria-label={`${pct}% match`}
+      title="Resume match, not your chance of an interview"
+      className={clsx("relative grid flex-none place-items-center", box, toneText[tone], className)}
+    >
+      <svg viewBox={`0 0 ${view} ${view}`} className="absolute inset-0 size-full -rotate-90" aria-hidden>
+        <circle cx={view / 2} cy={view / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-subtle" />
+        <circle
+          cx={view / 2}
+          cy={view / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={around}
+          strokeDashoffset={around * (1 - Math.max(0, Math.min(100, pct)) / 100)}
+        />
+      </svg>
+      <span className="text-center leading-none">
+        <span className={clsx("block font-display font-bold", number)}>{pct}</span>
+        {size === "lg" && <span className="mt-1 block text-xs font-medium tracking-wide text-ink-3 uppercase">match</span>}
+      </span>
     </div>
   );
 }

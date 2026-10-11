@@ -25,9 +25,11 @@ const NAV: NavItem[] = [
 
 export function Logo() {
   return (
-    <Link to="/" className="flex items-center gap-2 text-base font-bold">
+    <Link to="/" className="flex items-center gap-2 font-display text-lg font-bold tracking-tight">
       <img src="/favicon.svg" alt="" className="size-7" />
-      JobCopilot
+      <span>
+        Job<span className="text-accent">Copilot</span>
+      </span>
     </Link>
   );
 }

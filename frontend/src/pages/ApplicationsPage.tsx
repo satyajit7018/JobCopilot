@@ -3,7 +3,7 @@ import { Columns3 } from "lucide-react";
 import { Link } from "react-router";
 import { PageHeader } from "../components/AppShell";
 import { HeldQuestions } from "../components/HeldQuestions";
-import { Alert, Badge, Card, Chip, EmptyState, SkeletonRows, buttonClass } from "../components/ui";
+import { Alert, Badge, Card, Chip, EmptyState, SkeletonRows, buttonClass, cx, lift } from "../components/ui";
 import { BOARD_COLUMNS, STATUS_META, isTracked, relativeTime, useJobs, type Job } from "../lib/jobs";
 
 export function ApplicationsPage() {
@@ -108,7 +108,7 @@ function AppCard({ job }: { job: Job }) {
   const applied = relativeTime(job.applied_at);
   const when = applied ? `applied ${applied}` : relativeTime(job.created_at);
   return (
-    <Card className="relative p-3 hover:border-line-strong">
+    <Card className={cx("relative p-3", lift)}>
       <h3 className="text-sm font-semibold">
         {/* The link's ::after covers the card, so the whole card is clickable. */}
         <Link to={`/applications/${encodeURIComponent(job.job_id)}`} className="after:absolute after:inset-0 after:rounded-lg">

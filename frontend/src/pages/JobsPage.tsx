@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Bookmark, BookmarkCheck, BriefcaseBusiness, Clock, ExternalLink, EyeOff, MapPin, RefreshCw, Search, Wallet } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { SearchProgress } from "../components/SearchProgress";
-import { Alert, Badge, Button, Card, Chip, CompanyMark, EmptyState, SkeletonRows, buttonClass, cx, toneText } from "../components/ui";
+import { Alert, Badge, Button, Card, Chip, CompanyMark, EmptyState, ScoreRing, SkeletonRows, buttonClass, cx } from "../components/ui";
 import { Link, useSearchParams } from "react-router";
 import {
   HIDE_REASONS,
@@ -15,7 +15,6 @@ import {
   relativeTime,
   rememberMatchOrder,
   scorePercent,
-  scoreTone,
   useFindNewJobs,
   useHideReason,
   useLastVisit,
@@ -28,6 +27,9 @@ import {
 } from "../lib/jobs";
 
 type Sort = "match" | "newest";
+
+/** From this score up, a row gets the "strong match" wash. */
+const STRONG_MATCH = 90;
 
 /** How many jobs to show at once; the rest sit behind "Show more". */
 const PAGE_SIZE = 20;
@@ -269,18 +271,22 @@ function FilterSelect({
 function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean; onHide: () => void; onToggleSave: () => void }) {
   const saved = job.status === "SAVED";
   const pct = scorePercent(job.match_score);
-  const tone = scoreTone(pct);
   const why = matchSummary(job);
   const when = relativeTime(postedAt(job));
 
   return (
-    <li className="flex flex-col gap-2 border-b border-line px-4 py-3.5 last:border-b-0 sm:flex-row sm:items-center sm:gap-4 sm:px-5 sm:py-4">
+    <li
+      className={cx(
+        "flex flex-col gap-2 border-b border-line px-4 py-3.5 transition-colors last:border-b-0 hover:bg-subtle/60 sm:flex-row sm:items-center sm:gap-4 sm:px-5 sm:py-4",
+        // The very best matches get a soft wash so they stand out while scrolling.
+        pct >= STRONG_MATCH && "bg-linear-to-r from-ok-soft/60 to-transparent to-40%",
+      )}
+    >
       <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
         <CompanyMark name={job.company} />
         {/* Phones: the score sits beside the title so the actions fit on one short row. */}
-        <div className="order-last w-10 flex-none text-center sm:hidden" aria-hidden>
-          <span className={cx("block text-lg leading-none font-bold", toneText[tone])}>{pct}</span>
-          <span className="text-[0.625rem] tracking-wide text-ink-3 uppercase">match</span>
+        <div className="order-last flex-none sm:hidden" aria-hidden>
+          <ScoreRing pct={pct} size="sm" />
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="flex flex-wrap items-center gap-x-2 text-sm font-semibold">
@@ -314,10 +320,7 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
         </div>
       </div>
       <div className="flex items-center gap-1 pl-13 sm:gap-4 sm:pl-0">
-        <div className="w-14 text-center max-sm:sr-only" aria-label={`${pct}% match`} title="Resume match, not your chance of an interview">
-          <span className={cx("block text-lg leading-none font-bold", toneText[tone])}>{pct}</span>
-          <span className="text-xs tracking-wide text-ink-3 uppercase">match</span>
-        </div>
+        <ScoreRing pct={pct} className="max-sm:sr-only" />
         <button type="button" onClick={onToggleSave} aria-pressed={saved} className={buttonClass("ghost", "md")} title={saved ? "Saved" : "Save for later"}>
           {saved ? <BookmarkCheck className="size-4 text-accent" aria-hidden /> : <Bookmark className="size-4" aria-hidden />}
           <span className="sr-only">
