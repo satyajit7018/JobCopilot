@@ -1,7 +1,6 @@
 """
-JobCopilot - Indian Tech Job Portals & Priority Ingestion Test Suite
-Validates Naukri, Instahyre, Cuvette, Cutshort, and Hirist scrapers,
-query generators, LPA compensation parsing, and priority ranking.
+JobCopilot - Indian job sites: search links, priority ranking, and the rule that
+discovery only ever shows postings it really read (no built-in sample listings).
 """
 
 import uuid
@@ -13,9 +12,8 @@ from app.core.models import CandidateProfile, RecruiterPreferences, ApplicationS
 from app.core.database import db
 
 
-@pytest.mark.asyncio
-async def test_indian_job_platform_scrapers_and_queries():
-    """Validates boolean query builders and structured feeds for Indian job portals."""
+def test_search_links_for_indian_job_sites():
+    """Search links are built for sites we don't read ourselves."""
     # 1. Query Builder
     query = PlatformScrapers.build_targeted_query(
         skills=["Python", "FastAPI", "PostgreSQL", "Kafka"],
@@ -27,36 +25,6 @@ async def test_indian_job_platform_scrapers_and_queries():
     assert "cuvette.tech/app/jobs" in query["cuvette_url"]
     assert "cutshort.io/jobs/backend-engineer-jobs-in-bangalore" in query["cutshort_url"]
     assert "hirist.tech/k/backend-engineer-jobs-in-bangalore.html" in query["hirist_url"]
-
-    # 2. Naukri Feed
-    naukri_leads = await PlatformScrapers.fetch_naukri_india_feed()
-    assert len(naukri_leads) >= 4
-    for lead in naukri_leads:
-        assert lead["platform"] == "Naukri"
-        assert "LPA" in lead["salary_range"]
-        assert any(hub in lead["location"] for hub in ["Bangalore", "Bengaluru", "Mumbai", "Pune", "Gurgaon", "Gurugram"])
-
-    # 3. Instahyre Feed
-    insta_leads = await PlatformScrapers.fetch_instahyre_india_feed()
-    assert len(insta_leads) >= 4
-    for lead in insta_leads:
-        assert lead["platform"] == "Instahyre"
-        assert lead["company"] in ["Razorpay", "Cred", "BrowserStack", "Groww", "Classplus"]
-        assert "LPA" in lead["salary_range"]
-
-    # 4. Cuvette Feed
-    cuv_leads = await PlatformScrapers.fetch_cuvette_india_feed()
-    assert len(cuv_leads) >= 3
-    for lead in cuv_leads:
-        assert lead["platform"] == "Cuvette"
-        assert "LPA" in lead["salary_range"]
-
-    # 5. Cutshort Feed
-    cut_leads = await PlatformScrapers.fetch_cutshort_india_feed()
-    assert len(cut_leads) >= 2
-    for lead in cut_leads:
-        assert lead["platform"] == "Cutshort"
-        assert "LPA" in lead["salary_range"]
 
 
 def test_indian_job_priority_ranking():
@@ -98,11 +66,52 @@ def test_indian_job_priority_ranking():
     assert score_cuv >= 80.0
 
 
+REAL_LEAD = {
+    "external_id": "gh_real_1",
+    "platform": "Greenhouse",
+    "company": "Razorpay",
+    "title": "Backend Engineer",
+    "location": "Bangalore, India",
+    "url": "https://job-boards.greenhouse.io/razorpay/jobs/1",
+    "description": "Build payment services in Python, FastAPI, Kafka, PostgreSQL and Redis.",
+    "posted_date": None,
+}
+
+
+def _only_real_sources(monkeypatch, leads):
+    """Stands in for the network: every real source answers with `leads` (or nothing)."""
+    from app.discovery.ats_apis import ATSApiFeeders
+    from app.discovery.vc_boards import VCBoardFeeders
+
+    first = {"sent": False}
+
+    async def greenhouse(cls, slug, client=None):
+        if first["sent"]:
+            return []
+        first["sent"] = True
+        return [dict(lead) for lead in leads]
+
+    async def nothing(cls, *args, **kwargs):
+        return []
+
+    monkeypatch.setattr(ATSApiFeeders, "fetch_greenhouse_jobs", classmethod(greenhouse))
+    monkeypatch.setattr(ATSApiFeeders, "fetch_lever_jobs", classmethod(nothing))
+    monkeypatch.setattr(ATSApiFeeders, "fetch_ashby_jobs", classmethod(nothing))
+    monkeypatch.setattr(VCBoardFeeders, "fetch_yc_fast_track_jobs", classmethod(nothing))
+    monkeypatch.setattr(VCBoardFeeders, "fetch_hn_who_is_hiring", classmethod(nothing))
+
+
 @pytest.mark.asyncio
-async def test_discovery_orchestrator_indian_jobs_ingestion():
-    """Validates that the Discovery Orchestrator ingests and saves Indian tech leads."""
-    # Unique per run: searches skip postings a user already has, so reusing an id
-    # with jobs left from an earlier run would find nothing new.
+async def test_discovery_invents_nothing_when_sources_are_empty(monkeypatch):
+    """No postings read means no postings shown: there are no built-in sample jobs."""
+    _only_real_sources(monkeypatch, [])
+    orch = DiscoveryOrchestrator(min_match_threshold=0.45)
+    assert await orch._fetch_all_raw_leads(["razorpay", "swiggy"]) == []
+
+
+@pytest.mark.asyncio
+async def test_discovery_only_saves_postings_it_really_read(monkeypatch):
+    _only_real_sources(monkeypatch, [REAL_LEAD])
     test_uid = f"usr_india_test_{uuid.uuid4().hex[:8]}"
     profile = CandidateProfile(
         user_id=test_uid,
@@ -112,14 +121,7 @@ async def test_discovery_orchestrator_indian_jobs_ingestion():
         location="Bangalore, India",
         skills=["Python", "FastAPI", "Kafka", "PostgreSQL", "Redis", "Go", "Distributed Systems"],
         target_roles=["Backend Engineer", "Software Engineer", "SDE-2"],
-        preferences=RecruiterPreferences(
-            expected_ctc="25 LPA",
-            current_ctc="18 LPA",
-            notice_period_days=30,
-            remote_preference="Remote / Hybrid",
-            willing_to_relocate=True,
-            company_blacklist=[]
-        )
+        preferences=RecruiterPreferences(expected_ctc="25 LPA", current_ctc="18 LPA", notice_period_days=30),
     )
     db.save_profile(profile, user_id=test_uid)
 
@@ -127,11 +129,13 @@ async def test_discovery_orchestrator_indian_jobs_ingestion():
     res = await orch.run_discovery_cycle(profile=profile, user_id=test_uid)
 
     assert res["status"] == "success"
-    assert res["total_sourced"] > 10
-    assert res["matched_and_saved"] > 0
+    assert res["total_sourced"] == 1
+    saved = db.get_jobs(status=ApplicationStatus.DISCOVERED, user_id=test_uid)
+    assert [j.url for j in saved] == [REAL_LEAD["url"]]
+    assert not {j.platform for j in saved} & {"Naukri", "Instahyre", "Cuvette", "Cutshort", "Wellfound"}
 
-    # Verify jobs saved in database for user
-    user_jobs = db.get_jobs(status=ApplicationStatus.DISCOVERED, user_id=test_uid)
-    indian_platforms = {j.platform for j in user_jobs}
-    # Check that at least some Indian portals were ingested and saved
-    assert any(p in indian_platforms for p in ["Naukri", "Instahyre", "Cuvette", "Cutshort", "Wellfound"])
+
+def test_sample_feeds_are_gone():
+    for name in ("fetch_naukri_india_feed", "fetch_instahyre_india_feed", "fetch_cuvette_india_feed",
+                 "fetch_cutshort_india_feed", "fetch_wellfound_mock_or_feed"):
+        assert not hasattr(PlatformScrapers, name)

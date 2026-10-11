@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  SOURCES,
   answersFromProfile,
   fromChosenSource,
   loadSources,
@@ -86,30 +87,37 @@ describe("job sources", () => {
   beforeEach(() => localStorage.clear());
 
   it("maps platforms to sources", () => {
-    expect(sourceForPlatform("LinkedIn Easy Apply")).toBe("linkedin");
     expect(sourceForPlatform("Greenhouse")).toBe("ats");
-    expect(sourceForPlatform("Cutshort")).toBe("instahyre");
-    expect(sourceForPlatform("Wellfound")).toBe("indeed");
+    expect(sourceForPlatform("Y Combinator")).toBe("startups");
+    expect(sourceForPlatform("HackerNews")).toBe("startups");
     expect(sourceForPlatform("Some Board")).toBeNull();
     expect(sourceForPlatform(undefined)).toBeNull();
   });
 
-  it("defaults to every source when nothing (or the legacy all-off record) is saved", () => {
+  it("only offers places that are really searched", () => {
+    expect(SOURCES.map((s) => s.id)).toEqual(["ats", "startups"]);
+    for (const site of ["LinkedIn", "Naukri", "Instahyre", "Cutshort", "Cuvette", "Indeed", "Wellfound"]) {
+      expect(sourceForPlatform(site)).toBeNull();
+      expect(JSON.stringify(SOURCES)).not.toContain(site);
+    }
+  });
+
+  it("defaults to every source when nothing (or a record from the old list) is saved", () => {
     expect(Object.values(loadSources()).every(Boolean)).toBe(true);
-    localStorage.setItem("jobcopilot_connected_portals", JSON.stringify({ linkedin: false, naukri: false }));
+    localStorage.setItem("jobcopilot_connected_portals", JSON.stringify({ linkedin: true, naukri: false }));
     expect(Object.values(loadSources()).every(Boolean)).toBe(true);
   });
 
-  it("round-trips a saved choice under the legacy key", () => {
-    const choice = { ...loadSources(), naukri: false, indeed: false };
+  it("round-trips a saved choice", () => {
+    const choice = { ...loadSources(), startups: false };
     saveSources(choice);
-    expect(JSON.parse(localStorage.getItem("jobcopilot_connected_portals")!)).toMatchObject({ naukri: false, linkedin: true });
+    expect(JSON.parse(localStorage.getItem("jobcopilot_connected_portals")!)).toMatchObject({ startups: false, ats: true });
     expect(loadSources()).toEqual(choice);
   });
 
   it("hides jobs from unchecked sources but always shows unknown platforms", () => {
-    const chosen = { ...loadSources(), naukri: false } as SourceState;
-    expect(fromChosenSource("Naukri", chosen)).toBe(false);
+    const chosen = { ...loadSources(), startups: false } as SourceState;
+    expect(fromChosenSource("Y Combinator", chosen)).toBe(false);
     expect(fromChosenSource("Lever", chosen)).toBe(true);
     expect(fromChosenSource("Unknown Board", chosen)).toBe(true);
   });

@@ -129,8 +129,19 @@ class TestMilestone2:
 
     # 7. Test Discovery Orchestrator Mock Ingestion
     @pytest.mark.asyncio
-    async def test_discovery_orchestrator(self):
+    async def test_discovery_orchestrator(self, monkeypatch):
         orch = DiscoveryOrchestrator(min_match_threshold=0.50)
+
+        async def leads(companies):
+            # Stands in for the live career pages, so the test doesn't need the internet.
+            return [{
+                "external_id": "ashby_m2_1", "platform": "Ashby", "company": "Perplexity",
+                "title": "AI Engineer", "location": "Remote", "posted_date": None,
+                "url": "https://jobs.ashbyhq.com/perplexity/m2-1",
+                "description": "Build LLM systems in Python.",
+            }]
+
+        monkeypatch.setattr(orch, "_fetch_all_raw_leads", leads)
         result = await orch.run_discovery_cycle(
             profile=self.profile,
             companies=["linear", "perplexity"]

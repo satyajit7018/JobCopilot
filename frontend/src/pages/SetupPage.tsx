@@ -219,7 +219,7 @@ function SourcesStep({ onBack }: { onBack: () => void }) {
   return (
     <Card className="p-5 sm:p-8">
       <h1 className="text-xl font-semibold sm:text-2xl">Where should we look?</h1>
-      <p className="mt-1.5 mb-6 text-ink-2">Pick the job sites you want matches from. You can change this later in your profile.</p>
+      <p className="mt-1.5 mb-6 text-ink-2">Pick where you want matches from. You can change this later in your profile.</p>
       <SourceFields value={sources} onChange={setSources} disabled={searching} />
       {problem && (
         <div className="mt-5 flex flex-col gap-3">
