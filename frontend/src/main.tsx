@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, Navigate, Outlet, RouterProvider, ScrollRestoration, useLocation } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -7,6 +7,7 @@ import { loadPage, setReloadTarget } from "./lib/chunks";
 import { installGlobalErrorReporting } from "./lib/errorReporting";
 import { ErrorScreen } from "./components/ErrorScreen";
 import { AuthProvider, useAuth } from "./lib/auth";
+import { hideSplash } from "./lib/splash";
 import { AppShell } from "./components/AppShell";
 import { Alert, Button, Card, Spinner } from "./components/ui";
 import { LoginPage } from "./pages/LoginPage";
@@ -55,9 +56,19 @@ function RequireAuth() {
   return <Outlet />;
 }
 
+/** Takes the start-up screen away once we know whether you're signed in, so the app appears in one go. */
+function SplashGate() {
+  const { status } = useAuth();
+  useEffect(() => {
+    if (status !== "loading") hideSplash();
+  }, [status]);
+  return null;
+}
+
 function Root() {
   return (
     <AuthProvider>
+      <SplashGate />
       {/* New pages open at the top; Back returns to where you were. */}
       <ScrollRestoration />
       <Outlet />

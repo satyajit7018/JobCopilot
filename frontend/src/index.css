@@ -147,6 +147,23 @@
   }
 }
 
+/* The logo's ring turning while something loads (index.html has the same motion for start-up). */
+@keyframes logo-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.logo-ring-spin {
+  transform-box: view-box;
+  transform-origin: center;
+  animation: logo-ring-spin 1.4s cubic-bezier(0.5, 0.1, 0.3, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-ring-spin {
+    animation: none;
+  }
+}
+
 /* Toasts rise a little as they appear. */
 @keyframes toast-in {
   from {

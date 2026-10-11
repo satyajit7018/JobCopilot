@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import { isRouteErrorResponse, Link, useRouteError } from "react-router";
 import { RefreshCw, TriangleAlert } from "lucide-react";
 import { reportError } from "../lib/errorReporting";
+import { hideSplash } from "../lib/splash";
 import { Button, buttonClass } from "./ui";
 
 /** Replaces the router's raw error screen; the error is reported automatically. */
 export function ErrorScreen() {
   const error = useRouteError();
   const notFound = isRouteErrorResponse(error) && error.status === 404;
+  useEffect(hideSplash, []);
   useEffect(() => {
     if (!notFound) reportError(error);
   }, [error, notFound]);
