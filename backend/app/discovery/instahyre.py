@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from app.core import company_info
+from app.core import company_info, company_logo
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ def to_lead(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "posted_date": None,
         # The company note Instahyre publishes with the posting; shown as "About the company".
         "company_about": about,
+        "company_logo": str(employer.get("profile_image_src") or "").strip(),
     }
 
 
@@ -83,6 +84,7 @@ async def fetch_instahyre_jobs(client: Optional[httpx.AsyncClient] = None) -> Li
                     if lead:
                         leads[lead["external_id"]] = lead
                         company_info.remember(lead["company"], lead["company_about"])
+                        company_logo.remember_posting_logo(lead["company"], lead["company_logo"])
                 if len(items) < PAGE_SIZE:
                     break
                 await asyncio.sleep(PAUSE_SECONDS)

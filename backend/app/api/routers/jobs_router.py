@@ -72,7 +72,8 @@ async def company_logo_image(request: Request, name: str = ""):
     rate-limited; "no logo" is an empty 204 so the app falls back to the initial quietly."""
     data = await company_logo.get_logo(name.strip())
     if not data:
-        return Response(status_code=204, headers={"Cache-Control": "public, max-age=86400"})
+        # Kept briefly only: a logo often turns up later (a new posting, a lookup that was down).
+        return Response(status_code=204, headers={"Cache-Control": "public, max-age=600"})
     return Response(content=data, media_type=company_logo.media_type(data), headers={"Cache-Control": "public, max-age=604800"})
 
 

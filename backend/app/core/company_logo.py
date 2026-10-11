@@ -80,8 +80,41 @@ async def find_domain(client: httpx.AsyncClient, name: str) -> Optional[str]:
     return pick_domain(name, found.json()) if found.status_code == 200 else None
 
 
+# Job sites whose postings carry the employer's logo; only these hosts are ever fetched.
+POSTING_LOGO_PREFIXES = ("https://media.instahyre.com/",)
+
+
+def _source_path(key: str) -> Path:
+    return _cache_dir() / f"{hashlib.sha256(key.encode()).hexdigest()[:24]}.src"
+
+
+def remember_posting_logo(name: str, url: str) -> None:
+    """Keeps the logo address a job site published with this company's posting."""
+    key = normalise(name or "")
+    if not key or not str(url or "").startswith(POSTING_LOGO_PREFIXES) or len(url) > 500:
+        return
+    source = _source_path(key)
+    if not source.exists():
+        source.write_text(url)
+        # We may have answered "no logo" before this posting turned up.
+        _paths(key)[1].unlink(missing_ok=True)
+
+
+def _image(res: httpx.Response) -> Optional[bytes]:
+    data = res.content if res.status_code == 200 else b""
+    return data if 0 < len(data) <= MAX_BYTES and media_type(data) else None
+
+
 async def _fetch(name: str) -> Optional[bytes]:
     async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, follow_redirects=True) as client:
+        # A company we don't list ourselves: the logo from its own posting beats a name search.
+        source = _source_path(normalise(name))
+        if not known_website(name) and source.exists():
+            url = source.read_text().strip()
+            if url.startswith(POSTING_LOGO_PREFIXES):
+                posted = _image(await client.get(url, follow_redirects=False))
+                if posted:
+                    return posted
         domain = await find_domain(client, name)
         if not domain:
             return None

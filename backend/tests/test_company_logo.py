@@ -94,3 +94,50 @@ def test_switch_off_and_image_types(monkeypatch):
     assert asyncio.run(company_logo.get_logo("Swiggy")) is None
     assert company_logo.media_type(b"\xff\xd8\xff\xe0") == "image/jpeg"
     assert company_logo.media_type(b"<svg") == ""
+
+
+WEBP = b"RIFF" + b"\x10\x00\x00\x00" + b"WEBP" + b"0" * 32
+
+
+def test_logo_from_a_posting_is_used_for_unlisted_companies_only(monkeypatch):
+    import asyncio
+
+    asked = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.host)
+        if request.url.host == "media.instahyre.com":
+            return httpx.Response(200, content=WEBP, headers={"content-type": "application/octet-stream"})
+        if request.url.host == "autocomplete.clearbit.com":
+            return httpx.Response(200, json=[])
+        return httpx.Response(200, content=PNG, headers={"content-type": "image/png"})
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(company_logo.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+
+    company_logo.remember_posting_logo("ZOOP", "https://media.instahyre.com/images/zoop.webp")
+    company_logo.remember_posting_logo("ZOOP", "https://media.instahyre.com/images/other.webp")  # first one is kept
+    company_logo.remember_posting_logo("Evil Co", "https://internal.example/secret.png")  # not a host we trust
+    assert asyncio.run(company_logo._fetch("ZOOP")) == WEBP and company_logo.media_type(WEBP) == "image/webp"
+    assert asyncio.run(company_logo._fetch("Evil Co")) is None and "internal.example" not in asked
+
+    # A company on our own list keeps the logo of its own website.
+    company_logo.remember_posting_logo("Tide", "https://media.instahyre.com/images/tide.webp")
+    asked.clear()
+    assert asyncio.run(company_logo._fetch("Tide")) == PNG and "media.instahyre.com" not in asked
+
+
+def test_a_posting_logo_clears_an_earlier_no_logo_answer(client: TestClient, monkeypatch):
+    async def none(name):
+        return None
+
+    monkeypatch.setattr(company_logo, "_fetch", none)
+    res = client.get("/api/company-logo", params={"name": "Last9"})
+    assert res.status_code == 204 and res.headers["cache-control"] == "public, max-age=600"
+    company_logo.remember_posting_logo("Last9", "https://media.instahyre.com/images/last9.webp")
+
+    async def found(name):
+        return WEBP
+
+    monkeypatch.setattr(company_logo, "_fetch", found)
+    assert client.get("/api/company-logo", params={"name": "Last9"}).content == WEBP
