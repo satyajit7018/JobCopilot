@@ -289,9 +289,11 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
   const action = "relative z-10 grid h-11 w-8 flex-none place-items-center rounded-md text-ink-3 hover:bg-subtle hover:text-ink sm:w-10";
 
   return (
-    <li className={cx(rowClass, "gap-3 py-2.5 pr-1.5 transition-colors hover:bg-subtle/50 sm:pr-3")}>
+    // The row wraps instead of squeezing: if the person's text size leaves the title less
+    // than about seven characters' width, the score and actions drop to a second line.
+    <li className={cx(rowClass, "flex-wrap gap-x-3 gap-y-0 py-2.5 pr-1.5 transition-colors hover:bg-subtle/50 sm:pr-3")}>
       <CompanyMark name={job.company} />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-28 flex-1">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold">
           {isNew && (
             <span className="size-2 flex-none rounded-full bg-accent" aria-hidden />
@@ -309,22 +311,24 @@ function JobRow({ job, isNew, onHide, onToggleSave }: { job: Job; isNew: boolean
         </h2>
         <p className="truncate text-xs text-ink-2">{meta}</p>
       </div>
-      <p className="flex-none text-right text-xs text-ink-3 max-md:hidden">
-        {job.platform}
-        {when && ` · ${when}`}
-      </p>
-      <ScoreRing pct={pct} size="sm" draw={isNew} />
-      <div className="flex flex-none">
-        <button type="button" onClick={onToggleSave} aria-pressed={saved} className={action} title={saved ? "Saved" : "Save for later"}>
-          {saved ? <BookmarkCheck className="size-5 text-accent" strokeWidth={1.75} aria-hidden /> : <Bookmark className="size-5" strokeWidth={1.75} aria-hidden />}
-          <span className="sr-only">
-            {saved ? "Saved" : "Save"} {job.title} at {job.company}
-          </span>
-        </button>
-        <button type="button" onClick={onHide} className={action} title="Not interested">
-          <EyeOff className="size-5" strokeWidth={1.75} aria-hidden />
-          <span className="sr-only">Not interested in {job.title} at {job.company}</span>
-        </button>
+      <div className="ml-auto flex flex-none items-center gap-3">
+        <p className="text-right text-xs text-ink-3 max-md:hidden">
+          {job.platform}
+          {when && ` · ${when}`}
+        </p>
+        <ScoreRing pct={pct} size="sm" draw={isNew} />
+        <div className="flex flex-none">
+          <button type="button" onClick={onToggleSave} aria-pressed={saved} className={action} title={saved ? "Saved" : "Save for later"}>
+            {saved ? <BookmarkCheck className="size-5 text-accent" strokeWidth={1.75} aria-hidden /> : <Bookmark className="size-5" strokeWidth={1.75} aria-hidden />}
+            <span className="sr-only">
+              {saved ? "Saved" : "Save"} {job.title} at {job.company}
+            </span>
+          </button>
+          <button type="button" onClick={onHide} className={action} title="Not interested">
+            <EyeOff className="size-5" strokeWidth={1.75} aria-hidden />
+            <span className="sr-only">Not interested in {job.title} at {job.company}</span>
+          </button>
+        </div>
       </div>
     </li>
   );

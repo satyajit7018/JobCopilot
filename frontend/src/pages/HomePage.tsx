@@ -303,11 +303,11 @@ function UpNext({ jobs }: { jobs: Job[] }) {
           See all
         </Link>
       </div>
-      <ul className="overflow-hidden rounded-lg bg-surface md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:rounded-none md:bg-transparent">
+      <ul className="overflow-hidden rounded-lg bg-surface lg:grid lg:grid-cols-2 lg:gap-3 lg:overflow-visible lg:rounded-none lg:bg-transparent">
         {jobs.map((j) => (
           <li
             key={j.job_id}
-            className={cx(rowClass, "transition-colors hover:bg-subtle/50 md:rounded-lg md:bg-surface md:py-3.5 md:after:hidden md:hover:bg-surface md:hover:shadow-pop")}
+            className={cx(rowClass, "transition-colors hover:bg-subtle/50 lg:rounded-lg lg:bg-surface lg:py-3.5 lg:after:hidden lg:hover:bg-surface lg:hover:shadow-pop")}
           >
             <CompanyMark name={j.company} />
             <div className="min-w-0 flex-1">
