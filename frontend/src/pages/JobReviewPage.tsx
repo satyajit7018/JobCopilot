@@ -24,6 +24,7 @@ import {
   nextMatch,
   readableReason,
   scorePercent,
+  useJobDescription,
   useJobs,
   useSetMatchHidden,
   useSetMatchSaved,
@@ -110,6 +111,7 @@ export function JobReviewPage() {
 
 function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | null }) {
   const tailor = useTailor(job.job_id);
+  const description = useJobDescription(job.job_id);
   useEffect(() => markDone("reviewed"), []);
   const premium = useIsPremium();
   const [taskId, setTaskId] = useState<string | null>(() => taskStore.get(job.job_id));
@@ -229,10 +231,21 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
             )}
           </div>
 
-          {job.description && (
-            <div className="min-w-0 lg:col-start-1">
-              <Description text={job.description} />
+          {description.isPending ? (
+            <div className="min-w-0 lg:col-start-1" role="status">
+              <span className="sr-only">Loading the job description…</span>
+              <div aria-hidden className="flex animate-pulse flex-col gap-2.5 rounded-lg border border-line bg-surface p-5 motion-reduce:animate-none">
+                <span className="h-3.5 w-1/3 rounded bg-subtle" />
+                <span className="h-3 w-full rounded bg-subtle" />
+                <span className="h-3 w-5/6 rounded bg-subtle" />
+              </div>
             </div>
+          ) : (
+            description.data && (
+              <div className="min-w-0 lg:col-start-1">
+                <Description text={description.data} />
+              </div>
+            )
           )}
         </div>
       </div>

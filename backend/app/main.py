@@ -11,6 +11,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from slowapi import _rate_limit_exceeded_handler
@@ -113,6 +114,10 @@ app.add_middleware(
         "X-Span-ID"
     ],
 )
+
+# Compress larger answers (the job list above all) whatever sits in front of the API.
+# Added last so it wraps the others: they keep working with plain, uncompressed bodies.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Observability Endpoints
 @app.get("/metrics", tags=["Observability"], include_in_schema=False)

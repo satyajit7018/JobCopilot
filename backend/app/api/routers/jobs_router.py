@@ -79,13 +79,19 @@ async def company_logo_image(request: Request, name: str = ""):
 @router.get("/jobs")
 async def get_jobs(
     status: Optional[str] = None,
+    descriptions: bool = False,
     current_user: User = Depends(get_current_user)
 ):
-    """Returns all tracked job applications for the authenticated tenant."""
+    """Returns all tracked job applications for the authenticated tenant.
+
+    The list leaves each job's description out (it is most of the weight and no list shows
+    it); GET /jobs/{job_id} returns one job in full. `descriptions=true` keeps them in.
+    """
     jobs = db.get_jobs(status=status, user_id=current_user.user_id)
+    exclude = None if descriptions else {"description"}
     return {
         "count": len(jobs),
-        "jobs": [j.dict() for j in jobs]
+        "jobs": [j.dict(exclude=exclude) for j in jobs]
     }
 
 
@@ -400,6 +406,16 @@ async def get_held_applications(current_user: User = Depends(get_current_user)):
             "status": "ON_HOLD"
         })
     return {"status": "success", "count": len(held_jobs), "held_applications": held_jobs}
+
+
+# Registered after /jobs/held so that path isn't read as a job id.
+@router.get("/jobs/{job_id}")
+async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
+    """One job in full, description included."""
+    job = db.get_job_by_id(job_id, user_id=current_user.user_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return job.dict()
 
 
 @router.post("/outreach/alumni-referral")

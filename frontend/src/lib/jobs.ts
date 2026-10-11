@@ -26,7 +26,8 @@ export interface Job {
   title: string;
   location: string;
   url: string;
-  description: string;
+  /** Only on a single job (useJobDescription); the list leaves it out to stay small. */
+  description?: string;
   salary_range: string | null;
   seniority_level: string | null;
   posted_date: string | null;
@@ -44,6 +45,15 @@ export function useJobs() {
   return useQuery({
     queryKey: ["jobs"],
     queryFn: async ({ signal }) => (await api<{ count: number; jobs: Job[] }>("/jobs", { signal })).jobs,
+  });
+}
+
+/** The full description of one job, fetched when the job is opened. */
+export function useJobDescription(jobId: string) {
+  return useQuery({
+    queryKey: ["job-description", jobId],
+    queryFn: async ({ signal }) => (await api<Job>(`/jobs/${encodeURIComponent(jobId)}`, { signal })).description ?? "",
+    staleTime: 5 * 60_000,
   });
 }
 
