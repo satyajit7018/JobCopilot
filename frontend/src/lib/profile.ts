@@ -222,25 +222,18 @@ export function withCurrent(options: string[], current: string): string[] {
 // Job sources. The backend has no per-user source setting yet, so this is a
 // local preference stored under the legacy UI's key (both UIs stay in sync).
 
+// Only places JobCopilot actually reads postings from belong here.
 export const SOURCES = [
-  { id: "linkedin", name: "LinkedIn", detail: "Easy Apply roles" },
-  { id: "naukri", name: "Naukri", detail: "India's largest tech job board" },
-  { id: "instahyre", name: "Instahyre & Cutshort", detail: "Curated tech roles" },
   { id: "ats", name: "Company career pages", detail: "Greenhouse, Lever and Ashby" },
-  { id: "cuvette", name: "Startups", detail: "Cuvette and YC companies" },
-  { id: "indeed", name: "Indeed & Wellfound", detail: "Global and remote roles" },
+  { id: "startups", name: "Startup job boards", detail: "Y Combinator companies and Hacker News \"Who is hiring\"" },
 ] as const;
 
 export type SourceId = (typeof SOURCES)[number]["id"];
 export type SourceState = Record<SourceId, boolean>;
 
 const PLATFORM_HINTS: [SourceId, string[]][] = [
-  ["linkedin", ["linkedin"]],
-  ["naukri", ["naukri"]],
-  ["instahyre", ["instahyre", "cutshort"]],
   ["ats", ["greenhouse", "lever", "ashby", "workday"]],
-  ["cuvette", ["cuvette", "yc", "y combinator"]],
-  ["indeed", ["indeed", "wellfound"]],
+  ["startups", ["y combinator", "yc", "hackernews", "hacker news"]],
 ];
 
 /** Which source a job's platform belongs to, or null when it isn't one of ours. */

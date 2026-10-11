@@ -20,7 +20,6 @@ from app.core.match_scorer import MatchScorer
 from app.core.models import ApplicationStatus, CandidateProfile, JobListing
 from app.core.priority_ranker import PriorityRanker
 from app.discovery.ats_apis import ATSApiFeeders
-from app.discovery.scrapers import PlatformScrapers
 from app.discovery.vc_boards import VCBoardFeeders
 
 logger = logging.getLogger(__name__)
@@ -57,7 +56,7 @@ class DiscoveryOrchestrator:
         self.total_matched = 0
 
     async def _fetch_all_raw_leads(self, target_companies: List[str]) -> List[Dict[str, Any]]:
-        """Fetches raw job openings from Indian tech portals, ATS APIs, and VC feeds concurrently."""
+        """Fetches real, current job openings from company career pages (ATS APIs) and startup boards."""
         raw_leads: List[Dict[str, Any]] = []
         try:
             import h2  # type: ignore
@@ -75,13 +74,6 @@ class DiscoveryOrchestrator:
             # VC & Fast-Track Boards
             tasks.append(VCBoardFeeders.fetch_yc_fast_track_jobs(client=client))
             tasks.append(VCBoardFeeders.fetch_hn_who_is_hiring(max_posts=15, client=client))
-
-            # Indian Tech Portals & Startup Feeds (Prioritized)
-            tasks.append(PlatformScrapers.fetch_naukri_india_feed("Software Engineer"))
-            tasks.append(PlatformScrapers.fetch_instahyre_india_feed("Engineer"))
-            tasks.append(PlatformScrapers.fetch_cuvette_india_feed("Engineer"))
-            tasks.append(PlatformScrapers.fetch_cutshort_india_feed("Engineer"))
-            tasks.append(PlatformScrapers.fetch_wellfound_mock_or_feed("Engineer"))
 
             results = await asyncio.gather(*tasks, return_exceptions=True)
             for res in results:
