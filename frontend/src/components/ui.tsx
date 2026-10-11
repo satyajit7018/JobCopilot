@@ -13,6 +13,7 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { Check, Copy, LoaderCircle } from "lucide-react";
+import { LOGO_ACCENTS, LOGO_LETTER, LOGO_RING, LOGO_SIZE, LOGO_VIEWBOX } from "../lib/logoPaths";
 import type { Tone } from "../lib/jobs";
 
 export { clsx as cx };
@@ -274,10 +275,24 @@ export function CheckRow({
   );
 }
 
+/** The logo with its ring turning: the app's one "working on it" sign, same as the start-up screen. */
+export function LogoLoader({ className = "size-10" }: { className?: string }) {
+  return (
+    <svg viewBox={LOGO_VIEWBOX} className={className} aria-hidden>
+      <rect width={LOGO_SIZE.width} height={LOGO_SIZE.height} rx={LOGO_SIZE.radius} fill="#4f46e5" />
+      {LOGO_ACCENTS.map((a) => (
+        <path key={a.d.slice(0, 24)} fill="#fff" fillOpacity={a.opacity} d={a.d} />
+      ))}
+      <path fill="#fff" d={LOGO_LETTER} />
+      <path className="logo-ring-spin" fill="#fff" d={LOGO_RING} />
+    </svg>
+  );
+}
+
 export function Spinner({ label = "Loading" }: { label?: string }) {
   return (
-    <div role="status" className="flex items-center justify-center gap-2 py-16 text-ink-3">
-      <LoaderCircle className="size-5 animate-spin" aria-hidden />
+    <div role="status" className="flex flex-col items-center justify-center gap-3 py-16 text-ink-3">
+      <LogoLoader />
       <span>{label}…</span>
     </div>
   );
