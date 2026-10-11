@@ -18,6 +18,7 @@ import httpx
 
 from app.core.config import DATA_DIR
 from app.core.settings import settings
+from app.discovery.companies import known_website
 
 SUGGEST_URL = "https://autocomplete.clearbit.com/v1/companies/suggest"
 ICON_URL = "https://www.google.com/s2/favicons"
@@ -46,26 +47,42 @@ def _paths(key: str):
     return _cache_dir() / f"{stem}.img", _cache_dir() / f"{stem}.miss"
 
 
+_LEGAL_SUFFIX = re.compile(r"(privatelimited|pvtltd|limited|ltd|inc|llc|corp|corporation)$")
+
+
 def pick_domain(name: str, suggestions: list) -> Optional[str]:
-    """The first suggestion that is clearly this company, or nothing."""
+    """The first suggestion that is clearly this company, or nothing.
+
+    Several companies can share a name, so the name alone isn't enough: the web address
+    must spell it too ("Swiggy" and swiggy.com, "Sarvam AI" and sarvam.ai). A legal ending
+    such as "Limited" is ignored.
+    """
     key = normalise(name)
+    names = {key, _LEGAL_SUFFIX.sub("", key) or key}
     for s in suggestions if isinstance(suggestions, list) else []:
         if not isinstance(s, dict):
             continue
         domain = str(s.get("domain") or "").strip().lower()
         if not _DOMAIN.match(domain):
             continue
-        if normalise(str(s.get("name") or "")) == key:
+        same_name = normalise(str(s.get("name") or "")) in names
+        if normalise(domain) == key or (same_name and normalise(domain.split(".")[0]) in names):
             return domain
     return None
 
 
+async def find_domain(client: httpx.AsyncClient, name: str) -> Optional[str]:
+    """The company's website address: from our own list when we know it, else looked up."""
+    known = known_website(name) or known_website(re.sub(r"\([^)]*\)", "", name))
+    if known:
+        return known
+    found = await client.get(SUGGEST_URL, params={"query": re.sub(r"\([^)]*\)", "", name).strip()})
+    return pick_domain(name, found.json()) if found.status_code == 200 else None
+
+
 async def _fetch(name: str) -> Optional[bytes]:
     async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, follow_redirects=True) as client:
-        found = await client.get(SUGGEST_URL, params={"query": re.sub(r"\([^)]*\)", "", name).strip()})
-        if found.status_code != 200:
-            return None
-        domain = pick_domain(name, found.json())
+        domain = await find_domain(client, name)
         if not domain:
             return None
         icon = await client.get(ICON_URL, params={"domain": domain, "sz": "128"})

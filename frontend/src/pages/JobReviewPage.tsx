@@ -24,6 +24,8 @@ import {
   nextMatch,
   readableReason,
   scorePercent,
+  useCompanyInfo,
+  useJobDescription,
   useJobs,
   useSetMatchHidden,
   useSetMatchSaved,
@@ -108,8 +110,37 @@ export function JobReviewPage() {
   return <Review key={job.job_id} job={job} back={back} next={nextMatch(visible.data ?? [], job.job_id)} />;
 }
 
+/** The company in its own words, or at least a link to its website. Hidden when we have neither. */
+function AboutCompany({ company, jobId }: { company: string; jobId: string }) {
+  const { data } = useCompanyInfo(company, jobId);
+  if (!data?.about && !data?.website) return null;
+  const site = data.website?.replace(/^https?:\/\//, "");
+  return (
+    <Section title={`About ${company}`}>
+      {data.about ? (
+        <p className="leading-relaxed">{data.about}</p>
+      ) : (
+        <p className="text-ink-2">We don't have a description of {company} yet. Their website has the details.</p>
+      )}
+      {(data.about || data.website) && (
+        <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
+          {data.about && <span>{data.source === "posting" ? "From the job posting." : "From the company's website."}</span>}
+          {data.website && (
+            <a href={data.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+              Visit {site}
+              <ExternalLink className="size-3.5" aria-hidden />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+          )}
+        </p>
+      )}
+    </Section>
+  );
+}
+
 function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | null }) {
   const tailor = useTailor(job.job_id);
+  const description = useJobDescription(job.job_id);
   useEffect(() => markDone("reviewed"), []);
   const premium = useIsPremium();
   const [taskId, setTaskId] = useState<string | null>(() => taskStore.get(job.job_id));
@@ -202,6 +233,8 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
               </div>
             </Section>
 
+            <AboutCompany company={job.company} jobId={job.job_id} />
+
             {premium && <Materials job={job} tailor={tailor} />}
           </div>
 
@@ -229,10 +262,21 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
             )}
           </div>
 
-          {job.description && (
-            <div className="min-w-0 lg:col-start-1">
-              <Description text={job.description} />
+          {description.isPending ? (
+            <div className="min-w-0 lg:col-start-1" role="status">
+              <span className="sr-only">Loading the job description…</span>
+              <div aria-hidden className="flex animate-pulse flex-col gap-2.5 rounded-lg border border-line bg-surface p-5 motion-reduce:animate-none">
+                <span className="h-3.5 w-1/3 rounded bg-subtle" />
+                <span className="h-3 w-full rounded bg-subtle" />
+                <span className="h-3 w-5/6 rounded bg-subtle" />
+              </div>
             </div>
+          ) : (
+            description.data && (
+              <div className="min-w-0 lg:col-start-1">
+                <Description text={description.data} />
+              </div>
+            )
           )}
         </div>
       </div>

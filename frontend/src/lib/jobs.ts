@@ -26,7 +26,8 @@ export interface Job {
   title: string;
   location: string;
   url: string;
-  description: string;
+  /** Only on a single job (useJobDescription); the list leaves it out to stay small. */
+  description?: string;
   salary_range: string | null;
   seniority_level: string | null;
   posted_date: string | null;
@@ -44,6 +45,37 @@ export function useJobs() {
   return useQuery({
     queryKey: ["jobs"],
     queryFn: async ({ signal }) => (await api<{ count: number; jobs: Job[] }>("/jobs", { signal })).jobs,
+  });
+}
+
+/** The full description of one job, fetched when the job is opened. */
+export function useJobDescription(jobId: string) {
+  return useQuery({
+    queryKey: ["job-description", jobId],
+    queryFn: async ({ signal }) => (await api<Job>(`/jobs/${encodeURIComponent(jobId)}`, { signal })).description ?? "",
+    staleTime: 5 * 60_000,
+  });
+}
+
+export interface CompanyInfo {
+  /** The company in its own words (its website's summary, or the note on the posting). */
+  about: string | null;
+  website: string | null;
+  /** Where the text is from: the company's website, or a job posting. */
+  source: "website" | "posting" | null;
+}
+
+/**
+ * A short description of the company and its website; either can be missing. The job id
+ * lets the server fall back to the posting's own "About us" part.
+ */
+export function useCompanyInfo(company: string, jobId: string) {
+  return useQuery({
+    queryKey: ["company-info", company, jobId],
+    queryFn: ({ signal }) =>
+      api<CompanyInfo>(`/company-info?name=${encodeURIComponent(company)}&job_id=${encodeURIComponent(jobId)}`, { signal }),
+    staleTime: 60 * 60_000,
+    retry: false,
   });
 }
 

@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from app.api.auth import get_current_user, limiter
 from app.api.ws_gateway import ws_manager
 from app.core.cover_letter import CoverLetterGenerator
-from app.core import company_logo, match_feedback
+from app.core import company_info, company_logo, match_feedback
 from app.core.database import db
 from app.core.plans import require_premium
 from app.core.models import ApplicationStatus, CandidateProfile, JobListing, User
@@ -76,16 +76,40 @@ async def company_logo_image(request: Request, name: str = ""):
     return Response(content=data, media_type=company_logo.media_type(data), headers={"Cache-Control": "public, max-age=604800"})
 
 
+@router.get("/company-info")
+@limiter.limit("120/minute")
+async def company_about(request: Request, name: str = "", job_id: str = "", current_user: User = Depends(get_current_user)):
+    """A short description of a company in its own words, and its website. Either may be null.
+
+    With `job_id` (one of the user's jobs at this company), the posting's own "About us"
+    part fills in when the company's website has no summary.
+    """
+    name = name.strip()
+    posting = ""
+    if job_id:
+        job = db.get_job_by_id(job_id, user_id=current_user.user_id)
+        # Instahyre postings carry no description of their own; their company note is kept separately.
+        if job and job.platform != "Instahyre" and company_logo.normalise(job.company) == company_logo.normalise(name):
+            posting = job.description or ""
+    return await company_info.get_info(name, posting=posting)
+
+
 @router.get("/jobs")
 async def get_jobs(
     status: Optional[str] = None,
+    descriptions: bool = False,
     current_user: User = Depends(get_current_user)
 ):
-    """Returns all tracked job applications for the authenticated tenant."""
+    """Returns all tracked job applications for the authenticated tenant.
+
+    The list leaves each job's description out (it is most of the weight and no list shows
+    it); GET /jobs/{job_id} returns one job in full. `descriptions=true` keeps them in.
+    """
     jobs = db.get_jobs(status=status, user_id=current_user.user_id)
+    exclude = None if descriptions else {"description"}
     return {
         "count": len(jobs),
-        "jobs": [j.dict() for j in jobs]
+        "jobs": [j.dict(exclude=exclude) for j in jobs]
     }
 
 
@@ -400,6 +424,16 @@ async def get_held_applications(current_user: User = Depends(get_current_user)):
             "status": "ON_HOLD"
         })
     return {"status": "success", "count": len(held_jobs), "held_applications": held_jobs}
+
+
+# Registered after /jobs/held so that path isn't read as a job id.
+@router.get("/jobs/{job_id}")
+async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
+    """One job in full, description included."""
+    job = db.get_job_by_id(job_id, user_id=current_user.user_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return job.dict()
 
 
 @router.post("/outreach/alumni-referral")
