@@ -8,6 +8,7 @@ Validates:
 """
 
 import json
+import warnings
 import yaml
 import tomli
 from pathlib import Path
@@ -64,13 +65,19 @@ def test_api_is_served_at_one_address(client, auth_headers):
     assert client.get("/api/v1/openapi.json").status_code == 404
 
 
-def test_no_route_is_registered_twice(client):
+def test_no_route_is_registered_twice():
     """Each method and path is registered exactly once, and none of them is under /api/v1."""
-    pairs = [(method, route.path) for route in app.routes for method in sorted(getattr(route, "methods", None) or [])]
-    repeated = sorted({pair for pair in pairs if pairs.count(pair) > 1})
+    # Built from the schema, not app.routes: Starlette 1.x nests included routers, so the
+    # route list is not flat. FastAPI warns about a duplicate operation id when the same
+    # handler is mounted at the same method and path more than once.
+    app.openapi_schema = None
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        paths = app.openapi()["paths"]
+    repeated = [str(w.message) for w in caught if "Duplicate Operation ID" in str(w.message)]
     assert not repeated, f"Registered more than once: {repeated}"
-    assert not [path for _, path in pairs if path.startswith("/api/v1")]
-    assert len({path for _, path in pairs if path.startswith("/api/")}) > 50
+    assert not [path for path in paths if path.startswith("/api/v1")]
+    assert len([path for path in paths if path.startswith("/api/")]) > 50
 
 
 def test_generated_openapi_artifact():
