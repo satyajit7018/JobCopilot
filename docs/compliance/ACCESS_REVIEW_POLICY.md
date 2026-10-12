@@ -53,8 +53,7 @@ JobCopilot mandates formal access audits conducted on the following recurring sc
 | :--- | :--- | :--- | :--- |
 | **Cloud Infrastructure (AWS/GCP IAM)** | Quarterly | Security Officer / DevOps Lead | IAM Access Analyzer Report & Signed Audit Sign-off |
 | **Production Database Access** | Monthly | Lead Database Administrator | Connection logs and Active User Role Listing |
-| **Third-Party API Credentials (Stripe, OpenAI)** | Monthly | Engineering Director | Secret rotation log and token usage audit |
-| **Customer Tenant Administrators** | Continuous / In-App | Enterprise Organization Owner | `GET /api/v1/orgs/{org_id}/members` review |
+| **Third-Party API Credentials (Razorpay, OpenAI)** | Monthly | Engineering Director | Secret rotation log and token usage audit |
 
 ---
 
@@ -78,7 +77,7 @@ When JobCopilot engineers require temporary access to troubleshoot candidate acc
 
 1. **Immediate Revocation (Involuntary Termination):** Access to all code repositories, cloud consoles, communication channels, and VPN credentials must be terminated within **one (1) hour** of employee departure notification.
 2. **Scheduled Revocation (Voluntary Termination):** Access is scheduled to expire automatically at the close of the employee's final working day.
-3. **Candidate Account Self-Erasure:** When a candidate triggers `DELETE /api/v1/account`, all active JWT sessions are immediately invalidated, and database records are permanently purged.
+3. **Candidate Account Self-Erasure:** When a candidate triggers `DELETE /api/account`, all active JWT sessions are immediately invalidated, and database records are permanently purged.
 
 ---
 

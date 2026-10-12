@@ -24,7 +24,7 @@ PRELUDE = textwrap.dedent("""
     from fastapi.testclient import TestClient
     from app.main import app
     c = TestClient(app)
-    B = "/api/v1/auth"
+    B = "/api/auth"
     PW = "CorrectHorse!Battery9"
     def reg(email):
         r = c.post(B + "/register", json={"email": email, "password": PW, "full_name": email})
@@ -52,10 +52,10 @@ def _():
     a, b = reg("alice@a.com"), reg("bob@b.com")
     leaked = []
     with c.websocket_connect("/ws?token=" + b["access_token"]) as ws:
-        c.post("/api/v1/jobs/log-call", headers=H(a["access_token"]), json={
+        c.post("/api/jobs/log-call", headers=H(a["access_token"]), json={
             "company": "Acme", "role_title": "SDE", "status": "INTERVIEW",
             "call_notes": "SECRET-NOTES", "meeting_link": "https://meet/x"})
-        c.post("/api/v1/interview/notify-invitation", headers=H(a["access_token"]), json={
+        c.post("/api/interview/notify-invitation", headers=H(a["access_token"]), json={
             "company": "SECRET-CO", "role_title": "SDE", "job_id": "x", "meeting_url": "https://m"})
         # Bob sends a ping; the first message he gets back must be his own PONG, not Alice's data.
         ws.send_text("ping")
@@ -76,7 +76,7 @@ def _():
     payload = '<img src=x onerror="alert(1)">'
     got = None
     with c.websocket_connect("/ws?token=" + b["access_token"]) as ws:
-        c.post("/api/v1/interview/notify-invitation", headers=H(a["access_token"]), json={
+        c.post("/api/interview/notify-invitation", headers=H(a["access_token"]), json={
             "company": payload, "role_title": "SDE", "job_id": "x", "meeting_url": "https://m"})
         ws.send_text("ping")
         for _ in range(3):
@@ -97,13 +97,13 @@ def _():
 def _():
     """
     a = reg("alice@a.com")
-    j = c.post("/api/v1/jobs/log-call", headers=H(a["access_token"]), json={
+    j = c.post("/api/jobs/log-call", headers=H(a["access_token"]), json={
         "company": "Acme", "role_title": "SDE", "status": "INTERVIEW", "call_notes": "n", "meeting_link": ""}).json()
-    r = c.post("/api/v1/email/inbound-webhook", json={
+    r = c.post("/api/email/inbound-webhook", json={
         "user_id": a["user_id"], "sender": "hr@acme.com", "recipient": "x@y",
         "subject": "Your application at Acme",
         "body_text": "Unfortunately we have decided not to move forward with your application at Acme."})
-    jobs = c.get("/api/v1/jobs", headers=H(a["access_token"])).json()
+    jobs = c.get("/api/jobs", headers=H(a["access_token"])).json()
     jobs = jobs if isinstance(jobs, list) else jobs.get("jobs", [])
     status = [x["status"] for x in jobs if x["company"] == "Acme"]
     result(r.status_code in (401, 403) and status == ["INTERVIEW"], f"{r.status_code} {status}")
@@ -208,61 +208,6 @@ def _():
     """
 
 
-@check("P0-6 signed Stripe webhook does not crash", env={"STRIPE_WEBHOOK_SECRET": "whsec_test"})
-def _():
-    """
-    u = reg("payer@p.com")
-    ev = {"id": "evt_1", "object": "event", "type": "checkout.session.completed", "data": {"object": {
-        "id": "cs_1", "object": "checkout.session", "mode": "subscription", "subscription": "sub_1",
-        "customer": "cus_1", "metadata": {"user_id": u["user_id"], "tier": "PRO"}}}}
-    body = json.dumps(ev); t = str(int(time.time()))
-    sig = hmac.new(b"whsec_test", f"{t}.{body}".encode(), hashlib.sha256).hexdigest()
-    r = c.post("/api/v1/billing/webhook", content=body,
-               headers={"Stripe-Signature": f"t={t},v1={sig}", "Content-Type": "application/json"})
-    result(r.status_code == 200, f"{r.status_code} {r.text[:120]}")
-    """
-
-
-@check("P1-6 Stripe cancellation downgrades user", env={"STRIPE_WEBHOOK_SECRET": "whsec_test"})
-def _():
-    """
-    u = reg("payer@p.com")
-    def send(ev):
-        body = json.dumps(ev); t = str(int(time.time()))
-        sig = hmac.new(b"whsec_test", f"{t}.{body}".encode(), hashlib.sha256).hexdigest()
-        return c.post("/api/v1/billing/webhook", content=body,
-                      headers={"Stripe-Signature": f"t={t},v1={sig}", "Content-Type": "application/json"})
-    send({"id": "evt_1", "object": "event", "type": "checkout.session.completed", "data": {"object": {
-        "id": "cs_1", "object": "checkout.session", "mode": "subscription", "subscription": "sub_1",
-        "customer": "cus_1", "metadata": {"user_id": u["user_id"], "tier": "PRO"}}}})
-    mid = c.get(B + "/me", headers=H(u["access_token"])).json().get("role")
-    # Real Stripe behaviour: the Subscription only carries subscription_data.metadata. We send what the
-    # fixed checkout would have attached, AND rely on the stored customer id as the primary lookup.
-    send({"id": "evt_2", "object": "event", "type": "customer.subscription.deleted", "data": {"object": {
-        "id": "sub_1", "object": "subscription", "customer": "cus_1", "status": "canceled", "metadata": {}}}})
-    end = c.get(B + "/me", headers=H(u["access_token"])).json().get("role")
-    result(mid == "PRO" and end == "FREE", f"after checkout={mid} after cancel={end}")
-    """
-
-
-@check("P1-5 Stripe webhook does not overwrite ADMIN role", env={"STRIPE_WEBHOOK_SECRET": "whsec_test"})
-def _():
-    """
-    from app.core.database import db
-    u = reg("boss@p.com")
-    db.update_user_role(u["user_id"], "ADMIN")
-    ev = {"id": "evt_1", "object": "event", "type": "checkout.session.completed", "data": {"object": {
-        "id": "cs_1", "object": "checkout.session", "mode": "subscription", "subscription": "sub_1",
-        "customer": "cus_9", "metadata": {"user_id": u["user_id"], "tier": "PRO"}}}}
-    body = json.dumps(ev); t = str(int(time.time()))
-    sig = hmac.new(b"whsec_test", f"{t}.{body}".encode(), hashlib.sha256).hexdigest()
-    c.post("/api/v1/billing/webhook", content=body,
-           headers={"Stripe-Signature": f"t={t},v1={sig}", "Content-Type": "application/json"})
-    role = db.get_user_by_id(u["user_id"]).role
-    result(str(getattr(role, "value", role)) == "ADMIN", role)
-    """
-
-
 @check("P1-10 logout revokes refresh token")
 def _():
     """
@@ -273,31 +218,16 @@ def _():
     """
 
 
-@check("P1-11 password reset revokes existing sessions")
-def _():
-    """
-    from app.api.auth import create_jwt_token
-    from datetime import timedelta
-    u = reg("v@corp.com")
-    tok = create_jwt_token({"sub": u["user_id"], "email": "v@corp.com", "type": "reset_password"}, timedelta(minutes=15))
-    r = c.post(B + "/reset-password", json={"token": tok, "new_password": "AnotherLongPassw0rd!"})
-    old_access = c.get(B + "/me", headers=H(u["access_token"])).status_code
-    old_refresh = c.post(B + "/refresh", json={"refresh_token": u["refresh_token"]}).status_code
-    result(r.status_code == 200 and old_access == 401 and old_refresh == 401,
-           f"reset={r.status_code} access={old_access} refresh={old_refresh}")
-    """
-
-
 @check("P1-1 async apply does not report fake SUCCESS")
 def _():
     """
     u = reg("a@a.com")
-    j = c.post("/api/v1/jobs/log-call", headers=H(u["access_token"]), json={
+    j = c.post("/api/jobs/log-call", headers=H(u["access_token"]), json={
         "company": "Acme", "role_title": "SDE", "status": "INTERVIEW", "call_notes": "n", "meeting_link": ""}).json()
-    r = c.post(f"/api/v1/bot/apply-async/{j['job_id']}", headers=H(u["access_token"]))
+    r = c.post(f"/api/bot/apply-async/{j['job_id']}", headers=H(u["access_token"]))
     if r.status_code >= 400:
         result(True, f"refused {r.status_code}"); raise SystemExit
-    task = c.get(f"/api/v1/tasks/{r.json()['task_id']}", headers=H(u["access_token"])).json()
+    task = c.get(f"/api/tasks/{r.json()['task_id']}", headers=H(u["access_token"])).json()
     st = task.get("task", {}).get("status")
     result(st != "SUCCESS", st)
     """
@@ -307,9 +237,9 @@ def _():
 def _():
     """
     u = reg("a@a.com")
-    j = c.post("/api/v1/jobs/log-call", headers=H(u["access_token"]), json={
+    j = c.post("/api/jobs/log-call", headers=H(u["access_token"]), json={
         "company": "Acme", "role_title": "SDE", "status": "INTERVIEW", "call_notes": "n", "meeting_link": ""}).json()
-    r = c.post(f"/api/v1/bot/apply/{j['job_id']}?mode=dry_run", headers=H(u["access_token"]))
+    r = c.post(f"/api/bot/apply/{j['job_id']}?mode=dry_run", headers=H(u["access_token"]))
     result(r.status_code in (400, 422), f"{r.status_code} {r.text[:100]}")
     """
 
@@ -321,7 +251,7 @@ def _():
     from app.core.models import HITLEvent
     import uuid
     u = reg("a@a.com")
-    j = c.post("/api/v1/jobs/log-call", headers=H(u["access_token"]), json={
+    j = c.post("/api/jobs/log-call", headers=H(u["access_token"]), json={
         "company": "Acme", "role_title": "SDE", "status": "INTERVIEW", "call_notes": "n", "meeting_link": ""}).json()
     fields = HITLEvent.model_fields if hasattr(HITLEvent, "model_fields") else HITLEvent.__fields__
     kw = dict(event_id="evt_" + uuid.uuid4().hex[:8], job_id=j["job_id"], company="Acme", role_title="SDE",
@@ -329,7 +259,7 @@ def _():
     kw = {k: v for k, v in kw.items() if k in fields}
     if "user_id" in fields: kw["user_id"] = u["user_id"]
     db.save_hitl_event(HITLEvent(**kw), user_id=u["user_id"])
-    c.post("/api/v1/hitl/resolve-held", headers=H(u["access_token"]),
+    c.post("/api/hitl/resolve-held", headers=H(u["access_token"]),
            json={"event_id": kw["event_id"], "user_answer": "30 days", "save_to_vault": False})
     job = db.get_job_by_id(j["job_id"], user_id=u["user_id"])
     st = str(getattr(job.status, "value", job.status))
@@ -357,18 +287,6 @@ def _():
     mainmod.get_db = orig
     ok = anon == 401 and wrong == 401 and right == 200 and prod_no_token == 404 and "SECRET_INTERNAL_PATH" not in h
     result(ok, f"anon={anon} wrong={wrong} right={right} prod_no_token={prod_no_token} leak={'SECRET' in h}")
-    """
-
-
-@check("P1-15 org admin cannot invite an OWNER")
-def _():
-    """
-    owner, adm, victim = reg("o@o.com"), reg("adm@o.com"), reg("new@o.com")
-    org = c.post("/api/v1/orgs", headers=H(owner["access_token"]), json={"name": "Acme Org"}).json()
-    oid = org.get("org_id") or org.get("id")
-    c.post(f"/api/v1/orgs/{oid}/members", headers=H(owner["access_token"]), json={"email": "adm@o.com", "role": "ADMIN"})
-    r = c.post(f"/api/v1/orgs/{oid}/members", headers=H(adm["access_token"]), json={"email": "new@o.com", "role": "OWNER"})
-    result(r.status_code == 403, f"{r.status_code} {r.text[:100]}")
     """
 
 

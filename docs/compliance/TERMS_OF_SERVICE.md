@@ -57,7 +57,7 @@ Welcome to **JobCopilot** ("Company", "Platform", "we", "us", or "our"). These T
 
 1. **Candidate Data Ownership:** You retain 100% ownership of your resume, career history, vault documents, and personal questionnaire answers. JobCopilot claims no ownership over your candidate assets.
 2. **Platform License:** You grant JobCopilot a limited, non-exclusive, worldwide license to process, parse, embed, and transmit your candidate materials solely for the purpose of delivering JobCopilot services.
-3. **AI Training Restrictions:** Candidate career data is NOT used to train public foundation models without explicit, opt-in consent recorded via our Compliance API (`POST /api/v1/compliance/consent`).
+3. **AI Training Restrictions:** Candidate career data is NOT used to train public foundation models without explicit, opt-in consent recorded via our Compliance API (`POST /api/compliance/consent`).
 
 ---
 
@@ -71,5 +71,5 @@ Welcome to **JobCopilot** ("Company", "Platform", "we", "us", or "our"). These T
 ## 8. Governing Law, Dispute Resolution & Account Erasure
 
 1. **Governing Law:** These Terms shall be governed by and construed in accordance with the laws of the State of Delaware, United States, without regard to conflict of law principles.
-2. **GDPR / CCPA Self-Service Erasure:** Candidates may at any time request full cryptographic erasure of their personal account and associated telemetry via `DELETE /api/v1/account` or by contacting `privacy@jobcopilot.io`.
+2. **GDPR / CCPA Self-Service Erasure:** Candidates may at any time request full cryptographic erasure of their personal account and associated telemetry via `DELETE /api/account` or by contacting `privacy@jobcopilot.io`.
 3. **Amendments:** We reserve the right to update these Terms. Material changes will be accompanied by an updated policy version and require re-consent via the platform interface.

@@ -4,7 +4,7 @@ Verifies:
 1. Consent models & serialization across all 5 consent types.
 2. Dual-engine database adapter operations (record, active query, update/revoke, audit history).
 3. Strict multi-tenant isolation of consent records.
-4. REST API routes under canonical /api/v1/compliance and legacy /api/compliance.
+4. REST API routes under canonical /api/compliance and legacy /api/compliance.
 5. IP and User-Agent capture in compliance audit logs.
 6. Public legal metadata endpoints for Terms of Service and Data Processing Agreement.
 7. Verification of all 5 formal compliance policy documents in docs/compliance/.
@@ -187,8 +187,8 @@ def test_consent_multi_tenant_isolation():
 # 3. REST API Endpoint Tests
 # =========================================================================
 
-def test_api_v1_post_consent_grant_and_retrieval(auth_client: TestClient):
-    """Tests POST /api/v1/compliance/consent and GET /api/v1/compliance/consent."""
+def test_api_post_consent_grant_and_retrieval(auth_client: TestClient):
+    """Tests POST /api/compliance/consent and GET /api/compliance/consent."""
     # Grant Terms of Service
     payload = {
         "consent_type": "terms_of_service",
@@ -196,7 +196,7 @@ def test_api_v1_post_consent_grant_and_retrieval(auth_client: TestClient):
         "consented": True
     }
     response = auth_client.post(
-        "/api/v1/compliance/consent",
+        "/api/compliance/consent",
         json=payload,
         headers={"User-Agent": "JobCopilot-Compliance-Test-Runner/1.0", "X-Forwarded-For": "203.0.113.195"}
     )
@@ -209,34 +209,34 @@ def test_api_v1_post_consent_grant_and_retrieval(auth_client: TestClient):
     assert "JobCopilot-Compliance-Test-Runner" in data["user_agent"]
 
     # Verify active consent status
-    get_res = auth_client.get("/api/v1/compliance/consent")
+    get_res = auth_client.get("/api/compliance/consent")
     assert get_res.status_code == 200
     get_data = get_res.json()
     assert "terms_of_service" in get_data["consents"]
     assert get_data["consents"]["terms_of_service"]["consented"] is True
 
 
-def test_api_v1_consent_history_and_filtering(auth_client: TestClient):
-    """Tests GET /api/v1/compliance/consent/history with and without consent_type filter."""
+def test_api_consent_history_and_filtering(auth_client: TestClient):
+    """Tests GET /api/compliance/consent/history with and without consent_type filter."""
     # Record telemetry consent
     auth_client.post(
-        "/api/v1/compliance/consent",
+        "/api/compliance/consent",
         json={"consent_type": "telemetry_analytics", "version": "1.0", "consented": True}
     )
     # Revoke telemetry consent
     auth_client.post(
-        "/api/v1/compliance/consent",
+        "/api/compliance/consent",
         json={"consent_type": "telemetry_analytics", "version": "1.1", "consented": False}
     )
 
     # Get all history
-    history_res = auth_client.get("/api/v1/compliance/consent/history")
+    history_res = auth_client.get("/api/compliance/consent/history")
     assert history_res.status_code == 200
     all_history = history_res.json()
     assert len(all_history) >= 2
 
     # Get filtered history for telemetry_analytics
-    filter_res = auth_client.get("/api/v1/compliance/consent/history?consent_type=telemetry_analytics")
+    filter_res = auth_client.get("/api/compliance/consent/history?consent_type=telemetry_analytics")
     assert filter_res.status_code == 200
     filtered = filter_res.json()
     assert len(filtered) >= 2
@@ -246,19 +246,19 @@ def test_api_v1_consent_history_and_filtering(auth_client: TestClient):
 
 def test_unauthenticated_consent_actions_blocked(client: TestClient):
     """Verifies that unauthenticated access to consent mutations or candidate history is rejected."""
-    # POST /api/v1/compliance/consent without auth
+    # POST /api/compliance/consent without auth
     res_post = client.post(
-        "/api/v1/compliance/consent",
+        "/api/compliance/consent",
         json={"consent_type": "marketing", "version": "1.0", "consented": True}
     )
     assert res_post.status_code in (401, 403)
 
-    # GET /api/v1/compliance/consent without auth
-    res_get = client.get("/api/v1/compliance/consent")
+    # GET /api/compliance/consent without auth
+    res_get = client.get("/api/compliance/consent")
     assert res_get.status_code in (401, 403)
 
-    # GET /api/v1/compliance/consent/history without auth
-    res_hist = client.get("/api/v1/compliance/consent/history")
+    # GET /api/compliance/consent/history without auth
+    res_hist = client.get("/api/compliance/consent/history")
     assert res_hist.status_code in (401, 403)
 
 

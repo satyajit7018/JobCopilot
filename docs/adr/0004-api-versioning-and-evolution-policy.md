@@ -4,7 +4,10 @@ Date: 2026-09-06
 
 ## Status
 
-Accepted
+Superseded on 2026-10-12. The API is served at one address, `/api`. The `/api/v1` copy and the
+deprecation headers described below were removed before launch: the only client is the project's
+own web app, which ships together with the server, so there is no outside consumer to version for.
+If a public API is ever offered, revisit this record. The text below is kept as history.
 
 ## Context
 

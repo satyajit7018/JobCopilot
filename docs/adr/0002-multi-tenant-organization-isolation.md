@@ -29,4 +29,4 @@ We enforced a **Cryptographic and Schema-Enforced Multi-Tenant Isolation Archite
 
 ### Negative / Trade-offs
 - Every data access method must accept and enforce `user_id` or `org_id`.
-- Global administrative operations require explicit, audited impersonation protocols (`/api/v1/admin/impersonate`).
+- Global administrative operations require explicit, audited impersonation protocols (`/api/admin/impersonate`).
