@@ -9,6 +9,7 @@ import uuid
 import logging
 import sqlite3
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -885,12 +886,20 @@ class DatabaseManager(DatabaseAdapter):
             return cursor.fetchone() is not None
 
     def prune_revoked_tokens(self) -> int:
-        """Removes expired tokens from the revocation blacklist."""
-        now_str = datetime.now().isoformat()
+        """Removes revocations whose token has expired anyway.
+
+        expires_at holds the token's expiry as Unix seconds (text). It must be compared as a
+        number: compared as text against an ISO date, every row looked expired, so each prune
+        emptied the list and signed-out tokens worked again. Rows that are not plain digits
+        are kept.
+        """
+        now_ts = int(time.time())
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM revoked_tokens WHERE expires_at != '' AND expires_at < ?", (now_str,))
+                cursor.execute(
+                    "DELETE FROM revoked_tokens WHERE expires_at != '' AND expires_at NOT GLOB '*[^0-9]*' "
+                    "AND CAST(expires_at AS INTEGER) < ?", (now_ts,))
                 deleted = cursor.rowcount
                 conn.commit()
                 return deleted

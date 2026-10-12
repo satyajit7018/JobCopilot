@@ -16,7 +16,7 @@ from app.bot.apply_ledger import ApplyLedgerManager, apply_ledger
 from app.core.celery_app import TaskManager
 from app.core.config import DEFAULT_SUBMISSION_MODE
 from app.core.database import db
-from app.core.plans import require_premium
+from app.core.plans import is_premium, require_premium
 from app.core.models import ApplicationStatus, ApplyLedgerStatus, User
 from app.core.vector_vault import vault
 
@@ -145,7 +145,9 @@ async def resolve_held_application(
     job = db.get_job_by_id(evt.job_id, user_id=current_user.user_id)
     ledger = apply_ledger.get_ledger_for_job(current_user.user_id, job.job_id) if job else None
     task_id = None
-    if job and ledger and db.transition_ledger_status(ledger.ledger_id, current_user.user_id,
+    # Applying automatically is part of Premium. Someone who has left Premium can still save
+    # their answer, but the paused application is not sent on their behalf.
+    if job and ledger and is_premium(current_user) and db.transition_ledger_status(ledger.ledger_id, current_user.user_id,
                                               [ApplyLedgerStatus.HITL_PAUSED.value], ApplyLedgerStatus.INITIATED.value):
         wants_live = str(getattr(job, "submission_mode", "") or "") == "LIVE"
         consent = db.get_user_consents(current_user.user_id).get("autonomous_submission")

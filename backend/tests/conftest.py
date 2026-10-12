@@ -19,7 +19,24 @@ if "JOBCOPILOT_DATA_DIR" not in os.environ:
 # Tests never read live job sites; the ones about a source stand in for it themselves.
 os.environ.setdefault("INSTAHYRE_ENABLED", "false")
 
+import socket  # noqa: E402
+
 import pytest  # noqa: E402
+
+_real_connect = socket.socket.connect
+
+
+def _local_only_connect(self, address, *args, **kwargs):
+    """Tests never touch the internet: a real job site must not be read, and results must not
+    depend on the network. Anything that tries gets a clear error instead of a connection."""
+    host = address[0] if isinstance(address, tuple) else str(address)
+    if isinstance(address, tuple) and host not in ("127.0.0.1", "::1", "localhost"):
+        raise OSError(f"Tests may not open network connections (tried {host}). Stand in for the remote service instead.")
+    return _real_connect(self, address, *args, **kwargs)
+
+
+socket.socket.connect = _local_only_connect
+
 from datetime import timedelta
 from fastapi.testclient import TestClient
 from app.main import app

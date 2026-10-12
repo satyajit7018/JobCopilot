@@ -70,7 +70,21 @@ class TestMilestone6:
             assert any("airbnb.com" in m["sender"] for m in list_data["messages"])
 
     @pytest.mark.asyncio
-    async def test_end_to_end_pipeline_lifecycle(self):
+    async def test_end_to_end_pipeline_lifecycle(self, monkeypatch):
+        from app.discovery.orchestrator import DiscoveryOrchestrator
+
+        async def leads(self, companies):
+            # Stands in for the live career pages, so the test doesn't need the internet.
+            return [{
+                "external_id": "gh_m6_1", "platform": "Greenhouse", "company": "Acme",
+                "title": "Backend Engineer (Python)", "location": "Bangalore, India", "posted_date": None,
+                "url": "https://boards.greenhouse.io/acme/jobs/m6-1",
+                "description": "Build APIs in Python and FastAPI. Ship services with Docker. PyTorch is a plus.",
+            }]
+
+        # Patched on the class: patching the shared instance would leave its own copy of the
+        # method behind afterwards and hide later tests' stand-ins.
+        monkeypatch.setattr(DiscoveryOrchestrator, "_fetch_all_raw_leads", leads)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test", headers=self.headers) as ac:
             # 1. Check API Health

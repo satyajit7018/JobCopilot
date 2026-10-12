@@ -9,9 +9,9 @@ from app.core.database import db
 from app.core.models import (ApplyLedgerEntry, ApplyLedgerStatus, HITLEvent, JobListing, User, UserRole)
 
 
-def _user():
+def _user(role=UserRole.FREE):
     uid = f"usr_{uuid.uuid4().hex[:10]}"
-    db.create_user(User(user_id=uid, email=f"{uid}@t.test", password_hash="x", role=UserRole.FREE))
+    db.create_user(User(user_id=uid, email=f"{uid}@t.test", password_hash="x", role=role))
     return uid
 
 
@@ -86,7 +86,31 @@ def test_resolve_held_requeues_instead_of_faking_submission(monkeypatch):
     dispatched = {}
     monkeypatch.setattr(core_celery.TaskManager, "dispatch_apply_task",
                         classmethod(lambda cls, **kw: dispatched.update(kw) or "task_123"))
-    uid = _user(); job = _job(uid); e = _ledger(uid, job, ApplyLedgerStatus.HITL_PAUSED)
+    uid = _user(UserRole.PRO); job = _job(uid); e = _ledger(uid, job, ApplyLedgerStatus.HITL_PAUSED)
+    evt = HITLEvent(event_id=f"evt_{uuid.uuid4().hex[:8]}", job_id=job.job_id, company="Acme", role_title="SDE",
+                    question_text="Notice period?", input_type="text", user_id=uid)
+    db.save_hitl_event(evt, user_id=uid)
+    access, _ = start_session(db.get_user_by_id(uid), "PRO", "127.0.0.1", "pytest")
+
+    res = TestClient(app).post("/api/hitl/resolve-held", headers={"Authorization": f"Bearer {access}"},
+                               json={"event_id": evt.event_id, "user_answer": "30 days", "save_to_vault": False})
+    assert res.status_code == 200 and res.json()["task_id"] == "task_123"
+    assert dispatched["ledger_id"] == e.ledger_id and dispatched["submission_mode"] == "DRY_RUN"
+    assert str(getattr(db.get_job_by_id(job.job_id, user_id=uid).status, "value", "")) == "QUEUED"
+
+
+def test_resolve_held_saves_the_answer_but_does_not_apply_for_someone_off_premium(monkeypatch):
+    """Applying automatically is Premium. After leaving Premium, a held question can still be
+    answered, but the paused application is not sent."""
+    from fastapi.testclient import TestClient
+    from app.api.auth import start_session
+    from app.core import celery_app as core_celery
+    from app.main import app
+
+    dispatched = []
+    monkeypatch.setattr(core_celery.TaskManager, "dispatch_apply_task",
+                        classmethod(lambda cls, **kw: dispatched.append(kw) or "task_should_not_exist"))
+    uid = _user(UserRole.FREE); job = _job(uid); e = _ledger(uid, job, ApplyLedgerStatus.HITL_PAUSED)
     evt = HITLEvent(event_id=f"evt_{uuid.uuid4().hex[:8]}", job_id=job.job_id, company="Acme", role_title="SDE",
                     question_text="Notice period?", input_type="text", user_id=uid)
     db.save_hitl_event(evt, user_id=uid)
@@ -94,6 +118,37 @@ def test_resolve_held_requeues_instead_of_faking_submission(monkeypatch):
 
     res = TestClient(app).post("/api/hitl/resolve-held", headers={"Authorization": f"Bearer {access}"},
                                json={"event_id": evt.event_id, "user_answer": "30 days", "save_to_vault": False})
-    assert res.status_code == 200 and res.json()["task_id"] == "task_123"
-    assert dispatched["ledger_id"] == e.ledger_id and dispatched["submission_mode"] == "DRY_RUN"
-    assert str(getattr(db.get_job_by_id(job.job_id, user_id=uid).status, "value", "")) == "QUEUED"
+    assert res.status_code == 200 and res.json()["task_id"] is None
+    assert dispatched == []
+    led = apply_ledger.get_ledger_for_job(uid, job.job_id)
+    assert led.ledger_id == e.ledger_id and str(getattr(led.status, "value", led.status)) == "HITL_PAUSED"
+    assert str(getattr(db.get_job_by_id(job.job_id, user_id=uid).status, "value", "")) != "QUEUED"
+
+
+@pytest.mark.parametrize("path", ["/api/bot/apply/{job}", "/api/jobs/apply-async/{job}", "/api/bot/apply-async/{job}"])
+@pytest.mark.parametrize("mode", ["dry_run", "live", "LIVE ", "anything"])
+def test_invalid_submission_mode_is_rejected_before_anything_runs(monkeypatch, path, mode):
+    """Audit P1-2: only the exact values DRY_RUN and LIVE are accepted. Checked as a Premium user,
+    so the answer comes from the mode check and not from the plan gate."""
+    from fastapi.testclient import TestClient
+    from app.api.auth import start_session
+    from app.bot import runner as runner_mod
+    from app.core import celery_app as core_celery
+    from app.main import app
+
+    ran = []
+    monkeypatch.setattr(core_celery.TaskManager, "dispatch_apply_task",
+                        classmethod(lambda cls, **kw: ran.append("dispatched") or "task_should_not_exist"))
+
+    async def never(self, *a, **kw):
+        ran.append("executed")
+        return {"status": "error"}
+
+    monkeypatch.setattr(runner_mod.AutonomousJobRunner, "execute_application", never)
+    uid = _user(UserRole.PRO); job = _job(uid)
+    access, _ = start_session(db.get_user_by_id(uid), "PRO", "127.0.0.1", "pytest")
+
+    res = TestClient(app).post(path.format(job=job.job_id), params={"mode": mode}, headers={"Authorization": f"Bearer {access}"})
+    assert res.status_code == 422, res.text
+    assert ran == []
+    assert apply_ledger.get_ledger_for_job(uid, job.job_id) is None
