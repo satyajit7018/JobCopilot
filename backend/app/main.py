@@ -247,7 +247,7 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
     await ws_manager.connect(websocket, user_id=user_id)
     try:
         while True:
-            data = await websocket.receive_text()
+            await websocket.receive_text()
             await websocket.send_json({"type": "PONG", "message": "connected", "user_id": user_id})
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, user_id=user_id)

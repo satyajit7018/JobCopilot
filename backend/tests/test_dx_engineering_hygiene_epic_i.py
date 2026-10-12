@@ -65,10 +65,12 @@ def test_api_is_served_at_one_address(client, auth_headers):
 
 
 def test_no_route_is_registered_twice(client):
-    """Every path in the schema is either under /api/ or one of the few root pages; none is under /api/v1."""
-    paths = client.get("/openapi.json").json()["paths"]
-    assert not [p for p in paths if p.startswith("/api/v1")]
-    assert len([p for p in paths if p.startswith("/api/")]) > 50
+    """Each method and path is registered exactly once, and none of them is under /api/v1."""
+    pairs = [(method, route.path) for route in app.routes for method in sorted(getattr(route, "methods", None) or [])]
+    repeated = sorted({pair for pair in pairs if pairs.count(pair) > 1})
+    assert not repeated, f"Registered more than once: {repeated}"
+    assert not [path for _, path in pairs if path.startswith("/api/v1")]
+    assert len({path for _, path in pairs if path.startswith("/api/")}) > 50
 
 
 def test_generated_openapi_artifact():

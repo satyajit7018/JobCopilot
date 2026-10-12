@@ -4,7 +4,7 @@ Verifies:
 1. Consent models & serialization across all 5 consent types.
 2. Dual-engine database adapter operations (record, active query, update/revoke, audit history).
 3. Strict multi-tenant isolation of consent records.
-4. REST API routes under canonical /api/compliance and legacy /api/compliance.
+4. REST API routes under /api/compliance.
 5. IP and User-Agent capture in compliance audit logs.
 6. Public legal metadata endpoints for Terms of Service and Data Processing Agreement.
 7. Verification of all 5 formal compliance policy documents in docs/compliance/.
