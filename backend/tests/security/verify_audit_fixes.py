@@ -32,6 +32,16 @@ PRELUDE = textwrap.dedent("""
         return r.json()
     def H(tok):
         return {"Authorization": "Bearer " + tok}
+    def premium(u):
+        # Automatic applying is a Premium feature; without this the plan gate answers 402
+        # before the code under test is reached.
+        from app.core.database import db
+        db.update_user_role(u["user_id"], "PRO")
+        return u
+    def no_browser():
+        # These checks must never drive a real browser, whatever is installed here.
+        from app.bot import runner
+        runner.HAS_PLAYWRIGHT = False
     def result(fixed, detail=""):
         print("RESULT:" + json.dumps({"fixed": bool(fixed), "detail": str(detail)[:300]}))
 """)
@@ -221,22 +231,29 @@ def _():
 @check("P1-1 async apply does not report fake SUCCESS")
 def _():
     """
-    u = reg("a@a.com")
+    no_browser()
+    u = premium(reg("a@a.com"))
     j = c.post("/api/jobs/log-call", headers=H(u["access_token"]), json={
         "company": "Acme", "role_title": "SDE", "status": "INTERVIEW", "call_notes": "n", "meeting_link": ""}).json()
     r = c.post(f"/api/bot/apply-async/{j['job_id']}", headers=H(u["access_token"]))
-    if r.status_code >= 400:
-        result(True, f"refused {r.status_code}"); raise SystemExit
-    task = c.get(f"/api/tasks/{r.json()['task_id']}", headers=H(u["access_token"])).json()
-    st = task.get("task", {}).get("status")
-    result(st != "SUCCESS", st)
+    if r.status_code != 202:
+        result(False, f"not accepted for a Premium user: {r.status_code} {r.text[:100]}"); raise SystemExit
+    st = None
+    for _ in range(40):
+        task = c.get(f"/api/tasks/{r.json()['task_id']}", headers=H(u["access_token"])).json()
+        st = task.get("task", {}).get("status")
+        if st not in (None, "PENDING", "QUEUED", "STARTED", "RUNNING", "IN_PROGRESS"):
+            break
+        time.sleep(0.25)
+    result(st != "SUCCESS", f"with no browser available the task ended as {st}")
     """
 
 
 @check("P1-2 invalid submission mode rejected")
 def _():
     """
-    u = reg("a@a.com")
+    no_browser()
+    u = premium(reg("a@a.com"))
     j = c.post("/api/jobs/log-call", headers=H(u["access_token"]), json={
         "company": "Acme", "role_title": "SDE", "status": "INTERVIEW", "call_notes": "n", "meeting_link": ""}).json()
     r = c.post(f"/api/bot/apply/{j['job_id']}?mode=dry_run", headers=H(u["access_token"]))
@@ -250,7 +267,8 @@ def _():
     from app.core.database import db
     from app.core.models import HITLEvent
     import uuid
-    u = reg("a@a.com")
+    no_browser()
+    u = premium(reg("a@a.com"))
     j = c.post("/api/jobs/log-call", headers=H(u["access_token"]), json={
         "company": "Acme", "role_title": "SDE", "status": "INTERVIEW", "call_notes": "n", "meeting_link": ""}).json()
     fields = HITLEvent.model_fields if hasattr(HITLEvent, "model_fields") else HITLEvent.__fields__

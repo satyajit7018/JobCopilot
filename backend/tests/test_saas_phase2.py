@@ -29,7 +29,7 @@ class TestSaaSPhase2:
         adapter.local_base_dir = tmp_path
 
         user_id = "user_saas_42"
-        resume_content = b"%PDF-1.4 Mock Resume Bytes For Satyajit"
+        resume_content = b"%PDF-1.4 Mock Resume Bytes For Asha"
 
         # 1. Upload Resume
         saved_path = adapter.upload_resume(user_id, "resume_v1.pdf", resume_content)

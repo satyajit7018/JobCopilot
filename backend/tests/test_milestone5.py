@@ -29,9 +29,9 @@ class TestMilestone5:
         self.profile = CandidateProfile(
             id="usr_m5",
             user_id="usr_m5",
-            full_name="Satyajit Nayak",
-            email="scorpionsatyajit@gmail.com",
-            phone="+91 7008053476",
+            full_name="Asha Rao",
+            email="asha.rao@example.test",
+            phone="+91 9000000001",
             location="Bangalore, India",
             skills=["Python", "FastAPI", "PyTorch"],
             projects=[Project(name="Medical AI System", description="Diagnostic tool", metrics="96.19% accuracy")]
@@ -42,7 +42,7 @@ class TestMilestone5:
     def test_email_parser_pixel_stripping(self):
         raw_html = """
         <div style="font-family: Arial;">
-          <p>Hi Satyajit,</p>
+          <p>Hi Asha,</p>
           <p>We received your application for the Software Engineer role.</p>
           <p>Click <a href="https://calendly.com/techcorp/chat">here to schedule</a>.</p>
           <img src="https://mandrillapp.com/track/open.php?u=123" width="1" height="1" style="display:none;" />
@@ -50,7 +50,7 @@ class TestMilestone5:
         """
         parsed = EmailParser.parse_raw_email(
             sender="jobs@techcorp.io",
-            recipient="scorpionsatyajit@gmail.com",
+            recipient="asha.rao@example.test",
             subject="Interview with TechCorp",
             body_html=raw_html
         )
@@ -109,7 +109,7 @@ class TestMilestone5:
         try:
             res = await EmailSyncEngine.process_inbound_email(
                 sender="recruiting@linearcorp.com",
-                recipient="scorpionsatyajit@gmail.com",
+                recipient="asha.rao@example.test",
                 subject="Interview with LinearCorp for Backend Engineer",
                 body_html="<p>We want to invite you to interview! Book here: https://calendly.com/linearcorp/screen</p>",
                 user_id="usr_m5"

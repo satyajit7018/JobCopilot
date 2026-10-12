@@ -124,9 +124,9 @@ class TestMilestone1:
     # 5. Test Resume Parser
     def test_resume_parser(self):
         text_resume = """
-        Satyajit Nayak
-        scorpionsatyajit@gmail.com | +91 7008053476
-        https://linkedin.com/in/satyajit-nayak | https://github.com/satyajit7018
+        Asha Rao
+        asha.rao@example.test | +91 9000000001
+        https://linkedin.com/in/asha-rao-example | https://github.com/asha-rao-example
         Bangalore, India
 
         Education:
@@ -140,8 +140,8 @@ class TestMilestone1:
         Vector Search Gateway: Semantic retrieval system with sub-50ms latency using Qdrant and Redis.
         """
         profile = ResumeParser.parse_to_profile(text_resume)
-        assert profile.full_name == "Satyajit Nayak"
-        assert profile.email == "scorpionsatyajit@gmail.com"
+        assert profile.full_name == "Asha Rao"
+        assert profile.email == "asha.rao@example.test"
         assert "Python" in profile.categorized_skills.languages
         assert "FastAPI" in profile.categorized_skills.frameworks
         assert "Docker" in profile.categorized_skills.cloud_devops
@@ -196,11 +196,11 @@ class TestMilestone1:
     def test_vector_vault_seeding_and_matching(self):
         vault_instance = KnowledgeVault()
         profile = CandidateProfile(
-            full_name="Satyajit Nayak",
-            email="scorpionsatyajit@gmail.com",
-            phone="+91 7008053476",
+            full_name="Asha Rao",
+            email="asha.rao@example.test",
+            phone="+91 9000000001",
             location="Bangalore, India",
-            github_url="https://github.com/satyajit7018",
+            github_url="https://github.com/asha-rao-example",
             skills=["Python", "FastAPI", "PyTorch", "Docker"],
             preferences=RecruiterPreferences(
                 expected_ctc="24 LPA",

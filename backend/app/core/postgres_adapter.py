@@ -7,6 +7,7 @@ multi-tenant query execution with fail-safe schema bootstrapping and PII encrypt
 import json
 import uuid
 import logging
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
@@ -589,12 +590,15 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
             self.release_connection(conn)
 
     def prune_revoked_tokens(self) -> int:
-        """Removes expired tokens from the revocation blacklist."""
+        """Removes revocations whose token has expired anyway (expires_at is Unix seconds as text;
+        compared as a number, see DatabaseManager.prune_revoked_tokens)."""
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
-                now_str = datetime.now().isoformat()
-                cursor.execute("DELETE FROM revoked_tokens WHERE expires_at != '' AND expires_at < %s", (now_str,))
+                now_ts = int(time.time())
+                cursor.execute(
+                    "DELETE FROM revoked_tokens WHERE expires_at ~ '^[0-9]+$' AND CAST(expires_at AS BIGINT) < %s",
+                    (now_ts,))
                 deleted = cursor.rowcount
                 conn.commit()
                 return deleted

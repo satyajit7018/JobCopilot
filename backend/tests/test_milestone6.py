@@ -26,9 +26,9 @@ class TestMilestone6:
         profile = CandidateProfile(
             id="usr_test_tenant_a",
             user_id="usr_test_tenant_a",
-            full_name="Satyajit Nayak",
-            email="scorpionsatyajit@gmail.com",
-            phone="+91 7008053476",
+            full_name="Asha Rao",
+            email="asha.rao@example.test",
+            phone="+91 9000000001",
             location="Bangalore, India",
             skills=["Python", "FastAPI", "PyTorch", "Docker"],
             preferences=RecruiterPreferences(
@@ -39,7 +39,7 @@ class TestMilestone6:
         )
         db.save_profile(profile, user_id="usr_test_tenant_a")
         self.token = create_jwt_token(
-            {"sub": "usr_test_tenant_a", "email": "scorpionsatyajit@gmail.com", "role": "PRO", "type": "access"},
+            {"sub": "usr_test_tenant_a", "email": "asha.rao@example.test", "role": "PRO", "type": "access"},
             timedelta(minutes=60)
         )
         self.headers = {"Authorization": f"Bearer {self.token}"}
@@ -52,7 +52,7 @@ class TestMilestone6:
             email_payload = {
                 "sender": "talent@airbnb.com",
                 "subject": "Interview Invitation: Senior Software Engineer at Airbnb",
-                "body_html": "<p>Hi Satyajit, we would like to interview you! Book here: https://calendly.com/airbnb/screen</p><img src='https://mandrillapp.com/track/open.php?u=1' width='1' height='1'>"
+                "body_html": "<p>Hi Asha, we would like to interview you! Book here: https://calendly.com/airbnb/screen</p><img src='https://mandrillapp.com/track/open.php?u=1' width='1' height='1'>"
             }
             res = await ac.post("/api/email/inbound", json=email_payload)
             assert res.status_code == 200
@@ -70,7 +70,21 @@ class TestMilestone6:
             assert any("airbnb.com" in m["sender"] for m in list_data["messages"])
 
     @pytest.mark.asyncio
-    async def test_end_to_end_pipeline_lifecycle(self):
+    async def test_end_to_end_pipeline_lifecycle(self, monkeypatch):
+        from app.discovery.orchestrator import DiscoveryOrchestrator
+
+        async def leads(self, companies):
+            # Stands in for the live career pages, so the test doesn't need the internet.
+            return [{
+                "external_id": "gh_m6_1", "platform": "Greenhouse", "company": "Acme",
+                "title": "Backend Engineer (Python)", "location": "Bangalore, India", "posted_date": None,
+                "url": "https://boards.greenhouse.io/acme/jobs/m6-1",
+                "description": "Build APIs in Python and FastAPI. Ship services with Docker. PyTorch is a plus.",
+            }]
+
+        # Patched on the class: patching the shared instance would leave its own copy of the
+        # method behind afterwards and hide later tests' stand-ins.
+        monkeypatch.setattr(DiscoveryOrchestrator, "_fetch_all_raw_leads", leads)
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test", headers=self.headers) as ac:
             # 1. Check API Health

@@ -30,9 +30,9 @@ class TestMilestone2:
         self.db_path = tmp_path / "test_m2.db"
         self.db = DatabaseManager(self.db_path)
         self.profile = CandidateProfile(
-            full_name="Satyajit Nayak",
-            email="scorpionsatyajit@gmail.com",
-            phone="+91 7008053476",
+            full_name="Asha Rao",
+            email="asha.rao@example.test",
+            phone="+91 9000000001",
             location="Bangalore, India",
             skills=["Python", "FastAPI", "PyTorch", "Docker", "PostgreSQL", "Redis"],
             preferences=RecruiterPreferences(

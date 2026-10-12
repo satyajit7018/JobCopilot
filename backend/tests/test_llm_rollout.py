@@ -135,7 +135,7 @@ async def test_interview_studio_async_rollout():
 async def test_negotiation_async_rollout():
     """Validates generate_advanced_counter_script_async execution and fallback."""
     script = await SalaryNegotiationEngine.generate_advanced_counter_script_async(
-        candidate_name="Satyajit Nayak",
+        candidate_name="Asha Rao",
         target_company="100xEngineers",
         role_title="AI Systems Engineer",
         current_base="12 LPA",
