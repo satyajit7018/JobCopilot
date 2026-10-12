@@ -26,9 +26,9 @@ class TestMilestone6:
         profile = CandidateProfile(
             id="usr_test_tenant_a",
             user_id="usr_test_tenant_a",
-            full_name="Satyajit Nayak",
-            email="scorpionsatyajit@gmail.com",
-            phone="+91 7008053476",
+            full_name="Asha Rao",
+            email="asha.rao@example.test",
+            phone="+91 9000000001",
             location="Bangalore, India",
             skills=["Python", "FastAPI", "PyTorch", "Docker"],
             preferences=RecruiterPreferences(
@@ -39,7 +39,7 @@ class TestMilestone6:
         )
         db.save_profile(profile, user_id="usr_test_tenant_a")
         self.token = create_jwt_token(
-            {"sub": "usr_test_tenant_a", "email": "scorpionsatyajit@gmail.com", "role": "PRO", "type": "access"},
+            {"sub": "usr_test_tenant_a", "email": "asha.rao@example.test", "role": "PRO", "type": "access"},
             timedelta(minutes=60)
         )
         self.headers = {"Authorization": f"Bearer {self.token}"}
@@ -52,7 +52,7 @@ class TestMilestone6:
             email_payload = {
                 "sender": "talent@airbnb.com",
                 "subject": "Interview Invitation: Senior Software Engineer at Airbnb",
-                "body_html": "<p>Hi Satyajit, we would like to interview you! Book here: https://calendly.com/airbnb/screen</p><img src='https://mandrillapp.com/track/open.php?u=1' width='1' height='1'>"
+                "body_html": "<p>Hi Asha, we would like to interview you! Book here: https://calendly.com/airbnb/screen</p><img src='https://mandrillapp.com/track/open.php?u=1' width='1' height='1'>"
             }
             res = await ac.post("/api/email/inbound", json=email_payload)
             assert res.status_code == 200

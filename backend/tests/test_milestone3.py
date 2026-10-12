@@ -28,12 +28,12 @@ class TestMilestone3:
         self.db_path = tmp_path / "test_m3.db"
         self.db = DatabaseManager(self.db_path)
         self.profile = CandidateProfile(
-            full_name="Satyajit Nayak",
-            email="scorpionsatyajit@gmail.com",
-            phone="+91 7008053476",
+            full_name="Asha Rao",
+            email="asha.rao@example.test",
+            phone="+91 9000000001",
             location="Bangalore, India",
-            linkedin_url="https://linkedin.com/in/satyajit-nayak",
-            github_url="https://github.com/satyajit7018",
+            linkedin_url="https://linkedin.com/in/asha-rao-example",
+            github_url="https://github.com/asha-rao-example",
             skills=["SQL", "Python", "Docker", "FastAPI", "PyTorch", "PostgreSQL"],
             categorized_skills=CategorizedSkills(
                 languages=["SQL", "Python"],
@@ -76,8 +76,8 @@ class TestMilestone3:
     @pytest.mark.asyncio
     async def test_pdf_resume_compilation(self, tmp_path):
         html_doc = ResumeCompiler.generate_resume_html(self.profile)
-        assert "SATYAJIT NAYAK" in html_doc or "Satyajit Nayak" in html_doc
-        assert "scorpionsatyajit@gmail.com" in html_doc
+        assert "ASHA RAO" in html_doc or "Asha Rao" in html_doc
+        assert "asha.rao@example.test" in html_doc
 
         pdf_path = tmp_path / "test_out.pdf"
         await ResumeCompiler.compile_to_pdf(html_doc, pdf_path)
@@ -87,7 +87,7 @@ class TestMilestone3:
         # Validate with pypdf
         reader = PdfReader(str(pdf_path))
         text = reader.pages[0].extract_text()
-        assert "SATYAJIT NAYAK" in text
+        assert "ASHA RAO" in text
         assert "PyTorch" in text
         assert "96.19%" in text
 
@@ -116,7 +116,7 @@ class TestMilestone3:
         assert "Perplexity" in letter
         assert "AI Systems Engineer" in letter
         assert "96.19% accuracy" in letter
-        assert "github.com/satyajit7018" in letter
+        assert "github.com/asha-rao-example" in letter
 
         # Check absence of AI buzzwords
         for bad_word in CoverLetterGenerator.FORBIDDEN_AI_CLICHES:

@@ -36,12 +36,12 @@ class TestMilestone4:
         self.db_path = tmp_path / "test_m4.db"
         self.db = DatabaseManager(self.db_path)
         self.profile = CandidateProfile(
-            full_name="Satyajit Nayak",
-            email="scorpionsatyajit@gmail.com",
-            phone="+91 7008053476",
+            full_name="Asha Rao",
+            email="asha.rao@example.test",
+            phone="+91 9000000001",
             location="Bangalore, India",
-            linkedin_url="https://linkedin.com/in/satyajit-nayak",
-            github_url="https://github.com/satyajit7018",
+            linkedin_url="https://linkedin.com/in/asha-rao-example",
+            github_url="https://github.com/asha-rao-example",
             skills=["Python", "FastAPI", "PyTorch", "Docker"],
             preferences=RecruiterPreferences(
                 expected_ctc="20 LPA",
@@ -107,8 +107,8 @@ class TestMilestone4:
             </form>
             """)
             gh_res = await GreenhouseAdapter.fill_application(page, self.profile)
-            assert gh_res["first_name"] == "Satyajit"
-            assert gh_res["email"] == "scorpionsatyajit@gmail.com"
+            assert gh_res["first_name"] == "Asha"
+            assert gh_res["email"] == "asha.rao@example.test"
 
             # Lever Simulation
             await page.set_content("""
@@ -118,7 +118,7 @@ class TestMilestone4:
             </form>
             """)
             lv_res = await LeverAdapter.fill_application(page, self.profile)
-            assert lv_res["name"] == "Satyajit Nayak"
+            assert lv_res["name"] == "Asha Rao"
             assert lv_res["org"] == "CurrentTech"
 
             await browser.close()
@@ -130,14 +130,14 @@ class TestMilestone4:
             job_id=jid,
             current_step=1,
             total_steps=3,
-            filled_inputs={"name": "Satyajit"},
+            filled_inputs={"name": "Asha"},
             last_url="https://jobs.lever.co/stripe"
         )
         assert saved.current_step == 1
 
         retrieved = CheckpointManager.get_step(jid)
         assert retrieved is not None
-        assert retrieved.filled_inputs["name"] == "Satyajit"
+        assert retrieved.filled_inputs["name"] == "Asha"
 
         CheckpointManager.clear(jid)
         assert CheckpointManager.get_step(jid) is None
