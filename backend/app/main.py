@@ -21,7 +21,6 @@ from app.api.auth import limiter
 from app.api.endpoints import router as api_router
 from app.api.endpoints import ws_manager
 from app.api.middleware import (
-    ApiDeprecationMiddleware,
     IdempotencyMiddleware,
     RequestTracingMiddleware,
     SecurityHeadersMiddleware,
@@ -88,16 +87,13 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # 1. Tracing & Latency Logger
 app.add_middleware(RequestTracingMiddleware)
 
-# 2. RFC 8594 Sunset & Deprecation Warning for Legacy /api/ Routes
-app.add_middleware(ApiDeprecationMiddleware)
-
-# 3. Idempotency Key Engine for Mutating Operations
+# 2. Idempotency Key Engine for Mutating Operations
 app.add_middleware(IdempotencyMiddleware)
 
-# 4. Strict Security Headers (CSP, HSTS, X-Frame-Options)
+# 3. Strict Security Headers (CSP, HSTS, X-Frame-Options)
 app.add_middleware(SecurityHeadersMiddleware)
 
-# 3. CORS Policy
+# 4. CORS Policy
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS if isinstance(settings.ALLOWED_ORIGINS, list) else [settings.ALLOWED_ORIGINS],
@@ -251,7 +247,7 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = None):
     await ws_manager.connect(websocket, user_id=user_id)
     try:
         while True:
-            data = await websocket.receive_text()
+            await websocket.receive_text()
             await websocket.send_json({"type": "PONG", "message": "connected", "user_id": user_id})
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, user_id=user_id)

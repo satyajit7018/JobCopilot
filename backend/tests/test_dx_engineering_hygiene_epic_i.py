@@ -1,15 +1,14 @@
 """
 Unit & Integration Tests for Phase P3 Epic I: Engineering Hygiene & Developer Experience (DX)
 Validates:
-1. Canonical `/api/v1/` routes and backward-compatible `/api/` routes
-2. RFC 8594 `Deprecation`, `Sunset`, and `Link` response headers
-3. Versioned OpenAPI specification `/api/v1/openapi.json`
-4. Typed client generation (`api_client.js`, `api_client.d.ts`, `docs/openapi_v1.json`)
-5. Architecture Decision Records (ADRs 0001-0004) and CONTRIBUTING.md structure
-6. Configuration validation for `pyproject.toml` and `.pre-commit-config.yaml`
+1. One API address: everything under `/api/`, nothing under `/api/v1/`, no deprecation headers
+2. The generated OpenAPI specification (`docs/openapi.json`)
+3. Architecture Decision Records (ADRs 0001-0004) and CONTRIBUTING.md structure
+4. Configuration validation for `pyproject.toml` and `.pre-commit-config.yaml`
 """
 
 import json
+import warnings
 import yaml
 import tomli
 from pathlib import Path
@@ -50,46 +49,47 @@ def auth_headers():
     return {"Authorization": f"Bearer {token}", "user_id": test_user_id}
 
 
-def test_canonical_v1_and_legacy_api_routing(client, auth_headers):
-    """Validates that both /api/v1 and /api routes are functional and route to the same logic."""
+def test_api_is_served_at_one_address(client, auth_headers):
+    """The API lives under /api only: the old /api/v1 copy is gone and nothing is marked deprecated."""
     headers = {"Authorization": auth_headers["Authorization"]}
 
-    # 1. Canonical /api/v1 route
-    res_v1 = client.get("/api/v1/billing/plan", headers=headers)
-    assert res_v1.status_code == 200
-    # Canonical v1 routes MUST NOT have Deprecation header
-    assert "Deprecation" not in res_v1.headers
-    assert "Sunset" not in res_v1.headers
-
-    # 2. Legacy /api route
-    res_legacy = client.get("/api/billing/plan", headers=headers)
-    assert res_legacy.status_code == 200
-    # Legacy routes MUST have RFC 8594 Deprecation & Sunset headers
-    assert res_legacy.headers.get("Deprecation") == "true"
-    assert "Sunset" in res_legacy.headers
-    assert res_legacy.headers.get("Link") == '</api/v1/billing/plan>; rel="successor-version"'
-
-
-def test_v1_openapi_schema_endpoint(client):
-    """Validates that /api/v1/openapi.json produces valid OpenAPI v1 specification."""
-    res = client.get("/api/v1/openapi.json")
+    res = client.get("/api/billing/plan", headers=headers)
     assert res.status_code == 200
-    schema = res.json()
-    assert schema["info"]["title"] == "JobCopilot API v1"
-    assert schema["info"]["version"] == "1.0.0"
-    assert "paths" in schema
-    assert any(p.startswith("/api/v1") for p in schema["paths"].keys())
+    for header in ("Deprecation", "Sunset", "Link"):
+        assert header not in res.headers
+    assert client.get("/api/health").status_code == 200
+
+    # The versioned copy no longer exists, signed in or not.
+    assert client.get("/api/v1/billing/plan", headers=headers).status_code == 404
+    assert client.get("/api/v1/health").status_code == 404
+    assert client.get("/api/v1/openapi.json").status_code == 404
+
+
+def test_no_route_is_registered_twice():
+    """Each method and path is registered exactly once, and none of them is under /api/v1."""
+    # Built from the schema, not app.routes: Starlette 1.x nests included routers, so the
+    # route list is not flat. FastAPI warns about a duplicate operation id when the same
+    # handler is mounted at the same method and path more than once.
+    app.openapi_schema = None
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        paths = app.openapi()["paths"]
+    repeated = [str(w.message) for w in caught if "Duplicate Operation ID" in str(w.message)]
+    assert not repeated, f"Registered more than once: {repeated}"
+    assert not [path for path in paths if path.startswith("/api/v1")]
+    assert len([path for path in paths if path.startswith("/api/")]) > 50
 
 
 def test_generated_openapi_artifact():
     """Validates the OpenAPI specification written by scripts/generate_api_client.py."""
-    openapi_file = BASE_DIR / "docs" / "openapi_v1.json"
-    assert openapi_file.exists(), "docs/openapi_v1.json was not generated"
+    openapi_file = BASE_DIR / "docs" / "openapi.json"
+    assert openapi_file.exists(), "docs/openapi.json was not generated"
 
     with open(openapi_file, "r", encoding="utf-8") as f:
         spec = json.load(f)
         assert spec["info"]["version"] == "1.0.0"
         assert len(spec["paths"]) > 0
+        assert all(path.startswith("/api/") and not path.startswith("/api/v1") for path in spec["paths"])
 
 
 def test_adr_records_integrity():

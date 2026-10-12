@@ -1,12 +1,10 @@
 """
-JobCopilot - Master API Gateway & Router Aggregator
-Decomposed into modular domain routers under `app.api.routers` while maintaining
-100% backwards compatibility for existing imports, route topologies, and WebSocket streaming.
+JobCopilot - API router
+Gathers the domain routers in `app.api.routers` under one address, /api, and
+re-exports the request models and WebSocket manager that other modules import from here.
 """
 
-from fastapi import APIRouter, Depends, Request
-
-from app.api.auth import get_current_user
+from fastapi import APIRouter
 
 # Import all domain routers
 from app.api.routers import (
@@ -62,46 +60,13 @@ from app.core.models import (
     UserConsent,
 )
 
-# Backwards compatibility routers
-public_router = APIRouter()
-protected_router = APIRouter(dependencies=[Depends(get_current_user)])
-
-# 1. Canonical Version 1 Router mounted under prefix "/api/v1"
-v1_router = APIRouter(prefix="/api/v1")
-
-
-@v1_router.get("/openapi.json", tags=["Meta"], include_in_schema=False)
-async def get_v1_openapi(request: Request):
-    """Returns versioned OpenAPI schema specification for v1 endpoints."""
-    openapi_schema = request.app.openapi()
-    v1_schema = dict(openapi_schema)
-    v1_schema["info"] = {
-        "title": "JobCopilot API v1",
-        "version": "1.0.0",
-        "description": "Canonical Version 1 of JobCopilot REST API."
-    }
-    return v1_schema
-
-
+# Every domain router is served once, under /api.
+router = APIRouter(prefix="/api")
 for sub_router in all_routers:
-    v1_router.include_router(sub_router)
-
-# 2. Legacy Compatibility Router mounted under prefix "/api"
-legacy_router = APIRouter(prefix="/api")
-for sub_router in all_routers:
-    legacy_router.include_router(sub_router)
-
-# 3. Master Aggregator Router
-router = APIRouter()
-router.include_router(v1_router)
-router.include_router(legacy_router)
+    router.include_router(sub_router)
 
 __all__ = [
     "router",
-    "v1_router",
-    "legacy_router",
-    "public_router",
-    "protected_router",
     "ws_manager",
     "MultiTenantWebSocketGateway",
     "GoogleSSORequest",

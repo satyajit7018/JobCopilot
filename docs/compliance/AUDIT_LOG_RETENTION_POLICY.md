@@ -58,7 +58,7 @@ JobCopilot categorizes logs into four distinct tiers based on legal necessity, f
    - Telemetry and performance metrics exceeding ninety (90) days are purged automatically via database TTL indexes or scheduled background cron jobs.
    - Database backup snapshots older than thirty (30) days are automatically expired by cloud object lifecycle policies.
 2. **Candidate Account Erasure Interaction:**
-   - When a candidate invokes `DELETE /api/v1/account` (GDPR Article 17), personal candidate records, resumes, and profile answers are permanently wiped immediately.
+   - When a candidate invokes `DELETE /api/account` (GDPR Article 17), personal candidate records, resumes, and profile answers are permanently wiped immediately.
    - To satisfy legal accountability requirements under GDPR Article 7(1) ("demonstrate that the data subject has consented"), consent timestamp markers and erasure acknowledgment records are pseudonymized and retained in cold audit archives.
 
 ---

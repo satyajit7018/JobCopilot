@@ -1,12 +1,27 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "JobCopilot API v1",
+    "title": "JobCopilot API",
     "version": "1.0.0",
-    "description": "Version 1 of the JobCopilot Autonomous Career Operating System REST API."
+    "description": "The JobCopilot REST API. Every endpoint is served under /api."
   },
   "paths": {
-    "/api/v1/auth/register": {
+    "/api/client-errors": {
+      "post": {
+        "tags": [
+          "Observability"
+        ],
+        "summary": "Report Client Error",
+        "description": "Sink for uncaught client-side JS errors so frontend failures aren't invisible.\n\nBest-effort and never fails the caller: logs the error (with the request id\nfor correlation) and forwards to Sentry when configured. Rate-limited per\nuser/IP to prevent a broken client from flooding the backend.",
+        "operationId": "report_client_error_api_client_errors_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
       "post": {
         "tags": [
           "auth",
@@ -14,7 +29,7 @@
         ],
         "summary": "Register User",
         "description": "Registers a new multi-tenant candidate account with Argon2id password hashing.",
-        "operationId": "register_user_api_v1_auth_register_post",
+        "operationId": "register_user_api_auth_register_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -49,7 +64,7 @@
         }
       }
     },
-    "/api/v1/auth/login": {
+    "/api/auth/login": {
       "post": {
         "tags": [
           "auth",
@@ -57,7 +72,7 @@
         ],
         "summary": "Login User",
         "description": "Authenticates user credentials, enforces brute-force lockout, MFA gate, and issues JWT tokens.",
-        "operationId": "login_user_api_v1_auth_login_post",
+        "operationId": "login_user_api_auth_login_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -92,7 +107,7 @@
         }
       }
     },
-    "/api/v1/auth/refresh": {
+    "/api/auth/refresh": {
       "post": {
         "tags": [
           "auth",
@@ -100,7 +115,7 @@
         ],
         "summary": "Refresh Token",
         "description": "Rotates refresh token, revokes old token, and issues a new access token.",
-        "operationId": "refresh_token_api_v1_auth_refresh_post",
+        "operationId": "refresh_token_api_auth_refresh_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -135,7 +150,7 @@
         }
       }
     },
-    "/api/v1/auth/logout": {
+    "/api/auth/logout": {
       "post": {
         "tags": [
           "auth",
@@ -143,7 +158,7 @@
         ],
         "summary": "Logout User",
         "description": "Revokes the current access token in the database blacklist and deactivates active session.",
-        "operationId": "logout_user_api_v1_auth_logout_post",
+        "operationId": "logout_user_api_auth_logout_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -161,7 +176,7 @@
         ]
       }
     },
-    "/api/v1/auth/me": {
+    "/api/auth/me": {
       "get": {
         "tags": [
           "auth",
@@ -169,7 +184,7 @@
         ],
         "summary": "Get My Profile",
         "description": "Returns the authenticated candidate's identity and subscription tier.",
-        "operationId": "get_my_profile_api_v1_auth_me_get",
+        "operationId": "get_my_profile_api_auth_me_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -189,7 +204,7 @@
         ]
       }
     },
-    "/api/v1/auth/mfa/setup": {
+    "/api/auth/mfa/setup": {
       "post": {
         "tags": [
           "auth",
@@ -197,7 +212,7 @@
         ],
         "summary": "Setup Mfa",
         "description": "Initiates TOTP enrollment, generates secret, QR provisioning URI, and backup recovery codes.",
-        "operationId": "setup_mfa_api_v1_auth_mfa_setup_post",
+        "operationId": "setup_mfa_api_auth_mfa_setup_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -217,7 +232,7 @@
         ]
       }
     },
-    "/api/v1/auth/mfa/verify": {
+    "/api/auth/mfa/verify": {
       "post": {
         "tags": [
           "auth",
@@ -225,7 +240,7 @@
         ],
         "summary": "Verify And Enable Mfa",
         "description": "Verifies TOTP code against pending secret and finalizes MFA activation.",
-        "operationId": "verify_and_enable_mfa_api_v1_auth_mfa_verify_post",
+        "operationId": "verify_and_enable_mfa_api_auth_mfa_verify_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -263,7 +278,7 @@
         ]
       }
     },
-    "/api/v1/auth/mfa/login-challenge": {
+    "/api/auth/mfa/login-challenge": {
       "post": {
         "tags": [
           "auth",
@@ -271,7 +286,7 @@
         ],
         "summary": "Complete Mfa Login",
         "description": "Verifies MFA challenge token with TOTP code or backup recovery code, issuing full JWT.",
-        "operationId": "complete_mfa_login_api_v1_auth_mfa_login_challenge_post",
+        "operationId": "complete_mfa_login_api_auth_mfa_login_challenge_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -306,7 +321,7 @@
         }
       }
     },
-    "/api/v1/auth/mfa/disable": {
+    "/api/auth/mfa/disable": {
       "post": {
         "tags": [
           "auth",
@@ -314,7 +329,7 @@
         ],
         "summary": "Disable Mfa",
         "description": "Disables MFA after verifying the user's password or current TOTP code.",
-        "operationId": "disable_mfa_api_v1_auth_mfa_disable_post",
+        "operationId": "disable_mfa_api_auth_mfa_disable_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -352,7 +367,7 @@
         ]
       }
     },
-    "/api/v1/auth/sessions": {
+    "/api/auth/sessions": {
       "get": {
         "tags": [
           "auth",
@@ -360,7 +375,7 @@
         ],
         "summary": "List Active Sessions",
         "description": "Lists all active device sessions for the authenticated candidate.",
-        "operationId": "list_active_sessions_api_v1_auth_sessions_get",
+        "operationId": "list_active_sessions_api_auth_sessions_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -386,7 +401,7 @@
         ],
         "summary": "Revoke All Other Sessions",
         "description": "Revokes all active sessions for the user except the current one.",
-        "operationId": "revoke_all_other_sessions_api_v1_auth_sessions_delete",
+        "operationId": "revoke_all_other_sessions_api_auth_sessions_delete",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -404,7 +419,7 @@
         ]
       }
     },
-    "/api/v1/auth/sessions/{session_id}": {
+    "/api/auth/sessions/{session_id}": {
       "delete": {
         "tags": [
           "auth",
@@ -412,7 +427,7 @@
         ],
         "summary": "Revoke User Session",
         "description": "Revokes a specific device session and blacklists its token.",
-        "operationId": "revoke_user_session_api_v1_auth_sessions__session_id__delete",
+        "operationId": "revoke_user_session_api_auth_sessions__session_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -451,7 +466,7 @@
         }
       }
     },
-    "/api/v1/auth/security-logs": {
+    "/api/auth/security-logs": {
       "get": {
         "tags": [
           "auth",
@@ -459,7 +474,7 @@
         ],
         "summary": "Get User Security Logs",
         "description": "Returns security audit log events pertaining to the authenticated user.",
-        "operationId": "get_user_security_logs_api_v1_auth_security_logs_get",
+        "operationId": "get_user_security_logs_api_auth_security_logs_get",
         "security": [
           {
             "HTTPBearer": []
@@ -511,14 +526,14 @@
         }
       }
     },
-    "/api/v1/health": {
+    "/api/health": {
       "get": {
         "tags": [
           "auth"
         ],
         "summary": "Health Check",
         "description": "Public healthcheck endpoint.",
-        "operationId": "health_check_api_v1_health_get",
+        "operationId": "health_check_api_health_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -531,14 +546,14 @@
         }
       }
     },
-    "/api/v1/auth/public-config": {
+    "/api/auth/public-config": {
       "get": {
         "tags": [
           "auth"
         ],
         "summary": "Public Auth Config",
         "description": "Unauthenticated config the login gate needs to render the correct sign-in UI.\n\nExposes only the public OAuth client id (safe to ship to browsers) and whether\nthe demo/email-only path should be offered \u2014 never any secret.",
-        "operationId": "public_auth_config_api_v1_auth_public_config_get",
+        "operationId": "public_auth_config_api_auth_public_config_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -551,14 +566,14 @@
         }
       }
     },
-    "/api/v1/auth/google-sso": {
+    "/api/auth/google-sso": {
       "post": {
         "tags": [
           "auth"
         ],
         "summary": "Google Sso Auth",
         "description": "Authenticates with a Google ID token, then applies the same MFA gate as password login.\n\nAudit P0-4 hardening:\n  * the audience (client id) check can never be skipped,\n  * Google must assert email_verified,\n  * the email comes only from the verified token, never the request body,\n  * the tokenless demo path is gated on settings (not os.environ) and is off in production,\n  * deactivated accounts are refused, and MFA is enforced via complete_login().",
-        "operationId": "google_sso_auth_api_v1_auth_google_sso_post",
+        "operationId": "google_sso_auth_api_auth_google_sso_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -593,19 +608,19 @@
         }
       }
     },
-    "/api/v1/upload-resume": {
+    "/api/upload-resume": {
       "post": {
         "tags": [
           "profile"
         ],
         "summary": "Upload Resume",
         "description": "Uploads and parses a resume (PDF, DOCX, or text) and auto-prefills questionnaire.",
-        "operationId": "upload_resume_api_v1_upload_resume_post",
+        "operationId": "upload_resume_api_upload_resume_post",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_upload_resume_api_v1_upload_resume_post"
+                "$ref": "#/components/schemas/Body_upload_resume_api_upload_resume_post"
               }
             }
           }
@@ -637,14 +652,14 @@
         ]
       }
     },
-    "/api/v1/profile": {
+    "/api/profile": {
       "get": {
         "tags": [
           "profile"
         ],
         "summary": "Get Profile",
         "description": "Retrieves current candidate profile for authenticated tenant.",
-        "operationId": "get_profile_api_v1_profile_get",
+        "operationId": "get_profile_api_profile_get",
         "security": [
           {
             "HTTPBearer": []
@@ -690,14 +705,14 @@
         }
       }
     },
-    "/api/v1/profile/background": {
+    "/api/profile/background": {
       "put": {
         "tags": [
           "profile"
         ],
         "summary": "Update Background",
         "description": "Saves the user's corrections to skills, work history and education.",
-        "operationId": "update_background_api_v1_profile_background_put",
+        "operationId": "update_background_api_profile_background_put",
         "requestBody": {
           "content": {
             "application/json": {
@@ -735,14 +750,14 @@
         ]
       }
     },
-    "/api/v1/questionnaire": {
+    "/api/questionnaire": {
       "get": {
         "tags": [
           "profile"
         ],
         "summary": "Get Questionnaire",
         "description": "Retrieves the recruiter questions schema and prefilled answers.",
-        "operationId": "get_questionnaire_api_v1_questionnaire_get",
+        "operationId": "get_questionnaire_api_questionnaire_get",
         "security": [
           {
             "HTTPBearer": []
@@ -793,7 +808,7 @@
         ],
         "summary": "Submit Questionnaire",
         "description": "Applies user-confirmed answers to profile and Knowledge Vault.",
-        "operationId": "submit_questionnaire_api_v1_questionnaire_post",
+        "operationId": "submit_questionnaire_api_questionnaire_post",
         "security": [
           {
             "HTTPBearer": []
@@ -831,14 +846,14 @@
         }
       }
     },
-    "/api/v1/vault": {
+    "/api/vault": {
       "get": {
         "tags": [
           "vault"
         ],
         "summary": "Get Vault Entries",
         "description": "Returns all indexed Q&A slots for the authenticated tenant.",
-        "operationId": "get_vault_entries_api_v1_vault_get",
+        "operationId": "get_vault_entries_api_vault_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -856,14 +871,14 @@
         ]
       }
     },
-    "/api/v1/vault/learn": {
+    "/api/vault/learn": {
       "post": {
         "tags": [
           "vault"
         ],
         "summary": "Learn Vault Entry",
         "description": "Manually teaches or updates a Q&A slot.",
-        "operationId": "learn_vault_entry_api_v1_vault_learn_post",
+        "operationId": "learn_vault_entry_api_vault_learn_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -901,14 +916,14 @@
         ]
       }
     },
-    "/api/v1/discovery/run": {
+    "/api/discovery/run": {
       "post": {
         "tags": [
           "discovery"
         ],
         "summary": "Run Discovery",
         "description": "Triggers an async 0-day job discovery cycle across ATS APIs and VC boards.\n\nRate-limited (per user/IP): discovery fans out to many external ATS/VC feeds,\nso this caps abuse and runaway cost. Deeper per-tier daily quotas live in the\nRateLimiter singleton.",
-        "operationId": "run_discovery_api_v1_discovery_run_post",
+        "operationId": "run_discovery_api_discovery_run_post",
         "security": [
           {
             "HTTPBearer": []
@@ -954,14 +969,14 @@
         }
       }
     },
-    "/api/v1/discovery/status": {
+    "/api/discovery/status": {
       "get": {
         "tags": [
           "discovery"
         ],
         "summary": "Get Discovery Status",
         "description": "Returns current discovery metrics with caching.",
-        "operationId": "get_discovery_status_api_v1_discovery_status_get",
+        "operationId": "get_discovery_status_api_discovery_status_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -979,14 +994,14 @@
         ]
       }
     },
-    "/api/v1/company-logo": {
+    "/api/company-logo": {
       "get": {
         "tags": [
           "jobs"
         ],
         "summary": "Company Logo Image",
         "description": "A company's logo for the job lists. Open (image tags can't send a sign-in token) and\nrate-limited; \"no logo\" is an empty 204 so the app falls back to the initial quietly.",
-        "operationId": "company_logo_image_api_v1_company_logo_get",
+        "operationId": "company_logo_image_api_company_logo_get",
         "parameters": [
           {
             "name": "name",
@@ -1021,14 +1036,14 @@
         }
       }
     },
-    "/api/v1/company-info": {
+    "/api/company-info": {
       "get": {
         "tags": [
           "jobs"
         ],
         "summary": "Company About",
         "description": "A short description of a company in its own words, and its website. Either may be null.\n\nWith `job_id` (one of the user's jobs at this company), the posting's own \"About us\"\npart fills in when the company's website has no summary.",
-        "operationId": "company_about_api_v1_company_info_get",
+        "operationId": "company_about_api_company_info_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1078,14 +1093,14 @@
         }
       }
     },
-    "/api/v1/jobs": {
+    "/api/jobs": {
       "get": {
         "tags": [
           "jobs"
         ],
         "summary": "Get Jobs",
         "description": "Returns all tracked job applications for the authenticated tenant.\n\nThe list leaves each job's description out (it is most of the weight and no list shows\nit); GET /jobs/{job_id} returns one job in full. `descriptions=true` keeps them in.",
-        "operationId": "get_jobs_api_v1_jobs_get",
+        "operationId": "get_jobs_api_jobs_get",
         "security": [
           {
             "HTTPBearer": []
@@ -1141,14 +1156,14 @@
         }
       }
     },
-    "/api/v1/jobs/{job_id}/status": {
+    "/api/jobs/{job_id}/status": {
       "patch": {
         "tags": [
           "jobs"
         ],
         "summary": "Update Job Status",
         "description": "Updates the pipeline status of a tracked job application.",
-        "operationId": "update_job_status_api_v1_jobs__job_id__status_patch",
+        "operationId": "update_job_status_api_jobs__job_id__status_patch",
         "security": [
           {
             "HTTPBearer": []
@@ -1197,14 +1212,14 @@
         }
       }
     },
-    "/api/v1/jobs/{job_id}/notes": {
+    "/api/jobs/{job_id}/notes": {
       "patch": {
         "tags": [
           "jobs"
         ],
         "summary": "Update Job Notes",
         "description": "Saves the user's own notes on a job or application (\"spoke to Priya, follow up Friday\").",
-        "operationId": "update_job_notes_api_v1_jobs__job_id__notes_patch",
+        "operationId": "update_job_notes_api_jobs__job_id__notes_patch",
         "security": [
           {
             "HTTPBearer": []
@@ -1253,14 +1268,14 @@
         }
       }
     },
-    "/api/v1/jobs/{job_id}/not-interested": {
+    "/api/jobs/{job_id}/not-interested": {
       "post": {
         "tags": [
           "jobs"
         ],
         "summary": "Not Interested",
         "description": "Hides a match and, when the reason says something reusable, skips similar jobs in new searches.",
-        "operationId": "not_interested_api_v1_jobs__job_id__not_interested_post",
+        "operationId": "not_interested_api_jobs__job_id__not_interested_post",
         "security": [
           {
             "HTTPBearer": []
@@ -1309,14 +1324,14 @@
         }
       }
     },
-    "/api/v1/match-preferences": {
+    "/api/match-preferences": {
       "get": {
         "tags": [
           "jobs"
         ],
         "summary": "List Skip Rules",
         "description": "What new searches skip because of the user's \"Not interested\" reasons.",
-        "operationId": "list_skip_rules_api_v1_match_preferences_get",
+        "operationId": "list_skip_rules_api_match_preferences_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1334,14 +1349,14 @@
         ]
       }
     },
-    "/api/v1/match-preferences/{rule_id}": {
+    "/api/match-preferences/{rule_id}": {
       "delete": {
         "tags": [
           "jobs"
         ],
         "summary": "Delete Skip Rule",
         "description": "Stops skipping jobs for one rule. Jobs it skipped can come back in the next search.",
-        "operationId": "delete_skip_rule_api_v1_match_preferences__rule_id__delete",
+        "operationId": "delete_skip_rule_api_match_preferences__rule_id__delete",
         "security": [
           {
             "HTTPBearer": []
@@ -1380,14 +1395,14 @@
         }
       }
     },
-    "/api/v1/jobs/{job_id}/interview": {
+    "/api/jobs/{job_id}/interview": {
       "patch": {
         "tags": [
           "jobs"
         ],
         "summary": "Update Interview Date",
         "description": "Sets (or clears) the interview date for a tracked application.",
-        "operationId": "update_interview_date_api_v1_jobs__job_id__interview_patch",
+        "operationId": "update_interview_date_api_jobs__job_id__interview_patch",
         "security": [
           {
             "HTTPBearer": []
@@ -1436,14 +1451,14 @@
         }
       }
     },
-    "/api/v1/jobs/{job_id}/tailor": {
+    "/api/jobs/{job_id}/tailor": {
       "post": {
         "tags": [
           "jobs"
         ],
         "summary": "Generate Tailored Assets",
         "description": "Compiles a tailored PDF resume, cover letter, and outreach package for a job.\n\nRate-limited (per user/IP): each call runs LLM resume tailoring + cover-letter\n+ outreach generation, so this caps runaway AI cost from a single account.",
-        "operationId": "generate_tailored_assets_api_v1_jobs__job_id__tailor_post",
+        "operationId": "generate_tailored_assets_api_jobs__job_id__tailor_post",
         "security": [
           {
             "HTTPBearer": []
@@ -1498,14 +1513,14 @@
         }
       }
     },
-    "/api/v1/jobs/{job_id}/resume-wording": {
+    "/api/jobs/{job_id}/resume-wording": {
       "put": {
         "tags": [
           "jobs"
         ],
         "summary": "Set Resume Wording",
         "description": "Picks the AI wording or the user's own for this job's resume. Applying uses this pick.",
-        "operationId": "set_resume_wording_api_v1_jobs__job_id__resume_wording_put",
+        "operationId": "set_resume_wording_api_jobs__job_id__resume_wording_put",
         "security": [
           {
             "HTTPBearer": []
@@ -1554,14 +1569,14 @@
         }
       }
     },
-    "/api/v1/jobs/log-call": {
+    "/api/jobs/log-call": {
       "post": {
         "tags": [
           "jobs"
         ],
         "summary": "Log Direct Recruiter Call",
         "description": "Manually records an offline recruiter call or phone screen.",
-        "operationId": "log_direct_recruiter_call_api_v1_jobs_log_call_post",
+        "operationId": "log_direct_recruiter_call_api_jobs_log_call_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1599,14 +1614,14 @@
         ]
       }
     },
-    "/api/v1/jobs/{job_id}": {
+    "/api/jobs/{job_id}": {
       "get": {
         "tags": [
           "jobs"
         ],
         "summary": "Get Job",
         "description": "One job in full, description included.",
-        "operationId": "get_job_api_v1_jobs__job_id__get",
+        "operationId": "get_job_api_jobs__job_id__get",
         "security": [
           {
             "HTTPBearer": []
@@ -1645,14 +1660,14 @@
         }
       }
     },
-    "/api/v1/outreach/alumni-referral": {
+    "/api/outreach/alumni-referral": {
       "post": {
         "tags": [
           "jobs"
         ],
         "summary": "Generate Alumni Referral",
         "description": "Generates 280-char LinkedIn connection note and email for alumni referral outreach.",
-        "operationId": "generate_alumni_referral_api_v1_outreach_alumni_referral_post",
+        "operationId": "generate_alumni_referral_api_outreach_alumni_referral_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1690,14 +1705,14 @@
         ]
       }
     },
-    "/api/v1/outreach/recruiter-nudge": {
+    "/api/outreach/recruiter-nudge": {
       "post": {
         "tags": [
           "jobs"
         ],
         "summary": "Generate Recruiter Nudge Endpoint",
         "description": "Generates polite, high-converting recruiter follow-up message.",
-        "operationId": "generate_recruiter_nudge_endpoint_api_v1_outreach_recruiter_nudge_post",
+        "operationId": "generate_recruiter_nudge_endpoint_api_outreach_recruiter_nudge_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1735,14 +1750,14 @@
         ]
       }
     },
-    "/api/v1/hitl/pending": {
+    "/api/hitl/pending": {
       "get": {
         "tags": [
           "bot"
         ],
         "summary": "Get Pending Hitl",
         "description": "Returns all pending HITL questions for authenticated tenant.",
-        "operationId": "get_pending_hitl_api_v1_hitl_pending_get",
+        "operationId": "get_pending_hitl_api_hitl_pending_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1760,14 +1775,14 @@
         ]
       }
     },
-    "/api/v1/hitl/resolve": {
+    "/api/hitl/resolve": {
       "post": {
         "tags": [
           "bot"
         ],
         "summary": "Resolve Hitl",
         "description": "Atomically resolves a pending HITL question strictly for the authenticated tenant.",
-        "operationId": "resolve_hitl_api_v1_hitl_resolve_post",
+        "operationId": "resolve_hitl_api_hitl_resolve_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1805,14 +1820,14 @@
         ]
       }
     },
-    "/api/v1/hitl/resolve-held": {
+    "/api/hitl/resolve-held": {
       "post": {
         "tags": [
           "bot"
         ],
         "summary": "Resolve Held Application",
         "description": "Atomically resolves held application, saves Q&A to vault, and resumes submission.",
-        "operationId": "resolve_held_application_api_v1_hitl_resolve_held_post",
+        "operationId": "resolve_held_application_api_hitl_resolve_held_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1850,14 +1865,14 @@
         ]
       }
     },
-    "/api/v1/bot/apply/{job_id}": {
+    "/api/bot/apply/{job_id}": {
       "post": {
         "tags": [
           "bot"
         ],
         "summary": "Apply To Job",
         "description": "Executes full autonomous stealth application workflow with persistent rate limiting and idempotency.",
-        "operationId": "apply_to_job_api_v1_bot_apply__job_id__post",
+        "operationId": "apply_to_job_api_bot_apply__job_id__post",
         "security": [
           {
             "HTTPBearer": []
@@ -1928,14 +1943,14 @@
         }
       }
     },
-    "/api/v1/bot/apply-async/{job_id}": {
+    "/api/bot/apply-async/{job_id}": {
       "post": {
         "tags": [
           "bot"
         ],
         "summary": "Apply To Job Async",
         "description": "Dispatches asynchronous application task to Celery/Redis background worker queue with idempotency checks.\nReturns HTTP 202 Accepted with a unique task_id for progress polling.",
-        "operationId": "apply_to_job_async_api_v1_bot_apply_async__job_id__post",
+        "operationId": "apply_to_job_async_api_bot_apply_async__job_id__post",
         "security": [
           {
             "HTTPBearer": []
@@ -2006,14 +2021,14 @@
         }
       }
     },
-    "/api/v1/jobs/apply-async/{job_id}": {
+    "/api/jobs/apply-async/{job_id}": {
       "post": {
         "tags": [
           "bot"
         ],
         "summary": "Apply To Job Async",
         "description": "Dispatches asynchronous application task to Celery/Redis background worker queue with idempotency checks.\nReturns HTTP 202 Accepted with a unique task_id for progress polling.",
-        "operationId": "apply_to_job_async_api_v1_jobs_apply_async__job_id__post",
+        "operationId": "apply_to_job_async_api_jobs_apply_async__job_id__post",
         "security": [
           {
             "HTTPBearer": []
@@ -2084,14 +2099,14 @@
         }
       }
     },
-    "/api/v1/tasks/{task_id}": {
+    "/api/tasks/{task_id}": {
       "get": {
         "tags": [
           "bot"
         ],
         "summary": "Get Task Status Endpoint",
         "description": "Polls progress and completion status for an asynchronous background task.",
-        "operationId": "get_task_status_endpoint_api_v1_tasks__task_id__get",
+        "operationId": "get_task_status_endpoint_api_tasks__task_id__get",
         "security": [
           {
             "HTTPBearer": []
@@ -2130,14 +2145,14 @@
         }
       }
     },
-    "/api/v1/bot/ledger": {
+    "/api/bot/ledger": {
       "get": {
         "tags": [
           "bot"
         ],
         "summary": "Get Apply Ledger",
         "description": "Returns paginated application audit ledger history for authenticated tenant.",
-        "operationId": "get_apply_ledger_api_v1_bot_ledger_get",
+        "operationId": "get_apply_ledger_api_bot_ledger_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2203,14 +2218,14 @@
         }
       }
     },
-    "/api/v1/bot/ledger/{job_id}": {
+    "/api/bot/ledger/{job_id}": {
       "get": {
         "tags": [
           "bot"
         ],
         "summary": "Get Job Ledger",
         "description": "The automatic-apply record for a job, or ledger: null if JobCopilot never applied to it\n(e.g. an application the user made and tracked themselves). That's a normal state, not an error.",
-        "operationId": "get_job_ledger_api_v1_bot_ledger__job_id__get",
+        "operationId": "get_job_ledger_api_bot_ledger__job_id__get",
         "security": [
           {
             "HTTPBearer": []
@@ -2249,14 +2264,14 @@
         }
       }
     },
-    "/api/v1/hitl/{event_id}/evidence": {
+    "/api/hitl/{event_id}/evidence": {
       "get": {
         "tags": [
           "bot"
         ],
         "summary": "Get Hitl Evidence",
         "description": "Returns visual evidence (screenshot path, DOM snapshot, field selector) for a HITL challenge.",
-        "operationId": "get_hitl_evidence_api_v1_hitl__event_id__evidence_get",
+        "operationId": "get_hitl_evidence_api_hitl__event_id__evidence_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2295,14 +2310,14 @@
         }
       }
     },
-    "/api/v1/email/inbound-webhook": {
+    "/api/email/inbound-webhook": {
       "post": {
         "tags": [
           "email"
         ],
         "summary": "Receive Inbound Email Webhook",
         "description": "Public webhook receiver for external email providers (Postmark, SendGrid, Mailgun).\nVerifies HMAC-SHA256 signature and attributes incoming email to tenant via subaddress.",
-        "operationId": "receive_inbound_email_webhook_api_v1_email_inbound_webhook_post",
+        "operationId": "receive_inbound_email_webhook_api_email_inbound_webhook_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2315,14 +2330,14 @@
         }
       }
     },
-    "/api/v1/email/inbound": {
+    "/api/email/inbound": {
       "post": {
         "tags": [
           "email"
         ],
         "summary": "Receive Inbound Email",
         "description": "Processes incoming recruiter email and syncs pipeline for authenticated tenant.",
-        "operationId": "receive_inbound_email_api_v1_email_inbound_post",
+        "operationId": "receive_inbound_email_api_email_inbound_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2360,14 +2375,14 @@
         ]
       }
     },
-    "/api/v1/email/messages": {
+    "/api/email/messages": {
       "get": {
         "tags": [
           "email"
         ],
         "summary": "List Email Messages",
         "description": "Returns all parsed recruiter communications for authenticated tenant.",
-        "operationId": "list_email_messages_api_v1_email_messages_get",
+        "operationId": "list_email_messages_api_email_messages_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2385,14 +2400,14 @@
         ]
       }
     },
-    "/api/v1/email/followup/{job_id}": {
+    "/api/email/followup/{job_id}": {
       "post": {
         "tags": [
           "email"
         ],
         "summary": "Generate Job Followup",
         "description": "Generates and saves a follow-up draft for a submitted application.",
-        "operationId": "generate_job_followup_api_v1_email_followup__job_id__post",
+        "operationId": "generate_job_followup_api_email_followup__job_id__post",
         "security": [
           {
             "HTTPBearer": []
@@ -2457,14 +2472,14 @@
         }
       }
     },
-    "/api/v1/interview/dossier": {
+    "/api/interview/dossier": {
       "get": {
         "tags": [
           "interview"
         ],
         "summary": "Get Company Dossier",
         "description": "Generates technical architecture dossier and interview rounds for target company.",
-        "operationId": "get_company_dossier_api_v1_interview_dossier_get",
+        "operationId": "get_company_dossier_api_interview_dossier_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2513,14 +2528,14 @@
         }
       }
     },
-    "/api/v1/interview/questions": {
+    "/api/interview/questions": {
       "get": {
         "tags": [
           "interview"
         ],
         "summary": "Get Mock Questions",
         "description": "Generates role-specific mock technical, system design, and STAR leadership questions.",
-        "operationId": "get_mock_questions_api_v1_interview_questions_get",
+        "operationId": "get_mock_questions_api_interview_questions_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2592,14 +2607,14 @@
         }
       }
     },
-    "/api/v1/interview/evaluate": {
+    "/api/interview/evaluate": {
       "post": {
         "tags": [
           "interview"
         ],
         "summary": "Evaluate Interview Answer",
         "description": "Evaluates candidate response with multi-dimensional STAR scoring.",
-        "operationId": "evaluate_interview_answer_api_v1_interview_evaluate_post",
+        "operationId": "evaluate_interview_answer_api_interview_evaluate_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2637,14 +2652,14 @@
         ]
       }
     },
-    "/api/v1/interview/notify-invitation": {
+    "/api/interview/notify-invitation": {
       "post": {
         "tags": [
           "interview"
         ],
         "summary": "Trigger Interview Invitation Notification",
         "description": "Triggers an interview invitation alert and provides role-customized mock interview questions.",
-        "operationId": "trigger_interview_invitation_notification_api_v1_interview_notify_invitation_post",
+        "operationId": "trigger_interview_invitation_notification_api_interview_notify_invitation_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2682,14 +2697,14 @@
         ]
       }
     },
-    "/api/v1/interview/reverse-questions": {
+    "/api/interview/reverse-questions": {
       "get": {
         "tags": [
           "interview"
         ],
         "summary": "Get Reverse Interview Questions",
         "description": "Generates strategic questions to ask the hiring manager.",
-        "operationId": "get_reverse_interview_questions_api_v1_interview_reverse_questions_get",
+        "operationId": "get_reverse_interview_questions_api_interview_reverse_questions_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2739,14 +2754,14 @@
         }
       }
     },
-    "/api/v1/interview/interviewer-recon": {
+    "/api/interview/interviewer-recon": {
       "post": {
         "tags": [
           "interview"
         ],
         "summary": "Analyze Interviewer Recon",
         "description": "Infers interviewer persona, technical biases, and strategic preparation advice.",
-        "operationId": "analyze_interviewer_recon_api_v1_interview_interviewer_recon_post",
+        "operationId": "analyze_interviewer_recon_api_interview_interviewer_recon_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2784,14 +2799,14 @@
         ]
       }
     },
-    "/api/v1/interview/engineering-intel": {
+    "/api/interview/engineering-intel": {
       "get": {
         "tags": [
           "interview"
         ],
         "summary": "Get Company Engineering Intel Endpoint",
         "description": "Fetches company public engineering blog initiatives.",
-        "operationId": "get_company_engineering_intel_endpoint_api_v1_interview_engineering_intel_get",
+        "operationId": "get_company_engineering_intel_endpoint_api_interview_engineering_intel_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2830,14 +2845,14 @@
         }
       }
     },
-    "/api/v1/calendar/availability": {
+    "/api/calendar/availability": {
       "get": {
         "tags": [
           "interview"
         ],
         "summary": "Get Calendar Availability",
         "description": "Calculates non-conflicting interview scheduling windows.",
-        "operationId": "get_calendar_availability_api_v1_calendar_availability_get",
+        "operationId": "get_calendar_availability_api_calendar_availability_get",
         "security": [
           {
             "HTTPBearer": []
@@ -2887,14 +2902,14 @@
         }
       }
     },
-    "/api/v1/negotiation/evaluate": {
+    "/api/negotiation/evaluate": {
       "post": {
         "tags": [
           "negotiation"
         ],
         "summary": "Evaluate Offer Compensation",
         "description": "Benchmarks job offer against market percentiles.",
-        "operationId": "evaluate_offer_compensation_api_v1_negotiation_evaluate_post",
+        "operationId": "evaluate_offer_compensation_api_negotiation_evaluate_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2932,14 +2947,14 @@
         ]
       }
     },
-    "/api/v1/negotiation/equity": {
+    "/api/negotiation/equity": {
       "post": {
         "tags": [
           "negotiation"
         ],
         "summary": "Model Equity",
         "description": "Models startup ESOP ownership and future exit returns.",
-        "operationId": "model_equity_api_v1_negotiation_equity_post",
+        "operationId": "model_equity_api_negotiation_equity_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2977,14 +2992,14 @@
         ]
       }
     },
-    "/api/v1/negotiation/compare-offers": {
+    "/api/negotiation/compare-offers": {
       "post": {
         "tags": [
           "negotiation"
         ],
         "summary": "Compare Offers Endpoint",
         "description": "Compares multiple offers with 4-year TC progression and liquidation analysis.",
-        "operationId": "compare_offers_endpoint_api_v1_negotiation_compare_offers_post",
+        "operationId": "compare_offers_endpoint_api_negotiation_compare_offers_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3022,14 +3037,14 @@
         ]
       }
     },
-    "/api/v1/negotiation/advanced-counter": {
+    "/api/negotiation/advanced-counter": {
       "post": {
         "tags": [
           "negotiation"
         ],
         "summary": "Generate Advanced Counter Script Endpoint",
         "description": "Generates tailored executive negotiation email and phone talking points.",
-        "operationId": "generate_advanced_counter_script_endpoint_api_v1_negotiation_advanced_counter_post",
+        "operationId": "generate_advanced_counter_script_endpoint_api_negotiation_advanced_counter_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3067,14 +3082,14 @@
         ]
       }
     },
-    "/api/v1/negotiation/counter-offer": {
+    "/api/negotiation/counter-offer": {
       "post": {
         "tags": [
           "negotiation"
         ],
         "summary": "Generate Counter Offer",
         "description": "Generates an Anti-AI counter-offer negotiation email.",
-        "operationId": "generate_counter_offer_api_v1_negotiation_counter_offer_post",
+        "operationId": "generate_counter_offer_api_negotiation_counter_offer_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3112,14 +3127,14 @@
         ]
       }
     },
-    "/api/v1/billing/plan": {
+    "/api/billing/plan": {
       "get": {
         "tags": [
           "billing"
         ],
         "summary": "Get Billing Plan",
         "description": "The user's plan (Free or Premium), subscription state, and Premium prices.",
-        "operationId": "get_billing_plan_api_v1_billing_plan_get",
+        "operationId": "get_billing_plan_api_billing_plan_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3137,14 +3152,14 @@
         ]
       }
     },
-    "/api/v1/billing/razorpay/subscribe": {
+    "/api/billing/razorpay/subscribe": {
       "post": {
         "tags": [
           "billing"
         ],
         "summary": "Razorpay Subscribe",
         "description": "Creates a Premium subscription; the page then opens Razorpay Checkout with its id.",
-        "operationId": "razorpay_subscribe_api_v1_billing_razorpay_subscribe_post",
+        "operationId": "razorpay_subscribe_api_billing_razorpay_subscribe_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3182,14 +3197,14 @@
         ]
       }
     },
-    "/api/v1/billing/razorpay/verify": {
+    "/api/billing/razorpay/verify": {
       "post": {
         "tags": [
           "billing"
         ],
         "summary": "Razorpay Verify",
         "description": "Confirms the Checkout payment and turns Premium on (the webhook does the same).",
-        "operationId": "razorpay_verify_api_v1_billing_razorpay_verify_post",
+        "operationId": "razorpay_verify_api_billing_razorpay_verify_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3227,14 +3242,14 @@
         ]
       }
     },
-    "/api/v1/billing/razorpay/cancel": {
+    "/api/billing/razorpay/cancel": {
       "post": {
         "tags": [
           "billing"
         ],
         "summary": "Razorpay Cancel",
         "description": "Stops renewal; Premium stays on until the end of the paid month.",
-        "operationId": "razorpay_cancel_api_v1_billing_razorpay_cancel_post",
+        "operationId": "razorpay_cancel_api_billing_razorpay_cancel_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3252,14 +3267,14 @@
         ]
       }
     },
-    "/api/v1/billing/razorpay/webhook": {
+    "/api/billing/razorpay/webhook": {
       "post": {
         "tags": [
           "billing"
         ],
         "summary": "Razorpay Webhook",
         "description": "Razorpay subscription events (signed with the webhook secret).",
-        "operationId": "razorpay_webhook_api_v1_billing_razorpay_webhook_post",
+        "operationId": "razorpay_webhook_api_billing_razorpay_webhook_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3272,14 +3287,14 @@
         }
       }
     },
-    "/api/v1/storage/download": {
+    "/api/storage/download": {
       "get": {
         "tags": [
           "backup"
         ],
         "summary": "Download Storage File",
         "description": "Securely streams object storage files with tenant verification, expiry checks, and path traversal defense.",
-        "operationId": "download_storage_file_api_v1_storage_download_get",
+        "operationId": "download_storage_file_api_storage_download_get",
         "security": [
           {
             "HTTPBearer": []
@@ -3350,14 +3365,14 @@
         }
       }
     },
-    "/api/v1/admin/users": {
+    "/api/admin/users": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "List Admin Users",
         "description": "Lists all registered users with optional search filter.",
-        "operationId": "list_admin_users_api_v1_admin_users_get",
+        "operationId": "list_admin_users_api_admin_users_get",
         "security": [
           {
             "HTTPBearer": []
@@ -3425,14 +3440,14 @@
         }
       }
     },
-    "/api/v1/admin/metrics": {
+    "/api/admin/metrics": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Admin Metrics",
         "description": "Returns platform-wide metrics: user count, job count, application count, tier breakdown.",
-        "operationId": "get_admin_metrics_api_v1_admin_metrics_get",
+        "operationId": "get_admin_metrics_api_admin_metrics_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3452,14 +3467,14 @@
         ]
       }
     },
-    "/api/v1/admin/impersonate/{user_id}": {
+    "/api/admin/impersonate/{user_id}": {
       "post": {
         "tags": [
           "admin"
         ],
         "summary": "Impersonate User",
         "description": "Issues an audit-logged, short-lived JWT access token allowing an admin to impersonate a tenant.\nAll actions performed under this token contain an explicit 'impersonated_by' audit claim.",
-        "operationId": "impersonate_user_api_v1_admin_impersonate__user_id__post",
+        "operationId": "impersonate_user_api_admin_impersonate__user_id__post",
         "security": [
           {
             "HTTPBearer": []
@@ -3500,14 +3515,14 @@
         }
       }
     },
-    "/api/v1/admin/audit-logs": {
+    "/api/admin/audit-logs": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get Admin Audit Logs",
         "description": "Retrieves paginated admin audit trail.",
-        "operationId": "get_admin_audit_logs_api_v1_admin_audit_logs_get",
+        "operationId": "get_admin_audit_logs_api_admin_audit_logs_get",
         "security": [
           {
             "HTTPBearer": []
@@ -3557,14 +3572,14 @@
         }
       }
     },
-    "/api/v1/admin/security-audit-logs": {
+    "/api/admin/security-audit-logs": {
       "get": {
         "tags": [
           "admin"
         ],
         "summary": "Get System Security Audit Logs",
         "description": "Retrieves system-wide security audit logs and anomaly alerts (Admin only).",
-        "operationId": "get_system_security_audit_logs_api_v1_admin_security_audit_logs_get",
+        "operationId": "get_system_security_audit_logs_api_admin_security_audit_logs_get",
         "security": [
           {
             "HTTPBearer": []
@@ -3662,14 +3677,14 @@
         }
       }
     },
-    "/api/v1/admin/users/{user_id}/role": {
+    "/api/admin/users/{user_id}/role": {
       "patch": {
         "tags": [
           "admin"
         ],
         "summary": "Update User Role",
         "description": "Updates a user's subscription or system role.",
-        "operationId": "update_user_role_api_v1_admin_users__user_id__role_patch",
+        "operationId": "update_user_role_api_admin_users__user_id__role_patch",
         "security": [
           {
             "HTTPBearer": []
@@ -3717,14 +3732,14 @@
         }
       }
     },
-    "/api/v1/account/export": {
+    "/api/account/export": {
       "post": {
         "tags": [
           "account"
         ],
         "summary": "Export User Account Data",
         "description": "GDPR Article 20 (Right to Data Portability).\nGenerates and returns an exhaustive, machine-readable JSON archive of all\ncandidate data across all tables, decrypting stored PII.",
-        "operationId": "export_user_account_data_api_v1_account_export_post",
+        "operationId": "export_user_account_data_api_account_export_post",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3744,14 +3759,14 @@
         ]
       }
     },
-    "/api/v1/account": {
+    "/api/account": {
       "delete": {
         "tags": [
           "account"
         ],
         "summary": "Delete User Account",
         "description": "GDPR Article 17 (Right to Erasure / Hard Delete).\nPermanently erases all database records tied to the candidate, cancels active\nStripe and Razorpay subscriptions, purges file uploads, and revokes credentials.\nRequires the account email plus re-authentication (password, or TOTP when MFA is on).",
-        "operationId": "delete_user_account_api_v1_account_delete",
+        "operationId": "delete_user_account_api_account_delete",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3789,14 +3804,14 @@
         ]
       }
     },
-    "/api/v1/compliance/consent": {
+    "/api/compliance/consent": {
       "get": {
         "tags": [
           "compliance"
         ],
         "summary": "Get Candidate Consent Status",
         "description": "Retrieves the candidate's active consent states across all tracked consent categories.",
-        "operationId": "get_candidate_consent_status_api_v1_compliance_consent_get",
+        "operationId": "get_candidate_consent_status_api_compliance_consent_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -3821,7 +3836,7 @@
         ],
         "summary": "Record Candidate Consent",
         "description": "Records an append-only, audited consent grant or revocation decision.\nTracks client IP address and user-agent string for regulatory compliance.",
-        "operationId": "record_candidate_consent_api_v1_compliance_consent_post",
+        "operationId": "record_candidate_consent_api_compliance_consent_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3861,14 +3876,14 @@
         ]
       }
     },
-    "/api/v1/compliance/consent/history": {
+    "/api/compliance/consent/history": {
       "get": {
         "tags": [
           "compliance"
         ],
         "summary": "Get Candidate Consent Audit History",
         "description": "Returns the complete immutable chronological audit trail of consent grants and revocations.",
-        "operationId": "get_candidate_consent_audit_history_api_v1_compliance_consent_history_get",
+        "operationId": "get_candidate_consent_audit_history_api_compliance_consent_history_get",
         "security": [
           {
             "HTTPBearer": []
@@ -3904,7 +3919,7 @@
                   "items": {
                     "$ref": "#/components/schemas/UserConsent"
                   },
-                  "title": "Response Get Candidate Consent Audit History Api V1 Compliance Consent History Get"
+                  "title": "Response Get Candidate Consent Audit History Api Compliance Consent History Get"
                 }
               }
             }
@@ -3922,13 +3937,13 @@
         }
       }
     },
-    "/api/v1/feedback": {
+    "/api/feedback": {
       "post": {
         "tags": [
           "support"
         ],
         "summary": "Send Feedback",
-        "operationId": "send_feedback_api_v1_feedback_post",
+        "operationId": "send_feedback_api_feedback_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3966,13 +3981,13 @@
         ]
       }
     },
-    "/api/v1/admin/feedback": {
+    "/api/admin/feedback": {
       "get": {
         "tags": [
           "support"
         ],
         "summary": "List Feedback",
-        "operationId": "list_feedback_api_v1_admin_feedback_get",
+        "operationId": "list_feedback_api_admin_feedback_get",
         "security": [
           {
             "HTTPBearer": []
@@ -4340,46 +4355,6 @@
         },
         "type": "object",
         "title": "Body_upload_resume_api_upload_resume_post"
-      },
-      "Body_upload_resume_api_v1_upload_resume_post": {
-        "properties": {
-          "file": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "binary"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "File"
-          },
-          "raw_text": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Raw Text"
-          },
-          "profile_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Profile Id"
-          }
-        },
-        "type": "object",
-        "title": "Body_upload_resume_api_v1_upload_resume_post"
       },
       "ConsentGrantRequest": {
         "properties": {

@@ -61,10 +61,10 @@ JobCopilot enforces rigorous Technical and Organizational Measures to safeguard 
 
 JobCopilot provides automated programmatic mechanisms enabling Controllers to fulfill Data Subject requests without human intervention:
 
-- **Right of Access (Article 15) & Portability (Article 20):** Candidates can request an instant machine-readable JSON bundle containing all stored data via `POST /api/v1/account/export`.
-- **Right to Rectification (Article 16):** Resumes, questionnaire answers, and vault entries can be modified at any time via `PUT /api/v1/profile` and `POST /api/v1/vault/learn`.
-- **Right to Erasure (Article 17):** Candidates can execute irrevocable cryptographic account erasure via `DELETE /api/v1/account`.
-- **Consent Management (Article 7):** Granular consent grant and withdrawal via `POST /api/v1/compliance/consent`.
+- **Right of Access (Article 15) & Portability (Article 20):** Candidates can request an instant machine-readable JSON bundle containing all stored data via `POST /api/account/export`.
+- **Right to Rectification (Article 16):** Resumes, questionnaire answers, and vault entries can be modified at any time via `PUT /api/profile` and `POST /api/vault/learn`.
+- **Right to Erasure (Article 17):** Candidates can execute irrevocable cryptographic account erasure via `DELETE /api/account`.
+- **Consent Management (Article 7):** Granular consent grant and withdrawal via `POST /api/compliance/consent`.
 
 ---
 

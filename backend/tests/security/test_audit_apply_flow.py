@@ -92,7 +92,7 @@ def test_resolve_held_requeues_instead_of_faking_submission(monkeypatch):
     db.save_hitl_event(evt, user_id=uid)
     access, _ = start_session(db.get_user_by_id(uid), "FREE", "127.0.0.1", "pytest")
 
-    res = TestClient(app).post("/api/v1/hitl/resolve-held", headers={"Authorization": f"Bearer {access}"},
+    res = TestClient(app).post("/api/hitl/resolve-held", headers={"Authorization": f"Bearer {access}"},
                                json={"event_id": evt.event_id, "user_answer": "30 days", "save_to_vault": False})
     assert res.status_code == 200 and res.json()["task_id"] == "task_123"
     assert dispatched["ledger_id"] == e.ledger_id and dispatched["submission_mode"] == "DRY_RUN"

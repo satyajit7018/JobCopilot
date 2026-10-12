@@ -73,8 +73,8 @@ Every PR must uphold the following core architectural rules:
    - **Never** attempt to bypass or defeat CAPTCHAs programmatically.
    - Always escalate CAPTCHAs and unknown high-entropy form fields to Human-in-the-Loop (`HITLEvent`).
 
-4. **API Versioning**:
-   - New endpoints must be registered under `/api/v1/` in their respective domain router under `backend/app/api/routers/`.
+4. **API Address**:
+   - The API has one address, `/api/`. Add new endpoints to their domain router under `backend/app/api/routers/`; they are mounted under `/api/` automatically. There is no `/api/v1/`.
 
 ---
 

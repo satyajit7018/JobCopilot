@@ -69,20 +69,4 @@ class EmailService:
         )
         return cls.send_email(to_email, subject, body)
 
-    @classmethod
-    def send_password_reset_email(cls, to_email: str, token: str) -> bool:
-        """Sends password reset link."""
-        reset_url = f"http://localhost:{settings.FRONTEND_PORT}/#reset-password?token={token}"
-        subject = "JobCopilot Password Reset Request"
-        body = (
-            f"Hello,\n\n"
-            f"We received a request to reset your JobCopilot password.\n"
-            f"You can reset your password using the link below:\n"
-            f"{reset_url}\n\n"
-            f"This link will expire in 15 minutes. If you did not make this request, please ignore this email.\n\n"
-            f"Best regards,\nThe JobCopilot Security Team"
-        )
-        return cls.send_email(to_email, subject, body)
-
-
 mailer = EmailService()
