@@ -15,7 +15,6 @@ from app.core.database import db
 from app.core.models import (
     AdminAuditLog,
     AdminImpersonateResponse,
-    AdminOrgListResponse,
     AdminStatsResponse,
     AdminUserListResponse,
     User,
@@ -36,23 +35,6 @@ async def list_admin_users(
     total = db.count_all_users(search=search)
     return AdminUserListResponse(
         users=users,
-        total=total,
-        limit=limit,
-        offset=offset
-    )
-
-
-@router.get("/orgs", response_model=AdminOrgListResponse)
-async def list_admin_organizations(
-    limit: int = 50,
-    offset: int = 0,
-    admin_user: User = Depends(require_admin)
-):
-    """Lists all organizations with member counts and plan tiers."""
-    orgs = db.list_all_organizations(limit=limit, offset=offset)
-    total = db.count_all_organizations()
-    return AdminOrgListResponse(
-        orgs=orgs,
         total=total,
         limit=limit,
         offset=offset

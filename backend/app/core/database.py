@@ -17,11 +17,7 @@ from app.core.config import DB_PATH
 from app.core.credential_vault import cred_vault
 from app.core.db_adapter import DatabaseAdapter
 from app.core.models import (
-    ABAssignment,
-    ABExperiment,
-    ABVariant,
     AdminAuditLog,
-    AnalyticsEvent,
     ApplicationStatus,
     ApplyLedgerEntry,
     ApplyLedgerStatus,
@@ -32,9 +28,6 @@ from app.core.models import (
     HITLEvent,
     JobCheckpoint,
     JobListing,
-    Membership,
-    Organization,
-    OrgRole,
     OutreachRecord,
     User,
     UserConsent,
@@ -809,29 +802,6 @@ class DatabaseManager(DatabaseAdapter):
                 conn.commit()
                 return cursor.rowcount > 0
 
-    def set_stripe_customer_id(self, user_id: str, customer_id: str) -> bool:
-        with self._lock:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("UPDATE users SET stripe_customer_id = ?, updated_at = ? WHERE user_id = ?",
-                               (customer_id, datetime.now().isoformat(), user_id))
-                conn.commit()
-                return cursor.rowcount > 0
-
-    def get_user_id_by_stripe_customer(self, customer_id: str) -> Optional[str]:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT user_id FROM users WHERE stripe_customer_id = ?", (customer_id,))
-            row = cursor.fetchone()
-            return row[0] if row else None
-
-    def get_stripe_customer_id(self, user_id: str) -> Optional[str]:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT stripe_customer_id FROM users WHERE user_id = ?", (user_id,))
-            row = cursor.fetchone()
-            return row[0] if row else None
-
     def set_subscription(self, user_id: str, subscription_id: Optional[str], status: Optional[str],
                          current_end: Optional[str] = None) -> bool:
         with self._lock:
@@ -952,18 +922,6 @@ class DatabaseManager(DatabaseAdapter):
             if len(rows) >= max_failures and all(r["success"] == 0 for r in rows):
                 return True
             return False
-
-    def set_email_verified(self, user_id: str, verified: bool = True) -> bool:
-        """Marks user email as verified."""
-        with self._lock:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE users SET email_verified = ?, updated_at = ? WHERE user_id = ?",
-                    (1 if verified else 0, datetime.now().isoformat(), user_id)
-                )
-                conn.commit()
-                return cursor.rowcount > 0
 
     def get_daily_usage(self, user_id: str, date_str: str) -> int:
         """Gets count of daily applications for a user on a given date (YYYY-MM-DD)."""
@@ -1797,181 +1755,6 @@ class DatabaseManager(DatabaseAdapter):
             }
 
     # =========================================================================
-    # SaaS Organization & Team Management
-    # =========================================================================
-    def create_organization(self, org: Organization) -> bool:
-        """Creates a new organization."""
-        with self._lock:
-            with self.get_connection() as conn:
-                try:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                    INSERT INTO organizations (org_id, name, slug, owner_id, plan_tier, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        org.org_id,
-                        org.name,
-                        org.slug.lower().strip(),
-                        org.owner_id,
-                        org.plan_tier,
-                        org.created_at,
-                        org.updated_at
-                    ))
-                    conn.commit()
-                    return True
-                except Exception:
-                    logger.exception("create_organization failed")
-                    return False
-
-    def get_organization(self, org_id: str) -> Optional[Organization]:
-        """Retrieves an organization by its unique org_id."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM organizations WHERE org_id = ?", (org_id,))
-            row = cursor.fetchone()
-            if not row:
-                return None
-            return Organization(
-                org_id=row["org_id"],
-                name=row["name"],
-                slug=row["slug"],
-                owner_id=row["owner_id"],
-                plan_tier=row["plan_tier"],
-                created_at=row["created_at"],
-                updated_at=row["updated_at"]
-            )
-
-    def get_organization_by_slug(self, slug: str) -> Optional[Organization]:
-        """Retrieves an organization by its slug."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM organizations WHERE slug = ?", (slug.lower().strip(),))
-            row = cursor.fetchone()
-            if not row:
-                return None
-            return Organization(
-                org_id=row["org_id"],
-                name=row["name"],
-                slug=row["slug"],
-                owner_id=row["owner_id"],
-                plan_tier=row["plan_tier"],
-                created_at=row["created_at"],
-                updated_at=row["updated_at"]
-            )
-
-    def list_user_organizations(self, user_id: str) -> List[Dict[str, Any]]:
-        """Lists all organizations a user belongs to, including their membership role."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-            SELECT o.org_id, o.name, o.slug, o.owner_id, o.plan_tier, o.created_at, m.role
-            FROM organizations o
-            JOIN memberships m ON o.org_id = m.org_id
-            WHERE m.user_id = ?
-            ORDER BY o.created_at DESC
-            """, (user_id,))
-            return [dict(r) for r in cursor.fetchall()]
-
-    def update_organization(self, org_id: str, name: Optional[str] = None, plan_tier: Optional[str] = None) -> bool:
-        """Updates organization name or plan tier."""
-        with self._lock:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                now_str = datetime.now().isoformat()
-                if name is not None and plan_tier is not None:
-                    cursor.execute("UPDATE organizations SET name = ?, plan_tier = ?, updated_at = ? WHERE org_id = ?", (name, plan_tier, now_str, org_id))
-                elif name is not None:
-                    cursor.execute("UPDATE organizations SET name = ?, updated_at = ? WHERE org_id = ?", (name, now_str, org_id))
-                elif plan_tier is not None:
-                    cursor.execute("UPDATE organizations SET plan_tier = ?, updated_at = ? WHERE org_id = ?", (plan_tier, now_str, org_id))
-                else:
-                    return True
-                conn.commit()
-                return cursor.rowcount > 0
-
-    # =========================================================================
-    # Organization Memberships & RBAC
-    # =========================================================================
-    def add_membership(self, membership: Membership) -> bool:
-        """Adds or updates a user's membership in an organization."""
-        with self._lock:
-            with self.get_connection() as conn:
-                try:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                    INSERT INTO memberships (membership_id, org_id, user_id, role, invited_by, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(org_id, user_id) DO UPDATE SET
-                        role = excluded.role,
-                        updated_at = excluded.updated_at
-                    """, (
-                        membership.membership_id,
-                        membership.org_id,
-                        membership.user_id,
-                        membership.role.value if hasattr(membership.role, 'value') else str(membership.role),
-                        membership.invited_by,
-                        membership.created_at,
-                        membership.updated_at
-                    ))
-                    conn.commit()
-                    return True
-                except Exception:
-                    logger.exception("add_membership failed")
-                    return False
-
-    def get_membership(self, org_id: str, user_id: str) -> Optional[Membership]:
-        """Gets membership details for a user in an organization."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM memberships WHERE org_id = ? AND user_id = ?", (org_id, user_id))
-            row = cursor.fetchone()
-            if not row:
-                return None
-            return Membership(
-                membership_id=row["membership_id"],
-                org_id=row["org_id"],
-                user_id=row["user_id"],
-                role=OrgRole(row["role"]),
-                invited_by=row["invited_by"],
-                created_at=row["created_at"],
-                updated_at=row["updated_at"]
-            )
-
-    def list_org_members(self, org_id: str) -> List[Dict[str, Any]]:
-        """Lists all members of an organization with profile and role details."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-            SELECT m.membership_id, m.org_id, m.user_id, u.email, u.full_name, m.role, m.created_at
-            FROM memberships m
-            JOIN users u ON m.user_id = u.user_id
-            WHERE m.org_id = ?
-            ORDER BY m.created_at ASC
-            """, (org_id,))
-            return [dict(r) for r in cursor.fetchall()]
-
-    def remove_membership(self, org_id: str, user_id: str) -> bool:
-        """Removes a user's membership from an organization."""
-        with self._lock:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM memberships WHERE org_id = ? AND user_id = ?", (org_id, user_id))
-                conn.commit()
-                return cursor.rowcount > 0
-
-    def update_member_role(self, org_id: str, user_id: str, role: str) -> bool:
-        """Updates a user's role within an organization."""
-        with self._lock:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                UPDATE memberships SET role = ?, updated_at = ?
-                WHERE org_id = ? AND user_id = ?
-                """, (role, datetime.now().isoformat(), org_id, user_id))
-                conn.commit()
-                return cursor.rowcount > 0
-
-    # =========================================================================
     # Admin Panel, Metrics & Impersonation Audit
     # =========================================================================
     def log_admin_action(self, log_entry: AdminAuditLog) -> bool:
@@ -2055,28 +1838,6 @@ class DatabaseManager(DatabaseAdapter):
                 cursor.execute("SELECT COUNT(*) as total FROM users")
             return cursor.fetchone()["total"]
 
-    def list_all_organizations(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
-        """Lists all organizations with member counts."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-            SELECT o.org_id, o.name, o.slug, o.owner_id, o.plan_tier, o.created_at,
-                   COUNT(m.user_id) as member_count
-            FROM organizations o
-            LEFT JOIN memberships m ON o.org_id = m.org_id
-            GROUP BY o.org_id
-            ORDER BY o.created_at DESC
-            LIMIT ? OFFSET ?
-            """, (limit, offset))
-            return [dict(r) for r in cursor.fetchall()]
-
-    def count_all_organizations(self) -> int:
-        """Counts total organizations."""
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) as total FROM organizations")
-            return cursor.fetchone()["total"]
-
     def get_admin_system_metrics(self) -> Dict[str, Any]:
         """Calculates global SaaS platform metrics for admin dashboard."""
         with self.get_connection() as conn:
@@ -2135,8 +1896,6 @@ class DatabaseManager(DatabaseAdapter):
             cursor.execute("SELECT * FROM outreach_records WHERE user_id = ?", (user_id,))
             outreach_records = [dict(r) for r in cursor.fetchall()]
 
-            orgs = self.list_user_organizations(user_id)
-
             return {
                 "user_id": user_id,
                 "exported_at": datetime.now().isoformat(),
@@ -2147,13 +1906,11 @@ class DatabaseManager(DatabaseAdapter):
                 "apply_ledger": ledger_entries,
                 "hitl_events": hitl_events,
                 "emails": emails,
-                "outreach_records": outreach_records,
-                "organizations": orgs
+                "outreach_records": outreach_records
             }
 
     def hard_delete_user_account(self, user_id: str) -> bool:
         """Executes full GDPR Article 17 hard erasure across all tenant-scoped tables and disk storage."""
-        import shutil
 
         from app.core.config import settings
         with self._lock:
@@ -2611,233 +2368,6 @@ class DatabaseManager(DatabaseAdapter):
             cursor.execute(query, (user_id, user_id, event_type, event_type, severity, severity))
             row = cursor.fetchone()
             return row[0] if row else 0
-
-    # =========================================================================
-    # Epic H: Analytics Warehouse & Event Streaming
-    # =========================================================================
-    def record_analytics_event(self, event: AnalyticsEvent) -> str:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO analytics_events (event_id, user_id, event_type, entity_type, entity_id, properties, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    event.event_id,
-                    event.user_id,
-                    event.event_type,
-                    event.entity_type,
-                    event.entity_id,
-                    json.dumps(event.properties),
-                    event.created_at
-                )
-            )
-            conn.commit()
-            return event.event_id
-
-    def query_analytics_events(
-        self,
-        user_id: str,
-        event_type: Optional[str] = None,
-        limit: int = 100
-    ) -> List[AnalyticsEvent]:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            query = (
-                "SELECT event_id, user_id, event_type, entity_type, entity_id, properties, created_at "
-                "FROM analytics_events "
-                "WHERE (user_id = ? OR ? = 'admin') "
-                "AND (? IS NULL OR event_type = ?) "
-                "ORDER BY created_at DESC LIMIT ?"
-            )
-            cursor.execute(query, (user_id, user_id, event_type, event_type, limit))
-            rows = cursor.fetchall()
-            events = []
-            for r in rows:
-                props = json.loads(r[5]) if isinstance(r[5], str) else (r[5] or {})
-                events.append(AnalyticsEvent(
-                    event_id=r[0],
-                    user_id=r[1],
-                    event_type=r[2],
-                    entity_type=r[3],
-                    entity_id=r[4],
-                    properties=props,
-                    created_at=r[6]
-                ))
-            return events
-
-    # =========================================================================
-    # Epic H: A/B Testing Framework
-    # =========================================================================
-    def create_ab_experiment(self, experiment: ABExperiment) -> str:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT OR REPLACE INTO ab_experiments (experiment_id, user_id, name, description, variants, status, created_at, ended_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    experiment.experiment_id,
-                    experiment.user_id,
-                    experiment.name,
-                    experiment.description,
-                    json.dumps([v.model_dump() if hasattr(v, "model_dump") else v.dict() for v in experiment.variants]),
-                    experiment.status,
-                    experiment.created_at,
-                    experiment.ended_at
-                )
-            )
-            conn.commit()
-            return experiment.experiment_id
-
-    def get_ab_experiment(self, experiment_id: str, user_id: str) -> Optional[ABExperiment]:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT experiment_id, user_id, name, description, variants, status, created_at, ended_at "
-                "FROM ab_experiments "
-                "WHERE experiment_id = ? AND (user_id = ? OR ? = 'admin')",
-                (experiment_id, user_id, user_id)
-            )
-            r = cursor.fetchone()
-            if not r:
-                return None
-            raw_variants = json.loads(r[4]) if isinstance(r[4], str) else (r[4] or [])
-            variants = [ABVariant(**v) for v in raw_variants]
-            return ABExperiment(
-                experiment_id=r[0],
-                user_id=r[1],
-                name=r[2],
-                description=r[3],
-                variants=variants,
-                status=r[5],
-                created_at=r[6],
-                ended_at=r[7]
-            )
-
-    def list_ab_experiments(self, user_id: str) -> List[ABExperiment]:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT experiment_id, user_id, name, description, variants, status, created_at, ended_at "
-                "FROM ab_experiments "
-                "WHERE user_id = ? OR ? = 'admin' "
-                "ORDER BY created_at DESC",
-                (user_id, user_id)
-            )
-            rows = cursor.fetchall()
-            experiments = []
-            for r in rows:
-                raw_variants = json.loads(r[4]) if isinstance(r[4], str) else (r[4] or [])
-                variants = [ABVariant(**v) for v in raw_variants]
-                experiments.append(ABExperiment(
-                    experiment_id=r[0],
-                    user_id=r[1],
-                    name=r[2],
-                    description=r[3],
-                    variants=variants,
-                    status=r[5],
-                    created_at=r[6],
-                    ended_at=r[7]
-                ))
-            return experiments
-
-    def assign_ab_variant(self, experiment_id: str, user_id: str, entity_id: str, variant: str) -> ABAssignment:
-        existing = self.get_ab_assignment(experiment_id, user_id, entity_id)
-        if existing:
-            return existing
-
-        assignment = ABAssignment(
-            experiment_id=experiment_id,
-            user_id=user_id,
-            entity_id=entity_id,
-            variant=variant,
-            converted=False
-        )
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO ab_assignments (assignment_id, experiment_id, user_id, entity_id, variant, converted, converted_at, assigned_at) "
-                "VALUES (?, ?, ?, ?, ?, 0, NULL, ?)",
-                (
-                    assignment.assignment_id,
-                    assignment.experiment_id,
-                    assignment.user_id,
-                    assignment.entity_id,
-                    assignment.variant,
-                    assignment.assigned_at
-                )
-            )
-            conn.commit()
-            return assignment
-
-    def get_ab_assignment(self, experiment_id: str, user_id: str, entity_id: str) -> Optional[ABAssignment]:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT assignment_id, experiment_id, user_id, entity_id, variant, converted, converted_at, assigned_at "
-                "FROM ab_assignments "
-                "WHERE experiment_id = ? AND user_id = ? AND entity_id = ?",
-                (experiment_id, user_id, entity_id)
-            )
-            r = cursor.fetchone()
-            if not r:
-                return None
-            return ABAssignment(
-                assignment_id=r[0],
-                experiment_id=r[1],
-                user_id=r[2],
-                entity_id=r[3],
-                variant=r[4],
-                converted=bool(r[5]),
-                converted_at=r[6],
-                assigned_at=r[7]
-            )
-
-    def record_ab_conversion(self, experiment_id: str, user_id: str, entity_id: str) -> bool:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            now_iso = datetime.now().isoformat()
-            cursor.execute(
-                "UPDATE ab_assignments "
-                "SET converted = 1, converted_at = ? "
-                "WHERE experiment_id = ? AND user_id = ? AND entity_id = ? AND converted = 0",
-                (now_iso, experiment_id, user_id, entity_id)
-            )
-            conn.commit()
-            return cursor.rowcount > 0
-
-    def get_ab_experiment_stats(self, experiment_id: str, user_id: str) -> Dict[str, Any]:
-        with self.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT variant, COUNT(*), SUM(CASE WHEN converted = 1 THEN 1 ELSE 0 END) "
-                "FROM ab_assignments "
-                "WHERE experiment_id = ? AND (user_id = ? OR ? = 'admin') "
-                "GROUP BY variant",
-                (experiment_id, user_id, user_id)
-            )
-            rows = cursor.fetchall()
-            variants_stats = {}
-            total_samples = 0
-            total_conversions = 0
-            for r in rows:
-                var_name = r[0]
-                samples = r[1] or 0
-                conversions = r[2] or 0
-                rate = round((conversions / samples * 100), 2) if samples > 0 else 0.0
-                variants_stats[var_name] = {
-                    "samples": samples,
-                    "conversions": conversions,
-                    "conversion_rate_percent": rate
-                }
-                total_samples += samples
-                total_conversions += conversions
-
-            return {
-                "experiment_id": experiment_id,
-                "total_samples": total_samples,
-                "total_conversions": total_conversions,
-                "variants": variants_stats
-            }
 
     # =========================================================================
     # Epic H: Conversion Signals & Feedback Loop Weights

@@ -75,4 +75,4 @@ Security headers live in `security-headers.conf`, included in every nginx locati
 
 `public/sw.js` replaces the previous UI's service worker with one that clears its caches and unregisters itself, so returning users aren't stuck on the old app.
 
-**Features of the previous UI not rebuilt yet:** admin impersonation, organizations, the analytics funnel, the knowledge vault editor, referral and recruiter outreach drafts, pasting in recruiter emails by hand, the command palette, and installing as an app (PWA). The previous UI is in git history before the commit that removed it.
+**Features of the previous UI not rebuilt yet:** admin impersonation, the knowledge vault editor, referral and recruiter outreach drafts, pasting in recruiter emails by hand, the command palette, and installing as an app (PWA). The previous UI is in git history before the commit that removed it. Organizations and the analytics funnel were removed from the server as well.

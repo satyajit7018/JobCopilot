@@ -56,20 +56,6 @@ def test_frontend_endpoints_integration():
     admin_headers = _auth_headers_for(admin_user)
     member_headers = _auth_headers_for(member_user)
 
-    # 1. Organization list & create for user
-    org_res = client.post("/api/orgs", json={"name": "Frontend Test Org", "plan_tier": "PRO"}, headers=member_headers)
-    assert org_res.status_code == 201
-    org_id = org_res.json()["org_id"]
-
-    list_orgs = client.get("/api/orgs", headers=member_headers)
-    assert list_orgs.status_code == 200
-    assert any(o["org_id"] == org_id for o in list_orgs.json())
-
-    # 2. Organization members
-    members_res = client.get(f"/api/orgs/{org_id}/members", headers=member_headers)
-    assert members_res.status_code == 200
-    assert len(members_res.json()) >= 1
-
     # 3. Admin Metrics & Directories
     metrics = client.get("/api/admin/metrics", headers=admin_headers)
     assert metrics.status_code == 200
@@ -81,10 +67,6 @@ def test_frontend_endpoints_integration():
     assert users_list.status_code == 200
     assert "users" in users_list.json()
 
-    orgs_list = client.get("/api/admin/orgs", headers=admin_headers)
-    assert orgs_list.status_code == 200
-    assert "orgs" in orgs_list.json() or "organizations" in orgs_list.json()
-
     logs_list = client.get("/api/admin/audit-logs", headers=admin_headers)
     assert logs_list.status_code == 200
     assert "logs" in logs_list.json() or "audit_logs" in logs_list.json()
@@ -95,14 +77,6 @@ def test_frontend_endpoints_integration():
     imp_data = imp_res.json()
     assert "access_token" in imp_data or "impersonation_token" in imp_data
     assert imp_data.get("impersonated_user_id") == member_user.user_id or imp_data.get("target_user_id") == member_user.user_id
-
-    # 5. Billing Sync & Proration Preview
-    sync_res = client.post("/api/billing/sync", headers=member_headers)
-    assert sync_res.status_code == 200
-
-    proration_res = client.get("/api/billing/proration-preview?target_tier=PRO", headers=member_headers)
-    assert proration_res.status_code == 200
-    assert "prorated_amount_cents" in proration_res.json() or "estimated_prorated_charge_usd" in proration_res.json()
 
     # 6. GDPR Export
     export_res = client.post("/api/account/export", headers=member_headers)

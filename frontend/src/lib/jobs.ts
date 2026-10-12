@@ -129,12 +129,6 @@ export function scorePercent(score: number | null | undefined): number {
   return Math.min(100, Math.round(score <= 1 ? score * 100 : score));
 }
 
-export function scoreTone(pct: number): Tone {
-  if (pct >= 80) return "ok";
-  if (pct >= 60) return "warn";
-  return "neutral";
-}
-
 /** Matches saved before the wording changed still carry the old sentence; show the new one. */
 export function readableReason(reason: string): string {
   const m = /^Experience level \((\d+(?:\.\d+)?) yrs\) fits (.+) requirements\.$/.exec(reason);

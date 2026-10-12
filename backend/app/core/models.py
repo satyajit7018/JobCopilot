@@ -189,19 +189,6 @@ class UserResponse(BaseModel):
     mfa_enabled: bool = False
 
 
-class VerifyEmailRequest(BaseModel):
-    token: str
-
-
-class RequestPasswordResetRequest(BaseModel):
-    email: str
-
-
-class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str
-
-
 class CandidateProfile(BaseModel):
     id: str = "default_user"
     user_id: str = "default"
@@ -368,38 +355,6 @@ class JobCheckpoint(BaseModel):
         return self.model_dump(*args, **kwargs)
 
 
-class OrgRole(str, Enum):
-    OWNER = "OWNER"
-    ADMIN = "ADMIN"
-    MEMBER = "MEMBER"
-
-
-class Organization(BaseModel):
-    org_id: str
-    name: str
-    slug: str
-    owner_id: str
-    plan_tier: str = "FREE"
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-    def dict(self, *args, **kwargs):
-        return self.model_dump(*args, **kwargs)
-
-
-class Membership(BaseModel):
-    membership_id: str
-    org_id: str
-    user_id: str
-    role: OrgRole = OrgRole.MEMBER
-    invited_by: Optional[str] = None
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-    def dict(self, *args, **kwargs):
-        return self.model_dump(*args, **kwargs)
-
-
 class AdminAuditLog(BaseModel):
     log_id: str
     admin_id: str
@@ -414,54 +369,8 @@ class AdminAuditLog(BaseModel):
         return self.model_dump(*args, **kwargs)
 
 
-class CreateOrgRequest(BaseModel):
-    name: str
-    slug: Optional[str] = None
-
-
-class UpdateOrgRequest(BaseModel):
-    name: Optional[str] = None
-    plan_tier: Optional[str] = None
-
-
-class InviteMemberRequest(BaseModel):
-    email: str
-    role: OrgRole = OrgRole.MEMBER
-
-
-class UpdateMemberRoleRequest(BaseModel):
-    role: OrgRole
-
-
-class OrgResponse(BaseModel):
-    org_id: str
-    name: str
-    slug: str
-    owner_id: str
-    plan_tier: str = "FREE"
-    created_at: str
-    role: Optional[str] = None
-
-
-class MemberResponse(BaseModel):
-    membership_id: str
-    org_id: str
-    user_id: str
-    email: str
-    full_name: str
-    role: str
-    created_at: str
-
-
 class AdminUserListResponse(BaseModel):
     users: List[Dict[str, Any]]
-    total: int
-    limit: int
-    offset: int
-
-
-class AdminOrgListResponse(BaseModel):
-    orgs: List[Dict[str, Any]]
     total: int
     limit: int
     offset: int
@@ -544,55 +453,6 @@ class SecurityLogListResponse(BaseModel):
     total: int
     limit: int
     offset: int
-
-
-# --- Epic H: Data & ML Flywheel Models ---
-class AnalyticsEvent(BaseModel):
-    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
-    event_type: str
-    entity_type: str
-    entity_id: str
-    properties: Dict[str, Any] = Field(default_factory=dict)
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-    def dict(self, *args, **kwargs):
-        return self.model_dump(*args, **kwargs)
-
-
-class ABVariant(BaseModel):
-    variant_id: str
-    name: str
-    weight: float = 0.5
-    description: Optional[str] = None
-
-
-class ABExperiment(BaseModel):
-    experiment_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
-    name: str
-    description: Optional[str] = None
-    variants: List[ABVariant]
-    status: str = "ACTIVE"  # ACTIVE, PAUSED, COMPLETED
-    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-    ended_at: Optional[str] = None
-
-    def dict(self, *args, **kwargs):
-        return self.model_dump(*args, **kwargs)
-
-
-class ABAssignment(BaseModel):
-    assignment_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    experiment_id: str
-    user_id: str
-    entity_id: str
-    variant: str
-    converted: bool = False
-    converted_at: Optional[str] = None
-    assigned_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-
-    def dict(self, *args, **kwargs):
-        return self.model_dump(*args, **kwargs)
 
 
 class ConversionSignal(BaseModel):

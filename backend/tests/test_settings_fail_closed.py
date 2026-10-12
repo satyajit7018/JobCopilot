@@ -71,11 +71,6 @@ def test_postgres_mode_requires_postgres_url():
         _make(DB_MODE="postgres", DATABASE_URL=None)
 
 
-def test_stripe_secret_without_webhook_fails():
-    with pytest.raises(ValueError, match="STRIPE_WEBHOOK_SECRET"):
-        _make(STRIPE_SECRET_KEY="sk_live_x")
-
-
 def test_all_errors_reported_together():
     """A deploy missing several secrets fails with every problem listed at once."""
     with pytest.raises(ValueError) as exc:

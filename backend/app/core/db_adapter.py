@@ -8,10 +8,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 from app.core.models import (
-    ABAssignment,
-    ABExperiment,
     AdminAuditLog,
-    AnalyticsEvent,
     ApplicationStatus,
     CandidateProfile,
     ConversionSignal,
@@ -19,8 +16,6 @@ from app.core.models import (
     HITLEvent,
     JobCheckpoint,
     JobListing,
-    Membership,
-    Organization,
     OutreachRecord,
     User,
     UserConsent,
@@ -105,19 +100,6 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
-    def set_stripe_customer_id(self, user_id: str, customer_id: str) -> bool:
-        """Links a user to their Stripe customer (cus_...). Audit P1-6/P1-7."""
-        pass
-
-    @abstractmethod
-    def get_user_id_by_stripe_customer(self, customer_id: str) -> Optional[str]:
-        pass
-
-    @abstractmethod
-    def get_stripe_customer_id(self, user_id: str) -> Optional[str]:
-        pass
-
-    @abstractmethod
     def set_subscription(self, user_id: str, subscription_id: Optional[str], status: Optional[str],
                          current_end: Optional[str] = None) -> bool:
         """Stores the user's Razorpay subscription (id, status, paid-until ISO time)."""
@@ -144,10 +126,6 @@ class DatabaseAdapter(ABC):
 
     @abstractmethod
     def update_user_password(self, user_id: str, new_password_hash: str) -> bool:
-        pass
-
-    @abstractmethod
-    def set_email_verified(self, user_id: str, verified: bool = True) -> bool:
         pass
 
     @abstractmethod
@@ -243,37 +221,6 @@ class DatabaseAdapter(ABC):
     def list_user_apply_ledger(self, user_id: str, limit: int = 50, offset: int = 0, status: Optional[str] = None) -> List[Any]:
         return []
 
-    # SaaS Organization & Membership Methods (with safe base defaults)
-    def create_organization(self, org: Organization) -> bool:
-        return True
-
-    def get_organization(self, org_id: str) -> Optional[Organization]:
-        return None
-
-    def get_organization_by_slug(self, slug: str) -> Optional[Organization]:
-        return None
-
-    def list_user_organizations(self, user_id: str) -> List[Dict[str, Any]]:
-        return []
-
-    def update_organization(self, org_id: str, name: Optional[str] = None, plan_tier: Optional[str] = None) -> bool:
-        return True
-
-    def add_membership(self, membership: Membership) -> bool:
-        return True
-
-    def get_membership(self, org_id: str, user_id: str) -> Optional[Membership]:
-        return None
-
-    def list_org_members(self, org_id: str) -> List[Dict[str, Any]]:
-        return []
-
-    def remove_membership(self, org_id: str, user_id: str) -> bool:
-        return True
-
-    def update_member_role(self, org_id: str, user_id: str, role: str) -> bool:
-        return True
-
     # Admin Panel & Audit Logging Methods
     def log_admin_action(self, log_entry: AdminAuditLog) -> bool:
         return True
@@ -285,12 +232,6 @@ class DatabaseAdapter(ABC):
         return []
 
     def count_all_users(self, search: Optional[str] = None) -> int:
-        return 0
-
-    def list_all_organizations(self, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
-        return []
-
-    def count_all_organizations(self) -> int:
         return 0
 
     def get_admin_system_metrics(self) -> Dict[str, Any]:
@@ -363,34 +304,6 @@ class DatabaseAdapter(ABC):
 
     def count_security_audit_logs(self, user_id: Optional[str] = None, event_type: Optional[str] = None, severity: Optional[str] = None) -> int:
         return 0
-
-    # --- Epic H: Data & ML Flywheel ---
-    def record_analytics_event(self, event: AnalyticsEvent) -> str:
-        return event.event_id
-
-    def query_analytics_events(self, user_id: str, event_type: Optional[str] = None, limit: int = 100) -> List[AnalyticsEvent]:
-        return []
-
-    def create_ab_experiment(self, experiment: ABExperiment) -> str:
-        return experiment.experiment_id
-
-    def get_ab_experiment(self, experiment_id: str, user_id: str) -> Optional[ABExperiment]:
-        return None
-
-    def list_ab_experiments(self, user_id: str) -> List[ABExperiment]:
-        return []
-
-    def assign_ab_variant(self, experiment_id: str, user_id: str, entity_id: str, variant: str) -> ABAssignment:
-        return ABAssignment(experiment_id=experiment_id, user_id=user_id, entity_id=entity_id, variant=variant)
-
-    def get_ab_assignment(self, experiment_id: str, user_id: str, entity_id: str) -> Optional[ABAssignment]:
-        return None
-
-    def record_ab_conversion(self, experiment_id: str, user_id: str, entity_id: str) -> bool:
-        return False
-
-    def get_ab_experiment_stats(self, experiment_id: str, user_id: str) -> Dict[str, Any]:
-        return {}
 
     def upsert_conversion_signal(self, signal: ConversionSignal) -> None:
         pass

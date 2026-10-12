@@ -151,7 +151,7 @@ class TestCareerAccelerationPillars:
             assert len(r3.json()["intel"]["recent_initiatives"]) >= 2
 
             # 4. Multi-Offer Compare Endpoint
-            r4 = await ac.post("/api/salary/compare-offers", json={
+            r4 = await ac.post("/api/negotiation/compare-offers", json={
                 "offers": [
                     {"company": "Google", "base_lpa": 50, "bonus_lpa": 10, "equity_grant_total_lpa": 60, "sign_on_lpa": 10, "role_title": "L5"},
                     {"company": "Meta", "base_lpa": 52, "bonus_lpa": 12, "equity_grant_total_lpa": 80, "sign_on_lpa": 15, "role_title": "E5"}
@@ -161,7 +161,7 @@ class TestCareerAccelerationPillars:
             assert len(r4.json()["offers_comparison"]) == 2
 
             # 5. Advanced Counter Script Endpoint
-            r5 = await ac.post("/api/salary/counter-script", json={
+            r5 = await ac.post("/api/negotiation/advanced-counter", json={
                 "candidate_name": "Alex Mercer",
                 "target_company": "Google",
                 "role_title": "L5 Software Engineer",

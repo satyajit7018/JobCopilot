@@ -1,58 +1,19 @@
 """
-JobCopilot - Backup, Recovery & Storage Router
-Handles tenant-scoped encrypted backups (.jobcopilot.enc export and restore)
-and secure object storage file downloads.
+JobCopilot - Storage downloads
+Serves a user's own stored files (resumes, exports) through signed, expiring links.
 """
 
-import base64
 import os
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
 
 from app.api.auth import get_current_user
 from app.core.models import User, UserRole
 
 router = APIRouter(tags=["backup"])
-
-
-class RestoreBackupPayload(BaseModel):
-    encrypted_data_b64: Optional[str] = None
-
-
-@router.post("/backup/export")
-async def export_backup(current_user: User = Depends(get_current_user)):
-    """Exports encrypted archive (.jobcopilot.enc) scoped to authenticated tenant."""
-    from app.core.backup import BackupManager
-    path = BackupManager.export_encrypted_backup(user_id=current_user.user_id)
-    return {
-        "status": "success",
-        "backup_path": str(path),
-        "filename": path.name
-    }
-
-
-@router.post("/backup/restore")
-async def restore_backup(
-    file: Optional[UploadFile] = File(None),
-    payload: Optional[RestoreBackupPayload] = None,
-    current_user: User = Depends(get_current_user)
-):
-    """Restores database state strictly for the caller's tenant from uploaded backup buffer."""
-    from app.core.backup import BackupManager
-    if file:
-        contents = await file.read()
-        res = BackupManager.restore_encrypted_backup_buffer(contents, user_id=current_user.user_id)
-        return res
-    elif payload and payload.encrypted_data_b64:
-        contents = base64.b64decode(payload.encrypted_data_b64)
-        res = BackupManager.restore_encrypted_backup_buffer(contents, user_id=current_user.user_id)
-        return res
-    else:
-        raise HTTPException(status_code=400, detail="Must provide backup file upload or encrypted_data_b64 payload.")
 
 
 @router.get("/storage/download")

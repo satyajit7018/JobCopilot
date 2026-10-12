@@ -37,14 +37,11 @@ from app.core.database import db
 from app.core.mailer import mailer
 from app.core.mfa import mfa_engine
 from app.core.models import (
-    Membership,
     MFADisableRequest,
     MFALoginChallengeRequest,
     MFASetupResponse,
     MFAVerifyRequest,
     RefreshTokenRequest,
-    RequestPasswordResetRequest,
-    ResetPasswordRequest,
     SecurityLogListResponse,
     SessionListResponse,
     TokenResponse,
@@ -53,7 +50,6 @@ from app.core.models import (
     UserRegisterRequest,
     UserResponse,
     UserRole,
-    VerifyEmailRequest,
 )
 from app.core.security_logger import security_logger
 from app.core.session_manager import session_manager
@@ -304,46 +300,6 @@ def session_is_active(payload: Dict[str, Any]) -> bool:
     return bool(record) and record.get("user_id") == payload.get("sub") and bool(record.get("is_active"))
 
 
-# =========================================================================
-# FastAPI Security Dependencies (F-01, F-02, F-08)
-# =========================================================================
-async def get_current_user_optional(
-    auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
-) -> Optional[User]:
-    """
-    Resolves the authenticated user from JWT Bearer token if present.
-    Returns None if no token or token is invalid.
-    """
-    if auth and auth.credentials:
-        try:
-            payload = decode_jwt_token(auth.credentials)
-            if payload.get("type") == "access":
-                jti = payload.get("jti")
-                if jti and db.is_token_revoked(jti):
-                    return None
-                if not session_is_active(payload):
-                    return None
-                user_id = payload.get("sub")
-                if user_id:
-                    user = db.get_user_by_id(user_id)
-                    if user and user.is_active:
-                        return user
-        except Exception:
-            logging.getLogger("jobcopilot.auth").debug("Optional user resolution failed", exc_info=True)
-
-    # Gated dev escape hatch (F-02)
-    if os.getenv("JOBCOPILOT_DEV_AUTH") == "1" and os.getenv("ENV", "").lower() != "production":
-        return User(
-            user_id="dev_user",
-            email="dev@jobcopilot.local",
-            password_hash="",
-            full_name="Dev User",
-            role=UserRole.FREE
-        )
-
-    return None
-
-
 async def get_current_user(
     auth: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> User:
@@ -413,50 +369,6 @@ async def require_admin(
             detail="Admin access required for this resource."
         )
     return current_user
-
-
-async def get_current_org_membership(
-    org_id: str,
-    current_user: User = Depends(get_current_user)
-) -> Membership:
-    """Verifies that the authenticated user is an active member of the specified organization."""
-    membership = db.get_membership(org_id, current_user.user_id)
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not a member of this organization."
-        )
-    return membership
-
-
-async def require_org_admin(
-    org_id: str,
-    current_user: User = Depends(get_current_user)
-) -> Membership:
-    """Requires the authenticated user to be an OWNER or ADMIN of the specified organization."""
-    membership = await get_current_org_membership(org_id, current_user)
-    role_val = enum_value(membership.role)
-    if role_val not in ["OWNER", "ADMIN"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Organization administrator privileges required."
-        )
-    return membership
-
-
-async def require_org_owner(
-    org_id: str,
-    current_user: User = Depends(get_current_user)
-) -> Membership:
-    """Requires the authenticated user to be the OWNER of the specified organization."""
-    membership = await get_current_org_membership(org_id, current_user)
-    role_val = enum_value(membership.role)
-    if role_val != "OWNER":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Organization owner privileges required."
-        )
-    return membership
 
 
 # =========================================================================
@@ -721,77 +633,6 @@ async def refresh_token(request: Request, payload: RefreshTokenRequest):
         email=user.email,
         role=role_str
     )
-
-
-@router.post("/verify-email")
-async def verify_email(req: VerifyEmailRequest):
-    """Verifies user email from a signed verification token."""
-    payload = decode_jwt_token(req.token)
-    if payload.get("type") != "verify_email":
-        raise HTTPException(status_code=400, detail="Invalid verification token type.")
-
-    user_id = payload.get("sub")
-    if not user_id:
-        raise HTTPException(status_code=400, detail="Invalid token subject.")
-
-    db.set_email_verified(user_id, True)
-    return {"status": "success", "message": "Email address verified successfully!"}
-
-
-@router.post("/request-reset")
-@limiter.limit("3/minute")
-async def request_password_reset(request: Request, req: RequestPasswordResetRequest):
-    """Initiates a secure password reset workflow without user enumeration."""
-    clean_email = req.email.lower().strip()
-    user = db.get_user_by_email(clean_email)
-    if user:
-        reset_token = create_jwt_token(
-            {"sub": user.user_id, "email": clean_email, "type": "reset_password"},
-            timedelta(minutes=15)
-        )
-        mailer.send_password_reset_email(clean_email, reset_token)
-
-    return {
-        "status": "success",
-        "message": "If an account with this email exists, a password reset link has been sent."
-    }
-
-
-@router.post("/reset-password")
-@limiter.limit("5/minute")
-async def reset_password(request: Request, req: ResetPasswordRequest):
-    """Completes password reset using a single-use signed token."""
-    if len(req.new_password) < settings.PASSWORD_MIN_LENGTH:
-        raise HTTPException(
-            status_code=400,
-            detail=f"New password must be at least {settings.PASSWORD_MIN_LENGTH} characters."
-        )
-
-    payload = decode_jwt_token(req.token)
-    if payload.get("type") != "reset_password":
-        raise HTTPException(status_code=400, detail="Invalid reset token type.")
-
-    jti = payload.get("jti")
-    if jti and db.is_token_revoked(jti):
-        raise HTTPException(status_code=401, detail="Reset token has already been used or revoked.")
-
-    user_id = payload.get("sub")
-    user = db.get_user_by_id(user_id) if user_id else None
-    if not user:
-        raise HTTPException(status_code=404, detail="User account not found.")
-
-    # Update password with Argon2id hash
-    new_hash = hash_password(req.new_password)
-    db.update_user_password(user.user_id, new_hash)
-
-    # Revoke single-use reset token
-    if jti:
-        db.revoke_token(jti, user.user_id, str(payload.get("exp", "")))
-
-    # A password reset must end every existing session (audit P1-11).
-    session_manager.revoke_all_sessions(user.user_id)
-
-    return {"status": "success", "message": "Password reset successfully. You can now log in."}
 
 
 @router.post("/logout")

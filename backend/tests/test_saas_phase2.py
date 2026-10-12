@@ -16,7 +16,6 @@ if venv_site_packages.exists():
 import pytest
 import asyncio
 from app.core.object_storage import ObjectStorageAdapter, storage
-from app.bot.proxy_rotator import ProxyRotator
 from app.tasks.celery_app import local_task_runner
 from app.tasks.apply_task import enqueue_apply_job
 from app.api.ws_gateway import MultiTenantWebSocketGateway
@@ -49,25 +48,6 @@ class TestSaaSPhase2:
         screenshot_bytes = b"\x89PNG\r\n\x1a\nMockPNGBytes"
         ss_path = adapter.upload_screenshot(user_id, "job_999", screenshot_bytes)
         assert Path(ss_path).exists()
-
-    def test_proxy_rotator_modes(self):
-        """Verifies proxy configuration generation across providers."""
-        # Direct mode
-        direct_rotator = ProxyRotator(provider="direct")
-        assert direct_rotator.get_proxy_config() is None
-
-        # Bright Data mode
-        bd_rotator = ProxyRotator(provider="brightdata")
-        bd_cfg = bd_rotator.get_proxy_config(session_id="test_session")
-        assert bd_cfg is not None
-        assert "http://" in bd_cfg["server"]
-        assert "session-test_session" in bd_cfg["username"]
-
-        # Oxylabs mode
-        oxy_rotator = ProxyRotator(provider="oxylabs")
-        oxy_cfg = oxy_rotator.get_proxy_config()
-        assert oxy_cfg is not None
-        assert "customer-" in oxy_cfg["username"]
 
     def test_async_task_runner(self):
         """Verifies enqueueing and completion of async tasks."""

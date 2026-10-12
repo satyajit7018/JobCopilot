@@ -4,7 +4,6 @@ High-throughput, asynchronous ingestion for Greenhouse, Lever, and Ashby job boa
 Extracts 0-day openings directly from public JSON APIs in < 150ms per company.
 """
 
-import asyncio
 import html
 import logging
 import re

@@ -1,7 +1,7 @@
 """
 30-Loop Deep Subsystem Integrity & Edge-Case Audit for JobCopilot
 Runs 30 comprehensive cycles testing all core algorithms, storage, security,
-deduplication, anti-AI filters, and backup encryption against edge cases.
+deduplication and anti-AI filters against edge cases.
 """
 
 import sys
@@ -45,8 +45,6 @@ from app.email.classifier import EmailClassifier
 from app.core.interview_studio import InterviewStudioEngine
 from app.core.negotiation import SalaryNegotiationEngine
 from app.core.calendar_sync import CalendarAvailabilityEngine
-from app.core.backup import BackupManager
-from app.core.analytics import AnalyticsEngine
 
 def run_30_deep_loops():
     total_loops = 30
@@ -188,35 +186,6 @@ def run_30_deep_loops():
             intent, confidence = EmailClassifier.classify_intent("Interview with TechCorp", parsed["body_text"])
             assert intent == EmailIntent.INTERVIEW_INVITE, "Failed intent classification"
 
-            # 8. Encrypted Backup Export, Tamper Detection & Restore
-            backup_path = BackupManager.export_encrypted_backup(user_id=profile_id)
-            assert backup_path.exists(), "Backup archive not created"
-            
-            # Tamper detection check
-            with open(backup_path, "r", encoding="utf-8") as f:
-                envelope = json.load(f)
-            # Tamper with ciphertext
-            envelope["ciphertext"] = envelope["ciphertext"][:-5] + "AAAAA"
-            corrupt_path = backup_path.with_suffix(".corrupt.enc")
-            with open(corrupt_path, "w", encoding="utf-8") as f:
-                json.dump(envelope, f)
-            
-            tamper_detected = False
-            try:
-                BackupManager.restore_encrypted_backup(corrupt_path, user_id=profile_id)
-            except Exception:
-                tamper_detected = True
-            
-            assert tamper_detected, "Tamper detection failed to detect corrupted backup"
-            if corrupt_path.exists():
-                corrupt_path.unlink()
-
-            # Clean restore check
-            restore_res = BackupManager.restore_encrypted_backup(backup_path, user_id=profile_id)
-            assert restore_res["status"] == "success", "Failed encrypted backup restore"
-            if backup_path.exists():
-                backup_path.unlink()
-
             # 9. Interview Studio & ESOP Modeler
             dossier = InterviewStudioEngine.generate_company_dossier("Airbnb", "Senior Backend Engineer")
             assert len(dossier["likely_tech_stack"]) >= 3, "Missing dossier tech stack"
@@ -243,10 +212,6 @@ def run_30_deep_loops():
                 role_title="Senior Software Engineer"
             )
             assert "rating" in offer_eval or "total_annual_comp_lpa" in offer_eval, "Missing evaluation"
-
-            # 10. Funnel Analytics KPIs
-            funnel = AnalyticsEngine.get_funnel_stats(user_id=profile_id)
-            assert "total_sourced" in funnel, "Missing funnel analytics"
 
             elapsed = time.time() - loop_start
             passed_loops += 1

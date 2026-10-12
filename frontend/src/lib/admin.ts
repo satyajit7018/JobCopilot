@@ -9,7 +9,6 @@ export interface AdminMetrics {
   total_users: number;
   total_jobs: number;
   total_applications: number;
-  total_organizations: number;
   active_subscriptions: Record<string, number>;
 }
 

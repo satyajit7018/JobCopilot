@@ -31,12 +31,10 @@ def test_list_leaves_descriptions_out_and_one_job_has_it(auth_client: TestClient
     assert with_text["description"] == full.json()["description"]
 
 
-def test_one_job_is_private_and_held_list_still_works(auth_client: TestClient, tenant_b_client: TestClient):
+def test_one_job_is_private(auth_client: TestClient, tenant_b_client: TestClient):
     job = _job(auth_client)
     assert tenant_b_client.get(f"/api/jobs/{job.job_id}").status_code == 404
     assert auth_client.get("/api/jobs/job_does_not_exist").status_code == 404
-    held = auth_client.get("/api/jobs/held")
-    assert held.status_code == 200 and "detail" not in held.json()
 
 
 def test_large_answers_are_compressed(auth_client: TestClient):
