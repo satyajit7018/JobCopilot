@@ -35,7 +35,7 @@ import {
 import { useSetStatus } from "../lib/application";
 import { markDone } from "../lib/checklist";
 import { usePageTitle } from "../lib/pageTitle";
-import { useIsPremium } from "../lib/billing";
+import { useIsPremium, useLiveSubmission } from "../lib/billing";
 import { PremiumLock } from "../components/PremiumLock";
 import { noticeLabel, useProfile } from "../lib/profile";
 
@@ -144,6 +144,8 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
   const description = useJobDescription(job.job_id);
   useEffect(() => markDone("reviewed"), []);
   const premium = useIsPremium();
+  // While the server doesn't send applications, everyone applies on the employer's site.
+  const live = useLiveSubmission();
   const [taskId, setTaskId] = useState<string | null>(() => taskStore.get(job.job_id));
   const pct = scorePercent(job.match_score);
   usePageTitle(`${job.title} at ${job.company}`);
@@ -213,8 +215,8 @@ function Review({ job, back, next }: { job: Job; back: ReactNode; next: Job | nu
 
           {/* On phones the panel follows the materials; on desktop it's a sticky right column. */}
           <div className="lg:sticky lg:top-6 lg:col-start-2 lg:row-span-3 lg:row-start-1">
-            {!premium || applyOnSiteOnly(job) ? (
-              <ApplyYourself job={job} />
+            {!premium || !live || applyOnSiteOnly(job) ? (
+              <ApplyYourself job={job} premium={premium} live={live} />
             ) : taskId ? (
               <Progress
                 taskId={taskId}
@@ -623,8 +625,8 @@ function HiddenNotice({ job }: { job: Job }) {
   );
 }
 
-/** Free plan, or a site we never apply on for you: apply there, then track it here. */
-function ApplyYourself({ job }: { job: Job }) {
+/** Free plan, a site we never apply on for you, or sending switched off: apply there, then track it here. */
+function ApplyYourself({ job, premium, live }: { job: Job; premium: boolean; live: boolean }) {
   const site = applyOnSiteOnly(job);
   const setStatus = useSetStatus(job.job_id);
   const applied = isTracked(job) || setStatus.isSuccess;
@@ -649,6 +651,7 @@ function ApplyYourself({ job }: { job: Job }) {
               {site
                 ? `This job is on ${site}, where you apply with your own ${site} account. Apply there, then come back and mark it applied so we can track it for you.`
                 : `Apply on ${job.company}'s site, then come back and mark it applied so we can track it for you.`}
+              {premium && " Your tailored resume and cover letter are under “Your application”."}
             </p>
             <a href={job.url} target="_blank" rel="noopener noreferrer" className={buttonClass("primary", "md", "max-md:hidden")}>
               Open the application
@@ -671,13 +674,14 @@ function ApplyYourself({ job }: { job: Job }) {
         )}
       </Card>
       {/* One box for everything Premium adds here; two competed with the Apply button. */}
-      {!site && (
+      {!site && !premium && (
         <PremiumLock
-          title="Let JobCopilot apply for you"
-          points={[
-            "A resume and cover letter written for this job",
-            "The application filled in and sent, after you approve it",
-          ]}
+          title={live ? "Let JobCopilot apply for you" : "Let JobCopilot write your application"}
+          points={
+            live
+              ? ["A resume and cover letter written for this job", "The application filled in and sent, after you approve it"]
+              : ["A resume and cover letter written for this job"]
+          }
         />
       )}
     </div>

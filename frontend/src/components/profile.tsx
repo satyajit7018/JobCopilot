@@ -185,7 +185,7 @@ export function PreferenceFields({
           value={value.expected_ctc}
           onChange={(e) => onChange({ expected_ctc: e.target.value })}
           placeholder="e.g. 28 LPA or $140k"
-          hint="Used to answer salary questions on applications. Left blank, we answer “Open to discussion”."
+          hint="Used to answer salary questions on applications. Left blank, we leave those questions for you."
         />
         <Select
           label="Can start"
@@ -200,7 +200,11 @@ export function PreferenceFields({
         name="work_authorization"
         value={value.work_authorization}
         onChange={(e) => onChange({ work_authorization: e.target.value })}
-        options={withCurrent(authOptions, value.work_authorization).map((o) => ({ value: o, label: o }))}
+        options={[
+          // Never preselected: it's the user's to state, and saved answers go on applications.
+          ...(value.work_authorization ? [] : [{ value: "", label: "Choose one" }]),
+          ...withCurrent(authOptions, value.work_authorization).map((o) => ({ value: o, label: o })),
+        ]}
       />
     </div>
   );

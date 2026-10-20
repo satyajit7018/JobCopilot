@@ -10,7 +10,7 @@
 [![Docker Ready](https://img.shields.io/badge/docker-compose%20ready-0db7ed.svg)](https://github.com/satyajit7018/JobCopilot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-JobCopilot eliminates the manual friction of technical job hunting. It continuously discovers 0-day openings across direct ATS APIs, compiles targeted PDF resumes per role, fills multi-step application forms with humanized stealth browser automation, provides an AI-powered voice mock interview studio with real-time cadence scoring, and models multi-offer 4-year compensation trajectories.
+JobCopilot eliminates the manual friction of technical job hunting. It continuously discovers 0-day openings across direct ATS APIs, compiles targeted PDF resumes per role, fills application forms with the candidate's own details (stopping for anything it doesn't know), provides an AI-powered voice mock interview studio with real-time cadence scoring, and models multi-offer 4-year compensation trajectories.
 
 ---
 

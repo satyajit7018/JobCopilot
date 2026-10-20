@@ -1,6 +1,6 @@
 """
 JobCopilot - Autonomous Bot & HITL Router
-Handles synchronous and asynchronous stealth bot applications, background worker tasks,
+Handles synchronous and asynchronous bot applications, background worker tasks,
 and human-in-the-loop (HITL) novel question resolution.
 """
 
@@ -18,6 +18,7 @@ from app.core.config import DEFAULT_SUBMISSION_MODE
 from app.core.database import db
 from app.core.plans import is_premium, require_premium
 from app.core.models import ApplicationStatus, ApplyLedgerStatus, User
+from app.core.settings import settings
 from app.core.vector_vault import vault
 
 router = APIRouter(tags=["bot"])
@@ -48,6 +49,8 @@ def _resolve_submission_mode(mode: Optional[str], user_id: str) -> str:
     resolved = mode if mode is not None else DEFAULT_SUBMISSION_MODE
     if resolved not in VALID_SUBMISSION_MODES:
         raise HTTPException(status_code=422, detail=f"Invalid mode '{mode}'. Use one of: {', '.join(VALID_SUBMISSION_MODES)}.")
+    if resolved == "LIVE" and not settings.LIVE_SUBMISSION_ENABLED:
+        raise HTTPException(status_code=403, detail="Sending applications for you is switched off for now. A practice run still works.")
     if resolved == "LIVE":
         consent = db.get_user_consents(user_id).get("autonomous_submission")
         if not consent or not consent.consented:
@@ -110,9 +113,7 @@ async def resolve_hitl(
         raise HTTPException(status_code=400, detail="Event already resolved or failed to update.")
 
     if payload.save_to_vault:
-        entry = vault.learn_answer(evt.question_text, payload.user_answer)
-        entry.user_id = current_user.user_id
-        db.save_vault_entry(entry, user_id=current_user.user_id)
+        vault.learn_answer(evt.question_text, payload.user_answer, user_id=current_user.user_id)
 
     await ws_manager.broadcast({
         "type": "HITL_RESOLVED",
@@ -136,9 +137,7 @@ async def resolve_held_application(
     db.resolve_hitl_event(payload.event_id, payload.user_answer, user_id=current_user.user_id)
 
     if payload.save_to_vault:
-        entry = vault.learn_answer(evt.question_text, payload.user_answer)
-        entry.user_id = current_user.user_id
-        db.save_vault_entry(entry, user_id=current_user.user_id)
+        vault.learn_answer(evt.question_text, payload.user_answer, user_id=current_user.user_id)
 
     # Audit P1-4: this used to mark the job SUBMITTED without running anything.
     # Now the answer is recorded and the real application is re-queued.
@@ -151,7 +150,7 @@ async def resolve_held_application(
                                               [ApplyLedgerStatus.HITL_PAUSED.value], ApplyLedgerStatus.INITIATED.value):
         wants_live = str(getattr(job, "submission_mode", "") or "") == "LIVE"
         consent = db.get_user_consents(current_user.user_id).get("autonomous_submission")
-        mode = "LIVE" if wants_live and consent and consent.consented else "DRY_RUN"
+        mode = "LIVE" if wants_live and consent and consent.consented and settings.LIVE_SUBMISSION_ENABLED else "DRY_RUN"
         task_id = TaskManager.dispatch_apply_task(job_id=job.job_id, user_id=current_user.user_id,
                                                   submission_mode=mode, ledger_id=ledger.ledger_id)
         job.status = ApplicationStatus.QUEUED
@@ -182,7 +181,7 @@ async def apply_to_job(
     mode: Optional[str] = None,
     current_user: User = Depends(require_premium("auto_apply"))
 ):
-    """Executes full autonomous stealth application workflow with persistent rate limiting and idempotency."""
+    """Runs one application (practice or, when allowed, real) with rate limiting and idempotency."""
     _assert_site_allows_auto_apply(current_user.user_id, job_id)
     # Check Idempotent Apply Ledger before executing
     _assert_can_apply(current_user.user_id, job_id)

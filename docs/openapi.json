@@ -1871,7 +1871,7 @@
           "bot"
         ],
         "summary": "Apply To Job",
-        "description": "Executes full autonomous stealth application workflow with persistent rate limiting and idempotency.",
+        "description": "Runs one application (practice or, when allowed, real) with rate limiting and idempotency.",
         "operationId": "apply_to_job_api_bot_apply__job_id__post",
         "security": [
           {

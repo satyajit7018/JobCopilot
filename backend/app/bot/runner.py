@@ -1,7 +1,7 @@
 """
 JobCopilot - Autonomous Application Runner & Bot Orchestrator
-Executes end-to-end autonomous form filling, stealth navigation,
-checkpoint recovery, and HITL resolution for target job postings.
+Fills job application forms with the user's own details and answers, checkpoints
+progress, stops for the user when something is missing, and submits only when allowed.
 """
 
 import asyncio
@@ -21,21 +21,21 @@ from app.bot.apply_ledger import apply_ledger
 from app.bot.captcha_detector import detect_captcha
 from app.bot.checkpoint import CheckpointManager
 from app.bot.errors import BotErrorCategory, calculate_backoff_delay, classify_bot_error, is_transient
+from app.bot.form import missing_required
 from app.bot.hitl_agent import HITLAgent
-from app.bot.stealth import StealthEngine
 from app.core.config import DATA_DIR, DEFAULT_SUBMISSION_MODE
 from app.core.cover_letter import CoverLetterGenerator
 from app.core.database import db
 from app.core.models import ApplicationStatus
 from app.core.outreach_generator import OutreachGenerator
-from app.core.settings import settings
 from app.core.resume_tailor import ResumeTailor
+from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
 
 class AutonomousJobRunner:
-    """Orchestrates stealth browser automation for individual job applications with idempotency and resilience."""
+    """Runs one job application in a plain browser, with idempotency and retries."""
 
     def __init__(self, mode: str = DEFAULT_SUBMISSION_MODE, max_retries: int = 3):
         self.mode = mode  # "DRY_RUN" or "LIVE"
@@ -67,6 +67,22 @@ class AutonomousJobRunner:
                 return True
             await asyncio.sleep(0.5)
         return False
+
+    @staticmethod
+    async def _hold_for_answers(job, ledger_id: str, user_id: str, questions, ws_broadcast_callback=None) -> None:
+        """Pauses the application on the questions it can't answer, one held question each."""
+        already = {(e.job_id, e.question_text) for e in db.get_pending_hitl(user_id)}
+        for question in questions:
+            if (job.job_id, question) in already:
+                continue
+            await HITLAgent.request_human_input(
+                job_id=job.job_id, company=job.company, role_title=job.title, question_text=question,
+                input_type="text", user_id=user_id, ws_broadcast_callback=ws_broadcast_callback,
+            )
+        apply_ledger.mark_hitl_paused(ledger_id, user_id=user_id)
+        job.status = ApplicationStatus.HITL_REQUIRED
+        job.submission_mode = "LIVE"
+        db.save_job(job, user_id=user_id)
 
     async def execute_application(
         self,
@@ -119,6 +135,15 @@ class AutonomousJobRunner:
                     "ledger_status": (ledger_entry.status.value if hasattr(ledger_entry.status, "value") else str(ledger_entry.status)) if ledger_entry else None
                 }
             ledger_id = ledger_entry.ledger_id
+
+        # Sending for real can be switched off on the server (settings.LIVE_SUBMISSION_ENABLED).
+        # Checked here too, so a run queued before the switch was turned off still sends nothing.
+        if self.mode == "LIVE" and not settings.LIVE_SUBMISSION_ENABLED:
+            apply_ledger.mark_failed(ledger_id, target_user, "LIVE_SUBMISSION_DISABLED",
+                                     "Sending applications for you is switched off; nothing was sent.")
+            await log("⛔ Sending for real is switched off: application NOT submitted.")
+            return {"status": "error", "message": "Sending applications for you is switched off. Nothing was sent.",
+                    "job_id": job.job_id, "ledger_id": ledger_id, "mode": self.mode, "submitted": False}
 
         # Atomic INITIATED -> IN_PROGRESS: if two workers get the same message, only one proceeds.
         if not apply_ledger.mark_in_progress(ledger_id, user_id=target_user):
@@ -183,12 +208,13 @@ class AutonomousJobRunner:
         max_attempts = self.max_retries
 
         while current_attempt <= max_attempts:
-            await log(f"Initializing stealth headless Chromium session (Attempt {current_attempt}/{max_attempts})...")
+            await log(f"Opening the application form (attempt {current_attempt}/{max_attempts})...")
             browser = None
             try:
                 async with async_playwright() as p:
                     browser = await p.chromium.launch(headless=True)
-                    context = await StealthEngine.create_stealth_context(browser)
+                    # A plain browser: no disguise. Security checks are handed to the user.
+                    context = await browser.new_context()
                     page = await context.new_page()
 
                     await log(f"Navigating to ATS portal: {job.url}...")
@@ -252,9 +278,16 @@ class AutonomousJobRunner:
                     filled_data = await UniversalATSAdapter.fill_application(
                         page=page,
                         profile=tailored_profile,
-                        tailored_resume_path=pdf_path
+                        tailored_resume_path=pdf_path,
+                        user_id=target_user,
+                        company=job.company,
+                        role=job.title,
                     )
-                    await log(f"Auto-filled {len(filled_data)} form fields successfully.")
+                    await log(f"Filled in {len(filled_data)} fields.")
+                    # Questions the user hasn't answered yet stay empty; a form with any is never sent.
+                    unanswered = await missing_required(page)
+                    if unanswered:
+                        await log(f"{len(unanswered)} required question(s) need your answer: {', '.join(unanswered[:5])}")
 
                     # Checkpoint Step 2: Form Filled
                     screenshot_file = settings.user_files_dir(target_user, "screenshots") / f"filled_{job.job_id}.png"
@@ -275,6 +308,12 @@ class AutonomousJobRunner:
                     if self.mode != "LIVE":
                         await log(f"🧪 DRY_RUN: form filled, NOT submitted. Screenshot saved to {screenshot_file.name}")
                         apply_ledger.release_after_dry_run(ledger_id, target_user)
+                    elif unanswered:
+                        await self._hold_for_answers(job, ledger_id, target_user, unanswered, ws_broadcast_callback)
+                        await log("⏸️ Not submitted: waiting for your answers.")
+                        return {"status": "hitl_required", "job_id": job.job_id, "ledger_id": ledger_id,
+                                "mode": self.mode, "submitted": False, "unanswered": unanswered,
+                                "message": "The form asked questions we don't have your answer to. Answer them to continue."}
                     else:
                         await log("Submitting application...")
                         submit_btn = await page.query_selector("button[type='submit'], input[type='submit'], button:has-text('Submit')")
@@ -319,6 +358,7 @@ class AutonomousJobRunner:
                         "mode": self.mode,
                         "submitted": submitted,
                         "filled_fields_count": len(filled_data),
+                        "unanswered": unanswered,
                         "screenshot": str(screenshot_file),
                         "tailored_pdf": str(pdf_path),
                         "tailored_resume_path": str(pdf_path),

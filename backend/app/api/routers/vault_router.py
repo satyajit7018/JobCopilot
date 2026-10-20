@@ -43,9 +43,8 @@ async def learn_vault_entry(
         question=payload.question,
         answer_template=payload.answer,
         slot_type=payload.slot_type,
-        slot_key=payload.slot_key
+        slot_key=payload.slot_key,
+        user_id=current_user.user_id,
     )
-    entry.user_id = current_user.user_id
-    db.save_vault_entry(entry, user_id=current_user.user_id)
     return {"status": "success", "entry": entry.dict()}
 

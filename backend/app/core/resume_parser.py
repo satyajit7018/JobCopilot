@@ -520,7 +520,7 @@ class ResumeParser:
             expected_ctc="",
             current_ctc="",
             notice_period_days=0,
-            work_authorization="Citizen",
+            work_authorization="",
             remote_preference="Remote / Hybrid / On-site",
             why_looking_for_role=""  # the user's own words, asked for in setup
         )

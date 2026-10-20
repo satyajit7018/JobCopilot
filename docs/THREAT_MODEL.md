@@ -128,7 +128,7 @@ The JobCopilot steering team has established the following binding architectural
 
 4. **Polite, Non-Denial-of-Service Rate Limits**:
    - Concurrency is hard-capped at **1 concurrent active application task per candidate**.
-   - Keystroke dynamics and mouse movements mimic human speeds (50ms–200ms randomized intervals).
+   - The browser is not disguised and does not imitate a person; it fills fields directly. Security checks (CAPTCHAs) are never solved by the bot and are handed to the candidate.
    - Daily application caps are strictly enforced according to subscription tier (Free: 5/day, Pro: 30/day).
    - The bot adheres to ATS request limits to ensure zero infrastructure burden on hiring companies.
 
@@ -136,7 +136,7 @@ The JobCopilot steering team has established the following binding architectural
    - The application ledger records an auditable trail of every interaction, submission, and confirmation email for the candidate's inspection.
 
 ### 4.3 Sign-Off & Governance
-This policy represents the explicit, documented decision of the engineering and product governance team. Revisions to stealth bypass heuristics must preserve the ethical principles of candidate agency, polite rate limiting, and mandatory HITL escalation.
+This policy represents the explicit, documented decision of the engineering and product governance team. Any revision must preserve candidate agency, polite rate limiting, mandatory HITL escalation, and the rule that the bot neither disguises itself nor bypasses security checks.
 
 ---
 

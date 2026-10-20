@@ -16,5 +16,12 @@ def test_blank_salary_is_never_answered_with_a_made_up_number():
     profile = CandidateProfile(full_name="N", email="n@test.com", phone="", location="Pune")
     profile.preferences.expected_ctc = ""
     profile.preferences.current_ctc = "0 LPA"
-    answer = vault._resolve_template("{expected_ctc} / {current_ctc}", profile, "Acme", "Engineer", "Tech")
-    assert answer == "Open to discussion / Prefer not to say"
+    profile.preferences.confirmed = ["expected_ctc", "current_ctc"]
+    # Nothing to say for real, so nothing is said: the question is left for the user.
+    assert vault._resolve_template("{expected_ctc} / {current_ctc}", profile, "Acme", "Engineer", "Tech") is None
+
+
+def test_resume_never_guesses_work_authorization():
+    profile = ResumeParser.parse_to_profile("Nia Rao\nnia@example.test\nBackend engineer. Skills: Python, Go.")
+    assert profile.preferences.work_authorization == ""
+    assert profile.preferences.confirmed == []

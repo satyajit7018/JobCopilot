@@ -70,7 +70,7 @@ def test_multi_tenant_duplicate_job_fingerprint_isolation():
 
 
 def test_null_safe_knowledge_vault_template_resolution():
-    """Verifies that Knowledge Vault resolves templates safely even if candidate profile fields are None."""
+    """Empty profile fields don't crash template resolution, and never get stand-in values."""
     # Construct profile with missing / None preference attributes
     incomplete_prefs = RecruiterPreferences(
         expected_ctc="",
@@ -106,10 +106,8 @@ def test_null_safe_knowledge_vault_template_resolution():
         domain="Fintech"
     )
 
-    assert isinstance(resolved, str)
-    assert "Razorpay" not in resolved
-    assert "Seeking 15 LPA" in resolved or "Seeking" in resolved
-    assert "Authorized" in resolved
+    # Missing values are never filled with stand-ins: the answer is left for the user.
+    assert resolved is None
 
 
 def test_compensation_range_parsing_and_midpoint():

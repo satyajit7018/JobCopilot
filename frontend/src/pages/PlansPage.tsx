@@ -3,12 +3,13 @@ import { Link } from "react-router";
 import { Check, Minus, Sparkles } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { Alert, Badge, Button, Card, Spinner, buttonClass, cx } from "../components/ui";
-import { CheckoutDismissed, PLAN_FEATURES, detectRegion, formatPrice, useBillingPlan, useIsPremium, useUpgrade, type Region } from "../lib/billing";
+import { CheckoutDismissed, PLAN_FEATURES, detectRegion, formatPrice, useBillingPlan, useIsPremium, useLiveSubmission, useUpgrade, type Region } from "../lib/billing";
 
 export function PlansPage() {
   const plan = useBillingPlan();
   const premium = useIsPremium();
   const upgrade = useUpgrade();
+  const live = useLiveSubmission();
   const [region, setRegion] = useState<Region>(() => detectRegion());
   const p = plan.data;
   const price = p?.prices[region];
@@ -20,7 +21,11 @@ export function PlansPage() {
       <div className="mx-auto max-w-4xl px-4 py-5 md:px-7 md:py-8">
         <div className="mb-6 max-w-xl">
           <p className="text-base font-semibold">Find jobs for free. Let JobCopilot do the work with Premium.</p>
-          <p className="mt-1 text-ink-2">Premium writes your applications, applies with your approval, watches your inbox and gets you ready for interviews.</p>
+          <p className="mt-1 text-ink-2">
+            {live
+              ? "Premium writes your applications, applies with your approval, watches your inbox and gets you ready for interviews."
+              : "Premium writes your applications, watches your inbox and gets you ready for interviews."}
+          </p>
         </div>
 
         {upgrade.isSuccess ? (
@@ -138,9 +143,10 @@ function Welcome() {
 }
 
 function FeatureList({ premium }: { premium: boolean }) {
+  const live = useLiveSubmission();
   return (
     <ul className="flex flex-col gap-2">
-      {PLAN_FEATURES.map((f) => {
+      {PLAN_FEATURES.filter((f) => !f.live || live).map((f) => {
         const included = premium || f.free;
         return (
           <li key={f.label} className={cx("flex items-start gap-2", !included && "text-ink-3")}>

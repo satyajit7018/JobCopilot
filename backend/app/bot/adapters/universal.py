@@ -14,7 +14,7 @@ except ImportError:
 
 from app.bot.adapters.greenhouse import GreenhouseAdapter
 from app.bot.adapters.lever import LeverAdapter
-from app.bot.human_behavior import HumanBehaviorEngine
+from app.bot.form import fill_field
 from app.core.models import CandidateProfile
 
 
@@ -58,30 +58,26 @@ class UniversalATSAdapter:
             aria_label = hints["aria"].lower()
             combined_hint = f"{name_attr} {id_attr} {placeholder} {aria_label}"
 
+            parts = profile.full_name.split()
             if any(k in combined_hint for k in ["first", "fname"]) and not any(k in combined_hint for k in ["last", "lname"]):
-                val = profile.full_name.split()[0]
-                await HumanBehaviorEngine.human_type(page, inp, val)
-                filled["first_name"] = val
+                key, val = "first_name", parts[0] if parts else ""
             elif any(k in combined_hint for k in ["last", "lname"]):
-                parts = profile.full_name.split()
-                val = " ".join(parts[1:]) if len(parts) > 1 else parts[0]
-                await HumanBehaviorEngine.human_type(page, inp, val)
-                filled["last_name"] = val
+                key, val = "last_name", " ".join(parts[1:]) if len(parts) > 1 else (parts[0] if parts else "")
             elif any(k in combined_hint for k in ["full_name", "fullname", "name"]) and "company" not in combined_hint:
-                await HumanBehaviorEngine.human_type(page, inp, profile.full_name)
-                filled["name"] = profile.full_name
+                key, val = "name", profile.full_name
             elif "email" in combined_hint:
-                await HumanBehaviorEngine.human_type(page, inp, profile.email)
-                filled["email"] = profile.email
+                key, val = "email", profile.email
             elif any(k in combined_hint for k in ["phone", "tel", "mobile"]):
-                await HumanBehaviorEngine.human_type(page, inp, profile.phone)
-                filled["phone"] = profile.phone
-            elif "linkedin" in combined_hint and profile.linkedin_url:
-                await HumanBehaviorEngine.human_type(page, inp, profile.linkedin_url)
-                filled["linkedin"] = profile.linkedin_url
-            elif "github" in combined_hint and profile.github_url:
-                await HumanBehaviorEngine.human_type(page, inp, profile.github_url)
-                filled["github"] = profile.github_url
+                key, val = "phone", profile.phone
+            elif "linkedin" in combined_hint:
+                key, val = "linkedin", profile.linkedin_url or ""
+            elif "github" in combined_hint:
+                key, val = "github", profile.github_url or ""
+            else:
+                continue
+            # Only what the profile really has; an empty value leaves the field for the user.
+            if await fill_field(page, inp, val):
+                filled[key] = val
 
         # 2. File Upload
         if tailored_resume_path and Path(tailored_resume_path).exists():
@@ -97,7 +93,10 @@ class UniversalATSAdapter:
         cls,
         page: Page,
         profile: CandidateProfile,
-        tailored_resume_path: Optional[Path] = None
+        tailored_resume_path: Optional[Path] = None,
+        user_id: str = "",
+        company: str = "",
+        role: str = "",
     ) -> Dict[str, Any]:
         """Dispatches filling to the specialized adapter or heuristic fallback."""
         url = page.url
@@ -105,8 +104,8 @@ class UniversalATSAdapter:
         platform = cls.detect_platform(url, content)
 
         if platform == "Greenhouse":
-            return await GreenhouseAdapter.fill_application(page, profile, tailored_resume_path)
+            return await GreenhouseAdapter.fill_application(page, profile, tailored_resume_path, user_id=user_id, company=company, role=role)
         elif platform == "Lever":
-            return await LeverAdapter.fill_application(page, profile, tailored_resume_path)
+            return await LeverAdapter.fill_application(page, profile, tailored_resume_path, user_id=user_id, company=company, role=role)
         else:
             return await cls.fill_form_heuristics(page, profile, tailored_resume_path)

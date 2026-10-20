@@ -10,6 +10,13 @@ from app.core.compensation import CompensationConverter
 from app.core.models import CandidateProfile
 
 
+
+# Preference fields that answer application questions once the user has saved them.
+CONFIRMABLE = (
+    "expected_ctc", "current_ctc", "notice_period_days", "work_authorization",
+    "willing_to_relocate", "remote_preference", "years_of_experience",
+)
+
 class QuestionnaireEngine:
     """Manages the 8 canonical recruiter baseline questions and auto-prefilling."""
 
@@ -43,7 +50,7 @@ class QuestionnaireEngine:
             "question": "What is your work authorization status?",
             "description": "Citizen, Permanent Resident, or requires visa sponsorship.",
             "type": "select",
-            "default_value": "Citizen",
+            "default_value": "",
             "options": [
                 "Citizen / Permanent Resident",
                 "Require Visa Sponsorship",
@@ -140,6 +147,12 @@ class QuestionnaireEngine:
     def apply_answers_to_profile(cls, profile: CandidateProfile, answers: Dict[str, Any]) -> CandidateProfile:
         """Applies user-confirmed questionnaire answers back into CandidateProfile."""
         prefs = profile.preferences
+        # What the user has now saved counts as their answer on application forms.
+        for key in CONFIRMABLE:
+            if key in answers and str(answers[key]).strip() != "" and key not in prefs.confirmed:
+                prefs.confirmed.append(key)
+        if "work_authorization" in prefs.confirmed and "requires_sponsorship" not in prefs.confirmed:
+            prefs.confirmed.append("requires_sponsorship")
 
         if "expected_ctc" in answers:
             prefs.expected_ctc = str(answers["expected_ctc"])

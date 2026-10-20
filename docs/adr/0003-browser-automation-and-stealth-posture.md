@@ -4,7 +4,13 @@ Date: 2026-09-06
 
 ## Status
 
-Accepted
+Partly superseded on 2026-10-20. Points 1, 3 and 4 below still hold. Point 2 (human behavioural
+simulation) and the browser disguise that went with it (fake hardware details, canvas noise,
+hidden automation flag) were removed: the browser now fills fields directly and does not pretend
+to be a person. Applications are sent only after the candidate approves each one, at a slow pace,
+and a security check is always handed to the candidate. Sending for real is also behind a server
+switch (`LIVE_SUBMISSION_ENABLED`), off until the form filler is proven on saved copies of real
+forms. The text below is kept as history.
 
 ## Context
 
