@@ -144,15 +144,14 @@ class SlotMatcher:
             return SlotType.EXACT_PARAM, "current_ctc"
         if any(k in text for k in ["notice period", "how soon", "available to join", "earliest start date", "availability", "when can you start"]):
             return SlotType.EXACT_PARAM, "notice_period_days"
-        if any(k in text for k in ["sponsorship", "visa required", "work authorization", "authorized to work", "legally authorized"]):
+        if "sponsor" in text:
+            return SlotType.EXACT_PARAM, "requires_sponsorship"
+        if any(k in text for k in ["visa required", "work authorization", "authorized to work", "legally authorized"]):
             return SlotType.EXACT_PARAM, "work_authorization"
         if any(k in text for k in ["relocate", "willingness to relocate", "relocation", "open to relocate"]):
             return SlotType.EXACT_PARAM, "willing_to_relocate"
         if any(k in text for k in ["remote", "hybrid", "on-site", "work from home", "work mode"]):
             return SlotType.EXACT_PARAM, "remote_preference"
-        if any(k in text for k in ["total experience", "overall experience", "years of experience"]):
-            return SlotType.EXACT_PARAM, "years_of_experience"
-
         # 3. Skill-Specific Experience Years
         tech_matches = [
             "python", "react", "fastapi", "docker", "aws", "gcp", "sql", "pytorch",
@@ -162,6 +161,10 @@ class SlotMatcher:
         for tech in tech_matches:
             if tech in text and any(k in text for k in ["experience", "years", "how long", "proficiency", "worked with", "managed", "using", "built"]):
                 return SlotType.TECH_YEARS, f"TECH_YEARS:{tech.capitalize()}"
+
+        # Total experience only once no single skill is named (checked above).
+        if any(k in text for k in ["total experience", "overall experience", "years of experience"]):
+            return SlotType.EXACT_PARAM, "years_of_experience"
 
         # 4. Technical Achievements
         if any(k in text for k in ["describe a challenge", "project you built", "difficult bug", "proudest achievement", "technical achievement"]):

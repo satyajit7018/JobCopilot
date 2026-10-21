@@ -58,6 +58,8 @@ async def public_auth_config():
         # Google id_token (enforced in google_sso_auth below).
         "demo_enabled": not settings.is_production,
         "password_auth_enabled": settings.password_auth_enabled,
+        # Whether JobCopilot may send applications for users at all (a server switch).
+        "live_submission": settings.LIVE_SUBMISSION_ENABLED,
         # Shown on the legal and help pages.
         "operator_name": settings.OPERATOR_NAME,
         "support_email": settings.SUPPORT_EMAIL,

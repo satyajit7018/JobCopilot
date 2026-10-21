@@ -116,6 +116,10 @@ class Settings(BaseSettings):
     # Read Instahyre's public job search during discovery. Off = career pages and startup boards only.
     INSTAHYRE_ENABLED: bool = True
 
+    # Let JobCopilot submit applications for users (after each one's approval). Off until the
+    # form filler is proven on real form copies; while off, only practice runs are possible.
+    LIVE_SUBMISSION_ENABLED: bool = False
+
     # Observability
     SENTRY_DSN: Optional[str] = None
     # Company logos are looked up by the server (see core/company_logo.py). Off = initials only.

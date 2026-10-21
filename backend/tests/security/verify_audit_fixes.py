@@ -285,6 +285,58 @@ def _():
     """
 
 
+@check("A-1 real sending is switched off by default")
+def _():
+    """
+    from app.core.database import db
+    from app.core.models import ConsentType, UserConsent
+    no_browser()
+    u = premium(reg("a@a.com"))
+    db.record_user_consent(UserConsent(user_id=u["user_id"], consent_type=ConsentType.AUTONOMOUS_SUBMISSION, consented=True))
+    j = c.post("/api/jobs/log-call", headers=H(u["access_token"]), json={
+        "company": "Acme", "role_title": "SDE", "status": "INTERVIEW", "call_notes": "n", "meeting_link": ""}).json()
+    r = c.post(f"/api/jobs/apply-async/{j['job_id']}?mode=LIVE", headers=H(u["access_token"]))
+    result(r.status_code == 403, f"{r.status_code} {r.text[:100]}")
+    """
+
+
+@check("A-2 forms never get placeholders, canned essays or defaults")
+def _():
+    """
+    from app.bot.form import answer_for
+    from app.core.models import CandidateProfile
+    p = CandidateProfile(user_id="usr_x", full_name="T", email="t@t.test", phone="", location="")
+    answers = [answer_for(q, p, company="Acme") for q in (
+        "What is your expected salary?", "What is your notice period?", "Are you legally authorized to work here?",
+        "Why do you want to work at our company?", "Share a link to a technical project you built.",
+        "How many years of experience do you have with Kubernetes?")]
+    result(all(a is None for a in answers), answers)
+    """
+
+
+@check("A-3 a saved answer stays with its owner")
+def _():
+    """
+    from app.bot.form import answer_for
+    from app.core.database import db
+    from app.core.models import CandidateProfile, HITLEvent
+    import uuid
+    a, b = premium(reg("a@a.com")), premium(reg("b@b.com"))
+    j = c.post("/api/jobs/log-call", headers=H(a["access_token"]), json={
+        "company": "Acme", "role_title": "SDE", "status": "INTERVIEW", "call_notes": "n", "meeting_link": ""}).json()
+    evt = HITLEvent(event_id="evt_" + uuid.uuid4().hex[:8], user_id=a["user_id"], job_id=j["job_id"], company="Acme",
+                    role_title="SDE", question_text="Do you hold a security clearance?", input_type="text")
+    db.save_hitl_event(evt, user_id=a["user_id"])
+    c.post("/api/hitl/resolve-held", headers=H(a["access_token"]),
+           json={"event_id": evt.event_id, "user_answer": "Yes, level 2", "save_to_vault": True})
+    q = "Do you hold a security clearance?"
+    mine = answer_for(q, CandidateProfile(user_id=a["user_id"], full_name="A", email="a@a.com", phone="", location=""))
+    theirs = answer_for(q, CandidateProfile(user_id=b["user_id"], full_name="B", email="b@b.com", phone="", location=""))
+    shared = [e for e in db.get_vault_entries("default") if e.question_pattern == q]
+    result(mine == "Yes, level 2" and theirs is None and not shared, f"mine={mine} theirs={theirs} shared={len(shared)}")
+    """
+
+
 @check("P1-12/13 metrics require auth and health hides exceptions", env={"METRICS_TOKEN": "scrape-secret"})
 def _():
     """

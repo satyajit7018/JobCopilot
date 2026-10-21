@@ -105,7 +105,7 @@ class RecruiterPreferences(BaseModel):
     expected_ctc: str = "15 LPA"
     target_currency: str = "INR"
     notice_period_days: int = 0
-    work_authorization: str = "Citizen"
+    work_authorization: str = ""  # the user's to state; never guessed
     requires_sponsorship: bool = False
     willing_to_relocate: bool = True
     remote_preference: str = "Remote / Hybrid / On-site"
@@ -118,6 +118,9 @@ class RecruiterPreferences(BaseModel):
     current_employer: Optional[str] = None  # Used for stealth mode employer blacklisting
     # "Not interested because..." rules new searches follow (see core/match_feedback.py).
     skip_rules: List[Dict[str, Any]] = Field(default_factory=list)
+    # Preference fields the user has saved at least once. Only these answer application
+    # questions; the rest are defaults or guesses from the resume and are used for matching only.
+    confirmed: List[str] = Field(default_factory=list)
 
 
 class ResumeVariant(BaseModel):

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectRegion, formatPrice, subscriptionIsLive } from "./billing";
+import { PLAN_FEATURES, detectRegion, formatPrice, subscriptionIsLive } from "./billing";
 
 describe("plans", () => {
   it("prices India in rupees and everyone else in dollars", () => {
@@ -19,5 +19,11 @@ describe("plans", () => {
     for (const s of ["authenticated", "active", "pending", "cancelling"]) expect(subscriptionIsLive(sub(s))).toBe(true);
     for (const s of ["created", "halted", "cancelled", "completed", "expired"]) expect(subscriptionIsLive(sub(s))).toBe(false);
     expect(subscriptionIsLive(null)).toBe(false);
+  });
+
+  it("promises automatic applying only as a switch-dependent Premium feature", () => {
+    const liveOnly = PLAN_FEATURES.filter((f) => f.live);
+    expect(liveOnly.map((f) => f.label)).toEqual(["Automatic applying, with your approval for each one"]);
+    expect(liveOnly.every((f) => !f.free)).toBe(true);
   });
 });

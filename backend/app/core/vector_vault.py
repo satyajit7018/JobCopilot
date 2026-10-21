@@ -4,6 +4,7 @@ Indexes Q&A pairs with semantic embeddings, lexical token matching,
 and deterministic slot key resolution for zero-repeat autonomous form filling.
 """
 
+import re
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -12,6 +13,36 @@ from app.core.database import db
 from app.core.models import CandidateProfile, SlotType, VaultEntry
 from app.core.slot_matcher import SlotMatcher
 
+# Questions answered straight from the profile (fields the user has saved). The profile is the
+# one place these facts live, so a stored copy of them is never used in their place.
+PROFILE_SLOTS = {
+    "expected_ctc": "{expected_ctc}",
+    "current_ctc": "{current_ctc}",
+    "notice_period_days": "{notice_period}",
+    "work_authorization": "{work_authorization}",
+    "requires_sponsorship": "{sponsorship_answer}",
+    "willing_to_relocate": "{relocation_answer}",
+    "remote_preference": "{remote_preference}",
+    "years_of_experience": "{years_of_experience} years",
+}
+
+# Answers about one company ("Why do you want to work here?") are never reused for another.
+COMPANY_SPECIFIC_KEYS = {"why_join_company"}
+
+# Older versions copied profile defaults into every user's saved answers, and gave total years
+# of experience as the years with each skill. Those copies are ignored, never trusted.
+LEGACY_SEEDED_QUESTIONS = {
+    "what is your expected ctc / compensation?",
+    "what is your current ctc / salary?",
+    "what is your notice period / earliest start date?",
+    "are you open to relocation?",
+    "do you require visa sponsorship?",
+}
+LEGACY_SKILL_YEARS = re.compile(r"^how many years of experience do you have with .+\?$")
+LEGACY_SKILL_YEARS_ANSWER = re.compile(r"^(\d+\.\d years|1 year)$")
+
+PLACEHOLDER = re.compile(r"\{[a-z_]+\}")
+
 
 class KnowledgeVault:
     """Self-learning Knowledge Vault storing and resolving recruiter Q&As with in-memory caching."""
@@ -19,76 +50,25 @@ class KnowledgeVault:
     def __init__(self):
         self.matcher = SlotMatcher()
         self._cached_entries: Optional[List[VaultEntry]] = None
-        self._ensure_baseline_entries()
 
-    def _get_entries(self, user_id: str = "system_baseline") -> List[VaultEntry]:
+    def _get_entries(self, user_id: str) -> List[VaultEntry]:
         """Retrieves cached vault entries or reads from database for user."""
         return db.get_vault_entries(user_id=user_id)
 
-    def _ensure_baseline_entries(self):
-        """Seeds baseline universal recruiter questions and refreshes vector dimensions."""
-        existing = db.get_vault_entries(user_id="system_baseline")
-        vocab_len = len(self.matcher.VOCABULARY)
-
-        baselines = [
-            ("What is your expected salary / CTC?", SlotType.EXACT_PARAM, "expected_ctc", "{expected_ctc}"),
-            ("What is your current CTC / salary?", SlotType.EXACT_PARAM, "current_ctc", "{current_ctc}"),
-            ("What is your notice period or earliest start date?", SlotType.EXACT_PARAM, "notice_period_days", "{notice_period_days} days ({earliest_start_date})"),
-            ("Are you legally authorized to work in this location?", SlotType.EXACT_PARAM, "work_authorization", "{work_authorization}"),
-            ("Do you require visa sponsorship now or in the future?", SlotType.EXACT_PARAM, "requires_sponsorship", "{sponsorship_answer}"),
-            ("Are you willing to relocate for this role?", SlotType.EXACT_PARAM, "willing_to_relocate", "{relocation_answer}"),
-            ("What is your preferred work arrangement (Remote / Hybrid / On-site)?", SlotType.EXACT_PARAM, "remote_preference", "{remote_preference}"),
-            ("Total years of professional engineering experience?", SlotType.EXACT_PARAM, "years_of_experience", "{years_of_experience} years"),
-            ("Why do you want to work at our company?", SlotType.PARAMETRIC_ESSAY, "why_join_company",
-             "I am excited about {company}'s focus on {domain}. With experience in building scalable Python backends, machine learning pipelines, and vector search systems, I am eager to contribute directly to {company}'s engineering goals."),
-            ("Why should we hire you for this role?", SlotType.PARAMETRIC_ESSAY, "why_hire_me",
-             "I bring strong hands-on experience in {top_skills} combined with a track record of delivering high-performance software. I thrive in collaborative, fast-paced environments and take full ownership of backend reliability and feature delivery."),
-            ("Share a link to a technical project you built.", SlotType.PARAMETRIC_ESSAY, "technical_achievement",
-             "I developed a high-throughput diagnostic AI system with FastAPI and PyTorch achieving 96.19% classification accuracy and sub-50ms latency. Documentation and code available at: {github_url}")
-        ]
-
-        if not existing:
-            for question, slot_type, slot_key, template in baselines:
-                self.learn_answer(question, template, slot_type=slot_type, slot_key=slot_key, user_id="system_baseline")
-        else:
-            # Refresh embeddings if vocabulary changed
-            for entry in existing:
-                if len(entry.embedding) != vocab_len:
-                    entry.embedding = self.matcher.get_embedding(entry.question_pattern)
-                    db.save_vault_entry(entry, user_id="system_baseline")
-
     def seed_from_profile(self, profile: CandidateProfile):
-        """Seeds the Knowledge Vault with rich, specialized slots directly from a candidate profile."""
-        prefs = profile.preferences
-        notice_str = f"{prefs.notice_period_days} days" if prefs.notice_period_days > 0 else "0 days (Immediate)"
-        uid = profile.user_id or "default"
+        """Keeps the user's own "why I'm looking" words as a reusable answer.
 
-        # 1. Update Core Recruiter Preferences Slots
-        self.learn_answer("What is your expected CTC / compensation?", prefs.expected_ctc, slot_type=SlotType.EXACT_PARAM, slot_key="expected_ctc", user_id=uid)
-        self.learn_answer("What is your current CTC / salary?", prefs.current_ctc, slot_type=SlotType.EXACT_PARAM, slot_key="current_ctc", user_id=uid)
-        self.learn_answer("What is your notice period / earliest start date?", notice_str, slot_type=SlotType.EXACT_PARAM, slot_key="notice_period_days", user_id=uid)
-        self.learn_answer("Are you open to relocation?", "Yes, willing to relocate" if prefs.willing_to_relocate else "No, remote only", slot_type=SlotType.EXACT_PARAM, slot_key="willing_to_relocate", user_id=uid)
-        self.learn_answer("Do you require visa sponsorship?", "Yes, require visa sponsorship" if prefs.requires_sponsorship else "No, legally authorized without sponsorship", slot_type=SlotType.EXACT_PARAM, slot_key="requires_sponsorship", user_id=uid)
-
-        # 2. Seed Skill-Specific Experience Slots
-        yoe = prefs.years_of_experience
-        for skill in profile.skills:
-            self.learn_answer(
-                f"How many years of experience do you have with {skill}?",
-                f"{yoe:.1f} years" if yoe >= 1.0 else "1 year",
-                slot_type=SlotType.TECH_YEARS,
-                slot_key=f"TECH_YEARS:{skill}",
-                user_id=uid
-            )
-
-        # 3. Seed Career Narrative
-        if prefs.why_looking_for_role:
+        Salary, notice period and the other profile facts are read from the profile when a form
+        asks (see PROFILE_SLOTS), so they are not copied here, where they would go stale.
+        """
+        reason = (profile.preferences.why_looking_for_role or "").strip()
+        if reason:
             self.learn_answer(
                 "Why are you looking for a new role?",
-                prefs.why_looking_for_role,
+                reason,
                 slot_type=SlotType.PARAMETRIC_ESSAY,
                 slot_key="why_looking_for_role",
-                user_id=uid
+                user_id=profile.user_id or "default",
             )
 
     def learn_answer(
@@ -133,6 +113,41 @@ class KnowledgeVault:
         db.save_vault_entry(entry, user_id=user_id)
         return entry
 
+    @staticmethod
+    def _profile_values(profile: CandidateProfile) -> Dict[str, str]:
+        """What the profile can say for real. Preference fields count only once the user has saved them."""
+        prefs = profile.preferences
+        confirmed = set(getattr(prefs, "confirmed", None) or [])
+
+        def text(value: Any) -> str:
+            return str(value or "").strip()
+
+        values: Dict[str, str] = {}
+        if "expected_ctc" in confirmed:
+            values["expected_ctc"] = text(prefs.expected_ctc)
+        if "current_ctc" in confirmed and text(prefs.current_ctc).upper() != "0 LPA":
+            values["current_ctc"] = text(prefs.current_ctc)
+        if "notice_period_days" in confirmed:
+            days = int(prefs.notice_period_days or 0)
+            values["notice_period"] = "Immediately" if days == 0 else f"{days} days"
+        if "work_authorization" in confirmed:
+            values["work_authorization"] = text(prefs.work_authorization)
+        if "requires_sponsorship" in confirmed:
+            values["sponsorship_answer"] = "Yes" if prefs.requires_sponsorship else "No"
+        if "willing_to_relocate" in confirmed:
+            values["relocation_answer"] = "Yes" if prefs.willing_to_relocate else "No"
+        if "remote_preference" in confirmed:
+            values["remote_preference"] = text(prefs.remote_preference)
+        if "years_of_experience" in confirmed and prefs.years_of_experience is not None:
+            values["years_of_experience"] = f"{float(prefs.years_of_experience):g}"
+        skills = [text(s) for s in (profile.skills or []) if text(s)]
+        if skills:
+            values["top_skills"] = ", ".join(skills[:5])
+        for field in ("full_name", "email", "phone", "location", "github_url", "linkedin_url", "portfolio_url"):
+            if text(getattr(profile, field, "")):
+                values[field] = text(getattr(profile, field))
+        return values
+
     def _resolve_template(
         self,
         template: str,
@@ -140,104 +155,103 @@ class KnowledgeVault:
         company: str,
         role: str,
         domain: str
-    ) -> str:
-        """Substitutes dynamic template variables into final human answer with strict null-safety."""
-        resolved = (template or "").replace("{company}", str(company or "the company")).replace("{role}", str(role or "Software Engineer")).replace("{domain}", str(domain or "Technology"))
-        if profile:
-            prefs = profile.preferences
-            # No invented numbers on someone's application: say so when the user hasn't told us.
-            expected_ctc = str(getattr(prefs, "expected_ctc", "") or "").strip() or "Open to discussion"
-            current_ctc = str(getattr(prefs, "current_ctc", "") or "").strip()
-            if not current_ctc or current_ctc.upper() == "0 LPA":
-                current_ctc = "Prefer not to say"
-            notice_days = str(getattr(prefs, "notice_period_days", 0) or 0)
-            earliest_date = str(getattr(prefs, "earliest_start_date", "") or "Immediate")
-            work_auth = str(getattr(prefs, "work_authorization", "") or "Authorized")
-            req_spon = bool(getattr(prefs, "requires_sponsorship", False))
-            open_reloc = bool(getattr(prefs, "willing_to_relocate", False))
-            remote_pref = str(getattr(prefs, "remote_preference", "") or "Remote")
-            yoe = float(getattr(prefs, "years_of_experience", 0.0) or 0.0)
-            skills = profile.skills if isinstance(profile.skills, list) else []
-            top_skills = ", ".join(str(s) for s in skills[:5]) if skills else "Python, FastAPI, Backend Systems"
+    ) -> Optional[str]:
+        """Fills {placeholders} with real values. None if any of them isn't known.
 
-            resolved = resolved.replace("{expected_ctc}", expected_ctc)
-            resolved = resolved.replace("{current_ctc}", current_ctc)
-            resolved = resolved.replace("{notice_period_days}", notice_days)
-            resolved = resolved.replace("{earliest_start_date}", earliest_date)
-            resolved = resolved.replace("{work_authorization}", work_auth)
-            resolved = resolved.replace("{sponsorship_answer}", "Yes" if req_spon else "No")
-            resolved = resolved.replace("{relocation_answer}", "Yes, open to relocate" if open_reloc else "No, remote only")
-            resolved = resolved.replace("{remote_preference}", remote_pref)
-            resolved = resolved.replace("{years_of_experience}", f"{yoe:.1f}")
-            resolved = resolved.replace("{top_skills}", top_skills)
-            resolved = resolved.replace("{full_name}", str(profile.full_name or "Candidate"))
-            resolved = resolved.replace("{email}", str(profile.email or ""))
-            resolved = resolved.replace("{phone}", str(profile.phone or ""))
-            resolved = resolved.replace("{location}", str(profile.location or "Remote"))
-            resolved = resolved.replace("{github_url}", str(profile.github_url or "https://github.com"))
-            resolved = resolved.replace("{linkedin_url}", str(profile.linkedin_url or "https://linkedin.com"))
+        An application never gets a default, a guess or a leftover {placeholder}: if the
+        answer can't be completed from what the user told us, it is left for the user.
+        """
+        values: Dict[str, str] = {}
+        if (company or "").strip() and company.strip().lower() not in ("company", "the company"):
+            values["company"] = company.strip()
+        if (role or "").strip():
+            values["role"] = role.strip()
+        if (domain or "").strip():
+            values["domain"] = domain.strip()
+        if profile:
+            values.update(self._profile_values(profile))
+
+        resolved = PLACEHOLDER.sub(lambda m: values.get(m.group(0)[1:-1]) or m.group(0), template or "")
+        if not resolved.strip() or PLACEHOLDER.search(resolved):
+            return None
         return resolved
+
+    @staticmethod
+    def _is_legacy_copy(entry: VaultEntry) -> bool:
+        question = (entry.question_pattern or "").strip().lower()
+        if question in LEGACY_SEEDED_QUESTIONS:
+            return True
+        return bool(LEGACY_SKILL_YEARS.match(question) and LEGACY_SKILL_YEARS_ANSWER.match((entry.answer_template or "").strip()))
+
+    def _own_entries(self, user_id: str) -> List[VaultEntry]:
+        """The user's own saved answers. Old shared defaults ("system_baseline") and stale copies are left out."""
+        if not user_id or user_id == "system_baseline":
+            return []
+        return [e for e in self._get_entries(user_id=user_id) if not self._is_legacy_copy(e)]
 
     def query_answer(
         self,
         question: str,
         profile: Optional[CandidateProfile] = None,
-        company: str = "the company",
-        role: str = "Software Engineer",
-        domain: str = "Technology",
+        company: str = "",
+        role: str = "",
+        domain: str = "",
         similarity_threshold: float = 0.55,
         user_id: str = ""
     ) -> Tuple[Optional[str], float, Optional[VaultEntry]]:
-        """Queries the Knowledge Vault using deterministic slot resolution and hybrid search."""
-        target_user = user_id or (profile.user_id if profile else "system_baseline")
+        """The user's answer to an application question, or (None, score, None).
 
-        user_entries = self._get_entries(user_id=target_user) if target_user != "system_baseline" else []
-        baseline_entries = self._get_entries(user_id="system_baseline")
+        Answers come only from the user: profile fields they have saved, or answers they gave
+        before. A question about a known topic (salary, notice period, years with one skill) is
+        answered from that topic or not at all, never from a question that merely looks similar.
+        """
+        target_user = user_id or (profile.user_id if profile else "")
+        entries = self._own_entries(target_user)
 
-        # User overrides take precedence over universal system baselines
-        user_keys = {e.slot_key for e in user_entries if e.slot_key}
-        entries = list(user_entries) + [b for b in baseline_entries if b.slot_key not in user_keys]
-
-        if not entries:
-            return None, 0.0, None
-
-        # 1. Deterministic Slot Matching
+        # 1. A known topic.
         detected_type, detected_key = self.matcher.detect_slot_type(question)
         if detected_key != "general_question":
+            if detected_key in COMPANY_SPECIFIC_KEYS:
+                return None, 0.0, None
+            if detected_key in PROFILE_SLOTS and profile is not None:
+                resolved = self._resolve_template(PROFILE_SLOTS[detected_key], profile, company, role, domain)
+                if resolved:
+                    return resolved, 1.0, None
             for entry in entries:
                 if entry.slot_key == detected_key and entry.slot_type == detected_type:
-                    db.increment_vault_usage(entry.qa_id)
                     resolved = self._resolve_template(entry.answer_template, profile, company, role, domain)
-                    return resolved, 1.0, entry
+                    if resolved:
+                        db.increment_vault_usage(entry.qa_id)
+                        return resolved, 1.0, entry
+            return None, 0.0, None
 
-        # 2. Hybrid Semantic + Lexical Search Fallback
+        # 2. Anything else: the user's own earlier answer to a similar question.
+        reusable = [e for e in entries if e.slot_key not in COMPANY_SPECIFIC_KEYS]
         query_embedding = self.matcher.get_embedding(question)
         best_entry = None
         best_score = 0.0
-
-        for entry in entries:
+        for entry in reusable:
             doc_emb = entry.embedding
             if len(doc_emb) != len(query_embedding):
                 doc_emb = self.matcher.get_embedding(entry.question_pattern)
-
             score = self.matcher.compute_hybrid_score(question, query_embedding, entry.question_pattern, doc_emb)
             if score > best_score:
                 best_score = score
                 best_entry = entry
 
         if best_entry and best_score >= similarity_threshold:
-            db.increment_vault_usage(best_entry.qa_id)
             resolved = self._resolve_template(best_entry.answer_template, profile, company, role, domain)
-            return resolved, best_score, best_entry
+            if resolved:
+                db.increment_vault_usage(best_entry.qa_id)
+                return resolved, best_score, best_entry
 
-        # 3. Dense Semantic Vector Retrieval Fallback
-        semantic_matches = self.search_semantic(question, user_id=target_user, top_k=1)
-        if semantic_matches:
-            top_sem_entry, top_sem_score = semantic_matches[0]
-            if top_sem_score >= similarity_threshold:
-                db.increment_vault_usage(top_sem_entry.qa_id)
+        # 3. Dense semantic search over the same answers.
+        for top_sem_entry, top_sem_score in self.search_semantic(question, user_id=target_user, top_k=1):
+            if top_sem_score >= similarity_threshold and top_sem_entry.slot_key not in COMPANY_SPECIFIC_KEYS:
                 resolved = self._resolve_template(top_sem_entry.answer_template, profile, company, role, domain)
-                return resolved, top_sem_score, top_sem_entry
+                if resolved:
+                    db.increment_vault_usage(top_sem_entry.qa_id)
+                    return resolved, top_sem_score, top_sem_entry
 
         return None, best_score, None
 
@@ -253,11 +267,7 @@ class KnowledgeVault:
         """
         from app.core.llm_client import llm_client
 
-        user_entries = self._get_entries(user_id=user_id) if user_id != "system_baseline" else []
-        baseline_entries = self._get_entries(user_id="system_baseline")
-        user_keys = {e.slot_key for e in user_entries if e.slot_key}
-        entries = list(user_entries) + [b for b in baseline_entries if b.slot_key not in user_keys]
-
+        entries = self._own_entries(user_id)
         if not entries:
             return []
 
@@ -286,9 +296,9 @@ class KnowledgeVault:
         return self.query_answer(
             question=question,
             profile=profile,
-            company=ctx.get("company", "the company"),
-            role=ctx.get("role", "Software Engineer"),
-            domain=ctx.get("domain", "Technology"),
+            company=ctx.get("company", ""),
+            role=ctx.get("role", ""),
+            domain=ctx.get("domain", ""),
             similarity_threshold=similarity_threshold,
             user_id=user_id
         )

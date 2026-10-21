@@ -205,24 +205,26 @@ class TestMilestone1:
             preferences=RecruiterPreferences(
                 expected_ctc="24 LPA",
                 notice_period_days=0,
-                years_of_experience=2.0
+                years_of_experience=2.0,
+                # Saved by the user, so these answer application questions.
+                confirmed=["expected_ctc", "notice_period_days", "years_of_experience"],
             )
         )
         vault_instance.seed_from_profile(profile)
 
         # Test Salary Query
         ans_sal, score_sal, _ = vault_instance.query_answer("What is your expected salary?", profile=profile)
-        assert ans_sal is not None and "24 LPA" in ans_sal
+        assert ans_sal == "24 LPA"
 
         # Test Availability Query
         ans_av, score_av, _ = vault_instance.query_answer("What is your notice period?", profile=profile)
-        assert ans_av is not None and "0 days" in ans_av
+        assert ans_av == "Immediately"
 
-        # Test Dynamic Company Essay Query
+        # "Why us?" is the user's to write: no canned essay is ever offered.
         ans_comp, score_comp, _ = vault_instance.query_answer(
             "Why do you want to work at our company?",
             profile=profile,
             company="OpenAI",
             domain="Generative AI"
         )
-        assert ans_comp is not None and "OpenAI" in ans_comp and "Generative AI" in ans_comp
+        assert ans_comp is None

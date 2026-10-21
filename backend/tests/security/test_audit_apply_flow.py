@@ -65,6 +65,7 @@ async def test_runner_without_browser_never_marks_submitted(monkeypatch):
     uid = _user(); job = _job(uid)
     db.save_profile(CandidateProfile(id=uid, user_id=uid, full_name="T", email=f"{uid}@t.test", phone="1", location="X"), user_id=uid)
     monkeypatch.setattr(runner_mod, "HAS_PLAYWRIGHT", False)
+    monkeypatch.setattr(runner_mod.settings, "LIVE_SUBMISSION_ENABLED", True)
 
     live = await runner_mod.AutonomousJobRunner(mode="LIVE").execute_application(job_id=job.job_id, user_id=uid)
     assert live["status"] == "error" and live["submitted"] is False

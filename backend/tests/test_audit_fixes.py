@@ -77,7 +77,8 @@ class TestAuditFixes:
             company="Stripe",
             title="Backend Engineer",
             location="Remote",
-            url="https://boards.greenhouse.io/stripe/jobs/123",
+            # A local page: the browser in tests never reaches the internet.
+            url="data:text/html,<form><input name='first_name'></form>",
             description="Build scalable payment APIs.",
             status=ApplicationStatus.DISCOVERED
         )

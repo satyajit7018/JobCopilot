@@ -1,5 +1,6 @@
 // Privacy Policy and Terms. Public pages (no sign-in), written to match what the app does.
 // Operator name and support email come from the server (OPERATOR_NAME, SUPPORT_EMAIL).
+import { useLiveSubmission } from "../lib/billing";
 import { usePageTitle } from "../lib/pageTitle";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
@@ -321,10 +322,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
   {
     q: "What do I get with Premium?",
     a: (
-      <>
-        A resume and cover letter tailored to each job, automatic applying (you approve each application first), recruiter replies tracked from
-        your inbox, follow-up emails drafted for you, and interview prep. See <Link to="/plans" className="text-accent hover:underline">Plans</Link>.
-      </>
+      <PremiumSummary />
     ),
   },
   {
@@ -368,5 +366,20 @@ export function HelpPage() {
         </p>
       </section>
     </LegalLayout>
+  );
+}
+
+/** What Premium includes; automatic applying only while the server switch allows it. */
+function PremiumSummary() {
+  const live = useLiveSubmission();
+  return (
+    <>
+      A resume and cover letter tailored to each job, {live && "automatic applying (you approve each application first), "}recruiter replies tracked
+      from your inbox, follow-up emails drafted for you, and interview prep. See{" "}
+      <Link to="/plans" className="text-accent hover:underline">
+        Plans
+      </Link>
+      .
+    </>
   );
 }

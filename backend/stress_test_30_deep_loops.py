@@ -39,7 +39,6 @@ from app.core.match_scorer import MatchScorer
 from app.core.priority_ranker import PriorityRanker
 from app.core.cover_letter import CoverLetterGenerator
 from app.core.outreach_generator import OutreachGenerator
-from app.bot.human_behavior import HumanBehaviorEngine
 from app.email.parser import EmailParser
 from app.email.classifier import EmailClassifier
 from app.core.interview_studio import InterviewStudioEngine

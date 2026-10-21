@@ -149,10 +149,11 @@ async def submit_questionnaire(
         profile = CandidateProfile(
             id=target_id,
             user_id=user_id,
-            full_name=payload.answers.get("full_name", current_user.full_name or "Candidate"),
+            # Only what the user gave us: a made-up phone or city would end up on applications.
+            full_name=payload.answers.get("full_name", current_user.full_name or ""),
             email=payload.answers.get("email", current_user.email),
-            phone=payload.answers.get("phone", "+1-000-000-0000"),
-            location=payload.answers.get("location", "Remote")
+            phone=payload.answers.get("phone", ""),
+            location=payload.answers.get("location", "")
         )
 
     updated_profile = QuestionnaireEngine.apply_answers_to_profile(profile, payload.answers)

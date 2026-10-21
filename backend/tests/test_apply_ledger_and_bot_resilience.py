@@ -364,7 +364,8 @@ async def test_bot_runner_captcha_escalation_flow(test_user, monkeypatch):
         company="Datadog",
         title="Software Engineer",
         location="Remote",
-        url="https://boards.greenhouse.io/datadog/jobs/999",
+        # A local page: the browser in tests never reaches the internet.
+        url="data:text/html,<p>Verify you are human</p>",
         description="Distributed tracing systems.",
         status=ApplicationStatus.DISCOVERED
     )
@@ -380,6 +381,7 @@ async def test_bot_runner_captcha_escalation_flow(test_user, monkeypatch):
         }
 
     monkeypatch.setattr("app.bot.runner.detect_captcha", mock_detect_captcha)
+    monkeypatch.setattr("app.bot.runner.settings.LIVE_SUBMISSION_ENABLED", True)
 
     runner = AutonomousJobRunner(mode="LIVE")
     res = await runner.execute_application(

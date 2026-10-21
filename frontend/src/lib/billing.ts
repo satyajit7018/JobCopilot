@@ -1,7 +1,7 @@
 // Plans: Free and Premium (Razorpay subscriptions, Rs 199/month in India, $5/month elsewhere).
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./api";
-import { useAuth } from "./auth";
+import { useAuth, usePublicConfig } from "./auth";
 
 /** Roles that have Premium. ELITE is a legacy paid tier; admins always have it. */
 const PREMIUM_ROLES = new Set(["PRO", "ELITE", "ADMIN"]);
@@ -43,6 +43,11 @@ export interface BillingPlan {
 
 export function useBillingPlan() {
   return useQuery({ queryKey: ["billing-plan"], queryFn: () => api<BillingPlan>("/billing/plan") });
+}
+
+/** True only once the server says JobCopilot may send applications; false while unknown. */
+export function useLiveSubmission(): boolean {
+  return usePublicConfig().data?.live_submission === true;
 }
 
 /** Statuses that keep Premium on (mirrors the backend). */
@@ -142,13 +147,14 @@ export function useCancelPremium() {
 }
 
 /** What Free and Premium include, shown on the plans page and in locks. */
-export const PLAN_FEATURES: { label: string; free: boolean }[] = [
+export const PLAN_FEATURES: { label: string; free: boolean; live?: boolean }[] = [
   { label: "Job matches from top tech companies and startup job boards", free: true },
   { label: "Match scores with the reasons behind them", free: true },
   { label: "Track your applications on a board", free: true },
   { label: "Offer checks against salary ranges", free: true },
   { label: "Resume and cover letter tailored to each job", free: false },
-  { label: "Automatic applying, with your approval for each one", free: false },
+  // Listed only while the server lets JobCopilot send applications.
+  { label: "Automatic applying, with your approval for each one", free: false, live: true },
   { label: "Inbox tracking: recruiter replies update your board", free: false },
   { label: "Follow-up emails drafted for you", free: false },
   { label: "Interview prep: likely questions, practice and feedback", free: false },

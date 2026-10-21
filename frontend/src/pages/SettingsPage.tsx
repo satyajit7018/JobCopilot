@@ -7,7 +7,7 @@ import { Alert, Badge, Button, Card, CheckRow, ChoiceChips, CopyButton, Field, S
 import { GoogleButton } from "../components/GoogleButton";
 import { useLiveConsent, useSetLiveConsent } from "../lib/apply";
 import { useAuth, usePublicConfig } from "../lib/auth";
-import { subscriptionIsLive, useBillingPlan, useCancelPremium, useIsPremium } from "../lib/billing";
+import { subscriptionIsLive, useBillingPlan, useCancelPremium, useIsPremium, useLiveSubmission } from "../lib/billing";
 import { relativeTime } from "../lib/jobs";
 import {
   eventLabel,
@@ -122,6 +122,8 @@ function PlanSection() {
 function AutomationSection() {
   const consent = useLiveConsent();
   const set = useSetLiveConsent();
+  // Nothing to allow while the server doesn't send applications.
+  if (!useLiveSubmission()) return null;
   return (
     <Section title="Applying for you" description="Whether JobCopilot may submit applications. You still approve each one.">
       {consent.isPending ? (
