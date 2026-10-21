@@ -109,6 +109,10 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_pg_vault_user_key ON vault(user_id, slot_key);
+                ALTER TABLE vault ADD COLUMN IF NOT EXISTS scope VARCHAR(16) NOT NULL DEFAULT 'any';
+                ALTER TABLE vault ADD COLUMN IF NOT EXISTS job_id VARCHAR(64);
+                ALTER TABLE vault ADD COLUMN IF NOT EXISTS confirmed_at VARCHAR(64);
+                ALTER TABLE vault ADD COLUMN IF NOT EXISTS aliases JSONB NOT NULL DEFAULT '[]'::jsonb;
 
                 CREATE TABLE IF NOT EXISTS jobs (
                     job_id VARCHAR(64) PRIMARY KEY,
@@ -737,17 +741,27 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
 
     # Vault Operations
     def save_vault_entry(self, entry: VaultEntry, user_id: str) -> bool:
+        from app.core.credential_vault import cred_vault
+
+        answer = cred_vault.encrypt_field(entry.answer_template) if entry.answer_template else entry.answer_template
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                INSERT INTO vault (qa_id, user_id, slot_type, slot_key, question_pattern, embedding, answer_template, dynamic_variables, usage_count, last_used_at, created_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (qa_id) DO UPDATE SET answer_template = EXCLUDED.answer_template, usage_count = EXCLUDED.usage_count, last_used_at = EXCLUDED.last_used_at
+                INSERT INTO vault (qa_id, user_id, slot_type, slot_key, question_pattern, embedding, answer_template, dynamic_variables,
+                                   usage_count, last_used_at, created_at, scope, job_id, confirmed_at, aliases)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (qa_id) DO UPDATE SET slot_type = EXCLUDED.slot_type, slot_key = EXCLUDED.slot_key,
+                    question_pattern = EXCLUDED.question_pattern, embedding = EXCLUDED.embedding,
+                    answer_template = EXCLUDED.answer_template, usage_count = EXCLUDED.usage_count,
+                    last_used_at = EXCLUDED.last_used_at, scope = EXCLUDED.scope, job_id = EXCLUDED.job_id,
+                    confirmed_at = EXCLUDED.confirmed_at, aliases = EXCLUDED.aliases
+                WHERE vault.user_id = EXCLUDED.user_id
                 """, (
                     entry.qa_id, user_id, entry.slot_type.value if hasattr(entry.slot_type, 'value') else str(entry.slot_type),
-                    entry.slot_key, entry.question_pattern, json.dumps(entry.embedding), entry.answer_template,
-                    json.dumps(entry.dynamic_variables), entry.usage_count, entry.last_used_at, entry.created_at
+                    entry.slot_key, entry.question_pattern, json.dumps(entry.embedding), answer,
+                    json.dumps(entry.dynamic_variables), entry.usage_count, entry.last_used_at, entry.created_at,
+                    entry.scope, entry.job_id, entry.confirmed_at, json.dumps(entry.aliases)
                 ))
                 conn.commit()
                 return True
@@ -755,21 +769,38 @@ class PostgresDatabaseAdapter(DatabaseAdapter):
             self.release_connection(conn)
 
     def get_vault_entries(self, user_id: str) -> List[VaultEntry]:
+        from app.core.credential_vault import cred_vault
+
         conn = self.get_connection()
         try:
             with conn.cursor() as cursor:
-                cursor.execute("SELECT qa_id, user_id, slot_type, slot_key, question_pattern, embedding, answer_template, dynamic_variables, usage_count, last_used_at, created_at FROM vault WHERE user_id = %s", (user_id,))
+                cursor.execute("SELECT qa_id, user_id, slot_type, slot_key, question_pattern, embedding, answer_template, dynamic_variables, "
+                               "usage_count, last_used_at, created_at, scope, job_id, confirmed_at, aliases "
+                               "FROM vault WHERE user_id = %s ORDER BY usage_count DESC", (user_id,))
                 rows = cursor.fetchall()
                 entries = []
                 for r in rows:
                     entries.append(VaultEntry(
                         qa_id=r[0], user_id=r[1], slot_type=r[2], slot_key=r[3], question_pattern=r[4],
                         embedding=r[5] if isinstance(r[5], list) else json.loads(r[5]),
-                        answer_template=r[6],
+                        answer_template=cred_vault.decrypt_field(r[6]),
                         dynamic_variables=r[7] if isinstance(r[7], list) else json.loads(r[7]),
-                        usage_count=r[8], last_used_at=r[9], created_at=r[10]
+                        usage_count=r[8], last_used_at=r[9], created_at=r[10],
+                        scope=r[11] or "any", job_id=r[12], confirmed_at=r[13],
+                        aliases=r[14] if isinstance(r[14], list) else json.loads(r[14] or "[]"),
                     ))
                 return entries
+        finally:
+            self.release_connection(conn)
+
+    def delete_vault_entry(self, qa_id: str, user_id: str) -> bool:
+        conn = self.get_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM vault WHERE qa_id = %s AND user_id = %s", (qa_id, user_id))
+                deleted = cursor.rowcount > 0
+                conn.commit()
+                return deleted
         finally:
             self.release_connection(conn)
 

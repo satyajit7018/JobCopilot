@@ -282,6 +282,7 @@ class AutonomousJobRunner:
                         user_id=target_user,
                         company=job.company,
                         role=job.title,
+                        job_id=job.job_id,
                     )
                     await log(f"Filled in {len(filled_data)} fields.")
                     # Questions the user hasn't answered yet stay empty; a form with any is never sent.

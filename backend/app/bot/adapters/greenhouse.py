@@ -28,6 +28,7 @@ class GreenhouseAdapter:
         user_id: str = "",
         company: str = "",
         role: str = "",
+        job_id: str = "",
     ) -> Dict[str, Any]:
         """Fills standard and custom fields on a Greenhouse application page."""
         filled_fields: Dict[str, Any] = {}
@@ -74,7 +75,7 @@ class GreenhouseAdapter:
             label_text = (await label_el.inner_text()).strip()
             if not label_text:
                 continue
-            answer = answer_for(label_text, profile, user_id=user_id, company=company, role=role)
+            answer = answer_for(label_text, profile, user_id=user_id, company=company, role=role, job_id=job_id)
             if not answer:
                 continue
             parent = await label_el.evaluate_handle("el => el.closest('.field') || el.parentElement")

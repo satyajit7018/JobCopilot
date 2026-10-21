@@ -63,6 +63,16 @@ export async function seedProfile(s: Session, text = SAMPLE_RESUME) {
   if (!res.ok) throw new Error(`seedProfile failed: ${res.status} ${await res.text()}`);
 }
 
+/** Saves an answer to an application question, as answering it on a held form would. */
+export async function seedAnswer(s: Session, question: string, answer: string) {
+  const res = await fetch(`${API}/answers`, {
+    method: "PUT",
+    headers: { ...auth(s), "Content-Type": "application/json" },
+    body: JSON.stringify({ question, answer }),
+  });
+  if (!res.ok) throw new Error(`seedAnswer failed: ${res.status} ${await res.text()}`);
+}
+
 /** Creates a job through /jobs/log-call, then moves it to `status`. */
 export async function seedJob(s: Session, { company, title, status = "DISCOVERED" }: { company: string; title: string; status?: string }) {
   const headers = { ...auth(s), "Content-Type": "application/json" };

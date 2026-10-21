@@ -337,6 +337,24 @@ def _():
     """
 
 
+@check("A-4 saved answers: encrypted at rest, never used for a similar question, private to their owner")
+def _():
+    """
+    from app.bot.form import answer_for
+    from app.core.database import db
+    from app.core.models import CandidateProfile
+    a, b = reg("a@a.com"), reg("b@b.com")
+    r = c.put("/api/answers", headers=H(a["access_token"]), json={"question": "Do you hold a security clearance?", "answer": "Yes, level 2"})
+    qa = r.json()["id"]
+    with db.get_connection() as conn:
+        raw = conn.execute("SELECT answer_template FROM vault WHERE qa_id = ?", (qa,)).fetchone()[0]
+    lookalike = answer_for("Have you ever held a clearance?", CandidateProfile(user_id=a["user_id"], full_name="A", email="a@a.com", phone="", location=""))
+    other = [c.patch(f"/api/answers/{qa}", headers=H(b["access_token"]), json={"answer": "x"}).status_code,
+             c.delete(f"/api/answers/{qa}", headers=H(b["access_token"])).status_code]
+    result("level 2" not in raw and lookalike is None and other == [404, 404], f"plain={'level 2' in raw} lookalike={lookalike} other={other}")
+    """
+
+
 @check("P1-12/13 metrics require auth and health hides exceptions", env={"METRICS_TOKEN": "scrape-secret"})
 def _():
     """

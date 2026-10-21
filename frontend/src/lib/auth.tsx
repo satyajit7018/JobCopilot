@@ -28,6 +28,8 @@ export interface PublicConfig {
   password_auth_enabled?: boolean;
   /** Whether JobCopilot may send applications for users at all (a server switch). */
   live_submission?: boolean;
+  /** Prepared applications (the answers page and what follows), hidden until it's ready. */
+  prepared_applications?: boolean;
   /** Who runs the service, for the legal and help pages. */
   operator_name?: string;
   support_email?: string;

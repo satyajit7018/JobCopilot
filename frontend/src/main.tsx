@@ -101,6 +101,7 @@ const router = createBrowserRouter([
               // Less-visited pages load on demand to keep the first download small.
               { path: "prep", lazy: async () => ({ Component: (await loadPage(() => import("./pages/PrepPage"))).PrepPage }) },
               { path: "profile", element: <ProfilePage /> },
+              { path: "profile/answers", lazy: async () => ({ Component: (await loadPage(() => import("./pages/AnswersPage"))).AnswersPage }) },
               { path: "plans", lazy: async () => ({ Component: (await loadPage(() => import("./pages/PlansPage"))).PlansPage }) },
               { path: "settings", lazy: async () => ({ Component: (await loadPage(() => import("./pages/SettingsPage"))).SettingsPage }) },
               { path: "admin", lazy: async () => ({ Component: (await loadPage(() => import("./pages/AdminPage"))).AdminPage }) },

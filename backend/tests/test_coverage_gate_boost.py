@@ -95,7 +95,7 @@ def test_postgres_adapter_mocked():
         )
         adapter.save_vault_entry(vault_entry, user_id="usr_pg_1")
         mock_cursor.fetchall.return_value = [
-            ("qa_1", "usr_pg_1", "EXACT_PARAM", "slot_1", "Notice period?", "[]", "30 days", "[]", 2, "2026-09-01T00:00:00", "2026-09-01T00:00:00")
+            ("qa_1", "usr_pg_1", "EXACT_PARAM", "slot_1", "Notice period?", "[]", "30 days", "[]", 2, "2026-09-01T00:00:00", "2026-09-01T00:00:00", "any", None, None, "[]")
         ]
         entries = adapter.get_vault_entries(user_id="usr_pg_1")
         assert len(entries) == 1

@@ -55,6 +55,10 @@ class DatabaseAdapter(ABC):
         pass
 
     @abstractmethod
+    def delete_vault_entry(self, qa_id: str, user_id: str) -> bool:
+        pass
+
+    @abstractmethod
     def save_job(self, job: JobListing, user_id: str) -> bool:
         pass
 

@@ -28,6 +28,7 @@ class LeverAdapter:
         user_id: str = "",
         company: str = "",
         role: str = "",
+        job_id: str = "",
     ) -> Dict[str, Any]:
         """Fills standard and custom fields on a Lever application page."""
         filled_fields: Dict[str, Any] = {}
@@ -64,7 +65,7 @@ class LeverAdapter:
             text_label = (await card.inner_text()).split('\n')[0].strip()
             if not text_label:
                 continue
-            answer = answer_for(text_label, profile, user_id=user_id, company=company, role=role)
+            answer = answer_for(text_label, profile, user_id=user_id, company=company, role=role, job_id=job_id)
             if answer and await fill_field(page, await card.query_selector("input[type='text'], textarea"), answer):
                 filled_fields[text_label] = answer
 
