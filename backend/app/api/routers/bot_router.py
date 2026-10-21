@@ -113,7 +113,7 @@ async def resolve_hitl(
         raise HTTPException(status_code=400, detail="Event already resolved or failed to update.")
 
     if payload.save_to_vault:
-        vault.learn_answer(evt.question_text, payload.user_answer, user_id=current_user.user_id)
+        vault.learn_answer(evt.question_text, payload.user_answer, user_id=current_user.user_id, job_id=evt.job_id)
 
     await ws_manager.broadcast({
         "type": "HITL_RESOLVED",
@@ -137,7 +137,7 @@ async def resolve_held_application(
     db.resolve_hitl_event(payload.event_id, payload.user_answer, user_id=current_user.user_id)
 
     if payload.save_to_vault:
-        vault.learn_answer(evt.question_text, payload.user_answer, user_id=current_user.user_id)
+        vault.learn_answer(evt.question_text, payload.user_answer, user_id=current_user.user_id, job_id=evt.job_id)
 
     # Audit P1-4: this used to mark the job SUBMITTED without running anything.
     # Now the answer is recorded and the real application is re-queued.

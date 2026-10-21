@@ -120,6 +120,10 @@ class Settings(BaseSettings):
     # form filler is proven on real form copies; while off, only practice runs are possible.
     LIVE_SUBMISSION_ENABLED: bool = False
 
+    # Prepared applications (answers page, background preparing, "Ready to send"). Hidden from
+    # users while it is being built; turned on once every part is in.
+    PREPARED_APPLICATIONS_ENABLED: bool = False
+
     # Observability
     SENTRY_DSN: Optional[str] = None
     # Company logos are looked up by the server (see core/company_logo.py). Off = initials only.

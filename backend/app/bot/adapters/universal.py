@@ -97,6 +97,7 @@ class UniversalATSAdapter:
         user_id: str = "",
         company: str = "",
         role: str = "",
+        job_id: str = "",
     ) -> Dict[str, Any]:
         """Dispatches filling to the specialized adapter or heuristic fallback."""
         url = page.url
@@ -104,8 +105,8 @@ class UniversalATSAdapter:
         platform = cls.detect_platform(url, content)
 
         if platform == "Greenhouse":
-            return await GreenhouseAdapter.fill_application(page, profile, tailored_resume_path, user_id=user_id, company=company, role=role)
+            return await GreenhouseAdapter.fill_application(page, profile, tailored_resume_path, user_id=user_id, company=company, role=role, job_id=job_id)
         elif platform == "Lever":
-            return await LeverAdapter.fill_application(page, profile, tailored_resume_path, user_id=user_id, company=company, role=role)
+            return await LeverAdapter.fill_application(page, profile, tailored_resume_path, user_id=user_id, company=company, role=role, job_id=job_id)
         else:
             return await cls.fill_form_heuristics(page, profile, tailored_resume_path)

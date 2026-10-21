@@ -82,7 +82,7 @@ class HITLAgent:
         def _poll_once():
             with db.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT status, user_answer, question_text FROM hitl_events WHERE event_id = ? AND user_id = ?", (event_id, user_id))
+                cursor.execute("SELECT status, user_answer, question_text, job_id FROM hitl_events WHERE event_id = ? AND user_id = ?", (event_id, user_id))
                 row = cursor.fetchone()
                 if row and row["status"] == "RESOLVED" and row["user_answer"]:
                     user_ans = row["user_answer"]
@@ -90,7 +90,8 @@ class HITLAgent:
                     vault.learn_answer(
                         question=row["question_text"],
                         answer_template=user_ans,
-                        user_id=user_id
+                        user_id=user_id,
+                        job_id=row["job_id"],
                     )
                     return user_ans
             return None

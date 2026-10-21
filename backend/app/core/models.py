@@ -232,6 +232,13 @@ class VaultEntry(BaseModel):
     usage_count: int = 0
     last_used_at: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    # "any": reused on every form. "job": only for job_id (e.g. "Why do you want to work here?").
+    scope: str = "any"
+    job_id: Optional[str] = None
+    # When the user last saved or confirmed this answer themselves.
+    confirmed_at: Optional[str] = None
+    # Other wordings the user confirmed mean the same question; they fill automatically too.
+    aliases: List[str] = Field(default_factory=list)
 
     def dict(self, *args, **kwargs):
         return self.model_dump(*args, **kwargs)

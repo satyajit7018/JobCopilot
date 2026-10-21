@@ -6,6 +6,7 @@ and deterministic slot key resolution for zero-repeat autonomous form filling.
 
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -26,8 +27,18 @@ PROFILE_SLOTS = {
     "years_of_experience": "{years_of_experience} years",
 }
 
-# Answers about one company ("Why do you want to work here?") are never reused for another.
+# Answers about one company ("Why do you want to work here?") are saved for that job only.
 COMPANY_SPECIFIC_KEYS = {"why_join_company"}
+
+# Personal questions: always optional, "Prefer not to say" unless the user chose an answer.
+PERSONAL_KEYS = {"gender", "race_ethnicity", "veteran_status", "disability_status", "sexual_orientation", "eeo_disclosure"}
+PREFER_NOT_TO_SAY = "Prefer not to say"
+
+# Topics with one answer each, reused whatever the wording ("notice period", "years with Python").
+# Written answers (essays) are reused only for the same wording or one the user confirmed.
+ONE_ANSWER_TYPES = {SlotType.EXACT_PARAM, SlotType.TECH_YEARS, SlotType.SELECTION}
+
+SEEDED_REASON_QUESTION = "Why are you looking for a new role?"
 
 # Older versions copied profile defaults into every user's saved answers, and gave total years
 # of experience as the years with each skill. Those copies are ignored, never trusted.
@@ -42,6 +53,31 @@ LEGACY_SKILL_YEARS = re.compile(r"^how many years of experience do you have with
 LEGACY_SKILL_YEARS_ANSWER = re.compile(r"^(\d+\.\d years|1 year)$")
 
 PLACEHOLDER = re.compile(r"\{[a-z_]+\}")
+
+
+def normalize_question(text: str) -> str:
+    """Wording compared for "the same question": case, punctuation, "*" and "(required)" ignored."""
+    t = re.sub(r"\((required|optional)\)", " ", (text or "").lower())
+    t = re.sub(r"[^a-z0-9+#]+", " ", t)
+    return " ".join(t.split())
+
+
+@dataclass
+class AnswerMatch:
+    """What we know for one form question.
+
+    `answer` is safe to put on the form: from the profile, the user's saved answer to the same
+    (or a confirmed) wording, or "Prefer not to say" for a personal question. `suggestion` is
+    the user's answer to a similar question: shown marked "check this", never sent unconfirmed.
+    """
+    answer: Optional[str] = None
+    source: str = "none"  # profile | saved | default | none
+    entry: Optional[VaultEntry] = None
+    suggestion: Optional[str] = None
+    suggestion_entry: Optional[VaultEntry] = None
+    score: float = 0.0
+    slot_key: str = "general_question"
+    optional: bool = False
 
 
 class KnowledgeVault:
@@ -64,11 +100,12 @@ class KnowledgeVault:
         reason = (profile.preferences.why_looking_for_role or "").strip()
         if reason:
             self.learn_answer(
-                "Why are you looking for a new role?",
+                SEEDED_REASON_QUESTION,
                 reason,
                 slot_type=SlotType.PARAMETRIC_ESSAY,
                 slot_key="why_looking_for_role",
                 user_id=profile.user_id or "default",
+                confirmed=False,
             )
 
     def learn_answer(
@@ -77,24 +114,43 @@ class KnowledgeVault:
         answer_template: str,
         slot_type: Optional[SlotType] = None,
         slot_key: Optional[str] = None,
-        user_id: str = "default"
+        user_id: str = "default",
+        job_id: Optional[str] = None,
+        confirmed: bool = True,
     ) -> VaultEntry:
-        """Stores or updates a Q&A slot in the Knowledge Vault for user."""
+        """Saves the user's answer to a question, replacing their earlier answer to the same question.
+
+        Company-specific answers are kept for that one job. `confirmed` marks an answer the user
+        gave or checked themselves (always, except answers copied from the profile).
+        """
         if not slot_type or not slot_key:
             slot_type, slot_key = self.matcher.detect_slot_type(question)
-
+        slot_type = SlotType(slot_type)
+        scope = "job" if slot_key in COMPANY_SPECIFIC_KEYS else "any"
+        job_id = job_id if scope == "job" else None
+        now = datetime.now().isoformat()
         embedding = self.matcher.get_embedding(question)
+        wording = normalize_question(question)
 
-        # Check if an entry with this slot_key already exists for this user
-        existing_entries = self._get_entries(user_id=user_id)
-        for e in existing_entries:
-            if (e.slot_key == slot_key and e.slot_type == slot_type) or e.question_pattern.lower() == question.lower():
+        def same_question(e: VaultEntry) -> bool:
+            if e.scope != scope or (scope == "job" and e.job_id != job_id):
+                return False
+            if wording and (normalize_question(e.question_pattern) == wording or wording in {normalize_question(a) for a in e.aliases}):
+                return True
+            return slot_type in ONE_ANSWER_TYPES and e.slot_key == slot_key and e.slot_type == slot_type
+
+        for e in self._get_entries(user_id=user_id):
+            if same_question(e):
                 e.slot_key = slot_key
                 e.slot_type = slot_type
                 e.answer_template = answer_template
-                e.question_pattern = question
-                e.embedding = embedding
-                e.last_used_at = datetime.now().isoformat()
+                if normalize_question(e.question_pattern) != wording:
+                    e.aliases = [a for a in e.aliases if normalize_question(a) != wording]
+                    e.question_pattern = question
+                    e.embedding = embedding
+                e.last_used_at = now
+                if confirmed:
+                    e.confirmed_at = now
                 db.save_vault_entry(e, user_id=user_id)
                 return e
 
@@ -108,10 +164,42 @@ class KnowledgeVault:
             answer_template=answer_template,
             dynamic_variables=["company", "role", "domain", "expected_ctc", "github_url", "linkedin_url"],
             usage_count=1,
-            last_used_at=datetime.now().isoformat()
+            last_used_at=now,
+            scope=scope,
+            job_id=job_id,
+            confirmed_at=now if confirmed else None,
         )
         db.save_vault_entry(entry, user_id=user_id)
         return entry
+
+    def _find_own(self, user_id: str, qa_id: str) -> Optional[VaultEntry]:
+        return next((e for e in self._get_entries(user_id=user_id) if e.qa_id == qa_id), None) if user_id else None
+
+    def update_answer(self, user_id: str, qa_id: str, answer: str) -> Optional[VaultEntry]:
+        """The user edits one of their saved answers."""
+        entry = self._find_own(user_id, qa_id)
+        if not entry:
+            return None
+        entry.answer_template = answer
+        entry.confirmed_at = datetime.now().isoformat()
+        db.save_vault_entry(entry, user_id=user_id)
+        return entry
+
+    def add_wording(self, user_id: str, qa_id: str, question: str) -> Optional[VaultEntry]:
+        """The user confirms another wording means the same question; it then fills automatically."""
+        entry = self._find_own(user_id, qa_id)
+        if not entry:
+            return None
+        wording = normalize_question(question)
+        known = {normalize_question(entry.question_pattern), *(normalize_question(a) for a in entry.aliases)}
+        if wording and wording not in known:
+            entry.aliases = [*entry.aliases, question.strip()]
+        entry.confirmed_at = datetime.now().isoformat()
+        db.save_vault_entry(entry, user_id=user_id)
+        return entry
+
+    def delete_answer(self, user_id: str, qa_id: str) -> bool:
+        return bool(user_id) and db.delete_vault_entry(qa_id, user_id=user_id)
 
     @staticmethod
     def _profile_values(profile: CandidateProfile) -> Dict[str, str]:
@@ -189,6 +277,96 @@ class KnowledgeVault:
             return []
         return [e for e in self._get_entries(user_id=user_id) if not self._is_legacy_copy(e)]
 
+    def find_answer(
+        self,
+        question: str,
+        profile: Optional[CandidateProfile] = None,
+        user_id: str = "",
+        job_id: Optional[str] = None,
+        company: str = "",
+        role: str = "",
+        domain: str = "",
+        similarity_threshold: float = 0.55,
+    ) -> AnswerMatch:
+        """The user's answer to an application question, or a suggestion for them to check.
+
+        Answers come only from the user: profile fields they have saved, or answers they gave
+        before to the same question. A similar-looking question only ever gets a suggestion.
+        """
+        target_user = user_id or (profile.user_id if profile else "")
+        usable = [
+            e for e in self._own_entries(target_user)
+            if e.scope != "job" or (job_id and e.job_id == job_id)
+        ]
+        detected_type, detected_key = self.matcher.detect_slot_type(question)
+        empty = AnswerMatch(slot_key=detected_key, optional=detected_key in PERSONAL_KEYS)
+
+        def filled(template: str, source: str, entry: Optional[VaultEntry] = None) -> Optional[AnswerMatch]:
+            resolved = self._resolve_template(template, profile, company, role, domain)
+            if not resolved:
+                return None
+            if entry:
+                db.increment_vault_usage(entry.qa_id)
+            return AnswerMatch(answer=resolved, source=source, entry=entry, score=1.0,
+                               slot_key=detected_key, optional=empty.optional)
+
+        # 1. The same wording, or one the user confirmed means the same.
+        wording = normalize_question(question)
+        for entry in usable:
+            if wording and (normalize_question(entry.question_pattern) == wording
+                            or wording in {normalize_question(a) for a in entry.aliases}):
+                match = filled(entry.answer_template, "saved", entry)
+                if match:
+                    return match
+
+        # 2. A topic with one answer: the profile first, then the user's saved answer.
+        if detected_key in COMPANY_SPECIFIC_KEYS:
+            return empty
+        if detected_key in PROFILE_SLOTS and profile is not None:
+            match = filled(PROFILE_SLOTS[detected_key], "profile")
+            if match:
+                return match
+        if detected_type in ONE_ANSWER_TYPES and detected_key != "general_question":
+            for entry in usable:
+                if entry.slot_key == detected_key and entry.slot_type == detected_type:
+                    match = filled(entry.answer_template, "saved", entry)
+                    if match:
+                        return match
+            if detected_key in PERSONAL_KEYS:
+                return AnswerMatch(answer=PREFER_NOT_TO_SAY, source="default", score=1.0, slot_key=detected_key, optional=True)
+            # Salary, notice period, years with a skill: never taken from a lookalike question.
+            return empty
+
+        # 3. Anything else: the user's answer to a similar question, as a suggestion only.
+        reusable = [
+            e for e in usable
+            if e.scope == "any" and e.slot_key not in COMPANY_SPECIFIC_KEYS and e.slot_key not in PERSONAL_KEYS
+        ]
+        best_entry, best_score = None, 0.0
+        if detected_key != "general_question":
+            # A written answer on the same topic ("Why should we hire you?") is the closest match.
+            best_entry = next((e for e in reusable if e.slot_key == detected_key), None)
+            best_score = 1.0 if best_entry else 0.0
+        if not best_entry:
+            query_embedding = self.matcher.get_embedding(question)
+            for entry in reusable:
+                doc_emb = entry.embedding
+                if len(doc_emb) != len(query_embedding):
+                    doc_emb = self.matcher.get_embedding(entry.question_pattern)
+                score = self.matcher.compute_hybrid_score(question, query_embedding, entry.question_pattern, doc_emb)
+                if score > best_score:
+                    best_entry, best_score = entry, score
+        if not best_entry or best_score < similarity_threshold:
+            for sem_entry, sem_score in self.search_semantic(question, user_id=target_user, top_k=1):
+                if sem_score >= similarity_threshold and sem_entry in reusable:
+                    best_entry, best_score = sem_entry, sem_score
+        if best_entry and best_score >= similarity_threshold:
+            suggestion = self._resolve_template(best_entry.answer_template, profile, company, role, domain)
+            if suggestion:
+                return AnswerMatch(suggestion=suggestion, suggestion_entry=best_entry, score=best_score,
+                                   slot_key=detected_key, optional=empty.optional)
+        return AnswerMatch(score=best_score, slot_key=detected_key, optional=empty.optional)
+
     def query_answer(
         self,
         question: str,
@@ -197,63 +375,15 @@ class KnowledgeVault:
         role: str = "",
         domain: str = "",
         similarity_threshold: float = 0.55,
-        user_id: str = ""
+        user_id: str = "",
+        job_id: Optional[str] = None,
     ) -> Tuple[Optional[str], float, Optional[VaultEntry]]:
-        """The user's answer to an application question, or (None, score, None).
-
-        Answers come only from the user: profile fields they have saved, or answers they gave
-        before. A question about a known topic (salary, notice period, years with one skill) is
-        answered from that topic or not at all, never from a question that merely looks similar.
-        """
-        target_user = user_id or (profile.user_id if profile else "")
-        entries = self._own_entries(target_user)
-
-        # 1. A known topic.
-        detected_type, detected_key = self.matcher.detect_slot_type(question)
-        if detected_key != "general_question":
-            if detected_key in COMPANY_SPECIFIC_KEYS:
-                return None, 0.0, None
-            if detected_key in PROFILE_SLOTS and profile is not None:
-                resolved = self._resolve_template(PROFILE_SLOTS[detected_key], profile, company, role, domain)
-                if resolved:
-                    return resolved, 1.0, None
-            for entry in entries:
-                if entry.slot_key == detected_key and entry.slot_type == detected_type:
-                    resolved = self._resolve_template(entry.answer_template, profile, company, role, domain)
-                    if resolved:
-                        db.increment_vault_usage(entry.qa_id)
-                        return resolved, 1.0, entry
-            return None, 0.0, None
-
-        # 2. Anything else: the user's own earlier answer to a similar question.
-        reusable = [e for e in entries if e.slot_key not in COMPANY_SPECIFIC_KEYS]
-        query_embedding = self.matcher.get_embedding(question)
-        best_entry = None
-        best_score = 0.0
-        for entry in reusable:
-            doc_emb = entry.embedding
-            if len(doc_emb) != len(query_embedding):
-                doc_emb = self.matcher.get_embedding(entry.question_pattern)
-            score = self.matcher.compute_hybrid_score(question, query_embedding, entry.question_pattern, doc_emb)
-            if score > best_score:
-                best_score = score
-                best_entry = entry
-
-        if best_entry and best_score >= similarity_threshold:
-            resolved = self._resolve_template(best_entry.answer_template, profile, company, role, domain)
-            if resolved:
-                db.increment_vault_usage(best_entry.qa_id)
-                return resolved, best_score, best_entry
-
-        # 3. Dense semantic search over the same answers.
-        for top_sem_entry, top_sem_score in self.search_semantic(question, user_id=target_user, top_k=1):
-            if top_sem_score >= similarity_threshold and top_sem_entry.slot_key not in COMPANY_SPECIFIC_KEYS:
-                resolved = self._resolve_template(top_sem_entry.answer_template, profile, company, role, domain)
-                if resolved:
-                    db.increment_vault_usage(top_sem_entry.qa_id)
-                    return resolved, top_sem_score, top_sem_entry
-
-        return None, best_score, None
+        """(answer, score, entry) for an answer that may go on the form; (None, score, None) otherwise."""
+        match = self.find_answer(question, profile=profile, user_id=user_id, job_id=job_id, company=company,
+                                 role=role, domain=domain, similarity_threshold=similarity_threshold)
+        if match.answer and match.source in ("profile", "saved"):
+            return match.answer, match.score, match.entry
+        return None, match.score, None
 
     def search_semantic(
         self,
@@ -300,7 +430,8 @@ class KnowledgeVault:
             role=ctx.get("role", ""),
             domain=ctx.get("domain", ""),
             similarity_threshold=similarity_threshold,
-            user_id=user_id
+            user_id=user_id,
+            job_id=ctx.get("job_id") or None,
         )
 
 

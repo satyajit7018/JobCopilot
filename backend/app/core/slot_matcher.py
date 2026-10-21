@@ -14,6 +14,16 @@ from app.core.models import SlotType
 
 _WORD_REGEX = re.compile(r'\b[a-zA-Z0-9]+\b')
 
+# Personal questions on application forms. Always optional; answered "Prefer not to say"
+# unless the user has chosen an answer.
+PERSONAL_TOPICS = (
+    (re.compile(r"\b(gender|sex)\b"), "gender"),
+    (re.compile(r"\b(race|racial|ethnicity|ethnic)\b"), "race_ethnicity"),
+    (re.compile(r"\bveteran\b"), "veteran_status"),
+    (re.compile(r"\bdisabilit(y|ies)\b"), "disability_status"),
+    (re.compile(r"\bsexual orientation\b"), "sexual_orientation"),
+)
+
 
 @functools.lru_cache(maxsize=4096)
 def _cached_tokenize(text: str) -> Tuple[str, ...]:
@@ -170,8 +180,11 @@ class SlotMatcher:
         if any(k in text for k in ["describe a challenge", "project you built", "difficult bug", "proudest achievement", "technical achievement"]):
             return SlotType.PARAMETRIC_ESSAY, "technical_achievement"
 
-        # 5. EEO & Demographics
-        if any(k in text for k in ["gender", "race", "ethnicity", "veteran", "disability", "equal opportunity", "self-identify"]):
+        # 5. EEO & Demographics: one key per topic, so each keeps its own answer.
+        for pattern, key in PERSONAL_TOPICS:
+            if pattern.search(text):
+                return SlotType.SELECTION, key
+        if any(k in text for k in ["equal opportunity", "self-identify", "eeo"]):
             return SlotType.SELECTION, "eeo_disclosure"
 
         return SlotType.FREEFORM, "general_question"

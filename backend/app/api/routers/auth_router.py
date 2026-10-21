@@ -60,6 +60,7 @@ async def public_auth_config():
         "password_auth_enabled": settings.password_auth_enabled,
         # Whether JobCopilot may send applications for users at all (a server switch).
         "live_submission": settings.LIVE_SUBMISSION_ENABLED,
+        "prepared_applications": settings.PREPARED_APPLICATIONS_ENABLED,
         # Shown on the legal and help pages.
         "operator_name": settings.OPERATOR_NAME,
         "support_email": settings.SUPPORT_EMAIL,

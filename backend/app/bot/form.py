@@ -13,27 +13,30 @@ from app.core.vector_vault import PLACEHOLDER, vault
 
 logger = logging.getLogger(__name__)
 
-# How close an earlier answer's question must be to reuse it on a different form.
-MIN_ANSWER_SCORE = 0.65
-
-
 def answer_for(
     question: str,
     profile: CandidateProfile,
     user_id: str = "",
     company: str = "",
     role: str = "",
+    job_id: str = "",
 ) -> Optional[str]:
-    """The user's answer to a form question, or None to leave it for them."""
-    answer, score, _ = vault.get_answer_for_question(
+    """The user's answer to a form question, or None to leave it for them.
+
+    Only the profile and answers the user gave to the same (or a confirmed) wording are typed.
+    A similar question's answer is a suggestion for the user to check, never filled here.
+    """
+    match = vault.find_answer(
         question,
         profile=profile,
-        context={"company": company, "role": role},
         user_id=user_id or profile.user_id,
+        job_id=job_id or None,
+        company=company,
+        role=role,
     )
-    if not answer or score < MIN_ANSWER_SCORE or PLACEHOLDER.search(answer):
+    if match.source not in ("profile", "saved") or not match.answer or PLACEHOLDER.search(match.answer):
         return None
-    return answer
+    return match.answer
 
 
 async def fill_field(page: Any, target: Any, value: Optional[str]) -> bool:

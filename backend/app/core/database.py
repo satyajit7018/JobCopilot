@@ -238,7 +238,11 @@ class DatabaseManager(DatabaseAdapter):
                 )
                 """)
                 self._ensure_columns(conn, "vault", {
-                    "user_id": "TEXT NOT NULL DEFAULT 'default'"
+                    "user_id": "TEXT NOT NULL DEFAULT 'default'",
+                    "scope": "TEXT NOT NULL DEFAULT 'any'",
+                    "job_id": "TEXT",
+                    "confirmed_at": "TEXT",
+                    "aliases": "JSON NOT NULL DEFAULT '[]'",
                 })
 
                 # 4. Vault History Table
@@ -1062,15 +1066,17 @@ class DatabaseManager(DatabaseAdapter):
     # Knowledge Vault Operations (Multi-Tenant)
     # =========================================================================
     def save_vault_entry(self, entry: VaultEntry, user_id: str) -> bool:
-        """Saves a slot QA entry and tracks version history strictly for a user."""
+        """Saves a slot QA entry and tracks version history strictly for a user. Answers are encrypted at rest."""
+        answer = cred_vault.encrypt_field(entry.answer_template) if entry.answer_template else entry.answer_template
         with self._lock:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                 INSERT OR REPLACE INTO vault (
                     qa_id, user_id, slot_type, slot_key, question_pattern, embedding,
-                    answer_template, dynamic_variables, usage_count, last_used_at, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    answer_template, dynamic_variables, usage_count, last_used_at, created_at,
+                    scope, job_id, confirmed_at, aliases
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     entry.qa_id,
                     user_id,
@@ -1078,16 +1084,20 @@ class DatabaseManager(DatabaseAdapter):
                     entry.slot_key,
                     entry.question_pattern,
                     json.dumps(entry.embedding),
-                    entry.answer_template,
+                    answer,
                     json.dumps(entry.dynamic_variables),
                     entry.usage_count,
                     entry.last_used_at,
-                    entry.created_at
+                    entry.created_at,
+                    entry.scope,
+                    entry.job_id,
+                    entry.confirmed_at,
+                    json.dumps(entry.aliases),
                 ))
                 cursor.execute("""
                 INSERT INTO vault_history (qa_id, answer_template, changed_at)
                 VALUES (?, ?, ?)
-                """, (entry.qa_id, entry.answer_template, entry.created_at))
+                """, (entry.qa_id, answer, entry.created_at))
                 conn.commit()
                 return True
 
@@ -1106,15 +1116,31 @@ class DatabaseManager(DatabaseAdapter):
                     slot_key=r["slot_key"],
                     question_pattern=r["question_pattern"],
                     embedding=json.loads(r["embedding"]),
-                    answer_template=r["answer_template"],
+                    answer_template=cred_vault.decrypt_field(r["answer_template"]),
                     dynamic_variables=json.loads(r["dynamic_variables"]),
                     usage_count=r["usage_count"],
                     last_used_at=r["last_used_at"],
-                    created_at=r["created_at"]
+                    created_at=r["created_at"],
+                    scope=r["scope"] or "any",
+                    job_id=r["job_id"],
+                    confirmed_at=r["confirmed_at"],
+                    aliases=json.loads(r["aliases"] or "[]"),
                 ))
             return entries
 
     get_all_vault_entries = get_vault_entries
+
+    def delete_vault_entry(self, qa_id: str, user_id: str) -> bool:
+        """Deletes one saved answer and its history. False if the user has no such answer."""
+        with self._lock:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM vault WHERE qa_id = ? AND user_id = ?", (qa_id, user_id))
+                deleted = cursor.rowcount > 0
+                if deleted:
+                    cursor.execute("DELETE FROM vault_history WHERE qa_id = ?", (qa_id,))
+                conn.commit()
+                return deleted
 
     def increment_vault_usage(self, qa_id: str):
         """Increments usage counter atomically."""
@@ -1929,6 +1955,7 @@ class DatabaseManager(DatabaseAdapter):
                     cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
                     cursor.execute("DELETE FROM profiles WHERE user_id = ?", (user_id,))
                     cursor.execute("DELETE FROM jobs WHERE user_id = ?", (user_id,))
+                    cursor.execute("DELETE FROM vault_history WHERE qa_id IN (SELECT qa_id FROM vault WHERE user_id = ?)", (user_id,))
                     cursor.execute("DELETE FROM vault WHERE user_id = ?", (user_id,))
                     cursor.execute("DELETE FROM apply_ledger WHERE user_id = ?", (user_id,))
                     cursor.execute("DELETE FROM hitl_events WHERE user_id = ?", (user_id,))

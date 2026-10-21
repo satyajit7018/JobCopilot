@@ -125,6 +125,8 @@ export function useSaveAnswers() {
       qc.setQueryData(["profile"], profile);
       markDone("preferences");
       void qc.invalidateQueries({ queryKey: ["questionnaire"] });
+      // The answers page shows salary, notice period and the rest from the profile.
+      void qc.invalidateQueries({ queryKey: ["answers"] });
     },
   });
 }

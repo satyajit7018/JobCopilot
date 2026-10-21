@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Navigate } from "react-router";
-import { Check, X } from "lucide-react";
+import { Link, Navigate } from "react-router";
+import { Check, ChevronRight, X } from "lucide-react";
 import { PageHeader } from "../components/AppShell";
 import { initials } from "../lib/auth";
 import { UnsavedChanges } from "../components/UnsavedChanges";
 import { BackgroundEditor, PreferenceFields, ResumeDrop, SourceFields } from "../components/profile";
-import { Alert, Badge, Button, Card, Field, Spinner, Textarea } from "../components/ui";
+import { Alert, Badge, Button, Card, Field, Group, Spinner, Textarea, cx, rowClass } from "../components/ui";
+import { usePreparedApplications } from "../lib/answers";
 import { relativeTime, useRemoveSkipRule, useSkipRules } from "../lib/jobs";
 import {
   answersFromProfile,
@@ -70,6 +71,7 @@ export function ProfilePage() {
       <div className="mx-auto flex max-w-3xl flex-col gap-8 px-4 py-5 pb-28 md:px-7 md:py-8">
         <ResumeSection profile={p} onReplaced={() => setVersion((v) => v + 1)} />
         <DetailsForm key={version} profile={p} />
+        <AnswersRow />
         <Section title="Job sources" description="Matches from sites you turn off are hidden from Jobs.">
           <SourcesEditor />
         </Section>
@@ -263,7 +265,7 @@ function DetailsForm({ profile }: { profile: Profile }) {
               value={answers.current_ctc}
               onChange={(e) => set({ current_ctc: e.target.value })}
               placeholder="e.g. 18 LPA or $95k"
-              hint="Only given when a form asks for it. Left blank, we answer “Prefer not to say”."
+              hint="Only given when a form asks for it. Left blank, we leave that question for you."
             />
             <Field
               label="Current employer"
@@ -316,6 +318,19 @@ function DetailsForm({ profile }: { profile: Profile }) {
         </div>
       )}
     </form>
+  );
+}
+
+/** One row into Profile → Application answers. Hidden until prepared applications are on. */
+function AnswersRow() {
+  if (!usePreparedApplications()) return null;
+  return (
+    <Group note="Answers to questions application forms ask, reused so you only answer once.">
+      <Link to="/profile/answers" className={cx(rowClass, "min-h-12 after:left-4 hover:bg-subtle/50")}>
+        <span className="flex-1 font-medium">Application answers</span>
+        <ChevronRight className="size-4 text-ink-3" aria-hidden />
+      </Link>
+    </Group>
   );
 }
 
